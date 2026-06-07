@@ -1,0 +1,380 @@
+"""Config flow for Multizone Thermostat integration."""
+from __future__ import annotations
+
+import logging
+from typing import Any
+
+import voluptuous as vol
+
+from homeassistant import config_entries
+from homeassistant.components.climate import DOMAIN as CLIMATE_DOMAIN
+from homeassistant.components.switch import DOMAIN as SWITCH_DOMAIN
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
+import homeassistant.helpers.config_validation as cv
+
+from .const import (
+    CONF_BOILER_SWITCH,
+    CONF_ZONE_CLIMATE,
+    CONF_ZONE_NAME,
+    CONF_ZONE_TRV_SYNC,
+    CONF_ZONES,
+    DEFAULT_TRV_SYNC,
+    DOMAIN,
+)
+
+_LOGGER = logging.getLogger(__name__)
+
+
+def _get_switch_entities(hass: HomeAssistant) -> dict[str, str]:
+    """Return all switch entities as {entity_id: friendly_name}."""
+    entity_reg = er.async_get(hass)
+    switches = {}
+    for entry in entity_reg.entities.values():
+        if entry.domain == SWITCH_DOMAIN and not entry.disabled:
+            state = hass.states.get(entry.entity_id)
+            name = state.attributes.get("friendly_name", entry.entity_id) if state else entry.entity_id
+            switches[entry.entity_id] = name
+    # Also include states not in registry
+    for state in hass.states.async_all(SWITCH_DOMAIN):
+        if state.entity_id not in switches:
+            switches[state.entity_id] = state.attributes.get("friendly_name", state.entity_id)
+    return dict(sorted(switches.items(), key=lambda x: x[1]))
+
+
+def _get_climate_entities(hass: HomeAssistant) -> dict[str, str]:
+    """Return all climate entities as {entity_id: friendly_name}."""
+    entity_reg = er.async_get(hass)
+    climates = {}
+    for entry in entity_reg.entities.values():
+        if entry.domain == CLIMATE_DOMAIN and not entry.disabled:
+            state = hass.states.get(entry.entity_id)
+            name = state.attributes.get("friendly_name", entry.entity_id) if state else entry.entity_id
+            climates[entry.entity_id] = name
+    for state in hass.states.async_all(CLIMATE_DOMAIN):
+        if state.entity_id not in climates:
+            climates[state.entity_id] = state.attributes.get("friendly_name", state.entity_id)
+    return dict(sorted(climates.items(), key=lambda x: x[1]))
+
+
+def _friendly_name_from_climate(hass: HomeAssistant, entity_id: str) -> str:
+    """Get the friendly name of a climate entity."""
+    state = hass.states.get(entity_id)
+    if state:
+        return state.attributes.get("friendly_name", entity_id)
+    return entity_id
+
+
+class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+    """Handle a config flow for Multizone Thermostat."""
+
+    VERSION = 1
+
+    def __init__(self) -> None:
+        """Initialize."""
+        self._boiler_switch: str | None = None
+        self._zones: list[dict] = []
+        self._current_zone_data: dict = {}
+
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.FlowResult:
+        """Step 1: Select boiler switch."""
+        # Only allow one instance
+        await self.async_set_unique_id(DOMAIN)
+        self._abort_if_unique_id_configured()
+
+        errors: dict[str, str] = {}
+        switches = _get_switch_entities(self.hass)
+
+        if not switches:
+            return self.async_abort(reason="no_switches_found")
+
+        if user_input is not None:
+            self._boiler_switch = user_input[CONF_BOILER_SWITCH]
+            return await self.async_step_add_zone()
+
+        schema = vol.Schema({
+            vol.Required(CONF_BOILER_SWITCH): vol.In(switches),
+        })
+
+        return self.async_show_form(
+            step_id="user",
+            data_schema=schema,
+            errors=errors,
+            description_placeholders={
+                "switch_count": str(len(switches)),
+            },
+        )
+
+    async def async_step_add_zone(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.FlowResult:
+        """Step 2: Add a zone (climate entity)."""
+        errors: dict[str, str] = {}
+        climates = _get_climate_entities(self.hass)
+
+        # Filter out already-added climates
+        already_added = {z[CONF_ZONE_CLIMATE] for z in self._zones}
+        available_climates = {k: v for k, v in climates.items() if k not in already_added}
+
+        if not available_climates:
+            # No more climates to add, go to confirm
+            return await self.async_step_confirm()
+
+        if user_input is not None:
+            climate_entity = user_input[CONF_ZONE_CLIMATE]
+            zone_name = user_input[CONF_ZONE_NAME].strip()
+            trv_sync = user_input.get(CONF_ZONE_TRV_SYNC, DEFAULT_TRV_SYNC)
+
+            if not zone_name:
+                errors[CONF_ZONE_NAME] = "zone_name_required"
+            else:
+                self._zones.append({
+                    CONF_ZONE_NAME: zone_name,
+                    CONF_ZONE_CLIMATE: climate_entity,
+                    CONF_ZONE_TRV_SYNC: trv_sync,
+                })
+
+                # Ask if user wants to add another zone
+                return await self.async_step_another_zone()
+
+        # Pre-populate zone name with first available climate's friendly name
+        first_climate_id = next(iter(available_climates))
+        default_name = _friendly_name_from_climate(self.hass, first_climate_id)
+
+        schema = vol.Schema({
+            vol.Required(CONF_ZONE_CLIMATE): vol.In(available_climates),
+            vol.Required(CONF_ZONE_NAME, default=default_name): str,
+            vol.Optional(CONF_ZONE_TRV_SYNC, default=DEFAULT_TRV_SYNC): bool,
+        })
+
+        zones_added = len(self._zones)
+        return self.async_show_form(
+            step_id="add_zone",
+            data_schema=schema,
+            errors=errors,
+            description_placeholders={
+                "zones_added": str(zones_added),
+                "zone_number": str(zones_added + 1),
+            },
+        )
+
+    async def async_step_another_zone(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.FlowResult:
+        """Ask if user wants to add another zone."""
+        if user_input is not None:
+            if user_input.get("add_another", False):
+                return await self.async_step_add_zone()
+            else:
+                return await self.async_step_confirm()
+
+        climates = _get_climate_entities(self.hass)
+        already_added = {z[CONF_ZONE_CLIMATE] for z in self._zones}
+        remaining = len(climates) - len(already_added)
+
+        schema = vol.Schema({
+            vol.Required("add_another", default=remaining > 0): bool,
+        })
+
+        return self.async_show_form(
+            step_id="another_zone",
+            data_schema=schema,
+            description_placeholders={
+                "zones_added": str(len(self._zones)),
+                "zones_list": ", ".join(z[CONF_ZONE_NAME] for z in self._zones),
+                "remaining": str(remaining),
+            },
+        )
+
+    async def async_step_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.FlowResult:
+        """Step 3: Confirm configuration."""
+        if not self._zones:
+            return self.async_abort(reason="no_zones_configured")
+
+        if user_input is not None:
+            return self.async_create_entry(
+                title="Multizone Thermostat",
+                data={
+                    CONF_BOILER_SWITCH: self._boiler_switch,
+                    CONF_ZONES: self._zones,
+                },
+            )
+
+        schema = vol.Schema({})
+
+        return self.async_show_form(
+            step_id="confirm",
+            data_schema=schema,
+            description_placeholders={
+                "boiler_switch": self._boiler_switch,
+                "zones_count": str(len(self._zones)),
+                "zones_list": "\n".join(
+                    f"- {z[CONF_ZONE_NAME]} ({z[CONF_ZONE_CLIMATE]})"
+                    + (" [TRV sync]" if z[CONF_ZONE_TRV_SYNC] else "")
+                    for z in self._zones
+                ),
+            },
+        )
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(
+        config_entry: config_entries.ConfigEntry,
+    ) -> MultizoneOptionsFlow:
+        """Get options flow."""
+        return MultizoneOptionsFlow(config_entry)
+
+
+class MultizoneOptionsFlow(config_entries.OptionsFlow):
+    """Handle options flow for Multizone Thermostat."""
+
+    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
+        """Initialize."""
+        self._config_entry = config_entry
+        self._zones: list[dict] = list(config_entry.data.get(CONF_ZONES, []))
+        self._boiler_switch: str = config_entry.data.get(CONF_BOILER_SWITCH, "")
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.FlowResult:
+        """Options menu: choose what to edit."""
+        if user_input is not None:
+            action = user_input.get("action")
+            if action == "change_boiler":
+                return await self.async_step_change_boiler()
+            elif action == "add_zone":
+                return await self.async_step_add_zone()
+            elif action == "remove_zone":
+                return await self.async_step_remove_zone()
+            elif action == "edit_zone":
+                return await self.async_step_edit_zone()
+
+        schema = vol.Schema({
+            vol.Required("action"): vol.In({
+                "change_boiler": "Change boiler switch",
+                "add_zone": "Add a zone",
+                "remove_zone": "Remove a zone",
+                "edit_zone": "Edit a zone (TRV sync)",
+            }),
+        })
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=schema,
+            description_placeholders={
+                "boiler_switch": self._boiler_switch,
+                "zones_count": str(len(self._zones)),
+            },
+        )
+
+    async def async_step_change_boiler(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.FlowResult:
+        """Change the boiler switch."""
+        switches = _get_switch_entities(self.hass)
+
+        if user_input is not None:
+            self._boiler_switch = user_input[CONF_BOILER_SWITCH]
+            return self._save_options()
+
+        schema = vol.Schema({
+            vol.Required(CONF_BOILER_SWITCH, default=self._boiler_switch): vol.In(switches),
+        })
+
+        return self.async_show_form(step_id="change_boiler", data_schema=schema)
+
+    async def async_step_add_zone(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.FlowResult:
+        """Add a new zone."""
+        errors: dict[str, str] = {}
+        climates = _get_climate_entities(self.hass)
+        already_added = {z[CONF_ZONE_CLIMATE] for z in self._zones}
+        available_climates = {k: v for k, v in climates.items() if k not in already_added}
+
+        if not available_climates:
+            return self.async_abort(reason="no_climates_available")
+
+        if user_input is not None:
+            zone_name = user_input[CONF_ZONE_NAME].strip()
+            if not zone_name:
+                errors[CONF_ZONE_NAME] = "zone_name_required"
+            else:
+                self._zones.append({
+                    CONF_ZONE_NAME: zone_name,
+                    CONF_ZONE_CLIMATE: user_input[CONF_ZONE_CLIMATE],
+                    CONF_ZONE_TRV_SYNC: user_input.get(CONF_ZONE_TRV_SYNC, DEFAULT_TRV_SYNC),
+                })
+                return self._save_options()
+
+        first_climate_id = next(iter(available_climates))
+        default_name = _friendly_name_from_climate(self.hass, first_climate_id)
+
+        schema = vol.Schema({
+            vol.Required(CONF_ZONE_CLIMATE): vol.In(available_climates),
+            vol.Required(CONF_ZONE_NAME, default=default_name): str,
+            vol.Optional(CONF_ZONE_TRV_SYNC, default=DEFAULT_TRV_SYNC): bool,
+        })
+
+        return self.async_show_form(step_id="add_zone", data_schema=schema, errors=errors)
+
+    async def async_step_remove_zone(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.FlowResult:
+        """Remove a zone."""
+        if not self._zones:
+            return self.async_abort(reason="no_zones_configured")
+
+        zone_options = {z[CONF_ZONE_CLIMATE]: z[CONF_ZONE_NAME] for z in self._zones}
+
+        if user_input is not None:
+            climate_to_remove = user_input["zone_climate"]
+            self._zones = [z for z in self._zones if z[CONF_ZONE_CLIMATE] != climate_to_remove]
+            return self._save_options()
+
+        schema = vol.Schema({
+            vol.Required("zone_climate"): vol.In(zone_options),
+        })
+
+        return self.async_show_form(step_id="remove_zone", data_schema=schema)
+
+    async def async_step_edit_zone(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.FlowResult:
+        """Edit zone settings (TRV sync)."""
+        if not self._zones:
+            return self.async_abort(reason="no_zones_configured")
+
+        zone_options = {z[CONF_ZONE_CLIMATE]: z[CONF_ZONE_NAME] for z in self._zones}
+
+        if user_input is not None:
+            climate_id = user_input["zone_climate"]
+            trv_sync = user_input.get(CONF_ZONE_TRV_SYNC, DEFAULT_TRV_SYNC)
+            for zone in self._zones:
+                if zone[CONF_ZONE_CLIMATE] == climate_id:
+                    zone[CONF_ZONE_TRV_SYNC] = trv_sync
+            return self._save_options()
+
+        # Show first zone as default
+        first_zone = self._zones[0]
+        schema = vol.Schema({
+            vol.Required("zone_climate", default=first_zone[CONF_ZONE_CLIMATE]): vol.In(zone_options),
+            vol.Optional(CONF_ZONE_TRV_SYNC, default=first_zone.get(CONF_ZONE_TRV_SYNC, False)): bool,
+        })
+
+        return self.async_show_form(step_id="edit_zone", data_schema=schema)
+
+    @callback
+    def _save_options(self) -> config_entries.FlowResult:
+        """Save updated options and reload entry."""
+        return self.async_create_entry(
+            title="",
+            data={
+                CONF_BOILER_SWITCH: self._boiler_switch,
+                CONF_ZONES: self._zones,
+            },
+        )

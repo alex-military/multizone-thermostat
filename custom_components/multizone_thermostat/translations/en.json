@@ -1,0 +1,104 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Multizone Thermostat — Boiler Setup",
+        "description": "Select the switch entity that controls your boiler relay (circulator). This is the first required step.",
+        "data": {
+          "boiler_switch": "Boiler Switch"
+        },
+        "data_description": {
+          "boiler_switch": "The switch/relay that controls the boiler circulator pump"
+        }
+      },
+      "add_zone": {
+        "title": "Add Heating Zone ({zone_number})",
+        "description": "Configure a heating zone. {zones_added} zone(s) already added.",
+        "data": {
+          "climate_entity": "Climate Entity",
+          "name": "Zone Name",
+          "trv_preset_sync": "Enable TRV Preset Sync"
+        },
+        "data_description": {
+          "climate_entity": "The climate entity for this room/zone",
+          "name": "A friendly name for this zone (pre-filled from climate entity name)",
+          "trv_preset_sync": "Automatically sync preset mode when HVAC mode changes (for physical TRV valves)"
+        }
+      },
+      "another_zone": {
+        "title": "Add Another Zone?",
+        "description": "You have added {zones_added} zone(s): {zones_list}.\n\n{remaining} climate entities still available.",
+        "data": {
+          "add_another": "Add another zone"
+        }
+      },
+      "confirm": {
+        "title": "Confirm Configuration",
+        "description": "Ready to set up Multizone Thermostat with the following configuration:\n\n**Boiler Switch:** {boiler_switch}\n**Zones ({zones_count}):**\n{zones_list}\n\nClick Submit to create the integration.",
+        "data": {}
+      }
+    },
+    "abort": {
+      "already_configured": "Multizone Thermostat is already configured. Use the Options flow to modify zones.",
+      "no_switches_found": "No switch entities found in Home Assistant. Please add a switch/relay entity first.",
+      "no_zones_configured": "No zones were configured. Please add at least one zone."
+    },
+    "error": {
+      "zone_name_required": "Zone name cannot be empty."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Multizone Thermostat Options",
+        "description": "Current boiler: **{boiler_switch}**\nConfigured zones: **{zones_count}**\n\nWhat would you like to change?",
+        "data": {
+          "action": "Action"
+        }
+      },
+      "change_boiler": {
+        "title": "Change Boiler Switch",
+        "data": {
+          "boiler_switch": "New Boiler Switch"
+        }
+      },
+      "add_zone": {
+        "title": "Add New Zone",
+        "data": {
+          "climate_entity": "Climate Entity",
+          "name": "Zone Name",
+          "trv_preset_sync": "Enable TRV Preset Sync"
+        }
+      },
+      "remove_zone": {
+        "title": "Remove a Zone",
+        "description": "Select the zone to remove. The switch entity for this zone will also be removed.",
+        "data": {
+          "zone_climate": "Zone to Remove"
+        }
+      },
+      "edit_zone": {
+        "title": "Edit Zone Settings",
+        "description": "Edit TRV preset sync for a zone.",
+        "data": {
+          "zone_climate": "Zone",
+          "trv_preset_sync": "Enable TRV Preset Sync"
+        }
+      }
+    },
+    "abort": {
+      "no_zones_configured": "No zones configured.",
+      "no_climates_available": "All available climate entities are already configured as zones."
+    },
+    "error": {
+      "zone_name_required": "Zone name cannot be empty."
+    }
+  },
+  "entity": {
+    "switch": {
+      "master": {
+        "name": "Heating Master"
+      }
+    }
+  }
+}
