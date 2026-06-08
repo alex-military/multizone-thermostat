@@ -608,9 +608,10 @@ class MultizoneThermostatDialCard extends HTMLElement {
         position: absolute;
         top: 14px;
         right: 14px;
-        z-index: 10;
+        z-index: 9999;
         display: flex;
         align-items: center;
+        pointer-events: auto;
       }
       .toggle-container label {
         margin-right: 8px;
@@ -702,7 +703,11 @@ class MultizoneThermostatDialCard extends HTMLElement {
     wrapper.className = 'wrapper';
     wrapper.id = 'wrapper';
 
+    // The toggle-container is placed AFTER card-body in the DOM to make sure it paints on top
+    // of the native card (preventing it from being covered or blocked by the native card wrapper).
     wrapper.innerHTML = `
+      <div id="card-body"></div>
+
       <div class="toggle-container">
         <label id="zone-toggle-label">Zona Abilitata</label>
         <label class="switch">
@@ -716,8 +721,6 @@ class MultizoneThermostatDialCard extends HTMLElement {
           <ha-icon icon="mdi:alert-circle-outline" style="margin-right: 6px;"></ha-icon>Zona Esclusa / Bypassata
         </div>
       </div>
-
-      <div id="card-body"></div>
     `;
 
     // Hook events
