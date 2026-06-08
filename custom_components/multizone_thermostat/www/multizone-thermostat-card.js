@@ -12,12 +12,6 @@ window.customCards.push({
   description: "A card wrapping the native Home Assistant thermostat dial with an integrated zone bypass switch.",
   preview: true,
 });
-window.customCards.push({
-  type: "multizone-thermostat-status-card",
-  name: "Multizone Thermostat Card (Status Button)",
-  description: "A button-style card that changes color depending on whether the zone is heating (red), standby (orange), or off (gray).",
-  preview: true,
-});
 
 // Helper function to auto-discover the bypass switch for a climate entity
 function autoDiscoverSwitch(hass, climateEntity) {
@@ -840,20 +834,10 @@ class MultizoneThermostatCardEditor extends HTMLElement {
   }
 
   render() {
-    const isStatusCard = this._config && this._config.type === "multizone-thermostat-status-card";
-    
     if (this._rendered) {
       this.shadowRoot.querySelector('#title').value = this._config.title || '';
       this._climatePicker.value = this._config.entity || '';
       this._switchPicker.value = this._config.switch || '';
-      
-      // Update labels dynamically if editor is reused
-      this.shadowRoot.querySelector('#main-label').textContent = isStatusCard 
-        ? 'Interruttore Master (Switch / Input Boolean)' 
-        : 'Termostato (Climate Entity)';
-      this.shadowRoot.querySelector('#switch-label').textContent = isStatusCard 
-        ? 'Stato Caldaia / Circolatore (Switch Entity)' 
-        : 'Switch di Zona (Abilita/Escludi)';
       return;
     }
 
@@ -896,39 +880,28 @@ class MultizoneThermostatCardEditor extends HTMLElement {
     titleRow.appendChild(titleInput);
     container.appendChild(titleRow);
 
-    // Climate/Master Entity Picker Row
+    // Climate Entity Picker Row
     const climateRow = document.createElement('div');
     climateRow.className = 'form-row';
     const climateLabel = document.createElement('label');
-    climateLabel.id = 'main-label';
-    climateLabel.textContent = isStatusCard 
-      ? 'Interruttore Master (Switch / Input Boolean)' 
-      : 'Termostato (Climate Entity)';
+    climateLabel.textContent = 'Termostato (Climate Entity)';
     const climatePicker = document.createElement('ha-entity-picker');
-    if (!isStatusCard) {
-      climatePicker.setAttribute('domain-filter', 'climate');
-    }
+    climatePicker.setAttribute('domain-filter', 'climate');
     climatePicker.value = this._config.entity || '';
     climatePicker.hass = this._hass;
     
     // Automatically pre-fill the corresponding switch when the climate entity changes
     climatePicker.addEventListener('value-changed', (e) => {
-      const selectedEntity = e.detail.value;
-      let discoveredSwitch = '';
-      
-      if (!isStatusCard) {
-        discoveredSwitch = autoDiscoverSwitch(this._hass, selectedEntity) || '';
-      } else {
-        discoveredSwitch = this._config.switch || '';
-      }
+      const selectedClimate = e.detail.value;
+      const discoveredSwitch = autoDiscoverSwitch(this._hass, selectedClimate);
       
       const newConfig = { 
         ...this._config, 
-        entity: selectedEntity,
-        switch: discoveredSwitch
+        entity: selectedClimate,
+        switch: discoveredSwitch || ''
       };
       
-      this._switchPicker.value = discoveredSwitch;
+      this._switchPicker.value = discoveredSwitch || '';
       
       this.dispatchEvent(new CustomEvent('config-changed', {
         detail: { config: newConfig },
@@ -942,14 +915,11 @@ class MultizoneThermostatCardEditor extends HTMLElement {
     climateRow.appendChild(climatePicker);
     container.appendChild(climateRow);
 
-    // Switch/Boiler Entity Picker Row
+    // Switch Entity Picker Row
     const switchRow = document.createElement('div');
     switchRow.className = 'form-row';
     const switchLabel = document.createElement('label');
-    switchLabel.id = 'switch-label';
-    switchLabel.textContent = isStatusCard 
-      ? 'Stato Caldaia / Circolatore (Switch Entity)' 
-      : 'Switch di Zona (Abilita/Escludi)';
+    switchLabel.textContent = 'Switch di Zona (Abilita/Escludi)';
     const switchPicker = document.createElement('ha-entity-picker');
     switchPicker.setAttribute('domain-filter', 'switch');
     switchPicker.value = this._config.switch || '';
@@ -977,253 +947,7 @@ class MultizoneThermostatCardEditor extends HTMLElement {
   }
 }
 
-/* ==================== STATUS (BUTTON-STYLE DYNAMIC COLOR) CARD CLASS ==================== */
-class MultizoneThermostatStatusCard extends HTMLElement {
-  constructor() {
-    super();
-    this.attachShadow({ mode: 'open' });
-  }
-
-  set hass(hass) {
-    this._hass = hass;
-    this.updateCard();
-  }
-
-  setConfig(config) {
-    if (!config.entity) {
-      throw new Error("Specificare l'entità Master (switch o input_boolean)");
-    }
-    this._config = config;
-    if (!this._rendered) {
-      this.renderStructure();
-    }
-  }
-
-  getCardSize() {
-    return 1;
-  }
-
-  static getConfigElement() {
-    return document.createElement("multizone-thermostat-card-editor");
-  }
-
-  static getStubConfig() {
-    return {
-      entity: "",
-      switch: "",
-      title: "",
-      icon: ""
-    };
-  }
-
-  renderStructure() {
-    const card = document.createElement('ha-card');
-    const style = document.createElement('style');
-
-    style.textContent = `
-      ha-card {
-        padding: 16px;
-        border-radius: var(--ha-card-border-radius, 12px);
-        color: white;
-        transition: background-color 0.5s ease, transform 0.2s ease, box-shadow 0.2s ease;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        min-height: 90px;
-        position: relative;
-        overflow: hidden;
-        border: none;
-      }
-      ha-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.25);
-      }
-      ha-card:active {
-        transform: translateY(0);
-      }
-      .card-content {
-        display: flex;
-        align-items: center;
-        width: 100%;
-        gap: 16px;
-        pointer-events: none;
-      }
-      .icon-container {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 52px;
-        height: 52px;
-        border-radius: 50%;
-        background: rgba(255, 255, 255, 0.15);
-        flex-shrink: 0;
-      }
-      .icon-container ha-icon {
-        --mdc-icon-size: 28px;
-        color: white;
-      }
-      .info-container {
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        flex-grow: 1;
-        overflow: hidden;
-      }
-      .name {
-        font-size: 18px;
-        font-weight: 600;
-        margin: 0;
-        text-shadow: 0 1px 2px rgba(0,0,0,0.15);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-      .state {
-        font-size: 13px;
-        font-weight: 500;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        margin: 4px 0;
-        opacity: 0.9;
-        text-shadow: 0 1px 1px rgba(0,0,0,0.1);
-      }
-      .temp-row {
-        font-size: 12px;
-        opacity: 0.85;
-      }
-      .glow-flame {
-        animation: pulse-flame 1.5s infinite alternate;
-      }
-      @keyframes pulse-flame {
-        0% { transform: scale(1); filter: drop-shadow(0 0 1px rgba(255,255,255,0.4)); }
-        100% { transform: scale(1.1); filter: drop-shadow(0 0 6px rgba(255,255,255,0.7)); }
-      }
-    `;
-
-    card.innerHTML = `
-      <div class="card-content">
-        <div class="icon-container">
-          <ha-icon icon="mdi:power"></ha-icon>
-        </div>
-        <div class="info-container">
-          <div class="name">Riscaldamento</div>
-          <div class="state">Spento</div>
-          <div class="temp-row">Caldaia: --</div>
-        </div>
-      </div>
-    `;
-
-    // Hook tap event to toggle the master entity
-    card.addEventListener('click', () => this.handleTap());
-
-    this.shadowRoot.appendChild(style);
-    this.shadowRoot.appendChild(card);
-    this._rendered = true;
-  }
-
-  handleTap() {
-    const entity = this._config.entity;
-    if (!entity) return;
-
-    const domain = entity.split('.')[0];
-    this._hass.callService(domain, "toggle", {
-      entity_id: entity
-    });
-  }
-
-  updateCard() {
-    if (!this._hass || !this._config || !this._rendered) return;
-
-    const masterEntity = this._config.entity;
-    const boilerEntity = this._config.switch;
-
-    const masterState = this._hass.states[masterEntity];
-    const boilerState = boilerEntity ? this._hass.states[boilerEntity] : null;
-
-    if (!masterState) {
-      this.renderError(`Entità master ${masterEntity} non trovata.`);
-      return;
-    }
-
-    const isMasterOn = masterState.state === "on";
-    const isBoilerOn = boilerState ? boilerState.state === "on" : false;
-
-    let bgColor = "#37474f"; // grigio quando spento
-    let stateText = "Spento";
-    let iconName = this._config.icon || "mdi:power";
-    let glowClass = false;
-
-    if (!isMasterOn) {
-      bgColor = "#37474f"; // grigio quando spento
-      stateText = "Spento";
-      iconName = this._config.icon || "mdi:power";
-    } else {
-      // Master acceso
-      if (isBoilerOn) {
-        bgColor = "#f57c00"; // arancione quando circolatore/caldaia acceso
-        stateText = "Riscaldamento Attivo";
-        iconName = this._config.icon || "mdi:fire";
-        glowClass = true;
-      } else {
-        bgColor = "#fbc02d"; // giallo quando circolatore/caldaia spento
-        stateText = "Standby (In Attesa)";
-        iconName = this._config.icon || "mdi:radiator-off";
-      }
-    }
-
-    // Update the ha-card element's background color
-    const card = this.shadowRoot.querySelector('ha-card');
-    if (card) {
-      card.style.backgroundColor = bgColor;
-    }
-
-    // Update title / name
-    const nameEl = this.shadowRoot.querySelector('.name');
-    if (nameEl) {
-      nameEl.textContent = this._config.title || masterState.attributes.friendly_name || "Riscaldamento";
-    }
-
-    // Update state text
-    const stateEl = this.shadowRoot.querySelector('.state');
-    if (stateEl) {
-      stateEl.textContent = stateText;
-    }
-
-    // Update icon
-    const iconEl = this.shadowRoot.querySelector('ha-icon');
-    if (iconEl) {
-      iconEl.setAttribute('icon', iconName);
-      if (glowClass) {
-        iconEl.classList.add('glow-flame');
-      } else {
-        iconEl.classList.remove('glow-flame');
-      }
-    }
-
-    // Update subtext info
-    const infoEl = this.shadowRoot.querySelector('.temp-row');
-    if (infoEl) {
-      if (boilerEntity && boilerState) {
-        infoEl.textContent = `Caldaia/Circolatore: ${isBoilerOn ? 'ON' : 'OFF'}`;
-      } else {
-        infoEl.textContent = isMasterOn ? 'Sistema Attivo' : 'Sistema Spento';
-      }
-    }
-  }
-
-  renderError(msg) {
-    this.shadowRoot.innerHTML = `
-      <ha-card style="padding: 16px; color: red; background-color: rgba(255,0,0,0.15);">
-        <h3>Errore scheda Multizone Thermostat</h3>
-        <p>${msg}</p>
-      </ha-card>
-    `;
-    this._rendered = false;
-  }
-}
-
 // Define elements
 customElements.define("multizone-thermostat-button-card", MultizoneThermostatButtonCard);
 customElements.define("multizone-thermostat-dial-card", MultizoneThermostatDialCard);
-customElements.define("multizone-thermostat-status-card", MultizoneThermostatStatusCard);
 customElements.define("multizone-thermostat-card-editor", MultizoneThermostatCardEditor);
