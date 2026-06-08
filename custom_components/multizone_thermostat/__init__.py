@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 
+from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
@@ -54,11 +55,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     # Register static path for Lovelace custom card
-    hass.http.register_static_path(
-        "/multizone_thermostat_card",
-        hass.config.path("custom_components/multizone_thermostat/www"),
-        cache_headers=False,
-    )
+    await hass.http.async_register_static_paths([
+        StaticPathConfig(
+            url_path="/multizone_thermostat_card",
+            path=hass.config.path("custom_components/multizone_thermostat/www"),
+            cache_headers=False,
+        )
+    ])
 
     # Register Lovelace custom card resource automatically
     try:
