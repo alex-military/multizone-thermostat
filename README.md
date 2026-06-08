@@ -69,6 +69,81 @@ When enabled for a zone, the integration automatically syncs the TRV preset mode
 
 Only enable this for zones with physical TRV valves that support preset modes.
 
+## Lovelace Cards
+
+This integration includes three beautiful custom Lovelace cards to control your heating zones and view the central heating status directly in your Home Assistant dashboards.
+
+### 1. Central Heating Status Card (`custom:multizone-thermostat-status-card`)
+A zero-configuration, button-style card that displays the status of the central heating master switch. It changes color and icon dynamically depending on the state of the Master Switch and the Boiler/Circulator:
+- **Grey (Off)**: The master heating system is disabled.
+- **Yellow (Standby)**: The master heating system is enabled, but no zone is currently calling for heat (boiler is idle).
+- **Orange (Heating)**: The master heating system is enabled, and at least one zone is calling for heat (boiler is active).
+
+#### States
+| Off | Standby (Idle) | Active Heating |
+|---|---|---|
+| ![Master Off](images/status_off.png) | ![Master Standby](images/status_idle.png) | ![Master Heating](images/status_heating.png) |
+
+---
+
+### 2. Dial Thermostat Card (`custom:multizone-thermostat-dial-card`)
+Wraps the native Home Assistant circular thermostat card and adds a built-in toggle switch to easily enable or exclude (bypass) the zone.
+- **Enabled**: Displays the interactive dial to adjust temperature.
+- **Disabled**: Dims the dial and overlays a clean "Zone Excluded / Bypassed" message.
+
+#### States
+| Enabled | Excluded (Bypassed) |
+|---|---|
+| ![Dial Enabled](images/dial_enabled.png) | ![Dial Disabled](images/dial_disabled.png) |
+
+---
+
+### 3. Button Thermostat Card (`custom:multizone-thermostat-button-card`)
+A compact button-based thermostat card designed for spaces where a circular dial is too large. It includes temperature controls (`+` / `-`), current and target temperature displays, HVAC mode selectors, and the zone enable/exclude switch.
+- **Enabled**: Fully interactive controls.
+- **Disabled**: Dims the controls and displays a "Zone Excluded / Bypassed" overlay.
+
+#### States
+| Enabled | Excluded (Bypassed) |
+|---|---|
+| ![Button Enabled](images/button_enabled.png) | ![Button Disabled](images/button_disabled.png) |
+
+---
+
+### Card Installation
+
+To use these cards, make sure you add the JavaScript resource to your Lovelace dashboard configuration:
+1. Go to **Settings → Dashboards**.
+2. Click the three dots in the top right and select **Resources**.
+3. Add a new resource:
+   - **URL**: `/local/multizone-thermostat-card.js`
+   - **Resource type**: `JavaScript Module`
+4. Refresh your browser page.
+
+### Configurations
+
+#### Status Card (Zero-Config)
+The status card requires zero configuration because it automatically detects your Master Switch:
+```yaml
+type: custom:multizone-thermostat-status-card
+```
+
+#### Dial Thermostat Card
+```yaml
+type: custom:multizone-thermostat-dial-card
+entity: climate.living_room         # Your climate entity
+switch: switch.multizone_living_room # (Optional) The bypass switch for this zone
+title: Living Room                  # (Optional) Custom title
+```
+
+#### Button Thermostat Card
+```yaml
+type: custom:multizone-thermostat-button-card
+entity: climate.living_room         # Your climate entity
+switch: switch.multizone_living_room # (Optional) The bypass switch for this zone
+title: Living Room                  # (Optional) Custom title
+```
+
 ## Requirements
 
 - Home Assistant 2023.x or newer
@@ -78,5 +153,6 @@ Only enable this for zones with physical TRV valves that support preset modes.
 ## Future Roadmap
 
 - [ ] Diagnostic sensors (zones heating count, boiler demand)
-- [ ] Lovelace card for zone control
+- [x] Lovelace cards for zone control and system status
 - [ ] ESPHome panel integration support
+
