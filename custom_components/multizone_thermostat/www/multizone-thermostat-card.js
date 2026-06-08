@@ -505,6 +505,7 @@ class MultizoneThermostatDialCard extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
+    this.renderStructure();
   }
 
   set hass(hass) {
@@ -515,14 +516,21 @@ class MultizoneThermostatDialCard extends HTMLElement {
     this.updateCard();
   }
 
-  async setConfig(config) {
+  setConfig(config) {
     if (!config.entity) {
       throw new Error("Specificare un termostato (climate entity)");
     }
     this._config = config;
+    this.loadHelpers();
+  }
 
-    this._helpers = await window.loadCardHelpers();
-    this.createChildCard();
+  async loadHelpers() {
+    try {
+      this._helpers = await window.loadCardHelpers();
+      this.createChildCard();
+    } catch (err) {
+      console.error("Errore nel caricamento dei card helpers di Home Assistant:", err);
+    }
   }
 
   getCardSize() {
