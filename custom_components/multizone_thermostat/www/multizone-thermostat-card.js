@@ -1005,8 +1005,6 @@ class MultizoneThermostatCardEditor extends HTMLElement {
     climateLabel.textContent = 'Termostato (Climate Entity)';
     const climatePicker = document.createElement('ha-entity-picker');
     climatePicker.includeDomains = ['climate'];
-    climatePicker.setAttribute('include-domains', 'climate');
-    climatePicker.setAttribute('domain-filter', 'climate');
     climatePicker.value = this._config.entity || '';
     climatePicker.hass = this._hass;
     
@@ -1043,8 +1041,6 @@ class MultizoneThermostatCardEditor extends HTMLElement {
     switchLabel.textContent = 'Switch di Zona (Abilita/Escludi)';
     const switchPicker = document.createElement('ha-entity-picker');
     switchPicker.includeDomains = ['switch'];
-    switchPicker.setAttribute('include-domains', 'switch');
-    switchPicker.setAttribute('domain-filter', 'switch');
     switchPicker.value = this._config.switch || '';
     switchPicker.hass = this._hass;
     switchPicker.addEventListener('value-changed', (e) => this._updateConfig('switch', e.detail.value));
