@@ -12,6 +12,12 @@ window.customCards.push({
   description: "A card wrapping the native Home Assistant thermostat dial with an integrated zone bypass switch.",
   preview: true,
 });
+window.customCards.push({
+  type: "multizone-thermostat-status-card",
+  name: "Multizone Thermostat Card (Status Button)",
+  description: "A button-style card that changes color depending on whether the zone is heating (red), standby (orange), or off (gray).",
+  preview: true,
+});
 
 // Helper function to auto-discover the bypass switch for a climate entity
 function autoDiscoverSwitch(hass, climateEntity) {
@@ -947,7 +953,275 @@ class MultizoneThermostatCardEditor extends HTMLElement {
   }
 }
 
+/* ==================== STATUS (BUTTON-STYLE DYNAMIC COLOR) CARD CLASS ==================== */
+class MultizoneThermostatStatusCard extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: 'open' });
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    this.updateCard();
+  }
+
+  setConfig(config) {
+    if (!config.entity) {
+      throw new Error("Specificare un termostato (climate entity)");
+    }
+    this._config = config;
+    if (!this._rendered) {
+      this.renderStructure();
+    }
+  }
+
+  getCardSize() {
+    return 1;
+  }
+
+  static getConfigElement() {
+    return document.createElement("multizone-thermostat-card-editor");
+  }
+
+  static getStubConfig() {
+    return {
+      entity: "",
+      switch: "",
+      title: "",
+      icon: ""
+    };
+  }
+
+  renderStructure() {
+    const card = document.createElement('ha-card');
+    const style = document.createElement('style');
+
+    style.textContent = `
+      ha-card {
+        padding: 16px;
+        border-radius: var(--ha-card-border-radius, 12px);
+        color: white;
+        transition: background-color 0.5s ease, transform 0.2s ease, box-shadow 0.2s ease;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        min-height: 90px;
+        position: relative;
+        overflow: hidden;
+        border: none;
+      }
+      ha-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.25);
+      }
+      ha-card:active {
+        transform: translateY(0);
+      }
+      .card-content {
+        display: flex;
+        align-items: center;
+        width: 100%;
+        gap: 16px;
+        pointer-events: none;
+      }
+      .icon-container {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 52px;
+        height: 52px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.15);
+        flex-shrink: 0;
+      }
+      .icon-container ha-icon {
+        --mdc-icon-size: 28px;
+        color: white;
+      }
+      .info-container {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        flex-grow: 1;
+        overflow: hidden;
+      }
+      .name {
+        font-size: 18px;
+        font-weight: 600;
+        margin: 0;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.15);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .state {
+        font-size: 13px;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin: 4px 0;
+        opacity: 0.9;
+        text-shadow: 0 1px 1px rgba(0,0,0,0.1);
+      }
+      .temp-row {
+        font-size: 12px;
+        opacity: 0.85;
+      }
+      .glow-flame {
+        animation: pulse-flame 1.5s infinite alternate;
+      }
+      @keyframes pulse-flame {
+        0% { transform: scale(1); filter: drop-shadow(0 0 1px rgba(255,255,255,0.4)); }
+        100% { transform: scale(1.1); filter: drop-shadow(0 0 6px rgba(255,255,255,0.7)); }
+      }
+    `;
+
+    card.innerHTML = `
+      <div class="card-content">
+        <div class="icon-container">
+          <ha-icon icon="mdi:radiator"></ha-icon>
+        </div>
+        <div class="info-container">
+          <div class="name">Zona Termostato</div>
+          <div class="state">Spento</div>
+          <div class="temp-row">Set: --°C | Attuale: --°C</div>
+        </div>
+      </div>
+    `;
+
+    // Hook tap event to toggle the zone bypass switch or the climate entity
+    card.addEventListener('click', () => this.handleTap());
+
+    this.shadowRoot.appendChild(style);
+    this.shadowRoot.appendChild(card);
+    this._rendered = true;
+  }
+
+  handleTap() {
+    const switchEntity = this._config.switch;
+    if (switchEntity) {
+      const switchState = this._hass.states[switchEntity];
+      const currentState = switchState ? switchState.state : "on";
+      const newService = currentState === "on" ? "turn_off" : "turn_on";
+      this._hass.callService("switch", newService, {
+        entity_id: switchEntity
+      });
+    } else {
+      const climateEntity = this._config.entity;
+      const climateState = this._hass.states[climateEntity];
+      if (climateState) {
+        const currentMode = climateState.state;
+        const newMode = currentMode === "off" ? "heat" : "off";
+        this._hass.callService("climate", "set_hvac_mode", {
+          entity_id: climateEntity,
+          hvac_mode: newMode
+        });
+      }
+    }
+  }
+
+  updateCard() {
+    if (!this._hass || !this._config || !this._rendered) return;
+
+    const climateEntity = this._config.entity;
+    const switchEntity = this._config.switch;
+
+    const climateState = this._hass.states[climateEntity];
+    const switchState = switchEntity ? this._hass.states[switchEntity] : null;
+
+    if (!climateState) {
+      this.renderError(`Entità termostato ${climateEntity} non trovata.`);
+      return;
+    }
+
+    const currentTemp = climateState.attributes.current_temperature;
+    const targetTemp = climateState.attributes.temperature;
+    const hvacMode = climateState.state;
+    const hvacAction = climateState.attributes.hvac_action;
+
+    // Determine bypass switch state (default to enabled/on if not configured)
+    const isZoneEnabled = switchState ? switchState.state === "on" : true;
+
+    // Check if off, heating, or idle
+    let stateType = "off"; // "off", "heating", "idle"
+    if (isZoneEnabled && hvacMode !== "off") {
+      if (hvacAction === "heating") {
+        stateType = "heating";
+      } else {
+        stateType = "idle";
+      }
+    }
+
+    // Set background color & status text based on stateType
+    let bgColor = "#37474f"; // default off/gray
+    let stateText = "";
+    let iconName = this._config.icon || "mdi:radiator";
+
+    if (stateType === "off") {
+      bgColor = "#37474f";
+      stateText = !isZoneEnabled ? "Zona Esclusa" : "Spento";
+      iconName = this._config.icon || "mdi:power";
+    } else if (stateType === "heating") {
+      bgColor = "#b71c1c"; // Heating red
+      stateText = "Riscaldamento";
+      iconName = this._config.icon || "mdi:fire";
+    } else if (stateType === "idle") {
+      bgColor = "#e65100"; // Idle/Standby orange
+      stateText = "Standby (In Attesa)";
+      iconName = this._config.icon || "mdi:radiator";
+    }
+
+    // Update the ha-card element's background color
+    const card = this.shadowRoot.querySelector('ha-card');
+    if (card) {
+      card.style.backgroundColor = bgColor;
+    }
+
+    // Update title / name
+    const nameEl = this.shadowRoot.querySelector('.name');
+    if (nameEl) {
+      nameEl.textContent = this._config.title || climateState.attributes.friendly_name || "Termostato";
+    }
+
+    // Update state text
+    const stateEl = this.shadowRoot.querySelector('.state');
+    if (stateEl) {
+      stateEl.textContent = stateText;
+    }
+
+    // Update icon
+    const iconEl = this.shadowRoot.querySelector('ha-icon');
+    if (iconEl) {
+      iconEl.setAttribute('icon', iconName);
+      if (stateType === "heating") {
+        iconEl.classList.add('glow-flame');
+      } else {
+        iconEl.classList.remove('glow-flame');
+      }
+    }
+
+    // Update temp text
+    const tempEl = this.shadowRoot.querySelector('.temp-row');
+    if (tempEl) {
+      const curStr = currentTemp !== undefined ? `${currentTemp}°C` : '--°C';
+      const tgtStr = targetTemp !== undefined ? `${targetTemp}°C` : '--°C';
+      tempEl.textContent = `Set: ${tgtStr} | Attuale: ${curStr}`;
+    }
+  }
+
+  renderError(msg) {
+    this.shadowRoot.innerHTML = `
+      <ha-card style="padding: 16px; color: red; background-color: rgba(255,0,0,0.15);">
+        <h3>Errore scheda Multizone Thermostat</h3>
+        <p>${msg}</p>
+      </ha-card>
+    `;
+    this._rendered = false;
+  }
+}
+
 // Define elements
 customElements.define("multizone-thermostat-button-card", MultizoneThermostatButtonCard);
 customElements.define("multizone-thermostat-dial-card", MultizoneThermostatDialCard);
+customElements.define("multizone-thermostat-status-card", MultizoneThermostatStatusCard);
 customElements.define("multizone-thermostat-card-editor", MultizoneThermostatCardEditor);
