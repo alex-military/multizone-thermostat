@@ -505,7 +505,6 @@ class MultizoneThermostatDialCard extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
-    this.renderStructure();
   }
 
   set hass(hass) {
@@ -548,11 +547,8 @@ class MultizoneThermostatDialCard extends HTMLElement {
     const cardConfig = {
       type: "thermostat",
       entity: this._config.entity,
+      name: " ", // Empty space to hide native title and avoid duplicate titles
     };
-
-    if (this._config.title) {
-      cardConfig.name = this._config.title;
-    }
 
     this._childCard = this._helpers.createCardElement(cardConfig);
     
@@ -570,8 +566,16 @@ class MultizoneThermostatDialCard extends HTMLElement {
   updateCard() {
     if (!this._hass || !this._config) return;
 
+    const climateEntity = this._config.entity;
     const switchEntity = this._config.switch;
+    
+    const climateState = this._hass.states[climateEntity];
     const switchState = switchEntity ? this._hass.states[switchEntity] : null;
+
+    if (!climateState) {
+      this.renderError(`Entità termostato ${climateEntity} non trovata.`);
+      return;
+    }
 
     // Use temporary switch state if toggled locally to avoid flickering
     const actualSwitchState = this._tempSwitchState !== undefined 
@@ -583,6 +587,13 @@ class MultizoneThermostatDialCard extends HTMLElement {
     const toggle = this.shadowRoot.querySelector('#zone-toggle');
     if (toggle) {
       toggle.checked = isZoneEnabled;
+    }
+
+    // Update title
+    const title = this._config.title || climateState.attributes.friendly_name || "Termostato";
+    const titleEl = this.shadowRoot.querySelector('#card-title');
+    if (titleEl) {
+      titleEl.textContent = title;
     }
 
     // Apply active/disabled styling and overlay
@@ -600,22 +611,40 @@ class MultizoneThermostatDialCard extends HTMLElement {
     const style = document.createElement('style');
 
     style.textContent = `
+      ha-card {
+        padding: 16px;
+        position: relative;
+        overflow: hidden;
+      }
       .wrapper {
         position: relative;
         display: block;
       }
-      .toggle-container {
-        position: absolute;
-        top: 14px;
-        right: 14px;
-        z-index: 9999;
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+        padding-bottom: 4px;
+      }
+      .title {
+        font-size: 16px;
+        font-weight: 500;
+        color: var(--primary-text-color);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 60%;
+      }
+      .switch-container {
         display: flex;
         align-items: center;
+        z-index: 10;
         pointer-events: auto;
       }
-      .toggle-container label {
+      .switch-container label {
         margin-right: 8px;
-        font-size: 11px;
+        font-size: 12px;
         color: var(--secondary-text-color);
         font-weight: 500;
         pointer-events: none;
@@ -626,11 +655,13 @@ class MultizoneThermostatDialCard extends HTMLElement {
         display: inline-block;
         width: 38px;
         height: 20px;
+        pointer-events: auto;
       }
       .switch input {
         opacity: 0;
         width: 0;
         height: 0;
+        pointer-events: auto;
       }
       .slider {
         position: absolute;
@@ -642,6 +673,7 @@ class MultizoneThermostatDialCard extends HTMLElement {
         background-color: var(--disabled-text-color, #ccc);
         transition: .4s;
         border-radius: 20px;
+        pointer-events: none;
       }
       .slider:before {
         position: absolute;
@@ -653,6 +685,7 @@ class MultizoneThermostatDialCard extends HTMLElement {
         background-color: white;
         transition: .4s;
         border-radius: 50%;
+        pointer-events: none;
       }
       input:checked + .slider {
         background-color: var(--primary-color, #03a9f4);
@@ -664,7 +697,7 @@ class MultizoneThermostatDialCard extends HTMLElement {
       .disabled-overlay {
         display: none;
         position: absolute;
-        top: 0;
+        top: 40px; /* Positioned below our custom header, covering only the native card body */
         left: 0;
         right: 0;
         bottom: 0;
@@ -673,7 +706,7 @@ class MultizoneThermostatDialCard extends HTMLElement {
         backdrop-filter: blur(2px);
         align-items: center;
         justify-content: center;
-        border-radius: var(--ha-card-border-radius, 12px);
+        border-radius: 0 0 var(--ha-card-border-radius, 12px) var(--ha-card-border-radius, 12px);
         pointer-events: none;
       }
       .disabled-msg-box {
@@ -689,6 +722,15 @@ class MultizoneThermostatDialCard extends HTMLElement {
         pointer-events: auto;
       }
 
+      /* Native Thermostat card styles styling (custom variables are passed down shadow bounds) */
+      #card-body {
+        --ha-card-background: none;
+        --ha-card-box-shadow: none;
+        --ha-card-border-width: 0px;
+        --ha-card-border-color: transparent;
+        margin-top: -16px; /* pull the native card slightly up to align it nicely */
+      }
+
       /* When zone is disabled: fade out the native card */
       .wrapper.disabled #card-body {
         opacity: 0.25;
@@ -699,21 +741,24 @@ class MultizoneThermostatDialCard extends HTMLElement {
       }
     `;
 
+    const card = document.createElement('ha-card');
+    
     const wrapper = document.createElement('div');
     wrapper.className = 'wrapper';
     wrapper.id = 'wrapper';
 
-    // The toggle-container is placed AFTER card-body in the DOM to make sure it paints on top
-    // of the native card (preventing it from being covered or blocked by the native card wrapper).
+    // The layout renders our custom header inside our own ha-card.
+    // The native card below is stripped of its borders/title/shadows.
     wrapper.innerHTML = `
-      <div id="card-body"></div>
-
-      <div class="toggle-container">
-        <label id="zone-toggle-label">Zona Abilitata</label>
-        <label class="switch">
-          <input type="checkbox" id="zone-toggle" checked>
-          <span class="slider"></span>
-        </label>
+      <div class="header">
+        <div class="title" id="card-title">Termostato</div>
+        <div class="switch-container">
+          <label id="zone-toggle-label">Abilitata</label>
+          <label class="switch">
+            <input type="checkbox" id="zone-toggle" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
       </div>
 
       <div class="disabled-overlay">
@@ -721,14 +766,18 @@ class MultizoneThermostatDialCard extends HTMLElement {
           <ha-icon icon="mdi:alert-circle-outline" style="margin-right: 6px;"></ha-icon>Zona Esclusa / Bypassata
         </div>
       </div>
+
+      <div id="card-body"></div>
     `;
 
     // Hook events
     const toggle = wrapper.querySelector('#zone-toggle');
     toggle.addEventListener('change', () => this.toggleZone(toggle.checked));
 
+    card.appendChild(wrapper);
     this.shadowRoot.appendChild(style);
-    this.shadowRoot.appendChild(wrapper);
+    this.shadowRoot.appendChild(card);
+    this._rendered = true;
   }
 
   toggleZone(enable) {
@@ -747,6 +796,16 @@ class MultizoneThermostatDialCard extends HTMLElement {
       this._tempSwitchState = undefined;
       this.updateCard();
     }, 1000);
+  }
+
+  renderError(msg) {
+    this.shadowRoot.innerHTML = `
+      <ha-card style="padding: 16px; color: red;">
+        <h3>Errore scheda Multizone Thermostat</h3>
+        <p>${msg}</p>
+      </ha-card>
+    `;
+    this._rendered = false;
   }
 }
 
