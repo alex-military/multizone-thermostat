@@ -53,6 +53,33 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Set up platforms (switch)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
+    # Register static path for Lovelace custom card
+    hass.http.register_static_path(
+        "/multizone_thermostat_card",
+        hass.config.path("custom_components/multizone_thermostat/www"),
+        cache_headers=False,
+    )
+
+    # Register Lovelace custom card resource automatically
+    try:
+        if "lovelace" in hass.data:
+            resources = hass.data["lovelace"].resources
+            if hasattr(resources, "async_get_info"):
+                await resources.async_get_info()
+                url = "/multizone_thermostat_card/multizone-thermostat-card.js"
+                exists = False
+                for item in resources.async_items():
+                    if item.get("url") == url:
+                        exists = True
+                        break
+                if not exists:
+                    await resources.async_create_item({
+                        "res_type": "module",
+                        "url": url,
+                    })
+    except Exception as err:
+        _LOGGER.warning("Could not register Lovelace resource: %s", err)
+
     # Register update listener for options changes
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
 
