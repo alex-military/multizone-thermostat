@@ -634,6 +634,8 @@ class MultizoneThermostatDialCard extends HTMLElement {
         align-items: center;
         margin-bottom: 8px;
         padding-bottom: 4px;
+        position: relative;
+        z-index: 20;
       }
       .title {
         font-size: 16px;
@@ -647,15 +649,14 @@ class MultizoneThermostatDialCard extends HTMLElement {
       .switch-container {
         display: flex;
         align-items: center;
-        z-index: 10;
-        pointer-events: auto;
+        position: relative;
+        z-index: 21;
       }
       .switch-container label {
         margin-right: 8px;
         font-size: 12px;
         color: var(--secondary-text-color);
         font-weight: 500;
-        pointer-events: none;
       }
       /* Simple CSS Toggle Switch */
       .switch {
@@ -663,13 +664,11 @@ class MultizoneThermostatDialCard extends HTMLElement {
         display: inline-block;
         width: 38px;
         height: 20px;
-        pointer-events: auto;
       }
       .switch input {
         opacity: 0;
         width: 0;
         height: 0;
-        pointer-events: auto;
       }
       .slider {
         position: absolute;
@@ -681,7 +680,6 @@ class MultizoneThermostatDialCard extends HTMLElement {
         background-color: var(--disabled-text-color, #ccc);
         transition: .4s;
         border-radius: 20px;
-        pointer-events: none;
       }
       .slider:before {
         position: absolute;
@@ -693,7 +691,6 @@ class MultizoneThermostatDialCard extends HTMLElement {
         background-color: white;
         transition: .4s;
         border-radius: 50%;
-        pointer-events: none;
       }
       input:checked + .slider {
         background-color: var(--primary-color, #03a9f4);
