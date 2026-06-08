@@ -85,6 +85,14 @@ class MultizoneMasterSwitch(RestoreEntity, SwitchEntity):
         """Return true if switch is on."""
         return self._is_on
 
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return extra state attributes."""
+        return {
+            "multizone_type": "master",
+            "boiler_switch": self._coordinator.boiler_switch,
+        }
+
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn master on."""
         self._is_on = True
