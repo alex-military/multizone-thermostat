@@ -1,0 +1,104 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Multizone Thermostat — Configurazione Caldaia",
+        "description": "Seleziona l'entità interruttore (switch) che controlla il relè (circolatore) della caldaia. Questo è il primo passaggio obbligatorio.",
+        "data": {
+          "boiler_switch": "Interruttore Caldaia"
+        },
+        "data_description": {
+          "boiler_switch": "L'interruttore/relè che controlla la pompa di circolazione della caldaia"
+        }
+      },
+      "add_zone": {
+        "title": "Aggiungi Zona di Riscaldamento ({zone_number})",
+        "description": "Configure una zona di riscaldamento. {zones_added} zona/e già aggiunta/e.",
+        "data": {
+          "climate_entity": "Entità Termostato",
+          "name": "Nome Zona",
+          "trv_preset_sync": "Abilita Sincronizzazione Preset TRV"
+        },
+        "data_description": {
+          "climate_entity": "L'entità termostato (climate) per questa stanza/zona",
+          "name": "Un nome amichevole per questa zona (pre-popolato dal nome dell'entità termostato)",
+          "trv_preset_sync": "Sincronizza automaticamente la modalità preset quando cambia la modalità HVAC (per valvole termostatiche fisiche TRV)"
+        }
+      },
+      "another_zone": {
+        "title": "Aggiungere un'altra zona?",
+        "description": "Hai aggiunto {zones_added} zona/e: {zones_list}.\n\n{remaining} entità termostato ancora disponibili.",
+        "data": {
+          "add_another": "Aggiungi un'altra zona"
+        }
+      },
+      "confirm": {
+        "title": "Conferma Configurazione",
+        "description": "Pronto a configurare Multizone Thermostat con la seguente configurazione:\n\n**Interruttore Caldaia:** {boiler_switch}\n**Zone ({zones_count}):**\n{zones_list}\n\nFai clic su Invia per creare l'integrazione.",
+        "data": {}
+      }
+    },
+    "abort": {
+      "already_configured": "Multizone Thermostat è già configurato. Usa il flusso Opzioni per modificare le zone.",
+      "no_switches_found": "Nessuna entità interruttore trovata in Home Assistant. Aggiungi prima un'entità switch/relè.",
+      "no_zones_configured": "Nessuna zona è stata configurata. Aggiungi almeno una zona."
+    },
+    "error": {
+      "zone_name_required": "Il nome della zona non può essere vuoto."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Opzioni Multizone Thermostat",
+        "description": "Caldaia attuale: **{boiler_switch}**\nZone configurate: **{zones_count}**\n\nCosa vorresti modificare?",
+        "data": {
+          "action": "Azione"
+        }
+      },
+      "change_boiler": {
+        "title": "Modifica Interruttore Caldaia",
+        "data": {
+          "boiler_switch": "Nuovo Interruttore Caldaia"
+        }
+      },
+      "add_zone": {
+        "title": "Aggiungi Nuova Zona",
+        "data": {
+          "climate_entity": "Entità Termostato",
+          "name": "Nome Zona",
+          "trv_preset_sync": "Abilita Sincronizzazione Preset TRV"
+        }
+      },
+      "remove_zone": {
+        "title": "Rimuovi una Zona",
+        "description": "Seleziona la zona da rimuovere. Verrà rimossa anche l'entità interruttore creata per questa zona.",
+        "data": {
+          "zone_climate": "Zona da Rimuovere"
+        }
+      },
+      "edit_zone": {
+        "title": "Modifica Impostazioni Zona",
+        "description": "Modifica la sincronizzazione preset TRV per una zona.",
+        "data": {
+          "zone_climate": "Zona",
+          "trv_preset_sync": "Abilita Sincronizzazione Preset TRV"
+        }
+      }
+    },
+    "abort": {
+      "no_zones_configured": "Nessuna zona configurata.",
+      "no_climates_available": "Tutte le entità termostato disponibili sono già configurate come zone."
+    },
+    "error": {
+      "zone_name_required": "Il nome della zona non può essere vuoto."
+    }
+  },
+  "entity": {
+    "switch": {
+      "master": {
+        "name": "Master Riscaldamento"
+      }
+    }
+  }
+}
