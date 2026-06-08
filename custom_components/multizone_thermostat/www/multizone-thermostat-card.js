@@ -1260,7 +1260,7 @@ class MultizoneThermostatStatusCard extends HTMLElement {
     // Update title / name
     const nameEl = this.shadowRoot.querySelector('.name');
     if (nameEl) {
-      nameEl.textContent = this._config.title || masterState.attributes.friendly_name || getTranslation(this._hass, 'master_title');
+      nameEl.textContent = this._config.title || getTranslation(this._hass, 'heating');
     }
 
     // Update state text
