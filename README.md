@@ -8,8 +8,10 @@ A custom integration for Home Assistant that provides **multi-zone heating manag
 - 🔘 **Master Switch** — One switch to enable/disable the entire heating system
 - 🏠 **Per-Zone Switches** — Individual switches for each room/zone, persistent across restarts
 - 🔥 **Automatic Boiler Control** — Boiler turns ON when any zone is heating, OFF when all zones are idle
+- 🛡️ **Boiler Protection** — Native `number` entities for anti-short-cycle (min cycle on/off) and valve opening delay
+- 🪟 **Window Sensor Detection** — Automatically bypass zones when a window is opened, and restore them when closed
 - 🌡️ **TRV Preset Sync** — Optional per-zone preset synchronization for physical TRV valves
-- ⚙️ **Options Flow** — Add/remove zones and change settings after installation
+- ⚙️ **Options Flow** — Add/remove zones, change window sensors and settings after installation
 
 ## Installation
 
@@ -28,7 +30,7 @@ A custom integration for Home Assistant that provides **multi-zone heating manag
 2. Search for **"Multizone Thermostat"**
 3. Follow the setup wizard:
    - **Step 1**: Select your boiler switch/relay entity
-   - **Step 2**: Add heating zones (climate entity + zone name)
+   - **Step 2**: Add heating zones (climate entity, zone name, optional window binary_sensor)
    - **Step 3**: Confirm and finish
 
 ## Entities Created
@@ -50,10 +52,21 @@ Master Switch ON
 
 Master Switch OFF
     └── ALL zones → climate.set_hvac_mode(off)
-    └── Boiler   → switch.turn_off()
+    └── Boiler   → switch.turn_off() (ignores min_cycle_on for safety)
 
-Any zone hvac_action = heating → Boiler ON
-All zones hvac_action = idle/off → Boiler OFF
+Any zone hvac_action = heating
+    └── If valve_delay > 0, wait for delay
+    └── If boiler was recently off, wait for min_cycle_off
+    └── Boiler ON
+
+All zones hvac_action = idle/off
+    └── If boiler was recently on, wait for min_cycle_on
+    └── Boiler OFF
+    
+Window Opened
+    └── Zone Switch turns OFF automatically (bypassed) and saves state
+Window Closed
+    └── Zone Switch restores previous state
 ```
 
 ## Options (Post-Installation)
@@ -62,7 +75,7 @@ Go to **Settings → Devices & Services → Multizone Thermostat → Configure**
 - Change the boiler switch
 - Add a new zone
 - Remove an existing zone
-- Enable/disable TRV preset sync per zone
+- Edit a zone (TRV preset sync, Window Sensor)
 
 ## TRV Preset Sync
 
@@ -152,6 +165,7 @@ title: Living Room                  # (Optional) Custom title
 - Home Assistant 2023.x or newer
 - At least one `climate` entity (thermostat/TRV)
 - At least one `switch` entity (boiler relay)
+- **Note**: Currently supports only ON/OFF systems with a relay or actuator. Proportional modulation (PWM/PID) or OpenTherm will be added in future phases.
 
 ## Future Roadmap
 
