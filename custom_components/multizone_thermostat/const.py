@@ -8,6 +8,7 @@ CONF_ZONES = "zones"
 CONF_ZONE_NAME = "name"
 CONF_ZONE_CLIMATE = "climate_entity"
 CONF_ZONE_TRV_SYNC = "trv_preset_sync"
+CONF_ZONE_WINDOW_SENSOR = "window_sensor"
 CONF_ZONE_ENABLED = "enabled"
 
 # Protection keys

@@ -160,7 +160,14 @@ The project is structured in phases to evolve from a simple aggregator to a full
 ### FASE 1 — Sicurezza Impianto (Current Focus)
 - [x] **Antipendolamento (`min_cycle_duration`)**: Previene oscillazioni rapide della caldaia con tempi minimi di ON/OFF (implementato via entità `number`).
 - [x] **Ritardo Accensione Caldaia (`valve_opening_delay`)**: Ritardo in secondi per permettere l'apertura delle valvole termoelettriche (implementato via entità `number`).
-- [ ] **Rilevamento Finestra Aperta (`window_sensor`)**: Bypass automatico della zona se un sensore finestra è aperto.
+- [x] **Rilevamento Finestra Aperta — `window_sensor`**
+  - **Problema**: Apertura finestra → calo temperatura → termostato accende caldaia → spreco energetico.
+  - **Soluzione**: Selezione opzionale di un `binary_sensor` per ogni zona nel Config Flow.
+    - Sensore `on` (finestra aperta) → zona bypassata automaticamente.
+    - Sensore `off` (finestra chiusa) → zona ripristina lo stato precedente al bypass.
+  - **UI**: Entity picker per `binary_sensor` nel wizard di configurazione zona e nelle Opzioni.
+  - **Memoria stato**: Stato precedente salvato nello storage persistente (`.storage/`) per resistere ai riavvii di HA.
+  - **Stato**: ✅ Implementato
 
 ### FASE 2 — Evoluzione Architetturale
 - [ ] **Termostati Virtuali via UI**: Creazione automatica di entità `climate` da un sensore di temperatura e uno switch (es. fancoil/relè sfusi) senza YAML.

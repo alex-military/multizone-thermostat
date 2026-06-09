@@ -44,6 +44,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         zones=zones,
     )
 
+    # Load persistent data
+    await coordinator.async_load_storage()
+
     hass.data[DOMAIN][entry.entry_id] = {
         "coordinator": coordinator,
     }

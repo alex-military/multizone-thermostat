@@ -17,12 +17,14 @@
         "data": {
           "climate_entity": "Climate Entity",
           "name": "Zone Name",
-          "trv_preset_sync": "Enable TRV Preset Sync"
+          "trv_preset_sync": "Enable TRV Preset Sync",
+          "window_sensor": "Window Sensor (Optional)"
         },
         "data_description": {
           "climate_entity": "The climate entity for this room/zone",
           "name": "A friendly name for this zone (pre-filled from climate entity name)",
-          "trv_preset_sync": "Automatically sync preset mode when HVAC mode changes (for physical TRV valves)"
+          "trv_preset_sync": "Automatically sync preset mode when HVAC mode changes (for physical TRV valves)",
+          "window_sensor": "Automatically bypass the zone when this sensor is open"
         }
       },
       "another_zone": {
@@ -67,7 +69,8 @@
         "data": {
           "climate_entity": "Climate Entity",
           "name": "Zone Name",
-          "trv_preset_sync": "Enable TRV Preset Sync"
+          "trv_preset_sync": "Enable TRV Preset Sync",
+          "window_sensor": "Window Sensor (Optional)"
         }
       },
       "remove_zone": {
@@ -79,10 +82,11 @@
       },
       "edit_zone": {
         "title": "Edit Zone Settings",
-        "description": "Edit TRV preset sync for a zone.",
+        "description": "Edit settings for a zone.",
         "data": {
           "zone_climate": "Zone",
-          "trv_preset_sync": "Enable TRV Preset Sync"
+          "trv_preset_sync": "Enable TRV Preset Sync",
+          "window_sensor": "Window Sensor (Optional)"
         }
       }
     },

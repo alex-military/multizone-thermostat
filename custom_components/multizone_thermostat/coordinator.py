@@ -22,11 +22,13 @@ from homeassistant.const import (
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.restore_state import RestoreEntity
+from homeassistant.helpers.storage import Store
 
 from .const import (
     CONF_BOILER_SWITCH,
     CONF_ZONE_CLIMATE,
     CONF_ZONE_TRV_SYNC,
+    CONF_ZONE_WINDOW_SENSOR,
     CONF_ZONES,
     DOMAIN,
     HVAC_ACTION_HEATING,
@@ -41,6 +43,9 @@ _LOGGER = logging.getLogger(__name__)
 ATTR_HVAC_ACTION = "hvac_action"
 ATTR_HVAC_MODE = "hvac_mode"
 ATTR_PRESET_MODE = "preset_mode"
+
+STORAGE_VERSION = 1
+STORAGE_KEY = f"{DOMAIN}.window_states"
 
 
 class MultizoneCoordinator:
@@ -77,6 +82,20 @@ class MultizoneCoordinator:
 
         self._unsub_listeners: list = []
         self._switch_entities: dict[str, Any] = {}  # entity_id -> switch object
+        
+        self._store = Store(hass, STORAGE_VERSION, STORAGE_KEY)
+        self._pre_window_state: dict[str, bool] = {}
+
+    async def async_load_storage(self) -> None:
+        """Load stored window states."""
+        stored = await self._store.async_load()
+        if stored and isinstance(stored, dict):
+            self._pre_window_state = stored
+            _LOGGER.debug("Loaded pre_window_state from storage: %s", self._pre_window_state)
+
+    async def _async_save_storage(self) -> None:
+        """Save window states to storage."""
+        await self._store.async_save(self._pre_window_state)
 
     def register_switch(self, climate_or_master: str, switch_entity: Any) -> None:
         """Register a switch entity so coordinator can notify state changes."""
@@ -114,6 +133,24 @@ class MultizoneCoordinator:
             _LOGGER.debug(
                 "Listening to climate state changes for: %s", climate_entities
             )
+            
+        # Listen for window sensors
+        window_sensors = [
+            z[CONF_ZONE_WINDOW_SENSOR] for z in self.zones 
+            if z.get(CONF_ZONE_WINDOW_SENSOR) and z[CONF_ZONE_WINDOW_SENSOR] != "none"
+        ]
+        
+        if window_sensors:
+            self._unsub_listeners.append(
+                async_track_state_change_event(
+                    self.hass,
+                    window_sensors,
+                    self._async_on_window_state_changed,
+                )
+            )
+            _LOGGER.debug(
+                "Listening to window state changes for: %s", window_sensors
+            )
 
     @callback
     def async_teardown_listeners(self) -> None:
@@ -142,6 +179,47 @@ class MultizoneCoordinator:
             self.hass.async_create_task(
                 self._async_sync_trv_preset(entity_id, new_state.state)
             )
+
+    @callback
+    def _async_on_window_state_changed(self, event: Event) -> None:
+        """Handle window sensor state changes → bypass/restore zone."""
+        sensor_id = event.data.get("entity_id")
+        new_state = event.data.get("new_state")
+        
+        if new_state is None:
+            return
+            
+        # Find which zone this sensor belongs to
+        zone = next((z for z in self.zones if z.get(CONF_ZONE_WINDOW_SENSOR) == sensor_id), None)
+        if not zone:
+            return
+            
+        climate_id = zone[CONF_ZONE_CLIMATE]
+        switch_entity = self._switch_entities.get(climate_id)
+        
+        if new_state.state == STATE_ON:
+            # Window OPENED
+            _LOGGER.debug("Window opened (%s), bypassing zone %s", sensor_id, climate_id)
+            # Save current state if not already saved (don't overwrite if multiple sensors?)
+            if climate_id not in self._pre_window_state:
+                current_state = self.get_zone_state(climate_id)
+                self._pre_window_state[climate_id] = current_state
+                self.hass.async_create_task(self._async_save_storage())
+            
+            # Turn off the zone via the switch entity (updates UI and coordinator)
+            if switch_entity and switch_entity.is_on:
+                self.hass.async_create_task(switch_entity.async_turn_off())
+                
+        elif new_state.state == "off":
+            # Window CLOSED
+            _LOGGER.debug("Window closed (%s), restoring zone %s", sensor_id, climate_id)
+            if climate_id in self._pre_window_state:
+                was_on = self._pre_window_state.pop(climate_id)
+                self.hass.async_create_task(self._async_save_storage())
+                
+                # If it was ON, restore it to ON
+                if was_on and switch_entity and not switch_entity.is_on:
+                    self.hass.async_create_task(switch_entity.async_turn_on())
 
     def _get_zone(self, climate_entity: str) -> dict | None:
         """Get zone config by climate entity ID."""
@@ -323,6 +401,11 @@ class MultizoneCoordinator:
 
     async def async_apply_zone_on(self, climate_entity: str) -> None:
         """Zone switch turned ON (only if master is ON)."""
+        # If user manually turns on, clear pre_window_state so it doesn't revert later
+        if climate_entity in self._pre_window_state:
+            self._pre_window_state.pop(climate_entity)
+            await self._async_save_storage()
+            
         if self._master_state:
             _LOGGER.debug("Zone ON: %s", climate_entity)
             await self._async_set_hvac_mode(climate_entity, HVAC_MODE_HEAT)

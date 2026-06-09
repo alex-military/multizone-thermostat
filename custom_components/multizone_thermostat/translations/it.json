@@ -15,14 +15,16 @@
         "title": "Aggiungi Zona di Riscaldamento ({zone_number})",
         "description": "Configure una zona di riscaldamento. {zones_added} zona/e già aggiunta/e.",
         "data": {
-          "climate_entity": "Entità Termostato",
+          "climate_entity": "Entità Climatica",
           "name": "Nome Zona",
-          "trv_preset_sync": "Abilita Sincronizzazione Preset TRV"
+          "trv_preset_sync": "Sincronizza Preset TRV",
+          "window_sensor": "Sensore Finestra (Opzionale)"
         },
         "data_description": {
-          "climate_entity": "L'entità termostato (climate) per questa stanza/zona",
-          "name": "Un nome amichevole per questa zona (pre-popolato dal nome dell'entità termostato)",
-          "trv_preset_sync": "Sincronizza automaticamente la modalità preset quando cambia la modalità HVAC (per valvole termostatiche fisiche TRV)"
+          "climate_entity": "L'entità climatica per questa stanza/zona",
+          "name": "Un nome amichevole per questa zona (precompilato dall'entità climatica)",
+          "trv_preset_sync": "Sincronizza automaticamente la modalità preset al cambio della modalità HVAC (per valvole TRV fisiche)",
+          "window_sensor": "Bypassa automaticamente la zona quando questo sensore è aperto"
         }
       },
       "another_zone": {
@@ -79,10 +81,11 @@
       },
       "edit_zone": {
         "title": "Modifica Impostazioni Zona",
-        "description": "Modifica sincronizzazione preset TRV per una zona.",
+        "description": "Modifica le impostazioni per una zona.",
         "data": {
           "zone_climate": "Zona",
-          "trv_preset_sync": "Abilita Sync Preset TRV"
+          "trv_preset_sync": "Abilita Sync Preset TRV",
+          "window_sensor": "Sensore Finestra (Opzionale)"
         }
       }
     },
