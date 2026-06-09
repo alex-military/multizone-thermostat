@@ -34,7 +34,7 @@
       },
       "confirm": {
         "title": "Conferma Configurazione",
-        "description": "Pronto a configurare Multizone Thermostat con la seguente configurazione:\n\n**Interruttore Caldaia:** {boiler_switch}\n**Zone ({zones_count}):**\n{zones_list}\n\nFai clic su Invia per creare l'integrazione.",
+        "description": "Pronto a configurare Multizone Thermostat con questa configurazione:\n\n**Interruttore Caldaia:** {boiler_switch}\n**Zone ({zones_count}):**\n{zones_list}\n\nClicca Invia per creare l'integrazione.",
         "data": {}
       }
     },
@@ -79,10 +79,10 @@
       },
       "edit_zone": {
         "title": "Modifica Impostazioni Zona",
-        "description": "Modifica la sincronizzazione preset TRV per una zona.",
+        "description": "Modifica sincronizzazione preset TRV per una zona.",
         "data": {
           "zone_climate": "Zona",
-          "trv_preset_sync": "Abilita Sincronizzazione Preset TRV"
+          "trv_preset_sync": "Abilita Sync Preset TRV"
         }
       }
     },

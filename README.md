@@ -37,6 +37,9 @@ A custom integration for Home Assistant that provides **multi-zone heating manag
 |--------|-------------|
 | `switch.multizone_master` | Master on/off for the entire heating system |
 | `switch.multizone_[zone_name]` | Per-zone on/off switch (one per configured zone) |
+| `number.multizone_min_cycle_on` | Minimum boiler ON time (minutes) |
+| `number.multizone_min_cycle_off` | Minimum boiler OFF time (minutes) |
+| `number.multizone_valve_delay` | Valve opening delay before boiler starts (seconds) |
 
 ## How It Works
 
@@ -152,7 +155,22 @@ title: Living Room                  # (Optional) Custom title
 
 ## Future Roadmap
 
-- [ ] Diagnostic sensors (zones heating count, boiler demand)
-- [x] Lovelace cards for zone control and system status
-- [ ] ESPHome panel integration support
+The project is structured in phases to evolve from a simple aggregator to a full-fledged smart climate manager.
 
+### FASE 1 — Sicurezza Impianto (Current Focus)
+- [x] **Antipendolamento (`min_cycle_duration`)**: Previene oscillazioni rapide della caldaia con tempi minimi di ON/OFF (implementato via entità `number`).
+- [x] **Ritardo Accensione Caldaia (`valve_opening_delay`)**: Ritardo in secondi per permettere l'apertura delle valvole termoelettriche (implementato via entità `number`).
+- [ ] **Rilevamento Finestra Aperta (`window_sensor`)**: Bypass automatico della zona se un sensore finestra è aperto.
+
+### FASE 2 — Evoluzione Architetturale
+- [ ] **Termostati Virtuali via UI**: Creazione automatica di entità `climate` da un sensore di temperatura e uno switch (es. fancoil/relè sfusi) senza YAML.
+- [ ] **Preset Globali (Eco / Comfort / Sleep / Away)**: Mapping di temperature target per ogni zona attivabile globalmente.
+- [ ] **Sincronismo Top-Down + Eccezioni Locali**: Cambio preset globale con possibilità di override manuale per singola zona.
+- [ ] **Bypass Dinamico per Modalità**: Auto-esclusione di specifiche zone in base al preset (es. Studio escluso in modalità Sleep).
+- [ ] **Geofencing Zero-Code**: Cambio preset automatico in base alla presenza (Away/Comfort).
+
+### FASE 3 — Ottimizzazione Energetica Avanzata
+- [ ] **Algoritmo PWM/PID Selezionabile**: Modulazione del tempo di accensione per impianti modulanti.
+- [ ] **Carico Richiesto Globale (%)**: Sensore percentuale del fabbisogno termico per pompe di calore.
+- [ ] **Curva Climatica Integrata**: Ottimizzazione temperatura di mandata basata sul meteo esterno.
+- [ ] **Antigrippaggio Estivo**: Attivazione periodica delle valvole in estate per prevenire blocchi.

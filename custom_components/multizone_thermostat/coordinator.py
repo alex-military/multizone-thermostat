@@ -1,8 +1,12 @@
 """Coordinator for Multizone Thermostat: handles all heating logic."""
 from __future__ import annotations
 
+import asyncio
+from datetime import datetime, timedelta
 import logging
 from typing import Any
+
+import homeassistant.util.dt as dt_util
 
 from homeassistant.components.climate import (
     SERVICE_SET_HVAC_MODE,
@@ -54,6 +58,11 @@ class MultizoneCoordinator:
         self.entry_id = entry_id
         self.boiler_switch = boiler_switch
         self.zones = zones
+        
+        # These will be updated by the number entities
+        self._min_cycle_on = 5
+        self._min_cycle_off = 5
+        self._valve_delay = 0
 
         # State: master on/off and per-zone on/off
         # Loaded/saved externally by switch entities using RestoreState
@@ -61,6 +70,10 @@ class MultizoneCoordinator:
         self._zone_states: dict[str, bool] = {
             z[CONF_ZONE_CLIMATE]: True for z in zones
         }
+
+        self._boiler_locked_on_until: datetime | None = None
+        self._boiler_locked_off_until: datetime | None = None
+        self._pending_boiler_task: asyncio.Task | None = None
 
         self._unsub_listeners: list = []
         self._switch_entities: dict[str, Any] = {}  # entity_id -> switch object
@@ -137,17 +150,39 @@ class MultizoneCoordinator:
                 return zone
         return None
 
-    async def _async_update_boiler(self) -> None:
-        """Turn boiler ON if any zone is heating, OFF if all are idle/off."""
-        any_heating = False
+    def set_min_cycle_on(self, value: int) -> None:
+        """Set the min cycle on time (minutes)."""
+        self._min_cycle_on = value
+        
+    def set_min_cycle_off(self, value: int) -> None:
+        """Set the min cycle off time (minutes)."""
+        self._min_cycle_off = value
+        
+    def set_valve_delay(self, value: int) -> None:
+        """Set the valve delay time (seconds)."""
+        self._valve_delay = value
 
+    async def _async_update_boiler(self, emergency_off: bool = False) -> None:
+        """Turn boiler ON if any zone is heating, OFF if all are idle/off."""
+        now = dt_util.utcnow()
+
+        if emergency_off:
+            _LOGGER.debug("Emergency OFF triggered. Resetting locks and stopping boiler.")
+            if self._pending_boiler_task:
+                self._pending_boiler_task.cancel()
+                self._pending_boiler_task = None
+            self._boiler_locked_on_until = None
+            self._boiler_locked_off_until = None
+            await self._force_boiler_off()
+            return
+
+        any_heating = False
         for zone in self.zones:
             climate_id = zone[CONF_ZONE_CLIMATE]
             state = self.hass.states.get(climate_id)
             if state is None:
                 continue
-            hvac_action = state.attributes.get(ATTR_HVAC_ACTION, "")
-            if hvac_action == HVAC_ACTION_HEATING:
+            if state.attributes.get(ATTR_HVAC_ACTION, "") == HVAC_ACTION_HEATING:
                 any_heating = True
                 break
 
@@ -155,21 +190,79 @@ class MultizoneCoordinator:
         current_boiler_on = boiler_state is not None and boiler_state.state == STATE_ON
 
         if any_heating and not current_boiler_on:
+            # Want to turn ON
+            if self._boiler_locked_off_until and now < self._boiler_locked_off_until:
+                delay = (self._boiler_locked_off_until - now).total_seconds()
+                _LOGGER.debug("Boiler is locked OFF. Retrying in %s seconds.", delay)
+                self._schedule_boiler_check(delay)
+                return
+
             _LOGGER.debug("Boiler → ON (at least one zone heating)")
-            await self.hass.services.async_call(
-                "switch",
-                SERVICE_TURN_ON,
-                {ATTR_ENTITY_ID: self.boiler_switch},
-                blocking=False,
-            )
+            if self._valve_delay > 0:
+                _LOGGER.debug("Waiting %s seconds for valves to open...", self._valve_delay)
+                self._schedule_boiler_check(self._valve_delay, skip_lock_check=True)
+                return
+            else:
+                await self._force_boiler_on()
+
         elif not any_heating and current_boiler_on:
+            # Want to turn OFF
+            if self._boiler_locked_on_until and now < self._boiler_locked_on_until:
+                delay = (self._boiler_locked_on_until - now).total_seconds()
+                _LOGGER.debug("Boiler is locked ON. Retrying in %s seconds.", delay)
+                self._schedule_boiler_check(delay)
+                return
+
             _LOGGER.debug("Boiler → OFF (no zones heating)")
-            await self.hass.services.async_call(
-                "switch",
-                SERVICE_TURN_OFF,
-                {ATTR_ENTITY_ID: self.boiler_switch},
-                blocking=False,
-            )
+            await self._force_boiler_off()
+
+    def _schedule_boiler_check(self, delay_seconds: float, skip_lock_check: bool = False) -> None:
+        """Schedule a delayed boiler update."""
+        if self._pending_boiler_task:
+            self._pending_boiler_task.cancel()
+
+        async def _delayed_check():
+            try:
+                await asyncio.sleep(delay_seconds)
+                if skip_lock_check:
+                    # Time's up for valve delay, turn on now
+                    await self._force_boiler_on()
+                else:
+                    await self._async_update_boiler()
+            except asyncio.CancelledError:
+                pass
+
+        self._pending_boiler_task = self.hass.async_create_task(_delayed_check())
+
+    async def _force_boiler_on(self) -> None:
+        """Actually turn the boiler on and set locks."""
+        if self._pending_boiler_task:
+            self._pending_boiler_task.cancel()
+            self._pending_boiler_task = None
+
+        await self.hass.services.async_call(
+            "switch",
+            SERVICE_TURN_ON,
+            {ATTR_ENTITY_ID: self.boiler_switch},
+            blocking=False,
+        )
+        if self._min_cycle_on > 0:
+            self._boiler_locked_on_until = dt_util.utcnow() + timedelta(minutes=self._min_cycle_on)
+
+    async def _force_boiler_off(self) -> None:
+        """Actually turn the boiler off and set locks."""
+        if self._pending_boiler_task:
+            self._pending_boiler_task.cancel()
+            self._pending_boiler_task = None
+
+        await self.hass.services.async_call(
+            "switch",
+            SERVICE_TURN_OFF,
+            {ATTR_ENTITY_ID: self.boiler_switch},
+            blocking=False,
+        )
+        if self._min_cycle_off > 0:
+            self._boiler_locked_off_until = dt_util.utcnow() + timedelta(minutes=self._min_cycle_off)
 
     async def _async_sync_trv_preset(self, climate_entity: str, hvac_mode: str) -> None:
         """Sync TRV preset mode based on HVAC mode."""
@@ -225,13 +318,8 @@ class MultizoneCoordinator:
             climate_id = zone[CONF_ZONE_CLIMATE]
             await self._async_set_hvac_mode(climate_id, HVAC_MODE_OFF)
         # Boiler will auto-turn off via state change listener,
-        # but we also force it off here for safety
-        await self.hass.services.async_call(
-            "switch",
-            SERVICE_TURN_OFF,
-            {ATTR_ENTITY_ID: self.boiler_switch},
-            blocking=False,
-        )
+        # but we also force it off here for safety ignoring locks
+        await self._async_update_boiler(emergency_off=True)
 
     async def async_apply_zone_on(self, climate_entity: str) -> None:
         """Zone switch turned ON (only if master is ON)."""

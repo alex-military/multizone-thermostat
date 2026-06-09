@@ -10,6 +10,11 @@ CONF_ZONE_CLIMATE = "climate_entity"
 CONF_ZONE_TRV_SYNC = "trv_preset_sync"
 CONF_ZONE_ENABLED = "enabled"
 
+# Protection keys
+CONF_MIN_CYCLE_ON = "min_cycle_on"
+CONF_MIN_CYCLE_OFF = "min_cycle_off"
+CONF_VALVE_DELAY = "valve_opening_delay"
+
 # Storage keys
 STORAGE_VERSION = 1
 STORAGE_KEY = f"{DOMAIN}.zone_states"
@@ -30,3 +35,6 @@ SWITCH_ZONE_PREFIX = "zone"
 
 # Default values
 DEFAULT_TRV_SYNC = False
+DEFAULT_MIN_CYCLE_ON = 5
+DEFAULT_MIN_CYCLE_OFF = 5
+DEFAULT_VALVE_DELAY = 0
