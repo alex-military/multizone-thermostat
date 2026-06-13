@@ -44,8 +44,8 @@ ATTR_HVAC_ACTION = "hvac_action"
 ATTR_HVAC_MODE = "hvac_mode"
 ATTR_PRESET_MODE = "preset_mode"
 
-STORAGE_VERSION = 1
-STORAGE_KEY = f"{DOMAIN}.window_states"
+WINDOW_STORAGE_VERSION = 1
+WINDOW_STORAGE_KEY = f"{DOMAIN}.window_states"
 
 
 class MultizoneCoordinator:
@@ -83,7 +83,7 @@ class MultizoneCoordinator:
         self._unsub_listeners: list = []
         self._switch_entities: dict[str, Any] = {}  # entity_id -> switch object
         
-        self._store = Store(hass, STORAGE_VERSION, STORAGE_KEY)
+        self._store = Store(hass, WINDOW_STORAGE_VERSION, WINDOW_STORAGE_KEY)
         self._pre_window_state: dict[str, bool] = {}
 
     async def async_load_storage(self) -> None:

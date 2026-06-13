@@ -327,29 +327,21 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             if not name:
                 errors[CONF_ZONE_NAME] = "zone_name_required"
             else:
-                self._current_zone_data = {
+                zone_data = {
                     CONF_ZONE_CLIMATE: climate_id,
                     CONF_ZONE_NAME: name,
                     CONF_ZONE_TRV_SYNC: user_input.get(CONF_ZONE_TRV_SYNC, DEFAULT_TRV_SYNC),
                 }
                 if user_input.get(CONF_ZONE_WINDOW_SENSOR) and user_input[CONF_ZONE_WINDOW_SENSOR] != "none":
-                    self._current_zone_data[CONF_ZONE_WINDOW_SENSOR] = user_input[CONF_ZONE_WINDOW_SENSOR]
+                    zone_data[CONF_ZONE_WINDOW_SENSOR] = user_input[CONF_ZONE_WINDOW_SENSOR]
                     
-                self._zones.append(self._current_zone_data)
-                return await self.async_step_another_zone()
+                self._zones.append(zone_data)
+                return self._save_options()
 
-        climates = _get_climate_entities(self.hass)
         sensors = _get_binary_sensor_entities(self.hass)
-        
-        # Remove already added climates
-        for zone in self._zones:
-            climates.pop(zone[CONF_ZONE_CLIMATE], None)
-
-        if not climates:
-            return self.async_abort(reason="no_climates_available")
 
         schema = vol.Schema({
-            vol.Required(CONF_ZONE_CLIMATE): vol.In(climates),
+            vol.Required(CONF_ZONE_CLIMATE): vol.In(available_climates),
             vol.Required(CONF_ZONE_NAME): str,
             vol.Optional(CONF_ZONE_TRV_SYNC, default=DEFAULT_TRV_SYNC): bool,
             vol.Optional(CONF_ZONE_WINDOW_SENSOR, default="none"): vol.In(sensors),
