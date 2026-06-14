@@ -9,6 +9,7 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.components.climate import DOMAIN as CLIMATE_DOMAIN
 from homeassistant.components.switch import DOMAIN as SWITCH_DOMAIN
+from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN
 from homeassistant.components.binary_sensor import DOMAIN as BINARY_SENSOR_DOMAIN
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
@@ -16,13 +17,22 @@ import homeassistant.helpers.config_validation as cv
 
 from .const import (
     CONF_BOILER_SWITCH,
+    CONF_VIRTUAL_THERMOSTATS,
+    CONF_VT_HEATER_SWITCH,
+    CONF_VT_NAME,
+    CONF_VT_TARGET_TEMP,
+    CONF_VT_TEMP_SENSOR,
+    CONF_VT_TOLERANCE,
     CONF_ZONE_CLIMATE,
     CONF_ZONE_NAME,
     CONF_ZONE_TRV_SYNC,
     CONF_ZONE_WINDOW_SENSOR,
     CONF_ZONES,
     DEFAULT_TRV_SYNC,
+    DEFAULT_VT_TARGET_TEMP,
+    DEFAULT_VT_TOLERANCE,
     DOMAIN,
+    SWITCH_ZONE_PREFIX,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -74,6 +84,45 @@ def _get_binary_sensor_entities(hass: HomeAssistant) -> dict[str, str]:
     return sensors
 
 
+def _get_temperature_sensor_entities(hass: HomeAssistant) -> dict[str, str]:
+    """Return all temperature sensor entities as {entity_id: friendly_name}."""
+    entity_reg = er.async_get(hass)
+    sensors = {}
+    for entry in entity_reg.entities.values():
+        if entry.domain == SENSOR_DOMAIN and not entry.disabled:
+            state = hass.states.get(entry.entity_id)
+            if state and state.attributes.get("device_class") == "temperature":
+                name = state.attributes.get("friendly_name", entry.entity_id)
+                sensors[entry.entity_id] = name
+    for state in hass.states.async_all(SENSOR_DOMAIN):
+        if state.entity_id not in sensors:
+            if state.attributes.get("device_class") == "temperature":
+                sensors[state.entity_id] = state.attributes.get("friendly_name", state.entity_id)
+    return dict(sorted(sensors.items(), key=lambda x: x[1]))
+
+
+def _make_vt_entity_id(name: str) -> str:
+    """Generate a predictable entity_id for a virtual thermostat."""
+    safe = name.lower().replace(" ", "_").replace("-", "_")
+    safe = "".join(c for c in safe if c.isalnum() or c == "_")
+    return f"climate.{DOMAIN}_vt_{safe}"
+
+
+def _make_zone_switch_entity_id(name: str) -> str:
+    """Generate a predictable entity_id for a zone switch."""
+    safe = name.lower().replace(" ", "_").replace("-", "_")
+    safe = "".join(c for c in safe if c.isalnum() or c == "_")
+    return f"switch.{DOMAIN}_{SWITCH_ZONE_PREFIX}_{safe}"
+
+
+def _remove_entity_from_registry(hass: HomeAssistant, entity_id: str) -> None:
+    """Remove an entity from the entity registry."""
+    ent_reg = er.async_get(hass)
+    if ent_reg.async_get(entity_id):
+        ent_reg.async_remove(entity_id)
+        _LOGGER.debug("Removed %s from entity registry", entity_id)
+
+
 def _friendly_name_from_climate(hass: HomeAssistant, entity_id: str) -> str:
     """Get the friendly name of a climate entity."""
     state = hass.states.get(entity_id)
@@ -91,6 +140,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Initialize."""
         self._boiler_switch: str | None = None
         self._zones: list[dict] = []
+        self._virtual_thermostats: list[dict] = []
         self._current_zone_data: dict = {}
 
     async def async_step_user(
@@ -109,7 +159,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             self._boiler_switch = user_input[CONF_BOILER_SWITCH]
-            return await self.async_step_add_zone()
+            return await self.async_step_choose_zone_type()
 
         schema = vol.Schema({
             vol.Required(CONF_BOILER_SWITCH): vol.In(switches),
@@ -121,6 +171,88 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             description_placeholders={
                 "switch_count": str(len(switches)),
             },
+        )
+
+    async def async_step_choose_zone_type(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.FlowResult:
+        """Choose between existing climate or virtual thermostat."""
+        if user_input is not None:
+            zone_type = user_input.get("zone_type", "existing")
+            if zone_type == "virtual":
+                return await self.async_step_create_virtual_thermostat()
+            return await self.async_step_add_zone()
+
+        schema = vol.Schema({
+            vol.Required("zone_type", default="existing"): vol.In({
+                "existing": "Use existing thermostat",
+                "virtual": "Create virtual thermostat",
+            }),
+        })
+
+        return self.async_show_form(
+            step_id="choose_zone_type",
+            data_schema=schema,
+        )
+
+    async def async_step_create_virtual_thermostat(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.FlowResult:
+        """Create a virtual thermostat from a temp sensor + heater switch."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            vt_name = user_input[CONF_VT_NAME].strip()
+            if not vt_name:
+                errors[CONF_VT_NAME] = "zone_name_required"
+            else:
+                vt_config = {
+                    CONF_VT_NAME: vt_name,
+                    CONF_VT_TEMP_SENSOR: user_input[CONF_VT_TEMP_SENSOR],
+                    CONF_VT_HEATER_SWITCH: user_input[CONF_VT_HEATER_SWITCH],
+                    CONF_VT_TARGET_TEMP: user_input.get(CONF_VT_TARGET_TEMP, DEFAULT_VT_TARGET_TEMP),
+                    CONF_VT_TOLERANCE: user_input.get(CONF_VT_TOLERANCE, DEFAULT_VT_TOLERANCE),
+                }
+                self._virtual_thermostats.append(vt_config)
+
+                # Auto-add as zone
+                vt_entity_id = _make_vt_entity_id(vt_name)
+                sensors = _get_binary_sensor_entities(self.hass)
+                window_sensor = user_input.get(CONF_ZONE_WINDOW_SENSOR)
+
+                zone_data = {
+                    CONF_ZONE_NAME: vt_name,
+                    CONF_ZONE_CLIMATE: vt_entity_id,
+                    CONF_ZONE_TRV_SYNC: False,
+                }
+                if window_sensor and window_sensor != "none":
+                    zone_data[CONF_ZONE_WINDOW_SENSOR] = window_sensor
+
+                self._zones.append(zone_data)
+                return await self.async_step_another_zone()
+
+        temp_sensors = _get_temperature_sensor_entities(self.hass)
+        switches = _get_switch_entities(self.hass)
+        window_sensors = _get_binary_sensor_entities(self.hass)
+
+        if not temp_sensors:
+            return self.async_abort(reason="no_temp_sensors_found")
+        if not switches:
+            return self.async_abort(reason="no_switches_found")
+
+        schema = vol.Schema({
+            vol.Required(CONF_VT_NAME): str,
+            vol.Required(CONF_VT_TEMP_SENSOR): vol.In(temp_sensors),
+            vol.Required(CONF_VT_HEATER_SWITCH): vol.In(switches),
+            vol.Optional(CONF_VT_TARGET_TEMP, default=DEFAULT_VT_TARGET_TEMP): vol.Coerce(float),
+            vol.Optional(CONF_VT_TOLERANCE, default=DEFAULT_VT_TOLERANCE): vol.Coerce(float),
+            vol.Optional(CONF_ZONE_WINDOW_SENSOR, default="none"): vol.In(window_sensors),
+        })
+
+        return self.async_show_form(
+            step_id="create_virtual_thermostat",
+            data_schema=schema,
+            errors=errors,
         )
 
     async def async_step_add_zone(
@@ -187,7 +319,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Ask if user wants to add another zone."""
         if user_input is not None:
             if user_input.get("add_another", False):
-                return await self.async_step_add_zone()
+                return await self.async_step_choose_zone_type()
             else:
                 return await self.async_step_confirm()
 
@@ -217,12 +349,15 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self.async_abort(reason="no_zones_configured")
 
         if user_input is not None:
+            data = {
+                CONF_BOILER_SWITCH: self._boiler_switch,
+                CONF_ZONES: self._zones,
+            }
+            if self._virtual_thermostats:
+                data[CONF_VIRTUAL_THERMOSTATS] = self._virtual_thermostats
             return self.async_create_entry(
                 title="Multizone Thermostat",
-                data={
-                    CONF_BOILER_SWITCH: self._boiler_switch,
-                    CONF_ZONES: self._zones,
-                },
+                data=data,
             )
 
         schema = vol.Schema({})
@@ -258,6 +393,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
         self._config_entry = config_entry
         self._zones: list[dict] = list(config_entry.data.get(CONF_ZONES, []))
         self._boiler_switch: str = config_entry.data.get(CONF_BOILER_SWITCH, "")
+        self._virtual_thermostats: list[dict] = list(config_entry.data.get(CONF_VIRTUAL_THERMOSTATS, []))
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -273,14 +409,23 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                 return await self.async_step_remove_zone()
             elif action == "edit_zone":
                 return await self.async_step_edit_zone()
+            elif action == "create_virtual":
+                return await self.async_step_create_virtual_thermostat()
+            elif action == "remove_virtual":
+                return await self.async_step_remove_virtual_thermostat()
+
+        menu_options = {
+            "change_boiler": "Change boiler switch",
+            "add_zone": "Add a zone (existing thermostat)",
+            "create_virtual": "Create virtual thermostat",
+            "remove_zone": "Remove a zone",
+            "edit_zone": "Edit a zone",
+        }
+        if self._virtual_thermostats:
+            menu_options["remove_virtual"] = "Remove virtual thermostat"
 
         schema = vol.Schema({
-            vol.Required("action"): vol.In({
-                "change_boiler": "Change boiler switch",
-                "add_zone": "Add a zone",
-                "remove_zone": "Remove a zone",
-                "edit_zone": "Edit a zone (TRV sync)",
-            }),
+            vol.Required("action"): vol.In(menu_options),
         })
 
         return self.async_show_form(
@@ -364,7 +509,15 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
 
         if user_input is not None:
             climate_to_remove = user_input["zone_climate"]
+            zone_name = zone_options[climate_to_remove]
+            
+            # Remove the zone config
             self._zones = [z for z in self._zones if z[CONF_ZONE_CLIMATE] != climate_to_remove]
+            
+            # Remove the associated switch entity from registry
+            switch_entity_id = _make_zone_switch_entity_id(zone_name)
+            _remove_entity_from_registry(self.hass, switch_entity_id)
+            
             return self._save_options()
 
         schema = vol.Schema({
@@ -372,6 +525,107 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
         })
 
         return self.async_show_form(step_id="remove_zone", data_schema=schema)
+
+    async def async_step_create_virtual_thermostat(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.FlowResult:
+        """Create a virtual thermostat."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            vt_name = user_input[CONF_VT_NAME].strip()
+            if not vt_name:
+                errors[CONF_VT_NAME] = "zone_name_required"
+            else:
+                vt_config = {
+                    CONF_VT_NAME: vt_name,
+                    CONF_VT_TEMP_SENSOR: user_input[CONF_VT_TEMP_SENSOR],
+                    CONF_VT_HEATER_SWITCH: user_input[CONF_VT_HEATER_SWITCH],
+                    CONF_VT_TARGET_TEMP: user_input.get(CONF_VT_TARGET_TEMP, DEFAULT_VT_TARGET_TEMP),
+                    CONF_VT_TOLERANCE: user_input.get(CONF_VT_TOLERANCE, DEFAULT_VT_TOLERANCE),
+                }
+                self._virtual_thermostats.append(vt_config)
+
+                # Auto-add as zone
+                vt_entity_id = _make_vt_entity_id(vt_name)
+                window_sensor = user_input.get(CONF_ZONE_WINDOW_SENSOR)
+
+                zone_data = {
+                    CONF_ZONE_NAME: vt_name,
+                    CONF_ZONE_CLIMATE: vt_entity_id,
+                    CONF_ZONE_TRV_SYNC: False,
+                }
+                if window_sensor and window_sensor != "none":
+                    zone_data[CONF_ZONE_WINDOW_SENSOR] = window_sensor
+
+                self._zones.append(zone_data)
+                return self._save_options()
+
+        temp_sensors = _get_temperature_sensor_entities(self.hass)
+        switches = _get_switch_entities(self.hass)
+        window_sensors = _get_binary_sensor_entities(self.hass)
+
+        if not temp_sensors:
+            return self.async_abort(reason="no_temp_sensors_found")
+
+        schema = vol.Schema({
+            vol.Required(CONF_VT_NAME): str,
+            vol.Required(CONF_VT_TEMP_SENSOR): vol.In(temp_sensors),
+            vol.Required(CONF_VT_HEATER_SWITCH): vol.In(switches),
+            vol.Optional(CONF_VT_TARGET_TEMP, default=DEFAULT_VT_TARGET_TEMP): vol.Coerce(float),
+            vol.Optional(CONF_VT_TOLERANCE, default=DEFAULT_VT_TOLERANCE): vol.Coerce(float),
+            vol.Optional(CONF_ZONE_WINDOW_SENSOR, default="none"): vol.In(window_sensors),
+        })
+
+        return self.async_show_form(
+            step_id="create_virtual_thermostat",
+            data_schema=schema,
+            errors=errors,
+        )
+
+    async def async_step_remove_virtual_thermostat(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.FlowResult:
+        """Remove a virtual thermostat."""
+        if not self._virtual_thermostats:
+            return self.async_abort(reason="no_virtual_thermostats")
+
+        vt_options = {
+            _make_vt_entity_id(vt[CONF_VT_NAME]): vt[CONF_VT_NAME]
+            for vt in self._virtual_thermostats
+        }
+
+        if user_input is not None:
+            vt_to_remove = user_input["virtual_thermostat"]
+            
+            # Find the VT config to get its name before removal
+            vt_name = next((vt[CONF_VT_NAME] for vt in self._virtual_thermostats if _make_vt_entity_id(vt[CONF_VT_NAME]) == vt_to_remove), None)
+            
+            # Remove the VT config
+            self._virtual_thermostats = [
+                vt for vt in self._virtual_thermostats
+                if _make_vt_entity_id(vt[CONF_VT_NAME]) != vt_to_remove
+            ]
+            # Remove the associated zone
+            self._zones = [
+                z for z in self._zones
+                if z[CONF_ZONE_CLIMATE] != vt_to_remove
+            ]
+            
+            if vt_name:
+                # Remove VT entity from registry
+                _remove_entity_from_registry(self.hass, vt_to_remove)
+                # Remove associated zone switch from registry
+                switch_entity_id = _make_zone_switch_entity_id(vt_name)
+                _remove_entity_from_registry(self.hass, switch_entity_id)
+                
+            return self._save_options()
+
+        schema = vol.Schema({
+            vol.Required("virtual_thermostat"): vol.In(vt_options),
+        })
+
+        return self.async_show_form(step_id="remove_virtual_thermostat", data_schema=schema)
 
     async def async_step_edit_zone(
         self, user_input: dict[str, Any] | None = None
@@ -420,10 +674,13 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
     @callback
     def _save_options(self) -> config_entries.FlowResult:
         """Save updated options and reload entry."""
+        data = {
+            CONF_BOILER_SWITCH: self._boiler_switch,
+            CONF_ZONES: self._zones,
+        }
+        if self._virtual_thermostats:
+            data[CONF_VIRTUAL_THERMOSTATS] = self._virtual_thermostats
         return self.async_create_entry(
             title="",
-            data={
-                CONF_BOILER_SWITCH: self._boiler_switch,
-                CONF_ZONES: self._zones,
-            },
+            data=data,
         )

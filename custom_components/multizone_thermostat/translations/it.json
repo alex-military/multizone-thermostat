@@ -3,47 +3,74 @@
     "step": {
       "user": {
         "title": "Multizone Thermostat — Configurazione Caldaia",
-        "description": "Seleziona l'entità interruttore (switch) che controlla il relè (circolatore) della caldaia. Questo è il primo passaggio obbligatorio.",
+        "description": "Seleziona l'entità switch che controlla il relè della caldaia (circolatore). Questo è il primo passo obbligatorio.",
         "data": {
-          "boiler_switch": "Interruttore Caldaia"
+          "boiler_switch": "Switch Caldaia"
         },
         "data_description": {
-          "boiler_switch": "L'interruttore/relè che controlla la pompa di circolazione della caldaia"
+          "boiler_switch": "Lo switch/relè che controlla la pompa del circolatore della caldaia"
+        }
+      },
+      "choose_zone_type": {
+        "title": "Aggiungi Zona — Scegli Tipo",
+        "description": "Vuoi usare un termostato esistente o crearne uno virtuale?",
+        "data": {
+          "zone_type": "Tipo di zona"
+        }
+      },
+      "create_virtual_thermostat": {
+        "title": "Crea Termostato Virtuale",
+        "description": "Crea un termostato virtuale da un sensore di temperatura e uno switch/relè riscaldamento.",
+        "data": {
+          "name": "Nome Zona",
+          "temperature_sensor": "Sensore Temperatura",
+          "heater_switch": "Switch / Relè Riscaldamento",
+          "target_temperature": "Temperatura Target Iniziale (°C)",
+          "tolerance": "Tolleranza (°C)",
+          "window_sensor": "Sensore Finestra (Opzionale)"
+        },
+        "data_description": {
+          "temperature_sensor": "Il sensore che legge la temperatura attuale della stanza",
+          "heater_switch": "Lo switch/relè che controlla il riscaldamento in questa zona",
+          "target_temperature": "La temperatura target iniziale per questa zona",
+          "tolerance": "Isteresi: il riscaldamento si accende sotto target-tolleranza, si spegne sopra target+tolleranza",
+          "window_sensor": "Bypassa automaticamente la zona quando questo sensore è aperto"
         }
       },
       "add_zone": {
         "title": "Aggiungi Zona di Riscaldamento ({zone_number})",
-        "description": "Configure una zona di riscaldamento. {zones_added} zona/e già aggiunta/e.",
+        "description": "Configura una zona di riscaldamento. {zones_added} zona/e già aggiunte.",
         "data": {
-          "climate_entity": "Entità Climatica",
+          "climate_entity": "Entità Climate",
           "name": "Nome Zona",
-          "trv_preset_sync": "Sincronizza Preset TRV",
+          "trv_preset_sync": "Abilita Sincronizzazione Preset TRV",
           "window_sensor": "Sensore Finestra (Opzionale)"
         },
         "data_description": {
-          "climate_entity": "L'entità climatica per questa stanza/zona",
-          "name": "Un nome amichevole per questa zona (precompilato dall'entità climatica)",
-          "trv_preset_sync": "Sincronizza automaticamente la modalità preset al cambio della modalità HVAC (per valvole TRV fisiche)",
+          "climate_entity": "L'entità climate per questa stanza/zona",
+          "name": "Un nome per questa zona (precompilato dal nome dell'entità climate)",
+          "trv_preset_sync": "Sincronizza automaticamente la modalità preset quando cambia la modalità HVAC (per valvole TRV fisiche)",
           "window_sensor": "Bypassa automaticamente la zona quando questo sensore è aperto"
         }
       },
       "another_zone": {
         "title": "Aggiungere un'altra zona?",
-        "description": "Hai aggiunto {zones_added} zona/e: {zones_list}.\n\n{remaining} entità termostato ancora disponibili.",
+        "description": "Hai aggiunto {zones_added} zona/e: {zones_list}.\n\n{remaining} entità climate ancora disponibili.",
         "data": {
           "add_another": "Aggiungi un'altra zona"
         }
       },
       "confirm": {
         "title": "Conferma Configurazione",
-        "description": "Pronto a configurare Multizone Thermostat con questa configurazione:\n\n**Interruttore Caldaia:** {boiler_switch}\n**Zone ({zones_count}):**\n{zones_list}\n\nClicca Invia per creare l'integrazione.",
+        "description": "Pronto per configurare Multizone Thermostat con le seguenti impostazioni:\n\n**Switch Caldaia:** {boiler_switch}\n**Zone ({zones_count}):**\n{zones_list}\n\nClicca Invia per creare l'integrazione.",
         "data": {}
       }
     },
     "abort": {
       "already_configured": "Multizone Thermostat è già configurato. Usa il flusso Opzioni per modificare le zone.",
-      "no_switches_found": "Nessuna entità interruttore trovata in Home Assistant. Aggiungi prima un'entità switch/relè.",
-      "no_zones_configured": "Nessuna zona è stata configurata. Aggiungi almeno una zona."
+      "no_switches_found": "Nessuna entità switch trovata in Home Assistant. Aggiungi prima un'entità switch/relè.",
+      "no_zones_configured": "Nessuna zona configurata. Aggiungi almeno una zona.",
+      "no_temp_sensors_found": "Nessun sensore di temperatura trovato in Home Assistant."
     },
     "error": {
       "zone_name_required": "Il nome della zona non può essere vuoto."
@@ -53,45 +80,67 @@
     "step": {
       "init": {
         "title": "Opzioni Multizone Thermostat",
-        "description": "Caldaia attuale: **{boiler_switch}**\nZone configurate: **{zones_count}**\n\nCosa vorresti modificare?",
+        "description": "Caldaia attuale: **{boiler_switch}**\nZone configurate: **{zones_count}**\n\nCosa vuoi modificare?",
         "data": {
           "action": "Azione"
         }
       },
       "change_boiler": {
-        "title": "Modifica Interruttore Caldaia",
+        "title": "Cambia Switch Caldaia",
         "data": {
-          "boiler_switch": "Nuovo Interruttore Caldaia"
+          "boiler_switch": "Nuovo Switch Caldaia"
         }
       },
       "add_zone": {
         "title": "Aggiungi Nuova Zona",
         "data": {
-          "climate_entity": "Entità Termostato",
+          "climate_entity": "Entità Climate",
           "name": "Nome Zona",
-          "trv_preset_sync": "Abilita Sincronizzazione Preset TRV"
+          "trv_preset_sync": "Abilita Sincronizzazione Preset TRV",
+          "window_sensor": "Sensore Finestra (Opzionale)"
+        }
+      },
+      "create_virtual_thermostat": {
+        "title": "Crea Termostato Virtuale",
+        "description": "Crea un termostato virtuale da un sensore di temperatura e uno switch/relè riscaldamento.",
+        "data": {
+          "name": "Nome Zona",
+          "temperature_sensor": "Sensore Temperatura",
+          "heater_switch": "Switch / Relè Riscaldamento",
+          "target_temperature": "Temperatura Target Iniziale (°C)",
+          "tolerance": "Tolleranza (°C)",
+          "window_sensor": "Sensore Finestra (Opzionale)"
+        }
+      },
+      "remove_virtual_thermostat": {
+        "title": "Rimuovi Termostato Virtuale",
+        "description": "Seleziona il termostato virtuale da rimuovere. Anche la zona associata verrà rimossa.",
+        "data": {
+          "virtual_thermostat": "Termostato Virtuale"
         }
       },
       "remove_zone": {
         "title": "Rimuovi una Zona",
-        "description": "Seleziona la zona da rimuovere. Verrà rimossa anche l'entità interruttore creata per questa zona.",
+        "description": "Seleziona la zona da rimuovere. Anche l'entità switch per questa zona verrà rimossa.",
         "data": {
           "zone_climate": "Zona da Rimuovere"
         }
       },
       "edit_zone": {
         "title": "Modifica Impostazioni Zona",
-        "description": "Modifica le impostazioni per una zona.",
+        "description": "Modifica le impostazioni di una zona.",
         "data": {
           "zone_climate": "Zona",
-          "trv_preset_sync": "Abilita Sync Preset TRV",
+          "trv_preset_sync": "Abilita Sincronizzazione Preset TRV",
           "window_sensor": "Sensore Finestra (Opzionale)"
         }
       }
     },
     "abort": {
       "no_zones_configured": "Nessuna zona configurata.",
-      "no_climates_available": "Tutte le entità termostato disponibili sono già configurate come zone."
+      "no_climates_available": "Tutte le entità climate disponibili sono già configurate come zone.",
+      "no_temp_sensors_found": "Nessun sensore di temperatura trovato in Home Assistant.",
+      "no_virtual_thermostats": "Nessun termostato virtuale configurato."
     },
     "error": {
       "zone_name_required": "Il nome della zona non può essere vuoto."

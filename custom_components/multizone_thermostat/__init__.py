@@ -17,7 +17,7 @@ from .coordinator import MultizoneCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = ["switch", "number"]
+PLATFORMS = ["climate", "switch", "number"]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

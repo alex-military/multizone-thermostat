@@ -11,6 +11,32 @@
           "boiler_switch": "The switch/relay that controls the boiler circulator pump"
         }
       },
+      "choose_zone_type": {
+        "title": "Add Zone — Choose Type",
+        "description": "Do you want to use an existing thermostat or create a virtual one?",
+        "data": {
+          "zone_type": "Zone type"
+        }
+      },
+      "create_virtual_thermostat": {
+        "title": "Create Virtual Thermostat",
+        "description": "Create a virtual thermostat from a temperature sensor and a heater switch/relay.",
+        "data": {
+          "name": "Zone Name",
+          "temperature_sensor": "Temperature Sensor",
+          "heater_switch": "Heater Switch / Relay",
+          "target_temperature": "Initial Target Temperature (°C)",
+          "tolerance": "Tolerance (°C)",
+          "window_sensor": "Window Sensor (Optional)"
+        },
+        "data_description": {
+          "temperature_sensor": "The sensor that reads the current room temperature",
+          "heater_switch": "The switch/relay that controls the heater in this zone",
+          "target_temperature": "The initial target temperature for this zone",
+          "tolerance": "Hysteresis: heater turns on below target-tolerance, off above target+tolerance",
+          "window_sensor": "Automatically bypass the zone when this sensor is open"
+        }
+      },
       "add_zone": {
         "title": "Add Heating Zone ({zone_number})",
         "description": "Configure a heating zone. {zones_added} zone(s) already added.",
@@ -43,7 +69,8 @@
     "abort": {
       "already_configured": "Multizone Thermostat is already configured. Use the Options flow to modify zones.",
       "no_switches_found": "No switch entities found in Home Assistant. Please add a switch/relay entity first.",
-      "no_zones_configured": "No zones were configured. Please add at least one zone."
+      "no_zones_configured": "No zones were configured. Please add at least one zone.",
+      "no_temp_sensors_found": "No temperature sensors found in Home Assistant."
     },
     "error": {
       "zone_name_required": "Zone name cannot be empty."
@@ -73,6 +100,25 @@
           "window_sensor": "Window Sensor (Optional)"
         }
       },
+      "create_virtual_thermostat": {
+        "title": "Create Virtual Thermostat",
+        "description": "Create a virtual thermostat from a temperature sensor and a heater switch/relay.",
+        "data": {
+          "name": "Zone Name",
+          "temperature_sensor": "Temperature Sensor",
+          "heater_switch": "Heater Switch / Relay",
+          "target_temperature": "Initial Target Temperature (°C)",
+          "tolerance": "Tolerance (°C)",
+          "window_sensor": "Window Sensor (Optional)"
+        }
+      },
+      "remove_virtual_thermostat": {
+        "title": "Remove Virtual Thermostat",
+        "description": "Select the virtual thermostat to remove. The associated zone will also be removed.",
+        "data": {
+          "virtual_thermostat": "Virtual Thermostat"
+        }
+      },
       "remove_zone": {
         "title": "Remove a Zone",
         "description": "Select the zone to remove. The switch entity for this zone will also be removed.",
@@ -92,7 +138,9 @@
     },
     "abort": {
       "no_zones_configured": "No zones configured.",
-      "no_climates_available": "All available climate entities are already configured as zones."
+      "no_climates_available": "All available climate entities are already configured as zones.",
+      "no_temp_sensors_found": "No temperature sensors found in Home Assistant.",
+      "no_virtual_thermostats": "No virtual thermostats configured."
     },
     "error": {
       "zone_name_required": "Zone name cannot be empty."

@@ -39,3 +39,13 @@ DEFAULT_TRV_SYNC = False
 DEFAULT_MIN_CYCLE_ON = 5
 DEFAULT_MIN_CYCLE_OFF = 5
 DEFAULT_VALVE_DELAY = 0
+
+# Virtual Thermostat keys
+CONF_VIRTUAL_THERMOSTATS = "virtual_thermostats"
+CONF_VT_TEMP_SENSOR = "temperature_sensor"
+CONF_VT_HEATER_SWITCH = "heater_switch"
+CONF_VT_NAME = "name"
+CONF_VT_TARGET_TEMP = "target_temperature"
+CONF_VT_TOLERANCE = "tolerance"
+DEFAULT_VT_TARGET_TEMP = 20.0
+DEFAULT_VT_TOLERANCE = 0.5
