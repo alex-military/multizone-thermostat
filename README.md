@@ -204,6 +204,7 @@ The project is structured in phases to evolve from a simple aggregator to a full
   - Selezionando un preset, il sistema applicherà le impostazioni salvate per ogni zona.
   - Se modifichi la temperatura o attivi/disattivi il bypass di una zona mentre è attivo un preset, il sistema *ricorda* quella modifica e la salverà permanentemente per quel preset.
   - Al successivo utilizzo dello stesso preset, la zona tornerà esattamente allo stato (temperatura target e stato bypass) configurato l'ultima volta.
+- [ ] **Card Preset Rapida**: Una custom card Lovelace dedicata alla selezione rapida e centralizzata dei preset globali.
 - [ ] **Geofencing Zero-Code**: Cambio preset automatico in base alla presenza (Away/Comfort).
 
 ### FASE 3 — Ottimizzazione Energetica Avanzata
