@@ -228,10 +228,14 @@ class MultizoneCoordinator:
     def set_min_cycle_on(self, value: int) -> None:
         """Set the min cycle on time (minutes)."""
         self._min_cycle_on = value
+        self._boiler_locked_on_until = None
+        self.hass.async_create_task(self._async_update_boiler())
         
     def set_min_cycle_off(self, value: int) -> None:
         """Set the min cycle off time (minutes)."""
         self._min_cycle_off = value
+        self._boiler_locked_off_until = None
+        self.hass.async_create_task(self._async_update_boiler())
         
     def set_valve_delay(self, value: int) -> None:
         """Set the valve delay time (seconds)."""
