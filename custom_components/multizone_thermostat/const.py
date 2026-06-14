@@ -9,16 +9,12 @@ CONF_ZONE_NAME = "name"
 CONF_ZONE_CLIMATE = "climate_entity"
 CONF_ZONE_TRV_SYNC = "trv_preset_sync"
 CONF_ZONE_WINDOW_SENSOR = "window_sensor"
-CONF_ZONE_ENABLED = "enabled"
 
 # Protection keys
 CONF_MIN_CYCLE_ON = "min_cycle_on"
 CONF_MIN_CYCLE_OFF = "min_cycle_off"
 CONF_VALVE_DELAY = "valve_opening_delay"
 
-# Storage keys
-STORAGE_VERSION = 1
-STORAGE_KEY = f"{DOMAIN}.zone_states"
 
 # HVAC
 HVAC_MODE_HEAT = "heat"
@@ -49,3 +45,10 @@ CONF_VT_TARGET_TEMP = "target_temperature"
 CONF_VT_TOLERANCE = "tolerance"
 DEFAULT_VT_TARGET_TEMP = 20.0
 DEFAULT_VT_TOLERANCE = 0.5
+
+
+def make_vt_entity_id(name: str) -> str:
+    """Generate a predictable entity_id for a virtual thermostat."""
+    safe = name.lower().replace(" ", "_").replace("-", "_")
+    safe = "".join(c for c in safe if c.isalnum() or c == "_")
+    return f"climate.{DOMAIN}_vt_{safe}"

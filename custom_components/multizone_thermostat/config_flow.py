@@ -13,7 +13,6 @@ from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN
 from homeassistant.components.binary_sensor import DOMAIN as BINARY_SENSOR_DOMAIN
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
-import homeassistant.helpers.config_validation as cv
 
 from .const import (
     CONF_BOILER_SWITCH,
@@ -33,6 +32,7 @@ from .const import (
     DEFAULT_VT_TOLERANCE,
     DOMAIN,
     SWITCH_ZONE_PREFIX,
+    make_vt_entity_id,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -100,12 +100,6 @@ def _get_temperature_sensor_entities(hass: HomeAssistant) -> dict[str, str]:
                 sensors[state.entity_id] = state.attributes.get("friendly_name", state.entity_id)
     return dict(sorted(sensors.items(), key=lambda x: x[1]))
 
-
-def _make_vt_entity_id(name: str) -> str:
-    """Generate a predictable entity_id for a virtual thermostat."""
-    safe = name.lower().replace(" ", "_").replace("-", "_")
-    safe = "".join(c for c in safe if c.isalnum() or c == "_")
-    return f"climate.{DOMAIN}_vt_{safe}"
 
 
 def _make_zone_switch_entity_id(name: str) -> str:
@@ -216,7 +210,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 self._virtual_thermostats.append(vt_config)
 
                 # Auto-add as zone
-                vt_entity_id = _make_vt_entity_id(vt_name)
+                vt_entity_id = make_vt_entity_id(vt_name)
                 sensors = _get_binary_sensor_entities(self.hass)
                 window_sensor = user_input.get(CONF_ZONE_WINDOW_SENSOR)
 
@@ -394,6 +388,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
         self._zones: list[dict] = list(config_entry.data.get(CONF_ZONES, []))
         self._boiler_switch: str = config_entry.data.get(CONF_BOILER_SWITCH, "")
         self._virtual_thermostats: list[dict] = list(config_entry.data.get(CONF_VIRTUAL_THERMOSTATS, []))
+        self._current_zone_id: str | None = None
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -547,7 +542,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                 self._virtual_thermostats.append(vt_config)
 
                 # Auto-add as zone
-                vt_entity_id = _make_vt_entity_id(vt_name)
+                vt_entity_id = make_vt_entity_id(vt_name)
                 window_sensor = user_input.get(CONF_ZONE_WINDOW_SENSOR)
 
                 zone_data = {
@@ -591,7 +586,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             return self.async_abort(reason="no_virtual_thermostats")
 
         vt_options = {
-            _make_vt_entity_id(vt[CONF_VT_NAME]): vt[CONF_VT_NAME]
+            make_vt_entity_id(vt[CONF_VT_NAME]): vt[CONF_VT_NAME]
             for vt in self._virtual_thermostats
         }
 
@@ -599,12 +594,12 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             vt_to_remove = user_input["virtual_thermostat"]
             
             # Find the VT config to get its name before removal
-            vt_name = next((vt[CONF_VT_NAME] for vt in self._virtual_thermostats if _make_vt_entity_id(vt[CONF_VT_NAME]) == vt_to_remove), None)
+            vt_name = next((vt[CONF_VT_NAME] for vt in self._virtual_thermostats if make_vt_entity_id(vt[CONF_VT_NAME]) == vt_to_remove), None)
             
             # Remove the VT config
             self._virtual_thermostats = [
                 vt for vt in self._virtual_thermostats
-                if _make_vt_entity_id(vt[CONF_VT_NAME]) != vt_to_remove
+                if make_vt_entity_id(vt[CONF_VT_NAME]) != vt_to_remove
             ]
             # Remove the associated zone
             self._zones = [
@@ -635,7 +630,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             return self.async_abort(reason="no_zones_configured")
 
         if user_input is not None:
-            if getattr(self, "_current_zone_id", None):
+            if self._current_zone_id is not None:
                 # Find and update
                 for i, zone in enumerate(self._zones):
                     if zone[CONF_ZONE_CLIMATE] == self._current_zone_id:
@@ -645,6 +640,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                         else:
                             self._zones[i].pop(CONF_ZONE_WINDOW_SENSOR, None)
                         break
+                self._current_zone_id = None
                 return self._save_options()
 
             # First step: select zone to edit
@@ -673,14 +669,14 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
 
     @callback
     def _save_options(self) -> config_entries.FlowResult:
-        """Save updated options and reload entry."""
+        """Save updated options into entry.data and reload entry."""
         data = {
             CONF_BOILER_SWITCH: self._boiler_switch,
             CONF_ZONES: self._zones,
         }
         if self._virtual_thermostats:
             data[CONF_VIRTUAL_THERMOSTATS] = self._virtual_thermostats
-        return self.async_create_entry(
-            title="",
-            data=data,
+        self.hass.config_entries.async_update_entry(
+            self._config_entry, data=data
         )
+        return self.async_create_entry(title="", data={})

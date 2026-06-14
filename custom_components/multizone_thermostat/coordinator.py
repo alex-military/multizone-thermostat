@@ -21,15 +21,12 @@ from homeassistant.const import (
 )
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers.event import async_track_state_change_event
-from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.storage import Store
 
 from .const import (
-    CONF_BOILER_SWITCH,
     CONF_ZONE_CLIMATE,
     CONF_ZONE_TRV_SYNC,
     CONF_ZONE_WINDOW_SENSOR,
-    CONF_ZONES,
     DOMAIN,
     HVAC_ACTION_HEATING,
     HVAC_MODE_HEAT,
@@ -303,8 +300,8 @@ class MultizoneCoordinator:
             try:
                 await asyncio.sleep(delay_seconds)
                 if skip_lock_check:
-                    # Time's up for valve delay, turn on now
-                    await self._force_boiler_on()
+                    # Valve delay expired: re-check demand before turning on
+                    await self._async_update_boiler()
                 else:
                     await self._async_update_boiler()
             except asyncio.CancelledError:
@@ -434,15 +431,3 @@ class MultizoneCoordinator:
             blocking=False,
         )
 
-    def update_zones(self, zones: list[dict], boiler_switch: str) -> None:
-        """Update zones and boiler switch when options change."""
-        self.zones = zones
-        self.boiler_switch = boiler_switch
-        # Reset zone states for new zones
-        for zone in zones:
-            climate_id = zone[CONF_ZONE_CLIMATE]
-            if climate_id not in self._zone_states:
-                self._zone_states[climate_id] = True
-        # Re-setup listeners
-        self.async_teardown_listeners()
-        self.async_setup_listeners()

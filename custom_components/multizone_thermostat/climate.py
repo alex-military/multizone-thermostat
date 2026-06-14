@@ -37,6 +37,7 @@ from .const import (
     DEFAULT_VT_TARGET_TEMP,
     DEFAULT_VT_TOLERANCE,
     DOMAIN,
+    make_vt_entity_id,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -69,13 +70,6 @@ async def async_setup_entry(
 
     async_add_entities(entities)
 
-
-def _make_vt_entity_id(name: str) -> str:
-    """Generate a predictable entity_id for a virtual thermostat."""
-    safe = name.lower().replace(" ", "_").replace("-", "_")
-    # Remove non-alphanumeric chars except underscore
-    safe = "".join(c for c in safe if c.isalnum() or c == "_")
-    return f"climate.{DOMAIN}_vt_{safe}"
 
 
 class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
@@ -113,6 +107,8 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         self._current_temperature: float | None = None
 
         # Entity setup
+        vt_entity_id = make_vt_entity_id(name)
+        # unique_id uses the entry_id to be unique per config entry
         safe_name = name.lower().replace(" ", "_").replace("-", "_")
         safe_name = "".join(c for c in safe_name if c.isalnum() or c == "_")
         self._attr_unique_id = f"{DOMAIN}_{entry_id}_vt_{safe_name}"
@@ -124,7 +120,7 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         )
 
         # We explicitly set entity_id so the zone config can reference it
-        self.entity_id = f"climate.{DOMAIN}_vt_{safe_name}"
+        self.entity_id = vt_entity_id
 
         self._unsub_listeners: list = []
 

@@ -145,5 +145,12 @@
     "error": {
       "zone_name_required": "Zone name cannot be empty."
     }
+  },
+  "entity": {
+    "switch": {
+      "master": {
+        "name": "Heating Master"
+      }
+    }
   }
 }

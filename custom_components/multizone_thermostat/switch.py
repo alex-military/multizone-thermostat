@@ -76,11 +76,6 @@ class MultizoneMasterSwitch(RestoreEntity, SwitchEntity):
         self._is_on: bool = False
 
     @property
-    def name(self) -> str:
-        """Return the name of the switch."""
-        return "Heating Master"
-
-    @property
     def is_on(self) -> bool:
         """Return true if switch is on."""
         return self._is_on

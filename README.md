@@ -4,22 +4,25 @@ A custom integration for Home Assistant that provides **multi-zone heating manag
 
 ## Features
 
-- 🖥️ **UI Config Flow** — Select your boiler relay and climate entities directly from the HA interface
+- 🖥️ **100% UI Config Flow** — Setup wizard: select your boiler relay and add zones directly from the HA interface
 - 🔘 **Master Switch** — One switch to enable/disable the entire heating system
 - 🏠 **Per-Zone Switches** — Individual switches for each room/zone, persistent across restarts
 - 🔥 **Automatic Boiler Control** — Boiler turns ON when any zone is heating, OFF when all zones are idle
 - 🛡️ **Boiler Protection** — Native `number` entities for anti-short-cycle (min cycle on/off) and valve opening delay
 - 🪟 **Window Sensor Detection** — Automatically bypass zones when a window is opened, and restore them when closed
-- 🌡️ **Virtual Thermostats** — Create virtual thermostat entities directly from the UI by combining a temperature sensor and a heater switch
-- 🌡️ **TRV Preset Sync** — Optional per-zone preset synchronization for physical TRV valves
-- ⚙️ **Options Flow** — Add/remove zones, change window sensors and settings after installation
+- 🌡️ **Virtual Thermostats** — Create virtual thermostat entities directly from the UI by combining a temperature sensor and a heater switch — no YAML needed
+- 🔄 **TRV Preset Sync** — Optional per-zone preset synchronization for physical TRV valves
+- ⚙️ **Options Flow** — Add/remove zones and virtual thermostats, change window sensors and settings after installation
+- 🎨 **3 Custom Lovelace Cards** — Master status card, circular dial card, and compact button card — all auto-registered
 
 ## Installation
 
 ### Via HACS (recommended)
-1. Add this repository as a custom repository in HACS
-2. Install "Multizone Thermostat"
-3. Restart Home Assistant
+1. Open **HACS** from the sidebar
+2. Go to **Integrations**, click the 3-dot menu (top right) → **Custom repositories**
+3. Add `https://github.com/alex-military/multizone-thermostat` with category **Integration**
+4. Search for **"Multizone Thermostat"** in HACS and click **Download**
+5. Restart Home Assistant
 
 ### Manual
 1. Copy the `custom_components/multizone_thermostat` folder to your HA `custom_components` directory
@@ -31,19 +34,36 @@ A custom integration for Home Assistant that provides **multi-zone heating manag
 2. Search for **"Multizone Thermostat"**
 3. Follow the setup wizard:
    - **Step 1**: Select your boiler switch/relay entity
-   - **Step 2**: Add heating zones (use an existing climate entity OR create a new Virtual Thermostat from a temperature sensor + switch)
-   - **Step 3**: Confirm and finish
+   - **Step 2**: Choose zone type — **existing thermostat** or **create a virtual thermostat**
+   - **Step 3**: Configure the zone (name, optional window sensor, optional TRV sync)
+   - **Step 4**: Add more zones or confirm and finish
+
+### Creating a Virtual Thermostat
+
+If you don't have a pre-existing `climate` entity (e.g., you have a standalone temperature sensor and a relay/switch controlling a fancoil, radiator valve, or underfloor heating), you can create a **Virtual Thermostat** directly from the wizard:
+
+1. In the "Choose zone type" step, select **"Create virtual thermostat"**
+2. Fill in:
+   - **Zone Name**: A friendly name for the zone (e.g., "Camera", "Studio")
+   - **Temperature Sensor**: The `sensor` entity that reads the room temperature (must have `device_class: temperature`)
+   - **Heater Switch**: The `switch` entity that controls the heater/relay in that zone
+   - **Target Temperature**: Initial target temperature (default: 20°C)
+   - **Tolerance**: Hysteresis in °C (default: 0.5°C) — the heater turns ON when temperature drops below `target - tolerance`, and turns OFF when it rises above `target + tolerance`
+   - **Window Sensor** _(optional)_: A `binary_sensor` to auto-bypass the zone when a window is open
+3. The integration will automatically create a `climate` entity and register it as a zone
+
+Virtual thermostats can also be created **after installation** from the Options menu.
 
 ## Entities Created
 
 | Entity | Description |
 |--------|-------------|
 | `switch.multizone_master` | Master on/off for the entire heating system |
-| `switch.multizone_[zone_name]` | Per-zone on/off switch (one per configured zone) |
-| `climate.multizone_thermostat_vt_[name]` | (Optional) Virtual thermostat created via the UI |
-| `number.multizone_min_cycle_on` | Minimum boiler ON time (minutes) |
-| `number.multizone_min_cycle_off` | Minimum boiler OFF time (minutes) |
-| `number.multizone_valve_delay` | Valve opening delay before boiler starts (seconds) |
+| `switch.multizone_zone_[zone_name]` | Per-zone on/off switch (one per configured zone) |
+| `climate.multizone_thermostat_vt_[name]` | Virtual thermostat entity (only if created via the UI) |
+| `number.multizone_min_cycle_on` | Minimum boiler ON time (minutes, default: 5) |
+| `number.multizone_min_cycle_off` | Minimum boiler OFF time (minutes, default: 5) |
+| `number.multizone_valve_delay` | Valve opening delay before boiler starts (seconds, default: 0) |
 
 ## How It Works
 
@@ -69,14 +89,21 @@ Window Opened
     └── Zone Switch turns OFF automatically (bypassed) and saves state
 Window Closed
     └── Zone Switch restores previous state
+
+Virtual Thermostat Logic (ON/OFF with hysteresis)
+    └── current_temp < target - tolerance → heater switch ON
+    └── current_temp > target + tolerance → heater switch OFF
+    └── Reports hvac_action = heating/idle to the coordinator
 ```
 
 ## Options (Post-Installation)
 
 Go to **Settings → Devices & Services → Multizone Thermostat → Configure** to:
 - Change the boiler switch
-- Add a new zone (existing thermostat or create a new virtual one)
-- Remove an existing zone or virtual thermostat
+- Add a new zone (existing thermostat)
+- Create a new virtual thermostat (sensor + switch → climate entity)
+- Remove a zone
+- Remove a virtual thermostat (removes both the climate entity and the associated zone)
 - Edit a zone (TRV preset sync, Window Sensor)
 
 ## TRV Preset Sync
@@ -89,7 +116,7 @@ Only enable this for zones with physical TRV valves that support preset modes.
 
 ## Lovelace Cards
 
-This integration includes three beautiful custom Lovelace cards to control your heating zones and view the central heating status directly in your Home Assistant dashboards.
+This integration includes three custom Lovelace cards to control your heating zones and view the central heating status directly in your Home Assistant dashboards. The cards are **auto-registered** — no manual resource configuration needed.
 
 ### 1. Central Heating Status Card (`custom:multizone-thermostat-status-card`)
 A zero-configuration, button-style card that displays the status of the central heating master switch. It changes color and icon dynamically depending on the state of the Master Switch and the Boiler/Circulator:
@@ -128,17 +155,7 @@ A compact button-based thermostat card designed for spaces where a circular dial
 
 ---
 
-### Card Installation
-
-To use these cards, make sure you add the JavaScript resource to your Lovelace dashboard configuration:
-1. Go to **Settings → Dashboards**.
-2. Click the three dots in the top right and select **Resources**.
-3. Add a new resource:
-   - **URL**: `/local/multizone-thermostat-card.js`
-   - **Resource type**: `JavaScript Module`
-4. Refresh your browser page.
-
-### Configurations
+### Card Configuration
 
 #### Status Card (Zero-Config)
 The status card requires zero configuration because it automatically detects your Master Switch:
@@ -149,44 +166,40 @@ type: custom:multizone-thermostat-status-card
 #### Dial Thermostat Card
 ```yaml
 type: custom:multizone-thermostat-dial-card
-entity: climate.living_room         # Your climate entity
-switch: switch.multizone_living_room # (Optional) The bypass switch for this zone
-title: Living Room                  # (Optional) Custom title
+entity: climate.living_room                    # Your climate entity (or virtual thermostat)
+switch: switch.multizone_zone_living_room      # (Optional) The bypass switch for this zone
+title: Living Room                             # (Optional) Custom title
 ```
 
 #### Button Thermostat Card
 ```yaml
 type: custom:multizone-thermostat-button-card
-entity: climate.living_room         # Your climate entity
-switch: switch.multizone_living_room # (Optional) The bypass switch for this zone
-title: Living Room                  # (Optional) Custom title
+entity: climate.living_room                    # Your climate entity (or virtual thermostat)
+switch: switch.multizone_zone_living_room      # (Optional) The bypass switch for this zone
+title: Living Room                             # (Optional) Custom title
 ```
+
+> **Note**: If you installed via HACS, the Lovelace card resource is registered automatically. If cards don't appear, add the resource manually:
+> Go to **Settings → Dashboards → Resources** → Add `/multizone_thermostat_card/multizone-thermostat-card.js` as **JavaScript Module**.
 
 ## Requirements
 
-- Home Assistant 2023.x or newer
-- At least one `climate` entity (thermostat/TRV)
-- At least one `switch` entity (boiler relay)
+- Home Assistant 2024.x or newer
+- At least one `switch` entity (boiler relay/circulator)
+- At least one `climate` entity (thermostat/TRV) **OR** a temperature sensor + heater switch (to create a Virtual Thermostat)
 - **Note**: Currently supports only ON/OFF systems with a relay or actuator. Proportional modulation (PWM/PID) or OpenTherm will be added in future phases.
 
 ## Future Roadmap
 
 The project is structured in phases to evolve from a simple aggregator to a full-fledged smart climate manager.
 
-### FASE 1 — Sicurezza Impianto (Current Focus)
+### FASE 1 — Sicurezza Impianto ✅
 - [x] **Antipendolamento (`min_cycle_duration`)**: Previene oscillazioni rapide della caldaia con tempi minimi di ON/OFF (implementato via entità `number`).
 - [x] **Ritardo Accensione Caldaia (`valve_opening_delay`)**: Ritardo in secondi per permettere l'apertura delle valvole termoelettriche (implementato via entità `number`).
-- [x] **Rilevamento Finestra Aperta — `window_sensor`**
-  - **Problema**: Apertura finestra → calo temperatura → termostato accende caldaia → spreco energetico.
-  - **Soluzione**: Selezione opzionale di un `binary_sensor` per ogni zona nel Config Flow.
-    - Sensore `on` (finestra aperta) → zona bypassata automaticamente.
-    - Sensore `off` (finestra chiusa) → zona ripristina lo stato precedente al bypass.
-  - **UI**: Entity picker per `binary_sensor` nel wizard di configurazione zona e nelle Opzioni.
-  - **Memoria stato**: Stato precedente salvato nello storage persistente (`.storage/`) per resistere ai riavvii di HA.
-  - **Stato**: ✅ Implementato
+- [x] **Rilevamento Finestra Aperta (`window_sensor`)**: Bypass automatico zona su apertura finestra, con ripristino stato precedente e persistenza su riavvio.
 
-### FASE 2 — Evoluzione Architetturale
-- [x] **Termostati Virtuali via UI**: Creazione automatica di entità `climate` da un sensore di temperatura e uno switch (es. fancoil/relè sfusi) senza YAML. (✅ Implementato)
+### FASE 2 — Evoluzione Architetturale (In Progress)
+- [x] **Termostati Virtuali via UI**: Creazione automatica di entità `climate` da un sensore di temperatura e uno switch (es. fancoil/relè sfusi) senza YAML.
 - [ ] **Preset Globali (Memoria Temperature e Bypass)**: I preset (Eco / Comfort / Sleep / Away) fungono da "scenari globali" con memoria dinamica per singola zona. 
   - Selezionando un preset, il sistema applicherà le impostazioni salvate per ogni zona.
   - Se modifichi la temperatura o attivi/disattivi il bypass di una zona mentre è attivo un preset, il sistema *ricorda* quella modifica e la salverà permanentemente per quel preset.
@@ -198,3 +211,7 @@ The project is structured in phases to evolve from a simple aggregator to a full
 - [ ] **Carico Richiesto Globale (%)**: Sensore percentuale del fabbisogno termico per pompe di calore.
 - [ ] **Curva Climatica Integrata**: Ottimizzazione temperatura di mandata basata sul meteo esterno.
 - [ ] **Antigrippaggio Estivo**: Attivazione periodica delle valvole in estate per prevenire blocchi.
+
+## License
+
+This project is licensed under the MIT License.
