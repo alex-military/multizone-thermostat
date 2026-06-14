@@ -10,6 +10,7 @@ A custom integration for Home Assistant that provides **multi-zone heating manag
 - 🔥 **Automatic Boiler Control** — Boiler turns ON when any zone is heating, OFF when all zones are idle
 - 🛡️ **Boiler Protection** — Native `number` entities for anti-short-cycle (min cycle on/off) and valve opening delay
 - 🪟 **Window Sensor Detection** — Automatically bypass zones when a window is opened, and restore them when closed
+- 🌡️ **Virtual Thermostats** — Create virtual thermostat entities directly from the UI by combining a temperature sensor and a heater switch
 - 🌡️ **TRV Preset Sync** — Optional per-zone preset synchronization for physical TRV valves
 - ⚙️ **Options Flow** — Add/remove zones, change window sensors and settings after installation
 
@@ -30,7 +31,7 @@ A custom integration for Home Assistant that provides **multi-zone heating manag
 2. Search for **"Multizone Thermostat"**
 3. Follow the setup wizard:
    - **Step 1**: Select your boiler switch/relay entity
-   - **Step 2**: Add heating zones (climate entity, zone name, optional window binary_sensor)
+   - **Step 2**: Add heating zones (use an existing climate entity OR create a new Virtual Thermostat from a temperature sensor + switch)
    - **Step 3**: Confirm and finish
 
 ## Entities Created
@@ -39,6 +40,7 @@ A custom integration for Home Assistant that provides **multi-zone heating manag
 |--------|-------------|
 | `switch.multizone_master` | Master on/off for the entire heating system |
 | `switch.multizone_[zone_name]` | Per-zone on/off switch (one per configured zone) |
+| `climate.multizone_thermostat_vt_[name]` | (Optional) Virtual thermostat created via the UI |
 | `number.multizone_min_cycle_on` | Minimum boiler ON time (minutes) |
 | `number.multizone_min_cycle_off` | Minimum boiler OFF time (minutes) |
 | `number.multizone_valve_delay` | Valve opening delay before boiler starts (seconds) |
@@ -73,8 +75,8 @@ Window Closed
 
 Go to **Settings → Devices & Services → Multizone Thermostat → Configure** to:
 - Change the boiler switch
-- Add a new zone
-- Remove an existing zone
+- Add a new zone (existing thermostat or create a new virtual one)
+- Remove an existing zone or virtual thermostat
 - Edit a zone (TRV preset sync, Window Sensor)
 
 ## TRV Preset Sync
@@ -184,7 +186,7 @@ The project is structured in phases to evolve from a simple aggregator to a full
   - **Stato**: ✅ Implementato
 
 ### FASE 2 — Evoluzione Architetturale
-- [ ] **Termostati Virtuali via UI**: Creazione automatica di entità `climate` da un sensore di temperatura e uno switch (es. fancoil/relè sfusi) senza YAML.
+- [x] **Termostati Virtuali via UI**: Creazione automatica di entità `climate` da un sensore di temperatura e uno switch (es. fancoil/relè sfusi) senza YAML. (✅ Implementato)
 - [ ] **Preset Globali (Memoria Temperature e Bypass)**: I preset (Eco / Comfort / Sleep / Away) fungono da "scenari globali" con memoria dinamica per singola zona. 
   - Selezionando un preset, il sistema applicherà le impostazioni salvate per ogni zona.
   - Se modifichi la temperatura o attivi/disattivi il bypass di una zona mentre è attivo un preset, il sistema *ricorda* quella modifica e la salverà permanentemente per quel preset.
