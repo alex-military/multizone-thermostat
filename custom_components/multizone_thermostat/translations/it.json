@@ -140,6 +140,7 @@
       "no_zones_configured": "Nessuna zona configurata.",
       "no_climates_available": "Tutte le entità climate disponibili sono già configurate come zone.",
       "no_temp_sensors_found": "Nessun sensore di temperatura trovato in Home Assistant.",
+      "no_switches_found": "Nessuna entità switch trovata in Home Assistant.",
       "no_virtual_thermostats": "Nessun termostato virtuale configurato."
     },
     "error": {

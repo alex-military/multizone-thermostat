@@ -562,6 +562,8 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
 
         if not temp_sensors:
             return self.async_abort(reason="no_temp_sensors_found")
+        if not switches:
+            return self.async_abort(reason="no_switches_found")
 
         schema = vol.Schema({
             vol.Required(CONF_VT_NAME): str,

@@ -138,6 +138,7 @@ class MultizoneProtectionNumber(RestoreNumber):
             
         # Push the restored/default value to the coordinator
         self._update_coordinator(int(self._attr_native_value))
+        self.async_write_ha_state()
 
     async def async_set_native_value(self, value: float) -> None:
         """Update the value."""

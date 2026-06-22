@@ -9,6 +9,7 @@ from typing import Any
 import homeassistant.util.dt as dt_util
 
 from homeassistant.components.climate import (
+    ClimateEntityFeature,
     SERVICE_SET_HVAC_MODE,
     SERVICE_SET_PRESET_MODE,
     DOMAIN as CLIMATE_DOMAIN,
@@ -279,7 +280,7 @@ class MultizoneCoordinator:
             _LOGGER.debug("Boiler → ON (at least one zone heating)")
             if self._valve_delay > 0:
                 _LOGGER.debug("Waiting %s seconds for valves to open...", self._valve_delay)
-                self._schedule_boiler_check(self._valve_delay, skip_lock_check=True)
+                self._schedule_boiler_check(self._valve_delay)
                 return
             else:
                 await self._force_boiler_on()
@@ -295,19 +296,15 @@ class MultizoneCoordinator:
             _LOGGER.debug("Boiler → OFF (no zones heating)")
             await self._force_boiler_off()
 
-    def _schedule_boiler_check(self, delay_seconds: float, skip_lock_check: bool = False) -> None:
-        """Schedule a delayed boiler update."""
+    def _schedule_boiler_check(self, delay_seconds: float) -> None:
+        """Schedule a delayed boiler update (used for min-cycle locks and valve delay)."""
         if self._pending_boiler_task:
             self._pending_boiler_task.cancel()
 
         async def _delayed_check():
             try:
                 await asyncio.sleep(delay_seconds)
-                if skip_lock_check:
-                    # Valve delay expired: re-check demand before turning on
-                    await self._async_update_boiler()
-                else:
-                    await self._async_update_boiler()
+                await self._async_update_boiler()
             except asyncio.CancelledError:
                 pass
 
@@ -358,8 +355,7 @@ class MultizoneCoordinator:
 
         # Check if climate supports presets
         supported_features = state.attributes.get("supported_features", 0)
-        # Climate feature flag for preset mode is 16
-        if not (supported_features & 16):
+        if not (supported_features & ClimateEntityFeature.PRESET_MODE):
             _LOGGER.debug(
                 "Climate %s does not support presets, skipping sync", climate_entity
             )

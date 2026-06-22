@@ -56,14 +56,16 @@ Virtual thermostats can also be created **after installation** from the Options 
 
 ## Entities Created
 
-| Entity | Description |
+> **Note:** Entity IDs are assigned by Home Assistant based on the entity's unique ID and device name. The actual IDs may differ slightly from the examples below. Always copy the exact entity ID from **Settings → Devices & Services → Multizone Thermostat** or from the entity's settings page.
+
+| Entity (example ID) | Description |
 |--------|-------------|
-| `switch.multizone_master` | Master on/off for the entire heating system |
-| `switch.multizone_zone_[zone_name]` | Per-zone on/off switch (one per configured zone) |
+| `switch.multizone_thermostat_heating_master` | Master on/off for the entire heating system |
+| `switch.multizone_thermostat_[zone_name]` | Per-zone on/off switch (one per configured zone) |
 | `climate.multizone_thermostat_vt_[name]` | Virtual thermostat entity (only if created via the UI) |
-| `number.multizone_min_cycle_on` | Minimum boiler ON time (minutes, default: 5) |
-| `number.multizone_min_cycle_off` | Minimum boiler OFF time (minutes, default: 5) |
-| `number.multizone_valve_delay` | Valve opening delay before boiler starts (seconds, default: 0) |
+| `number.multizone_thermostat_min_cycle_on` | Minimum boiler ON time (minutes, default: 5) |
+| `number.multizone_thermostat_min_cycle_off` | Minimum boiler OFF time (minutes, default: 5) |
+| `number.multizone_thermostat_valve_delay` | Valve opening delay before boiler starts (seconds, default: 0) |
 
 ## How It Works
 
@@ -166,18 +168,20 @@ type: custom:multizone-thermostat-status-card
 #### Dial Thermostat Card
 ```yaml
 type: custom:multizone-thermostat-dial-card
-entity: climate.living_room                    # Your climate entity (or virtual thermostat)
-switch: switch.multizone_zone_living_room      # (Optional) The bypass switch for this zone
-title: Living Room                             # (Optional) Custom title
+entity: climate.your_climate_entity           # Your climate entity (copy ID from HA UI)
+switch: switch.multizone_thermostat_zone_name # (Optional) The bypass switch (copy ID from HA UI)
+title: Living Room                            # (Optional) Custom title
 ```
 
 #### Button Thermostat Card
 ```yaml
 type: custom:multizone-thermostat-button-card
-entity: climate.living_room                    # Your climate entity (or virtual thermostat)
-switch: switch.multizone_zone_living_room      # (Optional) The bypass switch for this zone
-title: Living Room                             # (Optional) Custom title
+entity: climate.your_climate_entity           # Your climate entity (copy ID from HA UI)
+switch: switch.multizone_thermostat_zone_name # (Optional) The bypass switch (copy ID from HA UI)
+title: Living Room                            # (Optional) Custom title
 ```
+
+> **Tip**: To find your exact entity IDs, go to **Settings → Devices & Services → Multizone Thermostat** and click on any entity. The entity ID is shown at the bottom of the entity page.
 
 > **Note**: If you installed via HACS, the Lovelace card resource is registered automatically. If cards don't appear, add the resource manually:
 > Go to **Settings → Dashboards → Resources** → Add `/multizone_thermostat_card/multizone-thermostat-card.js` as **JavaScript Module**.

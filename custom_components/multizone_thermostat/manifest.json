@@ -1,7 +1,7 @@
 {
   "domain": "multizone_thermostat",
   "name": "Multizone Thermostat",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "config_flow": true,
   "dependencies": ["frontend", "http"],
   "documentation": "https://github.com/alex-military/multizone-thermostat",
