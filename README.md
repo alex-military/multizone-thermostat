@@ -230,14 +230,16 @@ The project is structured in phases to evolve from a simple aggregator to a full
 - [x] **Card Preset Rapida**: Una custom card Lovelace dedicata alla selezione rapida e centralizzata dei preset globali.
 - [ ] **Geofencing Zero-Code**: Cambio preset automatico in base alla presenza (Away/Comfort).
 
-### FASE 3 — Ottimizzazione Energetica & Climatica
-- [ ] **Modulazione PWM / PID**: Per chi ha valvole elettrotermiche (che fanno solo ON/OFF) o pavimenti radianti, implementeremo un algoritmo PID che trasforma il segnale ON/OFF in una modulazione proporzionale (es. 5 minuti acceso, 15 spento) man mano che ci si avvicina alla temperatura target, azzerando gli "sbalzi" termici.
-- [ ] **Termoregolazione Climatica (Curva Climatica)**: Il sistema leggerà la temperatura esterna (tramite servizio meteo o sensore fisico) e regolerà automaticamente il fabbisogno interno, consentendo alla caldaia/pompa di calore di lavorare a temperature di mandata più basse nelle giornate miti.
-- [ ] **Sensore Fabbisogno Termico Globale (%)**: Verrà creata un'entità `sensor` che calcola la percentuale totale di carico richiesto dalla casa (es. 2 zone molto fredde = 80% load). Fondamentale per chi usa automazioni avanzate per pilotare l'inverter della Pompa di Calore in base al carico reale.
+### FASE 3 — Ottimizzazione Energetica Avanzata & AI
+- [ ] **PID Auto-Tuning (Autoregolazione)**: Algoritmo PID avanzato ad auto-apprendimento che studia l'inerzia termica della casa e regola la modulazione proporzionale (PWM) in totale autonomia per azzerare gli sbalzi termici.
+- [ ] **Integrazione AI Esterna (Ottimizzazione Predittiva)**: Predisposizione di un'interfaccia (API/Sensori) per permettere a Intelligenze Artificiali esterne di leggere i dati storici e ottimizzare costantemente i parametri del PID, la curva climatica e il geofencing predittivo.
+- [ ] **Curva Climatica Integrata**: Regolazione dinamica del fabbisogno termico (e temperatura di mandata della pompa di calore) basata sulle previsioni meteo e sulla temperatura esterna.
+- [ ] **Sensore Fabbisogno Termico Globale (%)**: Entità che calcola il carico richiesto esatto per pilotare in modo intelligente gli inverter delle Pompe di Calore.
 
-### FASE 4 — Manutenzione e Sicurezza
-- [ ] **Antigrippaggio Valvole (Summer Protection)**: Quando l'impianto è spento per lunghi periodi (es. estate), i motorini delle valvole di zona tendono a bloccarsi o incrostarsi. L'integrazione attiverà automaticamente le valvole per 5 minuti una volta alla settimana per prevenirne il grippaggio.
-- [ ] **Inversione Estate/Inverno (Raffrescamento)**: Supporto per le pompe di calore reversibili, invertendo la logica dei termostati virtuali (accendi se temperatura > target).
+### FASE 4 — Climatizzazione Totale & Dashboard Auto-Generate
+- [ ] **Supporto Ibrido (Riscaldamento / Raffrescamento)**: Riscrittura completa del motore di configurazione per gestire in contemporanea e scambiare agilmente le modalità Inverno (Caldo) ed Estate (Freddo), supportando pompe di calore reversibili.
+- [ ] **Dashboard Lovelace Auto-Generata**: L'integrazione sarà in grado di generare automaticamente (e mantenere aggiornata) una pagina intera sulla plancia di Home Assistant con una grafica premium dedicata esclusivamente al clima, includendo tutte le nostre custom cards senza che l'utente debba scrivere una riga di codice.
+- [ ] **Antigrippaggio Valvole (Summer Protection)**: Attivazione ciclica di sicurezza in estate per prevenire il blocco meccanico delle valvole e dei circolatori.
 
 ## License
 
