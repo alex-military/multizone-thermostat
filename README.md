@@ -63,6 +63,7 @@ Virtual thermostats can also be created **after installation** from the Options 
 | `switch.multizone_thermostat_heating_master` | Master on/off for the entire heating system |
 | `switch.multizone_thermostat_[zone_name]` | Per-zone on/off switch (one per configured zone) |
 | `climate.multizone_thermostat_vt_[name]` | Virtual thermostat entity (only if created via the UI) |
+| `select.multizone_thermostat_global_preset` | Global preset selector (Manual, Eco, Comfort, Sleep, Away) |
 | `number.multizone_thermostat_min_cycle_on` | Minimum boiler ON time (minutes, default: 5) |
 | `number.multizone_thermostat_min_cycle_off` | Minimum boiler OFF time (minutes, default: 5) |
 | `number.multizone_thermostat_valve_delay` | Valve opening delay before boiler starts (seconds, default: 0) |
