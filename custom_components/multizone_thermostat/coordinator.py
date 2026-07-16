@@ -29,6 +29,7 @@ from .const import (
     CONF_ZONE_TRV_SYNC,
     CONF_ZONE_WINDOW_SENSOR,
     DOMAIN,
+    GLOBAL_PRESET_NONE,
     HVAC_ACTION_HEATING,
     HVAC_MODE_HEAT,
     HVAC_MODE_OFF,
@@ -44,6 +45,8 @@ ATTR_PRESET_MODE = "preset_mode"
 
 WINDOW_STORAGE_VERSION = 1
 WINDOW_STORAGE_KEY = f"{DOMAIN}.window_states"
+PRESET_STORAGE_KEY = f"{DOMAIN}.presets"
+PRESET_STORAGE_VERSION = 1
 
 
 class MultizoneCoordinator:
@@ -84,16 +87,29 @@ class MultizoneCoordinator:
         self._store = Store(hass, WINDOW_STORAGE_VERSION, WINDOW_STORAGE_KEY)
         self._pre_window_state: dict[str, bool] = {}
 
+        self._preset_store = Store(hass, PRESET_STORAGE_VERSION, PRESET_STORAGE_KEY)
+        self._presets: dict[str, dict[str, dict[str, Any]]] = {}
+        self._current_global_preset: str = GLOBAL_PRESET_NONE
+
     async def async_load_storage(self) -> None:
-        """Load stored window states."""
+        """Load stored window states and presets."""
         stored = await self._store.async_load()
         if stored and isinstance(stored, dict):
             self._pre_window_state = stored
             _LOGGER.debug("Loaded pre_window_state from storage: %s", self._pre_window_state)
+            
+        preset_stored = await self._preset_store.async_load()
+        if preset_stored and isinstance(preset_stored, dict):
+            self._presets = preset_stored
+            _LOGGER.debug("Loaded presets from storage: %s", self._presets)
 
     async def _async_save_storage(self) -> None:
         """Save window states to storage."""
         await self._store.async_save(self._pre_window_state)
+
+    async def _async_save_presets_storage(self) -> None:
+        """Save presets to storage."""
+        await self._preset_store.async_save(self._presets)
 
     def register_switch(self, climate_or_master: str, switch_entity: Any) -> None:
         """Register a switch entity so coordinator can notify state changes."""
@@ -106,6 +122,54 @@ class MultizoneCoordinator:
     def set_zone_state(self, climate_entity: str, state: bool) -> None:
         """Set zone state (called by zone switch entity)."""
         self._zone_states[climate_entity] = state
+
+        # If a preset is active, save the bypass state
+        if self._current_global_preset != GLOBAL_PRESET_NONE:
+            if self._current_global_preset not in self._presets:
+                self._presets[self._current_global_preset] = {}
+            if climate_entity not in self._presets[self._current_global_preset]:
+                self._presets[self._current_global_preset][climate_entity] = {}
+
+            # Save 'bypassed' (which is the opposite of state: ON means active, OFF means bypassed)
+            self._presets[self._current_global_preset][climate_entity]["bypassed"] = not state
+            self.hass.async_create_task(self._async_save_presets_storage())
+
+    def set_global_preset(self, preset: str) -> None:
+        """Set the global preset (used on restore)."""
+        self._current_global_preset = preset
+
+    async def async_set_global_preset(self, preset: str) -> None:
+        """Set the global preset and apply it to all zones."""
+        self._current_global_preset = preset
+        _LOGGER.debug("Global preset changed to: %s", preset)
+        
+        if preset == GLOBAL_PRESET_NONE or preset not in self._presets:
+            return
+            
+        preset_data = self._presets[preset]
+        for climate_entity, data in preset_data.items():
+            if "target_temp" in data:
+                try:
+                    await self.hass.services.async_call(
+                        "climate",
+                        "set_temperature",
+                        {"entity_id": climate_entity, "temperature": data["target_temp"]},
+                        blocking=False,
+                    )
+                except Exception as ex:
+                    _LOGGER.warning("Could not set temperature for %s: %s", climate_entity, ex)
+            
+            if "bypassed" in data:
+                bypassed = data["bypassed"]
+                zone_switch = self._switch_entities.get(climate_entity)
+                if zone_switch:
+                    try:
+                        if not bypassed and not zone_switch.is_on:
+                            await zone_switch.async_turn_on()
+                        elif bypassed and zone_switch.is_on:
+                            await zone_switch.async_turn_off()
+                    except Exception as ex:
+                        _LOGGER.warning("Could not toggle bypass for %s: %s", climate_entity, ex)
 
     def get_master_state(self) -> bool:
         """Get current master state."""
@@ -167,6 +231,21 @@ class MultizoneCoordinator:
             return
 
         _LOGGER.debug("Climate state changed: %s → %s", entity_id, new_state.state)
+
+        # 0. Check for target temperature changes to save to preset memory
+        old_state = event.data.get("old_state")
+        if old_state is not None and self._current_global_preset != GLOBAL_PRESET_NONE:
+            new_temp = new_state.attributes.get("temperature")
+            old_temp = old_state.attributes.get("temperature")
+            if new_temp is not None and new_temp != old_temp:
+                if self._current_global_preset not in self._presets:
+                    self._presets[self._current_global_preset] = {}
+                if entity_id not in self._presets[self._current_global_preset]:
+                    self._presets[self._current_global_preset][entity_id] = {}
+                
+                self._presets[self._current_global_preset][entity_id]["target_temp"] = new_temp
+                self.hass.async_create_task(self._async_save_presets_storage())
+                _LOGGER.debug("Saved new target temp %s for %s in preset %s", new_temp, entity_id, self._current_global_preset)
 
         # 1. Manage boiler demand
         self.hass.async_create_task(self._async_update_boiler())

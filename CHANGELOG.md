@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.3.0] - 2026-07-16
+
+### Added
+- **Global Presets:** Introduced a new `select` entity (`select.multizone_thermostat_heating_global_preset`) that allows users to seamlessly switch the entire heating system between predefined scenarios: `Eco`, `Comfort`, `Sleep`, `Away`, and `None`.
+- **Dynamic Memory (Auto-Learning):** The integration now features an intelligent, zero-config memory system. When a global preset is active, any manual changes to a zone's target temperature or bypass state are automatically saved to that preset in the background. The next time the preset is activated, the system flawlessly restores all zones to their exact saved states. No YAML configuration or complex UI setup required!
+
 ## [2.2.0] - 2026-06-22
 
 ### Fixed

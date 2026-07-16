@@ -152,6 +152,18 @@
       "master": {
         "name": "Master Riscaldamento"
       }
+    },
+    "select": {
+      "global_preset": {
+        "name": "Preset Globale",
+        "state": {
+          "none": "Nessuno",
+          "eco": "Eco",
+          "comfort": "Comfort",
+          "sleep": "Notte",
+          "away": "Fuori Casa"
+        }
+      }
     }
   }
 }

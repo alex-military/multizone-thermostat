@@ -152,6 +152,18 @@
       "master": {
         "name": "Heating Master"
       }
+    },
+    "select": {
+      "global_preset": {
+        "name": "Global Preset",
+        "state": {
+          "none": "None",
+          "eco": "Eco",
+          "comfort": "Comfort",
+          "sleep": "Sleep",
+          "away": "Away"
+        }
+      }
     }
   }
 }
