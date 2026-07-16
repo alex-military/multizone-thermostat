@@ -157,6 +157,16 @@ A compact button-based thermostat card designed for spaces where a circular dial
 
 ---
 
+### 4. Global Preset Card (`custom:multizone-thermostat-preset-card`)
+A zero-configuration, multi-button card designed for quick selection of the global heating preset (Manual, Eco, Comfort, Sleep, Away). 
+- **Auto-Discovery**: Automatically finds and binds to the `select.multizone_thermostat_global_preset` entity without any configuration.
+- **Dynamic Styling**: The active preset is dynamically highlighted using your current Home Assistant theme colors.
+- **Smart Memory**: Changing the preset instantly recalls the exact temperatures and bypassed zones you had previously set for that specific preset.
+
+![Global Preset Card](images/preset_card.png)
+
+---
+
 ### Card Configuration
 
 #### Status Card (Zero-Config)
@@ -179,6 +189,14 @@ type: custom:multizone-thermostat-button-card
 entity: climate.your_climate_entity           # Your climate entity (copy ID from HA UI)
 switch: switch.multizone_thermostat_zone_name # (Optional) The bypass switch (copy ID from HA UI)
 title: Living Room                            # (Optional) Custom title
+```
+
+#### Global Preset Card (Zero-Config)
+The preset card automatically finds your global preset entity. You can optionally override it or set a custom title.
+```yaml
+type: custom:multizone-thermostat-preset-card
+# title: "My Presets"                           # (Optional) Custom title
+# entity: select.multizone_thermostat_global_preset # (Optional) Override auto-discovery
 ```
 
 > **Tip**: To find your exact entity IDs, go to **Settings → Devices & Services → Multizone Thermostat** and click on any entity. The entity ID is shown at the bottom of the entity page.
@@ -204,11 +222,11 @@ The project is structured in phases to evolve from a simple aggregator to a full
 
 ### FASE 2 — Evoluzione Architetturale (In Progress)
 - [x] **Termostati Virtuali via UI**: Creazione automatica di entità `climate` da un sensore di temperatura e uno switch (es. fancoil/relè sfusi) senza YAML.
-- [ ] **Preset Globali (Memoria Temperature e Bypass)**: I preset (Eco / Comfort / Sleep / Away) fungono da "scenari globali" con memoria dinamica per singola zona. 
+- [x] **Preset Globali (Memoria Temperature e Bypass)**: I preset (Manuale / Eco / Comfort / Sleep / Away) fungono da "scenari globali" con memoria dinamica per singola zona. 
   - Selezionando un preset, il sistema applicherà le impostazioni salvate per ogni zona.
   - Se modifichi la temperatura o attivi/disattivi il bypass di una zona mentre è attivo un preset, il sistema *ricorda* quella modifica e la salverà permanentemente per quel preset.
   - Al successivo utilizzo dello stesso preset, la zona tornerà esattamente allo stato (temperatura target e stato bypass) configurato l'ultima volta.
-- [ ] **Card Preset Rapida**: Una custom card Lovelace dedicata alla selezione rapida e centralizzata dei preset globali.
+- [x] **Card Preset Rapida**: Una custom card Lovelace dedicata alla selezione rapida e centralizzata dei preset globali.
 - [ ] **Geofencing Zero-Code**: Cambio preset automatico in base alla presenza (Away/Comfort).
 
 ### FASE 3 — Ottimizzazione Energetica Avanzata

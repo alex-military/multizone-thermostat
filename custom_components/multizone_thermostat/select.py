@@ -14,7 +14,7 @@ from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import (
     DOMAIN,
-    GLOBAL_PRESET_NONE,
+    GLOBAL_PRESET_MANUAL,
     GLOBAL_PRESETS,
 )
 from .coordinator import MultizoneCoordinator
@@ -47,7 +47,7 @@ class MultizoneGlobalPresetSelect(RestoreEntity, SelectEntity):
         self._attr_unique_id = f"{DOMAIN}_{entry_id}_global_preset"
         
         self._attr_options = GLOBAL_PRESETS
-        self._current_option = GLOBAL_PRESET_NONE
+        self._current_option = GLOBAL_PRESET_MANUAL
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -71,7 +71,7 @@ class MultizoneGlobalPresetSelect(RestoreEntity, SelectEntity):
         if last_state is not None and last_state.state in self.options:
             self._current_option = last_state.state
         else:
-            self._current_option = GLOBAL_PRESET_NONE
+            self._current_option = GLOBAL_PRESET_MANUAL
             
         self._coordinator.set_global_preset(self._current_option)
         _LOGGER.debug("Global preset restored to: %s", self._current_option)

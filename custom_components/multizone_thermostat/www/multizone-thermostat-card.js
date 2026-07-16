@@ -18,6 +18,12 @@ window.customCards.push({
   description: "A zero-config button card that controls the Heating Master switch and displays system status (Gray = Off, Yellow = Standby, Orange = Heating).",
   preview: true,
 });
+window.customCards.push({
+  type: "multizone-thermostat-preset-card",
+  name: "Multizone Thermostat Preset Card",
+  description: "A quick selection card for Global Presets (Comfort, Eco, Sleep, Away).",
+  preview: true,
+});
 
 const TRANSLATIONS = {
   it: {
@@ -40,7 +46,14 @@ const TRANSLATIONS = {
     thermostat: "Termostato",
     edit_title: "Titolo Personalizzato (Opzionale)",
     edit_climate: "Termostato (Climate Entity)",
-    edit_switch: "Switch di Zona (Abilita/Escludi)"
+    edit_switch: "Switch di Zona (Abilita/Escludi)",
+    preset_manual: "Manuale",
+    preset_eco: "Eco",
+    preset_comfort: "Comfort",
+    preset_sleep: "Notte",
+    preset_away: "Fuori Casa",
+    preset_card_title: "Preset Globale",
+    edit_preset: "Entità Preset (Opzionale)"
   },
   en: {
     enabled: "Enabled",
@@ -62,7 +75,14 @@ const TRANSLATIONS = {
     thermostat: "Thermostat",
     edit_title: "Custom Title (Optional)",
     edit_climate: "Thermostat (Climate Entity)",
-    edit_switch: "Zone Switch (Enable/Exclude)"
+    edit_switch: "Zone Switch (Enable/Exclude)",
+    preset_manual: "Manual",
+    preset_eco: "Eco",
+    preset_comfort: "Comfort",
+    preset_sleep: "Sleep",
+    preset_away: "Away",
+    preset_card_title: "Global Preset",
+    edit_preset: "Preset Entity (Optional)"
   }
 };
 
@@ -100,6 +120,14 @@ function findMasterEntity(hass) {
   // Fallback to name search
   return Object.keys(hass.states).find(key => {
     return key.startsWith('switch.') && key.includes('heating_master');
+  }) || null;
+}
+
+// Helper function to auto-discover the preset select entity
+function findPresetEntity(hass) {
+  if (!hass) return null;
+  return Object.keys(hass.states).find(key => {
+    return key.startsWith('select.') && key.includes('global_preset');
   }) || null;
 }
 
@@ -1302,8 +1330,272 @@ class MultizoneThermostatStatusCard extends HTMLElement {
   }
 }
 
+/* ==================== PRESET CARD CLASS ==================== */
+class MultizoneThermostatPresetCard extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: 'open' });
+    this.renderStructure();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    this.updateCard();
+  }
+
+  setConfig(config) {
+    this._config = config;
+  }
+
+  getCardSize() {
+    return 2;
+  }
+
+  static getConfigElement() {
+    return document.createElement("multizone-thermostat-preset-card-editor");
+  }
+
+  static getStubConfig() {
+    return {
+      entity: "",
+      title: ""
+    };
+  }
+
+  get presetEntity() {
+    if (this._config && this._config.entity) {
+      return this._config.entity;
+    }
+    return findPresetEntity(this._hass);
+  }
+
+  renderStructure() {
+    this.shadowRoot.innerHTML = `
+      <style>
+        ha-card {
+          padding: 16px;
+          border-radius: 12px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          background: var(--ha-card-background, var(--card-background-color, white));
+        }
+        .header {
+          font-weight: 500;
+          font-size: 16px;
+          color: var(--primary-text-color);
+        }
+        .buttons-row {
+          display: flex;
+          flex-direction: row;
+          justify-content: space-between;
+          gap: 8px;
+        }
+        .preset-btn {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          background: var(--secondary-background-color);
+          color: var(--secondary-text-color);
+          border-radius: 12px;
+          padding: 12px 4px;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          border: 2px solid transparent;
+          gap: 6px;
+        }
+        .preset-btn:hover {
+          background: rgba(var(--rgb-primary-color), 0.1);
+        }
+        .preset-btn.active {
+          background: rgba(var(--rgb-primary-color), 0.15);
+          color: var(--primary-color);
+          border-color: var(--primary-color);
+        }
+        .preset-btn ha-icon {
+          --mdc-icon-size: 28px;
+        }
+        .preset-label {
+          font-size: 11px;
+          font-weight: 500;
+          text-align: center;
+          word-break: break-word;
+        }
+      </style>
+      <ha-card>
+        <div class="header" id="card-title">Preset Globale</div>
+        <div class="buttons-row">
+          <div class="preset-btn" data-preset="manual" id="btn-manual">
+            <ha-icon icon="mdi:power"></ha-icon>
+            <div class="preset-label" id="lbl-manual">Manual</div>
+          </div>
+          <div class="preset-btn" data-preset="eco" id="btn-eco">
+            <ha-icon icon="mdi:leaf"></ha-icon>
+            <div class="preset-label" id="lbl-eco">Eco</div>
+          </div>
+          <div class="preset-btn" data-preset="comfort" id="btn-comfort">
+            <ha-icon icon="mdi:sofa"></ha-icon>
+            <div class="preset-label" id="lbl-comfort">Comfort</div>
+          </div>
+          <div class="preset-btn" data-preset="sleep" id="btn-sleep">
+            <ha-icon icon="mdi:bed"></ha-icon>
+            <div class="preset-label" id="lbl-sleep">Sleep</div>
+          </div>
+          <div class="preset-btn" data-preset="away" id="btn-away">
+            <ha-icon icon="mdi:car"></ha-icon>
+            <div class="preset-label" id="lbl-away">Away</div>
+          </div>
+        </div>
+      </ha-card>
+    `;
+
+    // Add click listeners
+    const buttons = this.shadowRoot.querySelectorAll('.preset-btn');
+    buttons.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const preset = e.currentTarget.getAttribute('data-preset');
+        this.setPreset(preset);
+      });
+    });
+  }
+
+  setPreset(preset) {
+    if (!this._hass || !this.presetEntity) return;
+    this._hass.callService('select', 'select_option', {
+      entity_id: this.presetEntity,
+      option: preset
+    });
+  }
+
+  updateCard() {
+    if (!this._hass) return;
+
+    // Title
+    const titleEl = this.shadowRoot.getElementById('card-title');
+    titleEl.textContent = (this._config && this._config.title) || getTranslation(this._hass, 'preset_card_title');
+
+    // Labels
+    this.shadowRoot.getElementById('lbl-manual').textContent = getTranslation(this._hass, 'preset_manual');
+    this.shadowRoot.getElementById('lbl-eco').textContent = getTranslation(this._hass, 'preset_eco');
+    this.shadowRoot.getElementById('lbl-comfort').textContent = getTranslation(this._hass, 'preset_comfort');
+    this.shadowRoot.getElementById('lbl-sleep').textContent = getTranslation(this._hass, 'preset_sleep');
+    this.shadowRoot.getElementById('lbl-away').textContent = getTranslation(this._hass, 'preset_away');
+
+    const entityId = this.presetEntity;
+    if (!entityId || !this._hass.states[entityId]) {
+      return; // Not found yet
+    }
+
+    const state = this._hass.states[entityId].state;
+
+    // Update active class
+    const buttons = this.shadowRoot.querySelectorAll('.preset-btn');
+    buttons.forEach(btn => {
+      if (btn.getAttribute('data-preset') === state) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+  }
+}
+
+/* ==================== PRESET CARD EDITOR CLASS ==================== */
+class MultizoneThermostatPresetCardEditor extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: 'open' });
+  }
+
+  setConfig(config) {
+    this._config = config;
+    this.render();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    if (!this._rendered) {
+      this.render();
+      this._rendered = true;
+    }
+  }
+
+  configChanged(newConfig) {
+    const event = new Event("config-changed", {
+      bubbles: true,
+      composed: true
+    });
+    event.detail = { config: newConfig };
+    this.dispatchEvent(event);
+  }
+
+  render() {
+    if (!this._hass) return;
+    const config = this._config || {};
+    
+    // Find select entities
+    const selectEntities = Object.keys(this._hass.states)
+      .filter(eid => eid.startsWith('select.'));
+
+    if (this.shadowRoot.hasChildNodes()) {
+      this.shadowRoot.innerHTML = '';
+    }
+
+    const container = document.createElement('div');
+    container.className = 'card-config';
+
+    // Title Row
+    const titleRow = document.createElement('div');
+    titleRow.className = 'form-row';
+    const titleLabel = document.createElement('label');
+    titleLabel.textContent = getTranslation(this._hass, 'edit_title');
+    titleLabel.style.display = 'block';
+    titleLabel.style.marginBottom = '8px';
+    const titleInput = document.createElement('input');
+    titleInput.type = 'text';
+    titleInput.value = config.title || '';
+    titleInput.style.width = '100%';
+    titleInput.style.padding = '8px';
+    titleInput.style.boxSizing = 'border-box';
+    titleInput.addEventListener('input', (e) => {
+      if (!this._config) return;
+      this._config = { ...this._config, title: e.target.value };
+      this.configChanged(this._config);
+    });
+    titleRow.appendChild(titleLabel);
+    titleRow.appendChild(titleInput);
+    container.appendChild(titleRow);
+
+    // Entity Row
+    const entityRow = document.createElement('div');
+    entityRow.className = 'form-row';
+    entityRow.style.marginTop = '16px';
+    const entityLabel = document.createElement('label');
+    entityLabel.textContent = getTranslation(this._hass, 'edit_preset');
+    const entityPicker = document.createElement('ha-entity-picker');
+    entityPicker.includeDomains = ['select'];
+    entityPicker.value = config.entity || '';
+    entityPicker.hass = this._hass;
+    entityPicker.addEventListener('value-changed', (e) => {
+      if (!this._config) return;
+      this._config = { ...this._config, entity: e.detail.value };
+      this.configChanged(this._config);
+    });
+    
+    entityRow.appendChild(entityLabel);
+    entityRow.appendChild(entityPicker);
+    container.appendChild(entityRow);
+
+    this.shadowRoot.appendChild(container);
+  }
+}
+
 // Define elements
 customElements.define("multizone-thermostat-button-card", MultizoneThermostatButtonCard);
 customElements.define("multizone-thermostat-dial-card", MultizoneThermostatDialCard);
 customElements.define("multizone-thermostat-status-card", MultizoneThermostatStatusCard);
 customElements.define("multizone-thermostat-card-editor", MultizoneThermostatCardEditor);
+customElements.define("multizone-thermostat-preset-card", MultizoneThermostatPresetCard);
+customElements.define("multizone-thermostat-preset-card-editor", MultizoneThermostatPresetCardEditor);

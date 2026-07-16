@@ -157,7 +157,7 @@
       "global_preset": {
         "name": "Preset Globale",
         "state": {
-          "none": "Nessuno",
+          "manual": "Manuale",
           "eco": "Eco",
           "comfort": "Comfort",
           "sleep": "Notte",

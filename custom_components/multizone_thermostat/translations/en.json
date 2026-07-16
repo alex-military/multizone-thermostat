@@ -157,7 +157,7 @@
       "global_preset": {
         "name": "Global Preset",
         "state": {
-          "none": "None",
+          "manual": "Manual",
           "eco": "Eco",
           "comfort": "Comfort",
           "sleep": "Sleep",

@@ -29,7 +29,7 @@ from .const import (
     CONF_ZONE_TRV_SYNC,
     CONF_ZONE_WINDOW_SENSOR,
     DOMAIN,
-    GLOBAL_PRESET_NONE,
+    GLOBAL_PRESET_MANUAL,
     HVAC_ACTION_HEATING,
     HVAC_MODE_HEAT,
     HVAC_MODE_OFF,
@@ -89,7 +89,7 @@ class MultizoneCoordinator:
 
         self._preset_store = Store(hass, PRESET_STORAGE_VERSION, PRESET_STORAGE_KEY)
         self._presets: dict[str, dict[str, dict[str, Any]]] = {}
-        self._current_global_preset: str = GLOBAL_PRESET_NONE
+        self._current_global_preset: str = GLOBAL_PRESET_MANUAL
 
     async def async_load_storage(self) -> None:
         """Load stored window states and presets."""
@@ -124,7 +124,7 @@ class MultizoneCoordinator:
         self._zone_states[climate_entity] = state
 
         # If a preset is active, save the bypass state
-        if self._current_global_preset != GLOBAL_PRESET_NONE:
+        if self._current_global_preset:
             if self._current_global_preset not in self._presets:
                 self._presets[self._current_global_preset] = {}
             if climate_entity not in self._presets[self._current_global_preset]:
@@ -143,7 +143,7 @@ class MultizoneCoordinator:
         self._current_global_preset = preset
         _LOGGER.debug("Global preset changed to: %s", preset)
         
-        if preset == GLOBAL_PRESET_NONE or preset not in self._presets:
+        if preset not in self._presets:
             return
             
         preset_data = self._presets[preset]
@@ -234,7 +234,7 @@ class MultizoneCoordinator:
 
         # 0. Check for target temperature changes to save to preset memory
         old_state = event.data.get("old_state")
-        if old_state is not None and self._current_global_preset != GLOBAL_PRESET_NONE:
+        if old_state is not None and self._current_global_preset:
             new_temp = new_state.attributes.get("temperature")
             old_temp = old_state.attributes.get("temperature")
             if new_temp is not None and new_temp != old_temp:
