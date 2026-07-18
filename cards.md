@@ -22,9 +22,9 @@ Wraps the native Home Assistant circular thermostat card and adds a built-in sel
 - **Bypassed**: Dims the dial, disables temperature controls, and displays a clean "Zone Excluded / Bypassed" message.
 
 ### States
-| Primary | Bypassed |
-|---|---|
-| ![Dial Primary](images/dial_enabled.png) | ![Dial Bypassed](images/dial_disabled.png) |
+| Primary (Idle) | Secondary (Idle) | Bypassed | Active Heating |
+|---|---|---|---|
+| ![Dial Primary](images/dial_primary.png) | ![Dial Secondary](images/dial_secondary.png) | ![Dial Bypassed](images/dial_bypass.png) | ![Dial Heating](images/dial_heating.png) |
 
 ---
 
@@ -34,9 +34,9 @@ A compact button-based thermostat card designed for spaces where a circular dial
 - **Bypassed**: Dims the controls and displays a "Zone Excluded / Bypassed" overlay.
 
 ### States
-| Active | Bypassed |
-|---|---|
-| ![Button Active](images/button_enabled.png) | ![Button Bypassed](images/button_disabled.png) |
+| Primary (Idle) | Secondary (Idle) | Bypassed | Active Heating |
+|---|---|---|---|
+| ![Button Primary](images/button_primary.png) | ![Button Secondary](images/button_secondary.png) | ![Button Bypassed](images/button_bypass.png) | ![Button Heating](images/button_heating.png) |
 
 ---
 
