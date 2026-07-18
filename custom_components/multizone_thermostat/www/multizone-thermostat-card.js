@@ -1592,10 +1592,22 @@ class MultizoneThermostatPresetCardEditor extends HTMLElement {
   }
 }
 
-// Define elements
-customElements.define("multizone-thermostat-button-card", MultizoneThermostatButtonCard);
-customElements.define("multizone-thermostat-dial-card", MultizoneThermostatDialCard);
-customElements.define("multizone-thermostat-status-card", MultizoneThermostatStatusCard);
-customElements.define("multizone-thermostat-card-editor", MultizoneThermostatCardEditor);
-customElements.define("multizone-thermostat-preset-card", MultizoneThermostatPresetCard);
-customElements.define("multizone-thermostat-preset-card-editor", MultizoneThermostatPresetCardEditor);
+// Define elements safely to avoid "already been used" errors on hot-reloads
+if (!customElements.get("multizone-thermostat-button-card")) {
+  customElements.define("multizone-thermostat-button-card", MultizoneThermostatButtonCard);
+}
+if (!customElements.get("multizone-thermostat-dial-card")) {
+  customElements.define("multizone-thermostat-dial-card", MultizoneThermostatDialCard);
+}
+if (!customElements.get("multizone-thermostat-status-card")) {
+  customElements.define("multizone-thermostat-status-card", MultizoneThermostatStatusCard);
+}
+if (!customElements.get("multizone-thermostat-card-editor")) {
+  customElements.define("multizone-thermostat-card-editor", MultizoneThermostatCardEditor);
+}
+if (!customElements.get("multizone-thermostat-preset-card")) {
+  customElements.define("multizone-thermostat-preset-card", MultizoneThermostatPresetCard);
+}
+if (!customElements.get("multizone-thermostat-preset-card-editor")) {
+  customElements.define("multizone-thermostat-preset-card-editor", MultizoneThermostatPresetCardEditor);
+}
