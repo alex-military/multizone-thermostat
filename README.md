@@ -29,74 +29,12 @@ A custom integration for Home Assistant that provides **multi-zone heating manag
 1. Copy the `custom_components/multizone_thermostat` folder to your HA `custom_components` directory
 2. Restart Home Assistant
 
-## Configuration
+## Configuration & Documentation
 
-1. Go to **Settings → Devices & Services → Add Integration**
-2. Search for **"Multizone Thermostat"**
-3. Follow the setup wizard:
-   - **Step 1**: Select your boiler switch/relay entity
-   - **Step 2**: Select an optional presence sensor for Geofencing (Away/Comfort)
-   - **Step 3**: Choose zone type — **existing thermostat** or **create a virtual thermostat**
-   - **Step 4**: Configure the zone (name, optional window sensor, optional TRV sync)
-   - **Step 5**: Add more zones or confirm and finish
+The Multizone Thermostat is 100% configured via the Home Assistant UI, without needing any YAML. 
+It supports advanced features like Geofencing, Virtual Thermostats, and Zone Priorities.
 
-👉 **[Click here to learn how to Create a Virtual Thermostat directly from the UI](virtual_thermostat.md)**
-
-## Entities Created
-
-The integration creates several entities to control your system (Master Switch, Zone Modes, Presets, etc.).
-
-👉 **[Click here to view the full list of Entities Created](entities.md)**
-
-## How It Works
-
-```
-Master Switch ON
-    └── Zone Mode = Primary   → Boiler can be triggered if zone is heating
-    └── Zone Mode = Secondary → Receives heat if boiler is running, but cannot trigger boiler
-    └── Zone Mode = Bypass    → Zone is completely excluded
-
-Master Switch OFF
-    └── ALL zones → Overridden to OFF
-    └── Boiler   → switch.turn_off() (ignores min_cycle_on for safety)
-
-Any Primary zone hvac_action = heating
-    └── If valve_delay > 0, wait for delay
-    └── If boiler was recently off, wait for min_cycle_off
-    └── Boiler ON
-
-All Primary zones hvac_action = idle/off
-    └── If boiler was recently on, wait for min_cycle_on
-    └── Boiler OFF
-    
-Window Opened
-    └── Zone Mode temporarily overridden to Bypassed (saves previous state)
-Window Closed
-    └── Zone Mode restores previous state
-
-Virtual Thermostat Logic (ON/OFF with hysteresis)
-    └── current_temp < target - tolerance → heater switch ON
-    └── current_temp > target + tolerance → heater switch OFF
-    └── Reports hvac_action = heating/idle to the coordinator
-```
-
-## Options (Post-Installation)
-
-Go to **Settings → Devices & Services → Multizone Thermostat → Configure** to:
-- Change the boiler switch
-- Add a new zone (existing thermostat)
-- Create a new virtual thermostat (sensor + switch → climate entity)
-- Remove a zone
-- Remove a virtual thermostat (removes both the climate entity and the associated zone)
-- Edit a zone (TRV preset sync, Window Sensor)
-
-## TRV Preset Sync
-
-When enabled for a zone, the integration automatically syncs the TRV preset mode:
-- HVAC mode `heat` → preset `manual`
-- HVAC mode `off` → preset `off`
-
-Only enable this for zones with physical TRV valves that support preset modes.
+👉 **[Click here to view the full Configuration Guide, Setup Instructions, and System Logic](configuration.md)**
 
 ## Lovelace Cards
 
