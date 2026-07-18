@@ -73,7 +73,7 @@ The project is structured in phases to evolve from a simple aggregator to a full
 - [ ] **Auto-Generated Lovelace Dashboard**: The integration will automatically generate (and keep updated) a full Home Assistant dashboard page with premium climate-dedicated graphics, including all our custom cards — zero-code required.
 
 ### PHASE 4 — Advanced Energy Optimization
-- [ ] **Self-Learning PID Auto-Tuning**: Advanced self-learning PID algorithm (no external AI required) that studies the thermal inertia of the house and regulates proportional modulation (PWM) autonomously to eliminate temperature swings.
+- [ ] **Self-Learning PID Auto-Tuning**: Advanced self-learning PID algorithm that studies the thermal inertia of the house and regulates proportional modulation (PWM) autonomously to eliminate temperature swings.
 - [ ] **Global Heat Demand (%)**: A `sensor` entity that calculates the exact percentage of load required by the house, essential for intelligently driving Heat Pump inverters based on real load.
 - [ ] **Weather Compensation Curve**: Dynamic adjustment of the heating demand (and heat pump flow temperature) based on weather forecasts and outdoor temperature.
 
