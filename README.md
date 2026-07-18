@@ -230,16 +230,16 @@ The project is structured in phases to evolve from a simple aggregator to a full
 - [x] **Card Preset Rapida**: Una custom card Lovelace dedicata alla selezione rapida e centralizzata dei preset globali.
 - [ ] **Geofencing Zero-Code**: Cambio preset automatico in base alla presenza (Away/Comfort).
 
-### FASE 3 — Ottimizzazione Energetica Avanzata & AI
-- [ ] **PID Auto-Tuning (Autoregolazione)**: Algoritmo PID avanzato ad auto-apprendimento che studia l'inerzia termica della casa e regola la modulazione proporzionale (PWM) in totale autonomia per azzerare gli sbalzi termici.
-- [ ] **Integrazione AI Esterna (Ottimizzazione Predittiva)**: Predisposizione di un'interfaccia (API/Sensori) per permettere a Intelligenze Artificiali esterne di leggere i dati storici e ottimizzare costantemente i parametri del PID, la curva climatica e il geofencing predittivo.
-- [ ] **Curva Climatica Integrata**: Regolazione dinamica del fabbisogno termico (e temperatura di mandata della pompa di calore) basata sulle previsioni meteo e sulla temperatura esterna.
-- [ ] **Sensore Fabbisogno Termico Globale (%)**: Entità che calcola il carico richiesto esatto per pilotare in modo intelligente gli inverter delle Pompe di Calore.
+### PHASE 3 — Advanced Energy Optimization & AI
+- [ ] **PID Auto-Tuning**: Advanced self-learning PID algorithm that studies the thermal inertia of the house and regulates proportional modulation (PWM) autonomously to eliminate temperature swings.
+- [ ] **External AI Integration (Predictive Optimization)**: Dedicated API/Sensors interface allowing external AIs to read historical data and constantly optimize PID parameters, weather compensation curves, and predictive geofencing.
+- [ ] **Weather Compensation Curve**: Dynamic adjustment of the heating demand (and heat pump flow temperature) based on weather forecasts and outdoor temperature.
+- [ ] **Global Heat Demand (%)**: A `sensor` entity that calculates the exact percentage of load required by the house, essential for intelligently driving Heat Pump inverters based on real load.
 
-### FASE 4 — Climatizzazione Totale & Dashboard Auto-Generate
-- [ ] **Supporto Ibrido (Riscaldamento / Raffrescamento)**: Riscrittura completa del motore di configurazione per gestire in contemporanea e scambiare agilmente le modalità Inverno (Caldo) ed Estate (Freddo), supportando pompe di calore reversibili.
-- [ ] **Dashboard Lovelace Auto-Generata**: L'integrazione sarà in grado di generare automaticamente (e mantenere aggiornata) una pagina intera sulla plancia di Home Assistant con una grafica premium dedicata esclusivamente al clima, includendo tutte le nostre custom cards senza che l'utente debba scrivere una riga di codice.
-- [ ] **Antigrippaggio Valvole (Summer Protection)**: Attivazione ciclica di sicurezza in estate per prevenire il blocco meccanico delle valvole e dei circolatori.
+### PHASE 4 — Total Climate Control & Auto-Generated Dashboards
+- [ ] **Hybrid Support (Heating / Cooling)**: Complete rewrite of the configuration engine to simultaneously manage and easily switch between Winter (Heating) and Summer (Cooling) modes, supporting reversible heat pumps.
+- [ ] **Auto-Generated Lovelace Dashboard**: The integration will automatically generate (and keep updated) a full Home Assistant dashboard page with premium climate-dedicated graphics, including all our custom cards — zero-code required.
+- [ ] **Summer Valve Protection (Anti-seize)**: Cyclical safety activation during summer to prevent mechanical seizing of valves and circulator pumps.
 
 ## License
 
