@@ -68,16 +68,18 @@ The project is structured in phases to evolve from a simple aggregator to a full
 - [x] **Geofencing Zero-Code**: Automatic preset switching based on home occupancy (Away/Comfort).
 - [x] **Room Priority Selector**: Replace the zone bypass switch with a multi-state selector (Primary / Secondary / Bypassed). *Primary* zones can turn on the boiler; *Secondary* zones can open their valves to receive heat but cannot turn on the boiler; *Bypassed* zones are excluded entirely.
 
-### PHASE 3 — Advanced Energy Optimization & AI
-- [ ] **PID Auto-Tuning**: Advanced self-learning PID algorithm that studies the thermal inertia of the house and regulates proportional modulation (PWM) autonomously to eliminate temperature swings.
-- [ ] **External AI Integration (Predictive Optimization)**: Dedicated API/Sensors interface allowing external AIs to read historical data and constantly optimize PID parameters, weather compensation curves, and predictive geofencing.
-- [ ] **Weather Compensation Curve**: Dynamic adjustment of the heating demand (and heat pump flow temperature) based on weather forecasts and outdoor temperature.
-- [ ] **Global Heat Demand (%)**: A `sensor` entity that calculates the exact percentage of load required by the house, essential for intelligently driving Heat Pump inverters based on real load.
-
-### PHASE 4 — Total Climate Control & Auto-Generated Dashboards
-- [ ] **Hybrid Support (Heating / Cooling)**: Complete rewrite of the configuration engine to simultaneously manage and easily switch between Winter (Heating) and Summer (Cooling) modes, supporting reversible heat pumps.
-- [ ] **Auto-Generated Lovelace Dashboard**: The integration will automatically generate (and keep updated) a full Home Assistant dashboard page with premium climate-dedicated graphics, including all our custom cards — zero-code required.
+### PHASE 3 — Quality of Life & Dashboards
 - [ ] **Summer Valve Protection (Anti-seize)**: Cyclical safety activation during summer to prevent mechanical seizing of valves and circulator pumps.
+- [ ] **Auto-Generated Lovelace Dashboard**: The integration will automatically generate (and keep updated) a full Home Assistant dashboard page with premium climate-dedicated graphics, including all our custom cards — zero-code required.
+
+### PHASE 4 — Advanced Energy Optimization
+- [ ] **Self-Learning PID Auto-Tuning**: Advanced self-learning PID algorithm (no external AI required) that studies the thermal inertia of the house and regulates proportional modulation (PWM) autonomously to eliminate temperature swings.
+- [ ] **Global Heat Demand (%)**: A `sensor` entity that calculates the exact percentage of load required by the house, essential for intelligently driving Heat Pump inverters based on real load.
+- [ ] **Weather Compensation Curve**: Dynamic adjustment of the heating demand (and heat pump flow temperature) based on weather forecasts and outdoor temperature.
+
+### PHASE 5 — Total Climate Control & External AI
+- [ ] **Hybrid Support (Heating / Cooling)**: Complete rewrite of the configuration engine to simultaneously manage and easily switch between Winter (Heating) and Summer (Cooling) modes, supporting reversible heat pumps.
+- [ ] **External AI Integration (Predictive Optimization)**: Dedicated API/Sensors interface allowing external AIs to read historical data and constantly optimize PID parameters, weather compensation curves, and predictive geofencing. *(Note: This phase is exploratory. We need to evaluate if existing AI solutions can be integrated or if we need to develop something completely from scratch).*
 
 ## License
 
