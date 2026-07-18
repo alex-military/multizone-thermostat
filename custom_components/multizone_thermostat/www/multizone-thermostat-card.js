@@ -1535,9 +1535,18 @@ class MultizoneThermostatPresetCardEditor extends HTMLElement {
     if (!this._hass) return;
     const config = this._config || {};
     
-    // Find select entities
-    const selectEntities = Object.keys(this._hass.states)
-      .filter(eid => eid.startsWith('select.'));
+    // Auto-discover preset entity if not configured
+    let currentEntity = config.entity;
+    if (!currentEntity) {
+      currentEntity = findPresetEntity(this._hass) || '';
+      if (currentEntity) {
+        // Defer the config change slightly to let the editor finish rendering
+        setTimeout(() => {
+          this._config = { ...this._config, entity: currentEntity };
+          this.configChanged(this._config);
+        }, 100);
+      }
+    }
 
     if (this.shadowRoot.hasChildNodes()) {
       this.shadowRoot.innerHTML = '';
