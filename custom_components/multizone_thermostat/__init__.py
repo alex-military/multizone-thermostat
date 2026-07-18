@@ -71,19 +71,31 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             resources = hass.data["lovelace"].resources
             if hasattr(resources, "async_get_info"):
                 await resources.async_get_info()
-                url = "/multizone_thermostat_card/multizone-thermostat-card.js"
-                exists = False
+                
+                from homeassistant.loader import async_get_integration
+                integration = await async_get_integration(hass, DOMAIN)
+                version = integration.version if integration else "unknown"
+                
+                base_url = "/multizone_thermostat_card/multizone-thermostat-card.js"
+                url = f"{base_url}?v={version}"
+                
+                existing_item = None
                 for item in resources.async_items():
-                    if item.get("url") == url:
-                        exists = True
+                    if item.get("url", "").startswith(base_url):
+                        existing_item = item
                         break
-                if not exists:
+                        
+                if not existing_item:
                     await resources.async_create_item({
                         "res_type": "module",
                         "url": url,
                     })
+                elif existing_item.get("url") != url:
+                    await resources.async_update_item(existing_item.get("id"), {
+                        "url": url,
+                    })
     except Exception as err:
-        _LOGGER.warning("Could not register Lovelace resource: %s", err)
+        _LOGGER.warning("Could not register or update Lovelace resource: %s", err)
 
     # Register update listener for options changes
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
