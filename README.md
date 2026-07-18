@@ -216,19 +216,20 @@ type: custom:multizone-thermostat-preset-card
 
 The project is structured in phases to evolve from a simple aggregator to a full-fledged smart climate manager.
 
-### FASE 1 — Sicurezza Impianto ✅
-- [x] **Antipendolamento (`min_cycle_duration`)**: Previene oscillazioni rapide della caldaia con tempi minimi di ON/OFF (implementato via entità `number`).
-- [x] **Ritardo Accensione Caldaia (`valve_opening_delay`)**: Ritardo in secondi per permettere l'apertura delle valvole termoelettriche (implementato via entità `number`).
-- [x] **Rilevamento Finestra Aperta (`window_sensor`)**: Bypass automatico zona su apertura finestra, con ripristino stato precedente e persistenza su riavvio.
+### PHASE 1 — System Safety ✅
+- [x] **Anti-short Cycle (`min_cycle_duration`)**: Prevents rapid boiler oscillations with minimum ON/OFF times (implemented via `number` entities).
+- [x] **Boiler Ignition Delay (`valve_opening_delay`)**: Delay in seconds to allow thermoelectric valves to open fully before firing the boiler (implemented via `number` entity).
+- [x] **Open Window Detection (`window_sensor`)**: Automatic zone bypass upon window opening, with state restoration and persistence across restarts.
 
-### FASE 2 — Evoluzione Architetturale (In Progress)
-- [x] **Termostati Virtuali via UI**: Creazione automatica di entità `climate` da un sensore di temperatura e uno switch (es. fancoil/relè sfusi) senza YAML.
-- [x] **Preset Globali (Memoria Temperature e Bypass)**: I preset (Manuale / Eco / Comfort / Sleep / Away) fungono da "scenari globali" con memoria dinamica per singola zona. 
-  - Selezionando un preset, il sistema applicherà le impostazioni salvate per ogni zona.
-  - Se modifichi la temperatura o attivi/disattivi il bypass di una zona mentre è attivo un preset, il sistema *ricorda* quella modifica e la salverà permanentemente per quel preset.
-  - Al successivo utilizzo dello stesso preset, la zona tornerà esattamente allo stato (temperatura target e stato bypass) configurato l'ultima volta.
-- [x] **Card Preset Rapida**: Una custom card Lovelace dedicata alla selezione rapida e centralizzata dei preset globali.
-- [ ] **Geofencing Zero-Code**: Cambio preset automatico in base alla presenza (Away/Comfort).
+### PHASE 2 — Architectural Evolution (In Progress)
+- [x] **Virtual Thermostats via UI**: Automatic creation of `climate` entities from a temperature sensor and a simple switch (e.g., bare relays) without YAML.
+- [x] **Global Presets (Dynamic Memory)**: Presets (Manual / Eco / Comfort / Sleep / Away) act as "global scenes" with dynamic memory per individual zone. 
+  - Selecting a preset applies the saved settings for each zone.
+  - Modifying the temperature or bypass state of a zone while a preset is active permanently saves that change to the current preset.
+  - Upon subsequent selection of the same preset, the zone accurately returns to its previously configured state (target temp and bypass).
+- [x] **Quick Preset Card**: A dedicated custom Lovelace card for quick and centralized global preset selection.
+- [ ] **Geofencing Zero-Code**: Automatic preset switching based on home occupancy (Away/Comfort).
+- [ ] **Room Priority Selector**: Replace the zone bypass switch with a multi-state selector (Primary / Secondary / Bypassed). *Primary* zones can turn on the boiler; *Secondary* zones can open their valves to receive heat but cannot turn on the boiler; *Bypassed* zones are excluded entirely.
 
 ### PHASE 3 — Advanced Energy Optimization & AI
 - [ ] **PID Auto-Tuning**: Advanced self-learning PID algorithm that studies the thermal inertia of the house and regulates proportional modulation (PWM) autonomously to eliminate temperature swings.
