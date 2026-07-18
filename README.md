@@ -119,91 +119,9 @@ Only enable this for zones with physical TRV valves that support preset modes.
 
 ## Lovelace Cards
 
-This integration includes three custom Lovelace cards to control your heating zones and view the central heating status directly in your Home Assistant dashboards. The cards are **auto-registered** — no manual resource configuration needed.
+This integration includes four custom Lovelace cards to control your heating zones, presets, and view the central heating status directly in your Home Assistant dashboards. The cards are **auto-registered** — no manual resource configuration needed.
 
-### 1. Central Heating Status Card (`custom:multizone-thermostat-status-card`)
-A zero-configuration, button-style card that displays the status of the central heating master switch. It changes color and icon dynamically depending on the state of the Master Switch and the Boiler/Circulator:
-- **Grey (Off)**: The master heating system is disabled.
-- **Yellow (Standby)**: The master heating system is enabled, but no zone is currently calling for heat (boiler is idle).
-- **Orange (Heating)**: The master heating system is enabled, and at least one zone is calling for heat (boiler is active).
-
-#### States
-| Off | Standby (Idle) | Active Heating |
-|---|---|---|
-| ![Master Off](images/status_off.png) | ![Master Standby](images/status_idle.png) | ![Master Heating](images/status_heating.png) |
-
----
-
-### 2. Dial Thermostat Card (`custom:multizone-thermostat-dial-card`)
-Wraps the native Home Assistant circular thermostat card and adds a built-in toggle switch to easily enable or exclude (bypass) the zone.
-- **Enabled**: Displays the interactive dial to adjust temperature.
-- **Disabled**: Dims the dial and overlays a clean "Zone Excluded / Bypassed" message.
-
-#### States
-| Enabled | Excluded (Bypassed) |
-|---|---|
-| ![Dial Enabled](images/dial_enabled.png) | ![Dial Disabled](images/dial_disabled.png) |
-
----
-
-### 3. Button Thermostat Card (`custom:multizone-thermostat-button-card`)
-A compact button-based thermostat card designed for spaces where a circular dial is too large. It includes temperature controls (`+` / `-`), current and target temperature displays, HVAC mode selectors, and the zone enable/exclude switch.
-- **Enabled**: Fully interactive controls.
-- **Disabled**: Dims the controls and displays a "Zone Excluded / Bypassed" overlay.
-
-#### States
-| Enabled | Excluded (Bypassed) |
-|---|---|
-| ![Button Enabled](images/button_enabled.png) | ![Button Disabled](images/button_disabled.png) |
-
----
-
-### 4. Global Preset Card (`custom:multizone-thermostat-preset-card`)
-A zero-configuration, multi-button card designed for quick selection of the global heating preset (Manual, Eco, Comfort, Sleep, Away). 
-- **Auto-Discovery**: Automatically finds and binds to the `select.multizone_thermostat_global_preset` entity without any configuration.
-- **Dynamic Styling**: The active preset is dynamically highlighted using your current Home Assistant theme colors.
-- **Smart Memory**: Changing the preset instantly recalls the exact temperatures and bypassed zones you had previously set for that specific preset.
-
-![Global Preset Card](images/preset_card.png)
-
----
-
-### Card Configuration
-
-#### Status Card (Zero-Config)
-The status card requires zero configuration because it automatically detects your Master Switch:
-```yaml
-type: custom:multizone-thermostat-status-card
-```
-
-#### Dial Thermostat Card
-```yaml
-type: custom:multizone-thermostat-dial-card
-entity: climate.your_climate_entity           # Your climate entity (copy ID from HA UI)
-switch: switch.multizone_thermostat_zone_name # (Optional) The bypass switch (copy ID from HA UI)
-title: Living Room                            # (Optional) Custom title
-```
-
-#### Button Thermostat Card
-```yaml
-type: custom:multizone-thermostat-button-card
-entity: climate.your_climate_entity           # Your climate entity (copy ID from HA UI)
-switch: switch.multizone_thermostat_zone_name # (Optional) The bypass switch (copy ID from HA UI)
-title: Living Room                            # (Optional) Custom title
-```
-
-#### Global Preset Card (Zero-Config)
-The preset card automatically finds your global preset entity. You can optionally override it or set a custom title.
-```yaml
-type: custom:multizone-thermostat-preset-card
-# title: "My Presets"                           # (Optional) Custom title
-# entity: select.multizone_thermostat_global_preset # (Optional) Override auto-discovery
-```
-
-> **Tip**: To find your exact entity IDs, go to **Settings → Devices & Services → Multizone Thermostat** and click on any entity. The entity ID is shown at the bottom of the entity page.
-
-> **Note**: If you installed via HACS, the Lovelace card resource is registered automatically. If cards don't appear, add the resource manually:
-> Go to **Settings → Dashboards → Resources** → Add `/multizone_thermostat_card/multizone-thermostat-card.js` as **JavaScript Module**.
+👉 **[Click here to view the documentation and screenshots for the Custom Lovelace Cards](cards.md)**
 
 ## Requirements
 
