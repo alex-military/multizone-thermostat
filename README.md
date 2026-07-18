@@ -6,14 +6,15 @@ A custom integration for Home Assistant that provides **multi-zone heating manag
 
 - 🖥️ **100% UI Config Flow** — Setup wizard: select your boiler relay and add zones directly from the HA interface
 - 🔘 **Master Switch** — One switch to enable/disable the entire heating system
-- 🏠 **Per-Zone Switches** — Individual switches for each room/zone, persistent across restarts
-- 🔥 **Automatic Boiler Control** — Boiler turns ON when any zone is heating, OFF when all zones are idle
+- 🏠 **Zone Modes (Primary/Secondary/Bypass)** — Advanced per-zone control. Primary zones trigger the boiler; Secondary zones only receive heat if the boiler is already running; Bypassed zones are excluded entirely.
+- 📍 **Geofencing & Auto-Sleep** — Automatically switch to Away or Sleep presets based on home occupancy (presence sensors) or time of day.
+- 🔥 **Automatic Boiler Control** — Boiler turns ON when any Primary zone is heating, OFF when all zones are idle
 - 🛡️ **Boiler Protection** — Native `number` entities for anti-short-cycle (min cycle on/off) and valve opening delay
 - 🪟 **Window Sensor Detection** — Automatically bypass zones when a window is opened, and restore them when closed
 - 🌡️ **Virtual Thermostats** — Create virtual thermostat entities directly from the UI by combining a temperature sensor and a heater switch — no YAML needed
 - 🔄 **TRV Preset Sync** — Optional per-zone preset synchronization for physical TRV valves
 - ⚙️ **Options Flow** — Add/remove zones and virtual thermostats, change window sensors and settings after installation
-- 🎨 **3 Custom Lovelace Cards** — Master status card, circular dial card, and compact button card — all auto-registered
+- 🎨 **4 Custom Lovelace Cards** — Master status card, circular dial card, compact button card, and global preset card — all auto-registered
 
 ## Installation
 
@@ -61,7 +62,7 @@ Virtual thermostats can also be created **after installation** from the Options 
 | Entity (example ID) | Description |
 |--------|-------------|
 | `switch.multizone_thermostat_heating_master` | Master on/off for the entire heating system |
-| `switch.multizone_thermostat_[zone_name]` | Per-zone on/off switch (one per configured zone) |
+| `select.zone_modes_[zone_name]_mode` | Per-zone mode selector (Primary, Secondary, Bypass) |
 | `climate.multizone_thermostat_vt_[name]` | Virtual thermostat entity (only if created via the UI) |
 | `select.multizone_thermostat_global_preset` | Global preset selector (Manual, Eco, Comfort, Sleep, Away) |
 | `number.multizone_thermostat_min_cycle_on` | Minimum boiler ON time (minutes, default: 5) |
@@ -72,26 +73,27 @@ Virtual thermostats can also be created **after installation** from the Options 
 
 ```
 Master Switch ON
-    └── Zone Switch ON  → climate.set_hvac_mode(heat)
-    └── Zone Switch OFF → climate.set_hvac_mode(off)
+    └── Zone Mode = Primary   → Boiler can be triggered if zone is heating
+    └── Zone Mode = Secondary → Receives heat if boiler is running, but cannot trigger boiler
+    └── Zone Mode = Bypass    → Zone is completely excluded
 
 Master Switch OFF
-    └── ALL zones → climate.set_hvac_mode(off)
+    └── ALL zones → Overridden to OFF
     └── Boiler   → switch.turn_off() (ignores min_cycle_on for safety)
 
-Any zone hvac_action = heating
+Any Primary zone hvac_action = heating
     └── If valve_delay > 0, wait for delay
     └── If boiler was recently off, wait for min_cycle_off
     └── Boiler ON
 
-All zones hvac_action = idle/off
+All Primary zones hvac_action = idle/off
     └── If boiler was recently on, wait for min_cycle_on
     └── Boiler OFF
     
 Window Opened
-    └── Zone Switch turns OFF automatically (bypassed) and saves state
+    └── Zone Mode temporarily overridden to Bypassed (saves previous state)
 Window Closed
-    └── Zone Switch restores previous state
+    └── Zone Mode restores previous state
 
 Virtual Thermostat Logic (ON/OFF with hysteresis)
     └── current_temp < target - tolerance → heater switch ON
@@ -146,8 +148,8 @@ The project is structured in phases to evolve from a simple aggregator to a full
   - Modifying the temperature or bypass state of a zone while a preset is active permanently saves that change to the current preset.
   - Upon subsequent selection of the same preset, the zone accurately returns to its previously configured state (target temp and bypass).
 - [x] **Quick Preset Card**: A dedicated custom Lovelace card for quick and centralized global preset selection.
-- [ ] **Geofencing Zero-Code**: Automatic preset switching based on home occupancy (Away/Comfort).
-- [ ] **Room Priority Selector**: Replace the zone bypass switch with a multi-state selector (Primary / Secondary / Bypassed). *Primary* zones can turn on the boiler; *Secondary* zones can open their valves to receive heat but cannot turn on the boiler; *Bypassed* zones are excluded entirely.
+- [x] **Geofencing Zero-Code**: Automatic preset switching based on home occupancy (Away/Comfort).
+- [x] **Room Priority Selector**: Replace the zone bypass switch with a multi-state selector (Primary / Secondary / Bypassed). *Primary* zones can turn on the boiler; *Secondary* zones can open their valves to receive heat but cannot turn on the boiler; *Bypassed* zones are excluded entirely.
 
 ### PHASE 3 — Advanced Energy Optimization & AI
 - [ ] **PID Auto-Tuning**: Advanced self-learning PID algorithm that studies the thermal inertia of the house and regulates proportional modulation (PWM) autonomously to eliminate temperature swings.
