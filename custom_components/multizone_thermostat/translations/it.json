@@ -55,9 +55,17 @@
       },
       "another_zone": {
         "title": "Aggiungere un'altra zona?",
-        "description": "Hai aggiunto {zones_added} zona/e: {zones_list}.\n\n{remaining} entità climate ancora disponibili.",
+        "description": "Hai aggiunto {zones_added} zone: {zones_list}.\n\nCi sono ancora {remaining} entità clima disponibili.",
         "data": {
           "add_another": "Aggiungi un'altra zona"
+        }
+      },
+      "geofencing": {
+        "title": "Geofencing & Programmazione",
+        "description": "Vuoi abilitare il Geofencing e la Modalità Notte Automatica? Se sì, seleziona un sensore di presenza (es. zone.home o person).",
+        "data": {
+          "geofencing_enabled": "Abilita Geofencing & Auto-Notte",
+          "presence_sensor": "Sensore di Presenza"
         }
       },
       "confirm": {
@@ -73,7 +81,8 @@
       "no_temp_sensors_found": "Nessun sensore di temperatura trovato in Home Assistant."
     },
     "error": {
-      "zone_name_required": "Il nome della zona non può essere vuoto."
+      "zone_name_required": "Il nome della zona non può essere vuoto.",
+      "presence_sensor_required": "Devi selezionare un sensore se abiliti il Geofencing."
     }
   },
   "options": {
@@ -128,11 +137,19 @@
       },
       "edit_zone": {
         "title": "Modifica Impostazioni Zona",
-        "description": "Modifica le impostazioni di una zona.",
+        "description": "Modifica le impostazioni per una zona.",
         "data": {
           "zone_climate": "Zona",
-          "trv_preset_sync": "Abilita Sincronizzazione Preset TRV",
+          "trv_preset_sync": "Abilita Sincronizzazione TRV",
           "window_sensor": "Sensore Finestra (Opzionale)"
+        }
+      },
+      "edit_geofencing": {
+        "title": "Geofencing & Programmazione",
+        "description": "Abilita o disabilita il Geofencing e seleziona il sensore di presenza.",
+        "data": {
+          "geofencing_enabled": "Abilita Geofencing & Auto-Notte",
+          "presence_sensor": "Sensore di Presenza"
         }
       }
     },

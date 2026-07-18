@@ -22,6 +22,8 @@ from .const import (
     CONF_VT_TARGET_TEMP,
     CONF_VT_TEMP_SENSOR,
     CONF_VT_TOLERANCE,
+    CONF_GEOFENCING_ENABLED,
+    CONF_PRESENCE_SENSOR,
     CONF_ZONE_CLIMATE,
     CONF_ZONE_NAME,
     CONF_ZONE_TRV_SYNC,
@@ -31,7 +33,6 @@ from .const import (
     DEFAULT_VT_TARGET_TEMP,
     DEFAULT_VT_TOLERANCE,
     DOMAIN,
-    SWITCH_ZONE_PREFIX,
     make_vt_entity_id,
 )
 
@@ -102,13 +103,6 @@ def _get_temperature_sensor_entities(hass: HomeAssistant) -> dict[str, str]:
 
 
 
-def _make_zone_switch_entity_id(name: str) -> str:
-    """Generate a predictable entity_id for a zone switch."""
-    safe = name.lower().replace(" ", "_").replace("-", "_")
-    safe = "".join(c for c in safe if c.isalnum() or c == "_")
-    return f"switch.{DOMAIN}_{SWITCH_ZONE_PREFIX}_{safe}"
-
-
 def _remove_entity_from_registry(hass: HomeAssistant, entity_id: str) -> None:
     """Remove an entity from the entity registry."""
     ent_reg = er.async_get(hass)
@@ -135,7 +129,8 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._boiler_switch: str | None = None
         self._zones: list[dict] = []
         self._virtual_thermostats: list[dict] = []
-        self._current_zone_data: dict = {}
+        self._geofencing_enabled: bool = True
+        self._presence_sensor: str | None = None
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -261,8 +256,8 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         available_climates = {k: v for k, v in climates.items() if k not in already_added}
 
         if not available_climates:
-            # No more climates to add, go to confirm
-            return await self.async_step_confirm()
+            # No more climates to add, go to geofencing
+            return await self.async_step_geofencing()
         if user_input is not None:
             climate_entity = user_input[CONF_ZONE_CLIMATE]
             zone_name = user_input[CONF_ZONE_NAME].strip()
@@ -315,7 +310,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if user_input.get("add_another", False):
                 return await self.async_step_choose_zone_type()
             else:
-                return await self.async_step_confirm()
+                return await self.async_step_geofencing()
 
         climates = _get_climate_entities(self.hass)
         already_added = {z[CONF_ZONE_CLIMATE] for z in self._zones}
@@ -335,10 +330,58 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             },
         )
 
+    async def async_step_geofencing(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.FlowResult:
+        """Step: Geofencing Setup."""
+        errors: dict[str, str] = {}
+        
+        # Get persons, zones, and groups for presence sensing
+        entity_reg = er.async_get(self.hass)
+        presence_entities = {}
+        # Pre-populate with zone.home which always exists
+        state = self.hass.states.get("zone.home")
+        if state:
+            presence_entities["zone.home"] = state.attributes.get("friendly_name", "Home")
+            
+        for entry in entity_reg.entities.values():
+            if entry.domain in ("person", "group", "zone", "input_boolean") and not entry.disabled:
+                st = self.hass.states.get(entry.entity_id)
+                name = st.attributes.get("friendly_name", entry.entity_id) if st else entry.entity_id
+                presence_entities[entry.entity_id] = name
+        for st in self.hass.states.async_all(("person", "group", "zone", "input_boolean")):
+            if st.entity_id not in presence_entities:
+                presence_entities[st.entity_id] = st.attributes.get("friendly_name", st.entity_id)
+                
+        presence_entities = dict(sorted(presence_entities.items(), key=lambda x: x[1]))
+
+        if user_input is not None:
+            self._geofencing_enabled = user_input.get(CONF_GEOFENCING_ENABLED, True)
+            if self._geofencing_enabled:
+                self._presence_sensor = user_input.get(CONF_PRESENCE_SENSOR)
+                if not self._presence_sensor:
+                    errors[CONF_PRESENCE_SENSOR] = "presence_sensor_required"
+                else:
+                    return await self.async_step_confirm()
+            else:
+                self._presence_sensor = None
+                return await self.async_step_confirm()
+
+        schema = vol.Schema({
+            vol.Required(CONF_GEOFENCING_ENABLED, default=True): bool,
+            vol.Optional(CONF_PRESENCE_SENSOR, default="zone.home"): vol.In(presence_entities),
+        })
+
+        return self.async_show_form(
+            step_id="geofencing",
+            data_schema=schema,
+            errors=errors,
+        )
+
     async def async_step_confirm(
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.FlowResult:
-        """Step 3: Confirm configuration."""
+        """Step: Confirm configuration."""
         if not self._zones:
             return self.async_abort(reason="no_zones_configured")
 
@@ -346,7 +389,10 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data = {
                 CONF_BOILER_SWITCH: self._boiler_switch,
                 CONF_ZONES: self._zones,
+                CONF_GEOFENCING_ENABLED: self._geofencing_enabled,
             }
+            if self._geofencing_enabled and self._presence_sensor:
+                data[CONF_PRESENCE_SENSOR] = self._presence_sensor
             if self._virtual_thermostats:
                 data[CONF_VIRTUAL_THERMOSTATS] = self._virtual_thermostats
             return self.async_create_entry(
@@ -388,6 +434,8 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
         self._zones: list[dict] = list(config_entry.data.get(CONF_ZONES, []))
         self._boiler_switch: str = config_entry.data.get(CONF_BOILER_SWITCH, "")
         self._virtual_thermostats: list[dict] = list(config_entry.data.get(CONF_VIRTUAL_THERMOSTATS, []))
+        self._geofencing_enabled: bool = config_entry.data.get(CONF_GEOFENCING_ENABLED, False)
+        self._presence_sensor: str | None = config_entry.data.get(CONF_PRESENCE_SENSOR)
         self._current_zone_id: str | None = None
 
     async def async_step_init(
@@ -404,6 +452,8 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                 return await self.async_step_remove_zone()
             elif action == "edit_zone":
                 return await self.async_step_edit_zone()
+            elif action == "edit_geofencing":
+                return await self.async_step_edit_geofencing()
             elif action == "create_virtual":
                 return await self.async_step_create_virtual_thermostat()
             elif action == "remove_virtual":
@@ -412,6 +462,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
         menu_options = {
             "change_boiler": "Change boiler switch",
             "add_zone": "Add a zone (existing thermostat)",
+            "edit_geofencing": "Edit Geofencing Settings",
             "create_virtual": "Create virtual thermostat",
             "remove_zone": "Remove a zone",
             "edit_zone": "Edit a zone",
@@ -509,9 +560,14 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             # Remove the zone config
             self._zones = [z for z in self._zones if z[CONF_ZONE_CLIMATE] != climate_to_remove]
             
-            # Remove the associated switch entity from registry
-            switch_entity_id = _make_zone_switch_entity_id(zone_name)
-            _remove_entity_from_registry(self.hass, switch_entity_id)
+            # Remove the associated select entity from registry
+            ent_reg = er.async_get(self.hass)
+            safe_climate = climate_to_remove.replace('.', '_').replace('-', '_')
+            unique_id = f"{DOMAIN}_{self._config_entry.entry_id}_zone_mode_{safe_climate}"
+            entity_id = ent_reg.async_get_entity_id("select", DOMAIN, unique_id)
+            if entity_id:
+                ent_reg.async_remove(entity_id)
+                _LOGGER.debug("Removed orphaned select entity %s from registry", entity_id)
             
             return self._save_options()
 
@@ -612,9 +668,14 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             if vt_name:
                 # Remove VT entity from registry
                 _remove_entity_from_registry(self.hass, vt_to_remove)
-                # Remove associated zone switch from registry
-                switch_entity_id = _make_zone_switch_entity_id(vt_name)
-                _remove_entity_from_registry(self.hass, switch_entity_id)
+                # Remove associated zone select from registry
+                ent_reg = er.async_get(self.hass)
+                safe_vt = vt_to_remove.replace('.', '_').replace('-', '_')
+                unique_id = f"{DOMAIN}_{self._config_entry.entry_id}_zone_mode_{safe_vt}"
+                entity_id = ent_reg.async_get_entity_id("select", DOMAIN, unique_id)
+                if entity_id:
+                    ent_reg.async_remove(entity_id)
+                    _LOGGER.debug("Removed orphaned VT select entity %s from registry", entity_id)
                 
             return self._save_options()
 
@@ -669,13 +730,63 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
         })
         return self.async_show_form(step_id="edit_zone", data_schema=schema)
 
+    async def async_step_edit_geofencing(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.FlowResult:
+        """Edit geofencing settings."""
+        errors: dict[str, str] = {}
+        
+        entity_reg = er.async_get(self.hass)
+        presence_entities = {}
+        state = self.hass.states.get("zone.home")
+        if state:
+            presence_entities["zone.home"] = state.attributes.get("friendly_name", "Home")
+            
+        for entry in entity_reg.entities.values():
+            if entry.domain in ("person", "group", "zone", "input_boolean") and not entry.disabled:
+                st = self.hass.states.get(entry.entity_id)
+                name = st.attributes.get("friendly_name", entry.entity_id) if st else entry.entity_id
+                presence_entities[entry.entity_id] = name
+        for st in self.hass.states.async_all(("person", "group", "zone", "input_boolean")):
+            if st.entity_id not in presence_entities:
+                presence_entities[st.entity_id] = st.attributes.get("friendly_name", st.entity_id)
+                
+        presence_entities = dict(sorted(presence_entities.items(), key=lambda x: x[1]))
+
+        if user_input is not None:
+            self._geofencing_enabled = user_input.get(CONF_GEOFENCING_ENABLED, False)
+            if self._geofencing_enabled:
+                self._presence_sensor = user_input.get(CONF_PRESENCE_SENSOR)
+                if not self._presence_sensor:
+                    errors[CONF_PRESENCE_SENSOR] = "presence_sensor_required"
+                else:
+                    return self._save_options()
+            else:
+                self._presence_sensor = None
+                return self._save_options()
+
+        schema = vol.Schema({
+            vol.Required(CONF_GEOFENCING_ENABLED, default=self._geofencing_enabled): bool,
+            vol.Optional(CONF_PRESENCE_SENSOR, default=self._presence_sensor or "zone.home"): vol.In(presence_entities),
+        })
+
+        return self.async_show_form(
+            step_id="edit_geofencing",
+            data_schema=schema,
+            errors=errors,
+        )
+
     @callback
     def _save_options(self) -> config_entries.FlowResult:
         """Save updated options into entry.data and reload entry."""
         data = {
             CONF_BOILER_SWITCH: self._boiler_switch,
             CONF_ZONES: self._zones,
+            CONF_GEOFENCING_ENABLED: self._geofencing_enabled,
         }
+        if self._geofencing_enabled and self._presence_sensor:
+            data[CONF_PRESENCE_SENSOR] = self._presence_sensor
+            
         if self._virtual_thermostats:
             data[CONF_VIRTUAL_THERMOSTATS] = self._virtual_thermostats
         self.hass.config_entries.async_update_entry(

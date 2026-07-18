@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 import logging
 from typing import Any
 
@@ -21,7 +21,7 @@ from homeassistant.const import (
     STATE_ON,
 )
 from homeassistant.core import Event, HomeAssistant, callback
-from homeassistant.helpers.event import async_track_state_change_event
+from homeassistant.helpers.event import async_track_state_change_event, async_track_time_interval
 from homeassistant.helpers.storage import Store
 
 from .const import (
@@ -35,6 +35,19 @@ from .const import (
     HVAC_MODE_OFF,
     PRESET_MANUAL,
     PRESET_OFF,
+    CONF_PRESENCE_SENSOR,
+    KEY_NIGHT_TIME,
+    KEY_MORNING_TIME,
+    KEY_AUTO_NIGHT_MODE,
+    KEY_GEOFENCING_TOGGLE,
+    KEY_PRE_AWAY_PRESET,
+    KEY_PRE_NIGHT_PRESET,
+    GLOBAL_PRESET_SLEEP,
+    GLOBAL_PRESET_AWAY,
+    GLOBAL_PRESET_COMFORT,
+    ZONE_MODE_PRIMARY,
+    ZONE_MODE_SECONDARY,
+    ZONE_MODE_BYPASS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -47,6 +60,8 @@ WINDOW_STORAGE_VERSION = 1
 WINDOW_STORAGE_KEY = f"{DOMAIN}.window_states"
 PRESET_STORAGE_KEY = f"{DOMAIN}.presets"
 PRESET_STORAGE_VERSION = 1
+SETTINGS_STORAGE_KEY = f"{DOMAIN}.settings"
+SETTINGS_STORAGE_VERSION = 1
 
 
 class MultizoneCoordinator:
@@ -58,12 +73,14 @@ class MultizoneCoordinator:
         entry_id: str,
         boiler_switch: str,
         zones: list[dict],
+        presence_sensor: str | None = None,
     ) -> None:
         """Initialize the coordinator."""
         self.hass = hass
         self.entry_id = entry_id
         self.boiler_switch = boiler_switch
         self.zones = zones
+        self.presence_sensor = presence_sensor
         
         # These will be updated by the number entities
         self._min_cycle_on = 5
@@ -71,10 +88,10 @@ class MultizoneCoordinator:
         self._valve_delay = 0
 
         # State: master on/off and per-zone on/off
-        # Loaded/saved externally by switch entities using RestoreState
+        # Loaded/saved externally by entities using RestoreState
         self._master_state: bool = False
-        self._zone_states: dict[str, bool] = {
-            z[CONF_ZONE_CLIMATE]: True for z in zones
+        self._zone_modes: dict[str, str] = {
+            z[CONF_ZONE_CLIMATE]: ZONE_MODE_PRIMARY for z in zones
         }
 
         self._boiler_locked_on_until: datetime | None = None
@@ -82,7 +99,7 @@ class MultizoneCoordinator:
         self._pending_boiler_task: asyncio.Task | None = None
 
         self._unsub_listeners: list = []
-        self._switch_entities: dict[str, Any] = {}  # entity_id -> switch object
+        self._select_entities: dict[str, Any] = {}  # key -> select object
         
         self._store = Store(hass, WINDOW_STORAGE_VERSION, WINDOW_STORAGE_KEY)
         self._pre_window_state: dict[str, bool] = {}
@@ -90,6 +107,21 @@ class MultizoneCoordinator:
         self._preset_store = Store(hass, PRESET_STORAGE_VERSION, PRESET_STORAGE_KEY)
         self._presets: dict[str, dict[str, dict[str, Any]]] = {}
         self._current_global_preset: str = GLOBAL_PRESET_MANUAL
+        
+        self._settings_store = Store(hass, SETTINGS_STORAGE_VERSION, SETTINGS_STORAGE_KEY)
+        self._settings: dict[str, Any] = {}
+        
+        self._last_night_trigger_date: datetime.date | None = None
+        self._last_morning_trigger_date: datetime.date | None = None
+
+    def get_persistent_data(self, key: str, default: Any = None) -> Any:
+        """Get a persistent setting."""
+        return self._settings.get(key, default)
+
+    async def async_set_persistent_data(self, key: str, value: Any) -> None:
+        """Set a persistent setting."""
+        self._settings[key] = value
+        await self._settings_store.async_save(self._settings)
 
     async def async_load_storage(self) -> None:
         """Load stored window states and presets."""
@@ -102,6 +134,11 @@ class MultizoneCoordinator:
         if preset_stored and isinstance(preset_stored, dict):
             self._presets = preset_stored
             _LOGGER.debug("Loaded presets from storage: %s", self._presets)
+            
+        settings_stored = await self._settings_store.async_load()
+        if settings_stored and isinstance(settings_stored, dict):
+            self._settings = settings_stored
+            _LOGGER.debug("Loaded settings from storage: %s", self._settings)
 
     async def _async_save_storage(self) -> None:
         """Save window states to storage."""
@@ -111,38 +148,54 @@ class MultizoneCoordinator:
         """Save presets to storage."""
         await self._preset_store.async_save(self._presets)
 
-    def register_switch(self, climate_or_master: str, switch_entity: Any) -> None:
-        """Register a switch entity so coordinator can notify state changes."""
-        self._switch_entities[climate_or_master] = switch_entity
+    def register_select(self, key: str, select_entity: Any) -> None:
+        """Register a select entity."""
+        self._select_entities[key] = select_entity
 
     def set_master_state(self, state: bool) -> None:
         """Set master state (called by master switch entity)."""
         self._master_state = state
 
-    def set_zone_state(self, climate_entity: str, state: bool) -> None:
-        """Set zone state (called by zone switch entity)."""
-        self._zone_states[climate_entity] = state
+    def get_zone_mode(self, climate_entity: str) -> str:
+        """Get current zone mode."""
+        return self._zone_modes.get(climate_entity, ZONE_MODE_PRIMARY)
 
-        # If a preset is active, save the bypass state
+    def set_zone_mode(self, climate_entity: str, mode: str) -> None:
+        """Set zone mode (called by zone select entity)."""
+        self._zone_modes[climate_entity] = mode
+
+        # If a preset is active, save the mode state
         if self._current_global_preset:
             if self._current_global_preset not in self._presets:
                 self._presets[self._current_global_preset] = {}
             if climate_entity not in self._presets[self._current_global_preset]:
                 self._presets[self._current_global_preset][climate_entity] = {}
 
-            # Save 'bypassed' (which is the opposite of state: ON means active, OFF means bypassed)
-            self._presets[self._current_global_preset][climate_entity]["bypassed"] = not state
+            self._presets[self._current_global_preset][climate_entity]["mode"] = mode
             self.hass.async_create_task(self._async_save_presets_storage())
+
+    @property
+    def current_global_preset(self) -> str:
+        """Return the current global preset."""
+        return self._current_global_preset
 
     def set_global_preset(self, preset: str) -> None:
         """Set the global preset (used on restore)."""
         self._current_global_preset = preset
+
+    def get_global_preset(self) -> str:
+        """Get the current global preset."""
+        return self._current_global_preset
 
     async def async_set_global_preset(self, preset: str) -> None:
         """Set the global preset and apply it to all zones."""
         self._current_global_preset = preset
         _LOGGER.debug("Global preset changed to: %s", preset)
         
+        # Notify the UI select entity if it's registered
+        if "global_preset" in self._select_entities:
+            self._select_entities["global_preset"].async_write_ha_state()
+
         if preset not in self._presets:
             return
             
@@ -159,25 +212,23 @@ class MultizoneCoordinator:
                 except Exception as ex:
                     _LOGGER.warning("Could not set temperature for %s: %s", climate_entity, ex)
             
-            if "bypassed" in data:
-                bypassed = data["bypassed"]
-                zone_switch = self._switch_entities.get(climate_entity)
-                if zone_switch:
-                    try:
-                        if not bypassed and not zone_switch.is_on:
-                            await zone_switch.async_turn_on()
-                        elif bypassed and zone_switch.is_on:
-                            await zone_switch.async_turn_off()
-                    except Exception as ex:
-                        _LOGGER.warning("Could not toggle bypass for %s: %s", climate_entity, ex)
+            # Legacy preset support
+            mode = ZONE_MODE_PRIMARY
+            if "mode" in data:
+                mode = data["mode"]
+            elif "bypassed" in data:
+                mode = ZONE_MODE_BYPASS if data["bypassed"] else ZONE_MODE_PRIMARY
+
+            zone_select = self._select_entities.get(f"zone_mode_{climate_entity}")
+            if zone_select:
+                try:
+                    await zone_select.async_select_option(mode)
+                except Exception as ex:
+                    _LOGGER.warning("Could not set zone mode for %s: %s", climate_entity, ex)
 
     def get_master_state(self) -> bool:
         """Get current master state."""
         return self._master_state
-
-    def get_zone_state(self, climate_entity: str) -> bool:
-        """Get current zone state."""
-        return self._zone_states.get(climate_entity, True)
 
     @callback
     def async_setup_listeners(self) -> None:
@@ -213,6 +264,26 @@ class MultizoneCoordinator:
             _LOGGER.debug(
                 "Listening to window state changes for: %s", window_sensors
             )
+
+        # Listen to presence sensor if configured
+        if self.presence_sensor:
+            self._unsub_listeners.append(
+                async_track_state_change_event(
+                    self.hass,
+                    [self.presence_sensor],
+                    self._async_on_presence_changed,
+                )
+            )
+            _LOGGER.debug("Listening to presence sensor: %s", self.presence_sensor)
+
+        # Listen every minute for Schedule check (Night / Morning)
+        self._unsub_listeners.append(
+            async_track_time_interval(
+                self.hass,
+                self._async_check_schedule,
+                timedelta(minutes=1),
+            )
+        )
 
     @callback
     def async_teardown_listeners(self) -> None:
@@ -272,31 +343,131 @@ class MultizoneCoordinator:
             return
             
         climate_id = zone[CONF_ZONE_CLIMATE]
-        switch_entity = self._switch_entities.get(climate_id)
+        zone_select = self._select_entities.get(f"zone_mode_{climate_id}")
         
         if new_state.state == STATE_ON:
             # Window OPENED
             _LOGGER.debug("Window opened (%s), bypassing zone %s", sensor_id, climate_id)
-            # Save current state if not already saved (don't overwrite if multiple sensors?)
+            # Save current state if not already saved
             if climate_id not in self._pre_window_state:
-                current_state = self.get_zone_state(climate_id)
-                self._pre_window_state[climate_id] = current_state
+                current_mode = self.get_zone_mode(climate_id)
+                self._pre_window_state[climate_id] = current_mode
                 self.hass.async_create_task(self._async_save_storage())
             
-            # Turn off the zone via the switch entity (updates UI and coordinator)
-            if switch_entity and switch_entity.is_on:
-                self.hass.async_create_task(switch_entity.async_turn_off())
+            # Change mode to Bypass
+            if zone_select and self.get_zone_mode(climate_id) != ZONE_MODE_BYPASS:
+                self.hass.async_create_task(zone_select.async_select_option(ZONE_MODE_BYPASS))
                 
         elif new_state.state == "off":
             # Window CLOSED
             _LOGGER.debug("Window closed (%s), restoring zone %s", sensor_id, climate_id)
             if climate_id in self._pre_window_state:
-                was_on = self._pre_window_state.pop(climate_id)
+                was_mode = self._pre_window_state.pop(climate_id)
                 self.hass.async_create_task(self._async_save_storage())
                 
-                # If it was ON, restore it to ON
-                if was_on and switch_entity and not switch_entity.is_on:
-                    self.hass.async_create_task(switch_entity.async_turn_on())
+                # Restore the mode
+                if zone_select and self.get_zone_mode(climate_id) != was_mode:
+                    self.hass.async_create_task(zone_select.async_select_option(was_mode))
+
+    @callback
+    def _async_on_presence_changed(self, event: Event) -> None:
+        """Handle presence sensor state changes (Geofencing logic)."""
+        if not self.get_persistent_data(KEY_GEOFENCING_TOGGLE, True):
+            return  # Geofencing is disabled dynamically
+
+        new_state = event.data.get("new_state")
+        old_state = event.data.get("old_state")
+        if new_state is None or old_state is None:
+            return
+            
+        old_val = old_state.state
+        new_val = new_state.state
+        if old_val == new_val:
+            return
+            
+        _LOGGER.info("Presence changed: %s -> %s", old_val, new_val)
+        
+        # Consider 0, 'not_home', or 'off' as Away
+        is_away = new_val in ("0", "not_home", "off")
+        was_away = old_val in ("0", "not_home", "off")
+        
+        if is_away and not was_away:
+            # Everyone left! Save current preset and set to Away
+            _LOGGER.info("Geofencing: Everyone left. Setting to Away mode.")
+            self.hass.async_create_task(self.async_set_persistent_data(KEY_PRE_AWAY_PRESET, self._current_global_preset))
+            self.hass.async_create_task(self.async_set_global_preset(GLOBAL_PRESET_AWAY))
+            
+        elif not is_away and was_away:
+            # Someone returned!
+            _LOGGER.info("Geofencing: Someone returned.")
+            
+            night_time_str = self.get_persistent_data(KEY_NIGHT_TIME, "22:30")
+            morning_time_str = self.get_persistent_data(KEY_MORNING_TIME, "07:00")
+            is_night = False
+            try:
+                n_hour, n_minute = map(int, night_time_str.split(":"))
+                m_hour, m_minute = map(int, morning_time_str.split(":"))
+                now = dt_util.now().time()
+                night_time = time(n_hour, n_minute)
+                morning_time = time(m_hour, m_minute)
+                
+                if night_time > morning_time:
+                    if now >= night_time or now <= morning_time:
+                        is_night = True
+                else:
+                    if now >= night_time and now <= morning_time:
+                        is_night = True
+                        
+                _LOGGER.error("GEOFENCING DEBUG: night_time=%s, morning_time=%s, now=%s, is_night=%s", night_time, morning_time, now, is_night)
+            except Exception as ex:
+                _LOGGER.error("GEOFENCING DEBUG EXCEPTION: %s", ex)
+                
+            if is_night:
+                _LOGGER.info("Geofencing: Returned at night. Setting Sleep mode.")
+                pre_away = self.get_persistent_data(KEY_PRE_AWAY_PRESET, GLOBAL_PRESET_COMFORT)
+                self.hass.async_create_task(self.async_set_persistent_data(KEY_PRE_NIGHT_PRESET, pre_away))
+                self.hass.async_create_task(self.async_set_global_preset(GLOBAL_PRESET_SLEEP))
+            else:
+                pre_away = self.get_persistent_data(KEY_PRE_AWAY_PRESET, GLOBAL_PRESET_COMFORT)
+                _LOGGER.info("Geofencing: Restoring previous mode: %s", pre_away)
+                self.hass.async_create_task(self.async_set_global_preset(pre_away))
+
+    @callback
+    def _async_check_schedule(self, now: datetime) -> None:
+        """Check if it's time to trigger Auto Night Mode or Morning Mode."""
+        if not self.get_persistent_data(KEY_AUTO_NIGHT_MODE, False):
+            return
+
+        local_now = dt_util.now()
+        current_date = local_now.date()
+
+        # Check Night Time
+        night_time_str = self.get_persistent_data(KEY_NIGHT_TIME, "22:30")
+        try:
+            hour, minute = map(int, night_time_str.split(":"))
+            if local_now.hour == hour and local_now.minute == minute:
+                if self._last_night_trigger_date != current_date:
+                    self._last_night_trigger_date = current_date
+                    _LOGGER.info("Auto Night Mode triggered. Setting Sleep mode.")
+                    # Save current preset before going to sleep (only if not already sleep)
+                    if self._current_global_preset != GLOBAL_PRESET_SLEEP:
+                        self.hass.async_create_task(self.async_set_persistent_data(KEY_PRE_NIGHT_PRESET, self._current_global_preset))
+                        self.hass.async_create_task(self.async_set_global_preset(GLOBAL_PRESET_SLEEP))
+        except Exception:
+            pass
+
+        # Check Morning Time
+        morning_time_str = self.get_persistent_data(KEY_MORNING_TIME, "07:00")
+        try:
+            hour, minute = map(int, morning_time_str.split(":"))
+            if local_now.hour == hour and local_now.minute == minute:
+                if self._last_morning_trigger_date != current_date:
+                    self._last_morning_trigger_date = current_date
+                    pre_night = self.get_persistent_data(KEY_PRE_NIGHT_PRESET, GLOBAL_PRESET_COMFORT)
+                    _LOGGER.info("Auto Morning Mode triggered. Restoring mode: %s", pre_night)
+                    self.hass.async_create_task(self.async_set_global_preset(pre_night))
+        except Exception:
+            pass
 
     def _get_zone(self, climate_entity: str) -> dict | None:
         """Get zone config by climate entity ID."""
@@ -335,20 +506,26 @@ class MultizoneCoordinator:
             await self._force_boiler_off()
             return
 
-        any_heating = False
+        any_primary_heating = False
         for zone in self.zones:
             climate_id = zone[CONF_ZONE_CLIMATE]
+            mode = self.get_zone_mode(climate_id)
+            
+            # Boiler only turns on if a PRIMARY zone needs heat
+            if mode != ZONE_MODE_PRIMARY:
+                continue
+                
             state = self.hass.states.get(climate_id)
             if state is None:
                 continue
             if state.attributes.get(ATTR_HVAC_ACTION, "") == HVAC_ACTION_HEATING:
-                any_heating = True
+                any_primary_heating = True
                 break
 
         boiler_state = self.hass.states.get(self.boiler_switch)
         current_boiler_on = boiler_state is not None and boiler_state.state == STATE_ON
 
-        if any_heating and not current_boiler_on:
+        if any_primary_heating and not current_boiler_on:
             # Want to turn ON
             if self._boiler_locked_off_until and now < self._boiler_locked_off_until:
                 delay = (self._boiler_locked_off_until - now).total_seconds()
@@ -364,7 +541,7 @@ class MultizoneCoordinator:
             else:
                 await self._force_boiler_on()
 
-        elif not any_heating and current_boiler_on:
+        elif not any_primary_heating and current_boiler_on:
             # Want to turn OFF
             if self._boiler_locked_on_until and now < self._boiler_locked_on_until:
                 delay = (self._boiler_locked_on_until - now).total_seconds()
@@ -459,7 +636,8 @@ class MultizoneCoordinator:
         _LOGGER.debug("Master ON → applying to all zones")
         for zone in self.zones:
             climate_id = zone[CONF_ZONE_CLIMATE]
-            zone_enabled = self._zone_states.get(climate_id, True)
+            mode = self._zone_modes.get(climate_id, ZONE_MODE_PRIMARY)
+            zone_enabled = (mode != ZONE_MODE_BYPASS)
             if zone_enabled:
                 await self._async_set_hvac_mode(climate_id, HVAC_MODE_HEAT)
             else:
@@ -475,21 +653,7 @@ class MultizoneCoordinator:
         # but we also force it off here for safety ignoring locks
         await self._async_update_boiler(emergency_off=True)
 
-    async def async_apply_zone_on(self, climate_entity: str) -> None:
-        """Zone switch turned ON (only if master is ON)."""
-        # If user manually turns on, clear pre_window_state so it doesn't revert later
-        if climate_entity in self._pre_window_state:
-            self._pre_window_state.pop(climate_entity)
-            await self._async_save_storage()
-            
-        if self._master_state:
-            _LOGGER.debug("Zone ON: %s", climate_entity)
-            await self._async_set_hvac_mode(climate_entity, HVAC_MODE_HEAT)
 
-    async def async_apply_zone_off(self, climate_entity: str) -> None:
-        """Zone switch turned OFF."""
-        _LOGGER.debug("Zone OFF: %s", climate_entity)
-        await self._async_set_hvac_mode(climate_entity, HVAC_MODE_OFF)
 
     async def _async_set_hvac_mode(self, climate_entity: str, mode: str) -> None:
         """Set HVAC mode on a climate entity."""

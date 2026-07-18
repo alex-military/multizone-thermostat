@@ -42,6 +42,11 @@ const TRANSLATIONS = {
     temp_detected: "Rilevata",
     custom_error: "Errore scheda Multizone Thermostat",
     heat_mode: "Caldo",
+    primary: "Prioritaria",
+    secondary: "Secondaria",
+    primary_tooltip: "Primaria (Accende Caldaia)",
+    secondary_tooltip: "Secondaria (Passiva)",
+    bypass_tooltip: "Bypass (Esclusa)",
     master_title: "Riscaldamento Centrale",
     thermostat: "Termostato",
     edit_title: "Titolo Personalizzato (Opzionale)",
@@ -71,6 +76,11 @@ const TRANSLATIONS = {
     temp_detected: "Detected",
     custom_error: "Multizone Thermostat Card Error",
     heat_mode: "Heat",
+    primary: "Primary",
+    secondary: "Secondary",
+    primary_tooltip: "Primary (Calls for Heat)",
+    secondary_tooltip: "Secondary (Passive)",
+    bypass_tooltip: "Bypass (Excluded)",
     master_title: "Central Heating",
     thermostat: "Thermostat",
     edit_title: "Custom Title (Optional)",
@@ -93,17 +103,28 @@ function getTranslation(hass, key) {
 }
 
 // Helper function to auto-discover the bypass switch for a climate entity
-function autoDiscoverSwitch(hass, climateEntity) {
-  if (!hass || !climateEntity) return null;
+function autoDiscoverSwitch(hass, climateId) {
+  if (!hass || !climateId) return "";
+  for (const entityId of Object.keys(hass.states)) {
+    // Check both legacy switches and new select entities for the climate_entity attribute
+    if ((entityId.startsWith("select.") || entityId.startsWith("switch.")) && 
+        hass.states[entityId].attributes && 
+        hass.states[entityId].attributes.climate_entity === climateId) {
+      return entityId;
+    }
+  }
   
-  // Look for a switch entity that has this climate_entity attribute
-  const switchEntity = Object.keys(hass.states).find(key => {
-    if (!key.startsWith('switch.')) return false;
-    const state = hass.states[key];
-    return state.attributes && state.attributes.climate_entity === climateEntity;
-  });
+  // Fallback: check if the entityId contains the climate device name AND is a zone_mode entity
+  const climateName = climateId.split('.')[1];
+  if (climateName) {
+    for (const entityId of Object.keys(hass.states)) {
+      if (entityId.startsWith("select.") && entityId.includes("zone_mode") && entityId.includes(climateName)) {
+        return entityId;
+      }
+    }
+  }
   
-  return switchEntity || null;
+  return "";
 }
 
 // Helper function to auto-discover the master switch entity
@@ -172,7 +193,21 @@ class MultizoneThermostatButtonCard extends HTMLElement {
     if (!this._hass || !this._config) return;
 
     const climateEntity = this._config.entity;
-    const switchEntity = this._config.switch;
+    let switchEntity = this._config.switch;
+
+    // Auto-migrate legacy zone_enable switch configs
+    if (switchEntity && switchEntity.endsWith('_zone_enable')) {
+      switchEntity = null;
+    }
+
+    if (!switchEntity || !this._hass.states[switchEntity]) {
+      const discovered = autoDiscoverSwitch(this._hass, climateEntity);
+      if (discovered) switchEntity = discovered;
+      // Only update config if we discovered something new so we don't keep searching
+      if (discovered && this._config.switch !== discovered) {
+        this._config = {...this._config, switch: discovered};
+      }
+    }
 
     const climateState = this._hass.states[climateEntity];
     const switchState = switchEntity ? this._hass.states[switchEntity] : null;
@@ -190,89 +225,81 @@ class MultizoneThermostatButtonCard extends HTMLElement {
     // Use temporary switch state if toggled locally to avoid flickering
     const actualSwitchState = this._tempSwitchState !== undefined 
       ? this._tempSwitchState 
-      : (switchState ? switchState.state : "on");
-    const isZoneEnabled = actualSwitchState === "on";
+      : (switchState ? switchState.state : "primary");
 
     const title = this._config.title || climateState.attributes.friendly_name || getTranslation(this._hass, 'thermostat');
 
     // Update title
     this.shadowRoot.querySelector('.title').textContent = title;
 
-    // Update switch toggle checked state and label
-    const toggle = this.shadowRoot.querySelector('#zone-toggle');
-    const toggleLabel = this.shadowRoot.querySelector('#zone-toggle-label');
-    if (toggleLabel) {
-      toggleLabel.textContent = getTranslation(this._hass, 'enabled');
-    }
+    // Update segmented buttons state
+    const segContainer = this.shadowRoot.querySelector('#zone-modes-container');
+    const segPrimary = this.shadowRoot.querySelector('#seg-primary');
+    const segSecondary = this.shadowRoot.querySelector('#seg-secondary');
+    const segBypass = this.shadowRoot.querySelector('#seg-bypass');
+    
     if (switchEntity) {
-      toggle.style.display = 'block';
-      if (toggleLabel) toggleLabel.style.display = 'block';
-      toggle.checked = isZoneEnabled;
+      if (segContainer) segContainer.style.display = 'flex';
+      if (segPrimary) segPrimary.classList.toggle('active', actualSwitchState === "primary" || actualSwitchState === "on");
+      if (segSecondary) segSecondary.classList.toggle('active', actualSwitchState === "secondary");
+      if (segBypass) segBypass.classList.toggle('active', actualSwitchState === "bypass" || actualSwitchState === "off");
     } else {
-      toggle.style.display = 'none';
-      if (toggleLabel) toggleLabel.style.display = 'none';
+      if (segContainer) segContainer.style.display = 'none';
     }
 
     // Apply active/disabled styling
     const controlsArea = this.shadowRoot.querySelector('.thermostat-body');
+    const wrapper = this.shadowRoot.querySelector('#wrapper');
     const disabledOverlay = this.shadowRoot.querySelector('.disabled-msg');
     const disabledMsgBox = this.shadowRoot.querySelector('.disabled-msg-box');
     if (disabledMsgBox) {
       disabledMsgBox.innerHTML = `<ha-icon icon="mdi:alert-circle-outline" style="margin-right: 6px;"></ha-icon>${getTranslation(this._hass, 'bypass_msg')}`;
     }
-    const wrapper = this.shadowRoot.querySelector('#wrapper');
-    if (isZoneEnabled) {
+    if (actualSwitchState !== "bypass" && actualSwitchState !== "off") {
       controlsArea.classList.remove('disabled');
-      disabledOverlay.style.display = 'none';
       wrapper.classList.remove('disabled');
+      if (disabledOverlay) disabledOverlay.style.display = 'none';
+      if (hvacAction === 'heating') {
+        controlsArea.classList.add('heating');
+      } else {
+        controlsArea.classList.remove('heating');
+      }
     } else {
       controlsArea.classList.add('disabled');
-      disabledOverlay.style.display = 'block';
       wrapper.classList.add('disabled');
+      if (disabledOverlay) disabledOverlay.style.display = 'block';
     }
 
     // Update temperatures
     const tempCurrentEl = this.shadowRoot.querySelector('.temp-current');
     if (tempCurrentEl) {
       const curStr = currentTemp !== undefined ? `${currentTemp}°C` : '--°C';
-      tempCurrentEl.innerHTML = `${getTranslation(this._hass, 'temp_detected')}: <span class="temp-current-val">${curStr}</span>`;
+      tempCurrentEl.innerHTML = `<span class="temp-current-val">${curStr}</span>`;
     }
     this.shadowRoot.querySelector('.temp-target-val').textContent = targetTemp !== undefined ? `${targetTemp}°C` : '--°C';
+    
+    const tempTargetEl = this.shadowRoot.querySelector('.temp-target');
+    if (tempTargetEl) {
+      if (hvacAction === 'heating') {
+        tempTargetEl.classList.add('heating');
+      } else {
+        tempTargetEl.classList.remove('heating');
+      }
+    }
 
-    // Update status badge
     const badge = this.shadowRoot.querySelector('.status-badge');
     badge.className = 'status-badge';
-    if (!isZoneEnabled) {
-      badge.classList.add('disabled');
-      badge.innerHTML = `<ha-icon icon="mdi:close-circle-outline" style="margin-right: 4px; --mdc-icon-size: 16px;"></ha-icon>${getTranslation(this._hass, 'excluded')}`;
-    } else if (hvacMode === 'off') {
-      badge.classList.add('off');
-      badge.innerHTML = `<ha-icon icon="mdi:power" style="margin-right: 4px; --mdc-icon-size: 16px;"></ha-icon>${getTranslation(this._hass, 'off')}`;
-    } else if (hvacAction === 'heating') {
-      badge.classList.add('heating');
-      badge.innerHTML = `<ha-icon icon="mdi:fire" style="margin-right: 4px; --mdc-icon-size: 16px;" class="glow-flame"></ha-icon>${getTranslation(this._hass, 'heating')}`;
+    if (actualSwitchState === "bypass" || actualSwitchState === "off") {
+      badge.innerHTML = "";
+    } else if (actualSwitchState === "secondary") {
+      badge.style.color = '#607d8b';
+      badge.innerHTML = `<ha-icon icon="mdi:link-variant" style="margin-right: 4px; --mdc-icon-size: 16px;"></ha-icon>${getTranslation(this._hass, 'secondary')}`;
     } else {
-      badge.classList.add('idle');
-      badge.innerHTML = `<ha-icon icon="mdi:thermometer" style="margin-right: 4px; --mdc-icon-size: 16px;"></ha-icon>${getTranslation(this._hass, 'idle')}`;
-    }
-
-    // Update HVAC mode buttons
-    const btnHeat = this.shadowRoot.querySelector('#btn-mode-heat');
-    const btnOff = this.shadowRoot.querySelector('#btn-mode-off');
-    if (btnHeat) {
-      btnHeat.className = 'btn-mode';
-      btnHeat.innerHTML = `<ha-icon icon="mdi:fire" style="--mdc-icon-size: 18px;"></ha-icon>${getTranslation(this._hass, 'heat_mode')}`;
-    }
-    if (btnOff) {
-      btnOff.className = 'btn-mode';
-      btnOff.innerHTML = `<ha-icon icon="mdi:power" style="--mdc-icon-size: 18px;"></ha-icon>${getTranslation(this._hass, 'off')}`;
-    }
-    if (hvacMode === 'heat') {
-      if (btnHeat) btnHeat.classList.add('active-heat');
-    } else if (hvacMode === 'off') {
-      if (btnOff) btnOff.classList.add('active-off');
+      badge.style.color = 'var(--primary-color, #03a9f4)';
+      badge.innerHTML = `<ha-icon icon="mdi:star-circle-outline" style="margin-right: 4px; --mdc-icon-size: 16px;"></ha-icon>${getTranslation(this._hass, 'primary')}`;
     }
   }
+
 
   renderStructure() {
     const card = document.createElement('ha-card');
@@ -313,49 +340,40 @@ class MultizoneThermostatButtonCard extends HTMLElement {
         font-size: 12px;
         color: var(--secondary-text-color);
       }
-      /* Simple CSS Toggle Switch */
-      .switch {
+      /* Segmented Control Styles */
+      .segmented-control {
+        display: flex;
+        align-items: center;
+        background-color: var(--secondary-background-color, #e0e0e0);
+        border-radius: 8px;
+        padding: 2px;
         position: relative;
-        display: inline-block;
-        width: 38px;
-        height: 20px;
       }
-      .switch input {
-        opacity: 0;
-        width: 0;
-        height: 0;
-      }
-      .slider {
-        position: absolute;
+      .seg-btn {
+        background: transparent;
+        border: none;
+        color: var(--secondary-text-color);
+        padding: 6px 12px;
         cursor: pointer;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-color: var(--disabled-text-color, #ccc);
-        transition: .4s;
-        border-radius: 20px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.3s, color 0.3s;
       }
-      .slider:before {
-        position: absolute;
-        content: "";
-        height: 14px;
-        width: 14px;
-        left: 3px;
-        bottom: 3px;
-        background-color: white;
-        transition: .4s;
-        border-radius: 50%;
-      }
-      input:checked + .slider {
+      .seg-btn.active {
         background-color: var(--primary-color, #03a9f4);
+        color: white;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
       }
-      input:checked + .slider:before {
-        transform: translateX(18px);
+      .seg-btn ha-icon {
+        --mdc-icon-size: 18px;
       }
 
       .thermostat-body {
         transition: opacity 0.3s ease;
+        border-radius: var(--ha-card-border-radius, 12px);
+        position: relative;
       }
       .thermostat-body.disabled {
         opacity: 0.25;
@@ -365,23 +383,23 @@ class MultizoneThermostatButtonCard extends HTMLElement {
       .disabled-msg {
         display: none;
         position: absolute;
-        top: 55px;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        z-index: 8;
-        text-align: center;
-        padding-top: 50px;
+        top: 40px; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.15);
+        z-index: 10;
+        border-radius: 0 0 var(--ha-card-border-radius, 12px) var(--ha-card-border-radius, 12px);
+        backdrop-filter: blur(2px);
       }
       .disabled-msg-box {
-        display: inline-block;
+        position: absolute;
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
         background: var(--card-background-color);
-        border: 1px solid var(--divider-color);
         padding: 8px 16px;
-        border-radius: 8px;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        color: var(--secondary-text-color);
+        border-radius: 20px;
         font-weight: 500;
+        color: var(--secondary-text-color);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        white-space: nowrap;
       }
 
       .controls-container {
@@ -416,12 +434,42 @@ class MultizoneThermostatButtonCard extends HTMLElement {
         display: flex;
         flex-direction: column;
         align-items: center;
+        position: relative;
+        z-index: 0;
+      }
+      .thermostat-body.heating .temp-display::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 440px;
+        height: 440px;
+        border-radius: 50%;
+        background: radial-gradient(closest-side, rgba(255, 111, 0, 0.35) 0%, rgba(255, 111, 0, 0.15) 30%, rgba(255, 111, 0, 0.02) 75%, transparent 100%);
+        z-index: -1;
+        pointer-events: none;
+        animation: pulse-halo 2s infinite alternate;
+      }
+      @keyframes pulse-halo {
+        0% { opacity: 0.8; transform: translate(-50%, -50%) scale(0.95); }
+        100% { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
       }
       .temp-target-val {
         font-size: 42px;
         font-weight: 300;
         color: var(--primary-text-color);
         line-height: 1.1;
+        transition: text-shadow 0.3s, color 0.3s;
+      }
+      .temp-target.heating .temp-target-val {
+        color: rgb(255, 152, 0);
+        text-shadow: 0 0 10px rgba(255, 152, 0, 0.5), 0 0 20px rgba(255, 152, 0, 0.3);
+        animation: pulse-glow 1.5s infinite alternate;
+      }
+      @keyframes pulse-glow {
+        0% { text-shadow: 0 0 10px rgba(255, 152, 0, 0.5), 0 0 20px rgba(255, 152, 0, 0.3); }
+        100% { text-shadow: 0 0 15px rgba(255, 111, 0, 0.9), 0 0 30px rgba(255, 111, 0, 0.6); }
       }
       .temp-current {
         font-size: 14px;
@@ -437,27 +485,13 @@ class MultizoneThermostatButtonCard extends HTMLElement {
       .status-badge {
         display: inline-flex;
         align-items: center;
-        padding: 6px 12px;
-        border-radius: 20px;
-        font-size: 13px;
-        font-weight: 500;
+        font-size: 14px;
+        font-weight: 400;
+        color: var(--secondary-text-color);
       }
-      .status-badge.heating {
-        background: rgba(255, 111, 0, 0.12);
-        color: rgb(255, 111, 0);
-      }
-      .status-badge.idle {
-        background: rgba(0, 150, 136, 0.12);
-        color: rgb(0, 150, 136);
-      }
-      .status-badge.off {
-        background: rgba(120, 120, 120, 0.12);
-        color: rgb(120, 120, 120);
-      }
-      .status-badge.disabled {
-        background: rgba(244, 67, 54, 0.12);
-        color: rgb(244, 67, 54);
-      }
+      .status-badge.heating { color: rgb(255, 111, 0); }
+      .status-badge.idle { color: rgb(0, 150, 136); }
+      .status-badge.disabled { color: rgb(244, 67, 54); }
 
       .glow-flame {
         animation: pulse-flame 1.5s infinite alternate;
@@ -467,57 +501,16 @@ class MultizoneThermostatButtonCard extends HTMLElement {
         100% { transform: scale(1.1); filter: drop-shadow(0 0 5px rgba(255,111,0,0.8)); }
       }
 
-      .hvac-modes {
-        display: flex;
-        justify-content: center;
-        gap: 12px;
-        border-top: 1px solid var(--divider-color);
-        padding-top: 16px;
-      }
-      .btn-mode {
-        flex: 1;
-        max-width: 120px;
-        padding: 10px;
-        border-radius: 24px;
-        border: 1px solid var(--divider-color);
-        background-color: var(--card-background-color);
-        color: var(--primary-text-color);
-        font-size: 13px;
-        font-weight: 500;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
-        transition: all 0.2s ease;
-      }
-      .btn-mode:hover {
-        background-color: var(--secondary-background-color);
-      }
-      .btn-mode.active-heat {
-        background-color: rgb(255, 111, 0);
-        color: white;
-        border-color: rgb(255, 111, 0);
-        box-shadow: 0 4px 10px rgba(255, 111, 0, 0.25);
-      }
-      .btn-mode.active-off {
-        background-color: var(--secondary-text-color);
-        color: white;
-        border-color: var(--secondary-text-color);
-        box-shadow: 0 4px 10px rgba(0,0,0,0.15);
-      }
     `;
 
     card.innerHTML = `
       <div class="wrapper" id="wrapper">
         <div class="header">
           <div class="title">Termostato</div>
-          <div class="switch-container">
-            <label id="zone-toggle-label">Abilitata</label>
-            <label class="switch">
-              <input type="checkbox" id="zone-toggle">
-              <span class="slider"></span>
-            </label>
+          <div class="segmented-control" id="zone-modes-container">
+            <button class="seg-btn primary" id="seg-primary"><ha-icon icon="mdi:star-circle-outline"></ha-icon></button>
+            <button class="seg-btn secondary" id="seg-secondary"><ha-icon icon="mdi:link-variant"></ha-icon></button>
+            <button class="seg-btn bypass" id="seg-bypass"><ha-icon icon="mdi:cancel"></ha-icon></button>
           </div>
         </div>
 
@@ -531,8 +524,10 @@ class MultizoneThermostatButtonCard extends HTMLElement {
           <div class="controls-container">
             <button class="btn-temp" id="temp-down">-</button>
             <div class="temp-display">
-              <div class="temp-target-val">--°C</div>
-              <div class="temp-current">Rilevata: <span class="temp-current-val">--°C</span></div>
+              <div class="temp-target">
+                <span class="temp-target-val">--°C</span>
+              </div>
+              <div class="temp-current"><span class="temp-current-val">--°C</span></div>
             </div>
             <button class="btn-temp" id="temp-up">+</button>
           </div>
@@ -541,43 +536,46 @@ class MultizoneThermostatButtonCard extends HTMLElement {
             <div class="status-badge"></div>
           </div>
 
-          <div class="hvac-modes">
-            <button class="btn-mode" id="btn-mode-off">
-              <ha-icon icon="mdi:power" style="--mdc-icon-size: 18px;"></ha-icon>Spento
-            </button>
-            <button class="btn-mode" id="btn-mode-heat">
-              <ha-icon icon="mdi:fire" style="--mdc-icon-size: 18px;"></ha-icon>Caldo
-            </button>
-          </div>
+
         </div>
       </div>
     `;
 
     // Hook events
-    const toggle = card.querySelector('#zone-toggle');
-    toggle.addEventListener('change', () => this.toggleZone(toggle.checked));
+    card.querySelector('#seg-primary').addEventListener('click', () => this.setZoneMode("primary"));
+    card.querySelector('#seg-secondary').addEventListener('click', () => this.setZoneMode("secondary"));
+    card.querySelector('#seg-bypass').addEventListener('click', () => this.setZoneMode("bypass"));
 
     card.querySelector('#temp-down').addEventListener('click', () => this.changeTemp(-0.5));
     card.querySelector('#temp-up').addEventListener('click', () => this.changeTemp(0.5));
 
-    card.querySelector('#btn-mode-off').addEventListener('click', () => this.changeHvacMode('off'));
-    card.querySelector('#btn-mode-heat').addEventListener('click', () => this.changeHvacMode('heat'));
+
 
     this.shadowRoot.appendChild(style);
     this.shadowRoot.appendChild(card);
     this._rendered = true;
   }
 
-  toggleZone(enable) {
+  setZoneMode(mode) {
     const switchEntity = this._config.switch;
     if (!switchEntity) return;
 
-    this._tempSwitchState = enable ? "on" : "off";
+    this._tempSwitchState = mode;
     this.updateCard(); // immediate local UI update
     
-    this._hass.callService("switch", enable ? "turn_on" : "turn_off", {
-      entity_id: switchEntity
-    });
+    // If it's a switch entity (legacy), map back to on/off
+    if (switchEntity.startsWith("switch.")) {
+      const enable = mode !== "bypass";
+      this._hass.callService("switch", enable ? "turn_on" : "turn_off", {
+        entity_id: switchEntity
+      });
+    } else {
+      // It's a select entity
+      this._hass.callService("select", "select_option", {
+        entity_id: switchEntity,
+        option: mode
+      });
+    }
 
     if (this._tempTimer) clearTimeout(this._tempTimer);
     this._tempTimer = setTimeout(() => {
@@ -697,10 +695,24 @@ class MultizoneThermostatDialCard extends HTMLElement {
     if (!this._hass || !this._config) return;
 
     const climateEntity = this._config.entity;
-    const switchEntity = this._config.switch;
+    let switchEntity = this._config.switch;
+    
+    // Auto-migrate legacy zone_enable switch configs
+    if (switchEntity && switchEntity.endsWith('_zone_enable')) {
+      switchEntity = null;
+    }
+
+    if (!switchEntity || !this._hass.states[switchEntity]) {
+      const discovered = autoDiscoverSwitch(this._hass, climateEntity);
+      if (discovered) switchEntity = discovered;
+      if (discovered && this._config.switch !== discovered) {
+        this._config = {...this._config, switch: discovered};
+      }
+    }
     
     const climateState = this._hass.states[climateEntity];
     const switchState = switchEntity ? this._hass.states[switchEntity] : null;
+
 
     if (!climateState) {
       this.renderError(getTranslation(this._hass, 'custom_error') + `: ${climateEntity} not found.`);
@@ -710,19 +722,26 @@ class MultizoneThermostatDialCard extends HTMLElement {
     // Use temporary switch state if toggled locally to avoid flickering
     const actualSwitchState = this._tempSwitchState !== undefined 
       ? this._tempSwitchState 
-      : (switchState ? switchState.state : "on");
-    const isZoneEnabled = actualSwitchState === "on";
+      : (switchState ? switchState.state : "primary");
 
-    // Update switch toggle state and label
-    const toggle = this.shadowRoot.querySelector('#zone-toggle');
-    if (toggle) {
-      toggle.checked = isZoneEnabled;
+    // Update segmented buttons state and tooltips
+    const segPrimary = this.shadowRoot.querySelector('#seg-primary');
+    const segSecondary = this.shadowRoot.querySelector('#seg-secondary');
+    const segBypass = this.shadowRoot.querySelector('#seg-bypass');
+    
+    if (segPrimary) {
+      segPrimary.classList.toggle('active', actualSwitchState === "primary" || actualSwitchState === "on");
+      segPrimary.title = getTranslation(this._hass, 'primary_tooltip');
     }
-    const toggleLabel = this.shadowRoot.querySelector('#zone-toggle-label');
-    if (toggleLabel) {
-      toggleLabel.textContent = getTranslation(this._hass, 'enabled');
+    if (segSecondary) {
+      segSecondary.classList.toggle('active', actualSwitchState === "secondary");
+      segSecondary.title = getTranslation(this._hass, 'secondary_tooltip');
     }
-
+    if (segBypass) {
+      segBypass.classList.toggle('active', actualSwitchState === "bypass" || actualSwitchState === "off");
+      segBypass.title = getTranslation(this._hass, 'bypass_tooltip');
+    }
+    
     // Update disabled overlay text
     const disabledMsgBox = this.shadowRoot.querySelector('.disabled-msg-box');
     if (disabledMsgBox) {
@@ -736,10 +755,27 @@ class MultizoneThermostatDialCard extends HTMLElement {
       titleEl.textContent = title;
     }
 
+    // Update status text
+    const badge = this.shadowRoot.querySelector('.status-badge');
+    if (badge) {
+      const hvacMode = climateState.state;
+      const hvacAction = climateState.attributes.hvac_action;
+      badge.className = 'status-badge';
+      if (actualSwitchState === "bypass" || actualSwitchState === "off") {
+        badge.innerHTML = "";
+      } else if (actualSwitchState === "secondary") {
+        badge.style.color = '#607d8b';
+        badge.innerHTML = `<ha-icon icon="mdi:link-variant" style="margin-right: 4px; --mdc-icon-size: 16px;"></ha-icon>${getTranslation(this._hass, 'secondary')}`;
+      } else {
+        badge.style.color = 'var(--primary-color, #03a9f4)';
+        badge.innerHTML = `<ha-icon icon="mdi:star-circle-outline" style="margin-right: 4px; --mdc-icon-size: 16px;"></ha-icon>${getTranslation(this._hass, 'primary')}`;
+      }
+    }
+
     // Apply active/disabled styling and overlay
     const wrapper = this.shadowRoot.querySelector('#wrapper');
     if (wrapper) {
-      if (isZoneEnabled) {
+      if (actualSwitchState !== "bypass" && actualSwitchState !== "off") {
         wrapper.classList.remove('disabled');
       } else {
         wrapper.classList.add('disabled');
@@ -764,7 +800,7 @@ class MultizoneThermostatDialCard extends HTMLElement {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 8px;
+        margin-bottom: 4px;
         padding-bottom: 4px;
         position: relative;
         z-index: 20;
@@ -778,57 +814,64 @@ class MultizoneThermostatDialCard extends HTMLElement {
         text-overflow: ellipsis;
         max-width: 60%;
       }
-      .switch-container {
+      .status-bar {
+        position: absolute;
+        top: 100px;
+        left: 0;
+        right: 0;
+        display: flex;
+        justify-content: center;
+        z-index: 10;
+        pointer-events: none;
+      }
+      .status-badge {
+        display: inline-flex;
+        align-items: center;
+        font-size: 14px;
+        font-weight: 400;
+        color: var(--secondary-text-color);
+      }
+      .status-badge.heating { color: rgb(255, 111, 0); }
+      .status-badge.idle { color: rgb(0, 150, 136); }
+      .status-badge.disabled { color: rgb(244, 67, 54); }
+
+      .glow-flame {
+        animation: pulse-flame 1.5s infinite alternate;
+      }
+      @keyframes pulse-flame {
+        0% { transform: scale(1); filter: drop-shadow(0 0 1px rgba(255,111,0,0.5)); }
+        100% { transform: scale(1.1); filter: drop-shadow(0 0 5px rgba(255,111,0,0.8)); }
+      }
+
+      /* Segmented Control Styles */
+      .segmented-control {
         display: flex;
         align-items: center;
+        background-color: var(--secondary-background-color, #e0e0e0);
+        border-radius: 8px;
+        padding: 2px;
         position: relative;
         z-index: 21;
       }
-      .switch-container label {
-        margin-right: 8px;
-        font-size: 12px;
+      .seg-btn {
+        background: transparent;
+        border: none;
         color: var(--secondary-text-color);
-        font-weight: 500;
-      }
-      /* Simple CSS Toggle Switch */
-      .switch {
-        position: relative;
-        display: inline-block;
-        width: 38px;
-        height: 20px;
-      }
-      .switch input {
-        opacity: 0;
-        width: 0;
-        height: 0;
-      }
-      .slider {
-        position: absolute;
+        padding: 6px 12px;
         cursor: pointer;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-color: var(--disabled-text-color, #ccc);
-        transition: .4s;
-        border-radius: 20px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.3s, color 0.3s;
       }
-      .slider:before {
-        position: absolute;
-        content: "";
-        height: 14px;
-        width: 14px;
-        left: 3px;
-        bottom: 3px;
-        background-color: white;
-        transition: .4s;
-        border-radius: 50%;
-      }
-      input:checked + .slider {
+      .seg-btn.active {
         background-color: var(--primary-color, #03a9f4);
+        color: white;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
       }
-      input:checked + .slider:before {
-        transform: translateX(18px);
+      .seg-btn ha-icon {
+        --mdc-icon-size: 18px;
       }
 
       .disabled-overlay {
@@ -889,13 +932,15 @@ class MultizoneThermostatDialCard extends HTMLElement {
     wrapper.innerHTML = `
       <div class="header">
         <div class="title" id="card-title">Termostato</div>
-        <div class="switch-container">
-          <label id="zone-toggle-label">Abilitata</label>
-          <label class="switch">
-            <input type="checkbox" id="zone-toggle" checked>
-            <span class="slider"></span>
-          </label>
+        <div class="segmented-control" id="zone-modes-container">
+          <button class="seg-btn primary" id="seg-primary"><ha-icon icon="mdi:star-circle-outline"></ha-icon></button>
+          <button class="seg-btn secondary" id="seg-secondary"><ha-icon icon="mdi:link-variant"></ha-icon></button>
+          <button class="seg-btn bypass" id="seg-bypass"><ha-icon icon="mdi:cancel"></ha-icon></button>
         </div>
+      </div>
+      
+      <div class="status-bar">
+        <div class="status-badge"></div>
       </div>
 
       <div class="disabled-overlay">
@@ -908,8 +953,9 @@ class MultizoneThermostatDialCard extends HTMLElement {
     `;
 
     // Hook events
-    const toggle = wrapper.querySelector('#zone-toggle');
-    toggle.addEventListener('change', () => this.toggleZone(toggle.checked));
+    wrapper.querySelector('#seg-primary').addEventListener('click', () => this.setZoneMode("primary"));
+    wrapper.querySelector('#seg-secondary').addEventListener('click', () => this.setZoneMode("secondary"));
+    wrapper.querySelector('#seg-bypass').addEventListener('click', () => this.setZoneMode("bypass"));
 
     card.appendChild(wrapper);
     this.shadowRoot.appendChild(style);
@@ -917,16 +963,26 @@ class MultizoneThermostatDialCard extends HTMLElement {
     this._rendered = true;
   }
 
-  toggleZone(enable) {
+  setZoneMode(mode) {
     const switchEntity = this._config.switch;
     if (!switchEntity) return;
 
-    this._tempSwitchState = enable ? "on" : "off";
+    this._tempSwitchState = mode;
     this.updateCard(); // immediate local UI update
 
-    this._hass.callService("switch", enable ? "turn_on" : "turn_off", {
-      entity_id: switchEntity
-    });
+    // If it's a switch entity (legacy), map back to on/off
+    if (switchEntity.startsWith("switch.")) {
+      const enable = mode !== "bypass";
+      this._hass.callService("switch", enable ? "turn_on" : "turn_off", {
+        entity_id: switchEntity
+      });
+    } else {
+      // It's a select entity
+      this._hass.callService("select", "select_option", {
+        entity_id: switchEntity,
+        option: mode
+      });
+    }
 
     if (this._tempTimer) clearTimeout(this._tempTimer);
     this._tempTimer = setTimeout(() => {

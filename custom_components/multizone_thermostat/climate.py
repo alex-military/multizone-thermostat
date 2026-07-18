@@ -113,10 +113,11 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         safe_name = "".join(c for c in safe_name if c.isalnum() or c == "_")
         self._attr_unique_id = f"{DOMAIN}_{entry_id}_vt_{safe_name}"
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry_id)},
-            name="Multizone Thermostat",
+            identifiers={(DOMAIN, f"{entry_id}_virtual_thermostats")},
+            name="Virtual Thermostats",
             manufacturer="Custom Integration",
-            model="Multizone Thermostat",
+            model="Virtual Thermostats",
+            via_device=(DOMAIN, entry_id),
         )
 
         # We explicitly set entity_id so the zone config can reference it

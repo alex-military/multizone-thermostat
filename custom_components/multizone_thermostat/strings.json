@@ -60,6 +60,14 @@
           "add_another": "Add another zone"
         }
       },
+      "geofencing": {
+        "title": "Geofencing & Smart Schedule",
+        "description": "Do you want to enable Geofencing and Auto-Night mode? If enabled, select a presence sensor (e.g. zone.home or a person entity).",
+        "data": {
+          "geofencing_enabled": "Enable Geofencing & Auto-Night",
+          "presence_sensor": "Presence Sensor"
+        }
+      },
       "confirm": {
         "title": "Confirm Configuration",
         "description": "Ready to set up Multizone Thermostat with the following configuration:\n\n**Boiler Switch:** {boiler_switch}\n**Zones ({zones_count}):**\n{zones_list}\n\nClick Submit to create the integration.",
@@ -73,7 +81,8 @@
       "no_temp_sensors_found": "No temperature sensors found in Home Assistant."
     },
     "error": {
-      "zone_name_required": "Zone name cannot be empty."
+      "zone_name_required": "Zone name cannot be empty.",
+      "presence_sensor_required": "You must select a presence sensor if Geofencing is enabled."
     }
   },
   "options": {
@@ -133,6 +142,14 @@
           "zone_climate": "Zone",
           "trv_preset_sync": "Enable TRV Preset Sync",
           "window_sensor": "Window Sensor (Optional)"
+        }
+      },
+      "edit_geofencing": {
+        "title": "Geofencing & Smart Schedule",
+        "description": "Enable or disable Geofencing and select the presence sensor.",
+        "data": {
+          "geofencing_enabled": "Enable Geofencing & Auto-Night",
+          "presence_sensor": "Presence Sensor"
         }
       }
     },

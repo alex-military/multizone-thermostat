@@ -10,6 +10,10 @@ CONF_ZONE_CLIMATE = "climate_entity"
 CONF_ZONE_TRV_SYNC = "trv_preset_sync"
 CONF_ZONE_WINDOW_SENSOR = "window_sensor"
 
+# Geofencing keys
+CONF_GEOFENCING_ENABLED = "geofencing_enabled"
+CONF_PRESENCE_SENSOR = "presence_sensor"
+
 # Protection keys
 CONF_MIN_CYCLE_ON = "min_cycle_on"
 CONF_MIN_CYCLE_OFF = "min_cycle_off"
@@ -41,9 +45,19 @@ GLOBAL_PRESETS = [
     GLOBAL_PRESET_AWAY,
 ]
 
-# Entity prefixes
-SWITCH_MASTER_SUFFIX = "master"
-SWITCH_ZONE_PREFIX = "zone"
+# Persistent State Keys (Geofencing)
+KEY_NIGHT_TIME = "night_time"
+KEY_MORNING_TIME = "morning_time"
+KEY_PRE_NIGHT_PRESET = "pre_night_preset"
+
+# Mode Selectors for Zones
+ZONE_MODE_PRIMARY = "primary"
+ZONE_MODE_SECONDARY = "secondary"
+ZONE_MODE_BYPASS = "bypass"
+ZONE_MODES = [ZONE_MODE_PRIMARY, ZONE_MODE_SECONDARY, ZONE_MODE_BYPASS]
+KEY_AUTO_NIGHT_MODE = "auto_night_mode"
+KEY_GEOFENCING_TOGGLE = "geofencing_toggle"
+KEY_PRE_AWAY_PRESET = "pre_away_preset"
 
 # Default values
 DEFAULT_TRV_SYNC = False

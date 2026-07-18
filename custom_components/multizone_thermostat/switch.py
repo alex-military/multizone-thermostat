@@ -17,7 +17,9 @@ from .const import (
     CONF_ZONE_NAME,
     CONF_ZONES,
     DOMAIN,
-    SWITCH_MASTER_SUFFIX,
+    CONF_GEOFENCING_ENABLED,
+    KEY_GEOFENCING_TOGGLE,
+    KEY_AUTO_NIGHT_MODE,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -38,21 +40,37 @@ async def async_setup_entry(
     master_switch = MultizoneMasterSwitch(coordinator, config_entry.entry_id)
     entities.append(master_switch)
 
-    # Per-zone switches
-    for zone in zones:
-        zone_switch = MultizoneZoneSwitch(
-            coordinator=coordinator,
-            entry_id=config_entry.entry_id,
-            zone_name=zone[CONF_ZONE_NAME],
-            climate_entity=zone[CONF_ZONE_CLIMATE],
-        )
-        entities.append(zone_switch)
+    # (Zone switches are now Select entities in select.py)
+
+    # Auto Night Mode
+    entities.append(MultizoneAutoNightModeSwitch(coordinator, config_entry.entry_id))
+
+    # Geofencing (if enabled)
+    if config_entry.data.get(CONF_GEOFENCING_ENABLED, True):
+        entities.append(MultizoneGeofencingSwitch(coordinator, config_entry.entry_id))
 
     async_add_entities(entities, True)
 
 
-def _make_device_info(entry_id: str) -> DeviceInfo:
+def _make_device_info(entry_id: str, device_type: str = "main") -> DeviceInfo:
     """Create a shared device info for all entities of this integration instance."""
+    if device_type == "time_geofencing":
+        return DeviceInfo(
+            identifiers={(DOMAIN, f"{entry_id}_time_geofencing")},
+            name="Time & Geofencing",
+            manufacturer="Custom Integration",
+            model="Time & Geofencing Settings",
+            via_device=(DOMAIN, entry_id),
+        )
+    elif device_type == "zone_modes":
+        return DeviceInfo(
+            identifiers={(DOMAIN, f"{entry_id}_zone_modes")},
+            name="Zone Modes",
+            manufacturer="Custom Integration",
+            model="Zone Modes",
+            via_device=(DOMAIN, entry_id),
+        )
+        
     return DeviceInfo(
         identifiers={(DOMAIN, entry_id)},
         name="Multizone Thermostat",
@@ -111,77 +129,65 @@ class MultizoneMasterSwitch(RestoreEntity, SwitchEntity):
             self._is_on = last_state.state == "on"
             self._coordinator.set_master_state(self._is_on)
             _LOGGER.debug("Master switch restored to: %s", self._is_on)
-        # Register with coordinator
-        self._coordinator.register_switch("master", self)
 
 
-class MultizoneZoneSwitch(RestoreEntity, SwitchEntity):
-    """Switch for an individual heating zone."""
+
+class MultizoneAutoNightModeSwitch(SwitchEntity):
+    """Switch to enable/disable Auto Night Mode."""
 
     _attr_has_entity_name = True
+    _attr_name = "Auto Night Mode"
+    _attr_icon = "mdi:theme-light-dark"
     _attr_entity_category = EntityCategory.CONFIG
-    _attr_icon = "mdi:radiator"
 
-    def __init__(
-        self,
-        coordinator: Any,
-        entry_id: str,
-        zone_name: str,
-        climate_entity: str,
-    ) -> None:
-        """Initialize zone switch."""
+    def __init__(self, coordinator: Any, entry_id: str) -> None:
+        """Initialize switch."""
         self._coordinator = coordinator
-        self._entry_id = entry_id
-        self._zone_name = zone_name
-        self._climate_entity = climate_entity
-        self._is_on: bool = True  # Default: zone enabled
-
-        # Unique ID based on climate entity to survive renames
-        safe_id = climate_entity.replace(".", "_").replace("-", "_")
-        self._attr_unique_id = f"{DOMAIN}_{entry_id}_zone_{safe_id}"
-        self._attr_device_info = _make_device_info(entry_id)
-
-    @property
-    def name(self) -> str:
-        """Return zone name."""
-        return self._zone_name
+        self._attr_unique_id = f"{DOMAIN}_{entry_id}_auto_night"
+        self._attr_device_info = _make_device_info(entry_id, "time_geofencing")
 
     @property
     def is_on(self) -> bool:
-        """Return true if zone is enabled."""
-        return self._is_on
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        """Return extra state attributes."""
-        return {
-            "climate_entity": self._climate_entity,
-            "zone_name": self._zone_name,
-        }
+        """Return true if auto night mode is enabled."""
+        return self._coordinator.get_persistent_data(KEY_AUTO_NIGHT_MODE, False)
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        """Enable this zone."""
-        self._is_on = True
-        self._coordinator.set_zone_state(self._climate_entity, True)
+        """Enable auto night mode."""
+        await self._coordinator.async_set_persistent_data(KEY_AUTO_NIGHT_MODE, True)
         self.async_write_ha_state()
-        await self._coordinator.async_apply_zone_on(self._climate_entity)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        """Disable this zone."""
-        self._is_on = False
-        self._coordinator.set_zone_state(self._climate_entity, False)
+        """Disable auto night mode."""
+        await self._coordinator.async_set_persistent_data(KEY_AUTO_NIGHT_MODE, False)
         self.async_write_ha_state()
-        await self._coordinator.async_apply_zone_off(self._climate_entity)
 
-    async def async_added_to_hass(self) -> None:
-        """Restore state on HA restart."""
-        await super().async_added_to_hass()
-        last_state = await self.async_get_last_state()
-        if last_state is not None:
-            self._is_on = last_state.state == "on"
-            self._coordinator.set_zone_state(self._climate_entity, self._is_on)
-            _LOGGER.debug(
-                "Zone switch '%s' restored to: %s", self._zone_name, self._is_on
-            )
-        # Register with coordinator
-        self._coordinator.register_switch(self._climate_entity, self)
+
+class MultizoneGeofencingSwitch(SwitchEntity):
+    """Switch to dynamically enable/disable Geofencing."""
+
+    _attr_has_entity_name = True
+    _attr_name = "Geofencing"
+    _attr_icon = "mdi:map-marker-radius"
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(self, coordinator: Any, entry_id: str) -> None:
+        """Initialize switch."""
+        self._coordinator = coordinator
+        self._attr_unique_id = f"{DOMAIN}_{entry_id}_geofencing"
+        self._attr_device_info = _make_device_info(entry_id, "time_geofencing")
+
+    @property
+    def is_on(self) -> bool:
+        """Return true if geofencing is enabled."""
+        return self._coordinator.get_persistent_data(KEY_GEOFENCING_TOGGLE, True)
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Enable geofencing."""
+        await self._coordinator.async_set_persistent_data(KEY_GEOFENCING_TOGGLE, True)
+        self.async_write_ha_state()
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Disable geofencing."""
+        await self._coordinator.async_set_persistent_data(KEY_GEOFENCING_TOGGLE, False)
+        self.async_write_ha_state()
+

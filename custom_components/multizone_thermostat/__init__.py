@@ -11,12 +11,13 @@ from .const import (
     CONF_BOILER_SWITCH,
     CONF_ZONES,
     DOMAIN,
+    CONF_PRESENCE_SENSOR,
 )
 from .coordinator import MultizoneCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = ["climate", "switch", "number", "select"]
+PLATFORMS = ["climate", "switch", "number", "select", "time"]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -41,6 +42,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry_id=entry.entry_id,
         boiler_switch=boiler_switch,
         zones=zones,
+        presence_sensor=entry.data.get(CONF_PRESENCE_SENSOR),
     )
 
     # Load persistent data
