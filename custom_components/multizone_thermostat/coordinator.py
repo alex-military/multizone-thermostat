@@ -337,37 +337,38 @@ class MultizoneCoordinator:
         if new_state is None:
             return
             
-        # Find which zone this sensor belongs to
-        zone = next((z for z in self.zones if z.get(CONF_ZONE_WINDOW_SENSOR) == sensor_id), None)
-        if not zone:
+        # Find ALL zones this sensor belongs to
+        matching_zones = [z for z in self.zones if z.get(CONF_ZONE_WINDOW_SENSOR) == sensor_id]
+        if not matching_zones:
             return
             
-        climate_id = zone[CONF_ZONE_CLIMATE]
-        zone_select = self._select_entities.get(f"zone_mode_{climate_id}")
-        
-        if new_state.state == STATE_ON:
-            # Window OPENED
-            _LOGGER.debug("Window opened (%s), bypassing zone %s", sensor_id, climate_id)
-            # Save current state if not already saved
-            if climate_id not in self._pre_window_state:
-                current_mode = self.get_zone_mode(climate_id)
-                self._pre_window_state[climate_id] = current_mode
-                self.hass.async_create_task(self._async_save_storage())
+        for zone in matching_zones:
+            climate_id = zone[CONF_ZONE_CLIMATE]
+            zone_select = self._select_entities.get(f"zone_mode_{climate_id}")
             
-            # Change mode to Bypass
-            if zone_select and self.get_zone_mode(climate_id) != ZONE_MODE_BYPASS:
-                self.hass.async_create_task(zone_select.async_select_option(ZONE_MODE_BYPASS))
+            if new_state.state == STATE_ON:
+                # Window OPENED
+                _LOGGER.debug("Window opened (%s), bypassing zone %s", sensor_id, climate_id)
+                # Save current state if not already saved
+                if climate_id not in self._pre_window_state:
+                    current_mode = self.get_zone_mode(climate_id)
+                    self._pre_window_state[climate_id] = current_mode
+                    self.hass.async_create_task(self._async_save_storage())
                 
-        elif new_state.state == "off":
-            # Window CLOSED
-            _LOGGER.debug("Window closed (%s), restoring zone %s", sensor_id, climate_id)
-            if climate_id in self._pre_window_state:
-                was_mode = self._pre_window_state.pop(climate_id)
-                self.hass.async_create_task(self._async_save_storage())
-                
-                # Restore the mode
-                if zone_select and self.get_zone_mode(climate_id) != was_mode:
-                    self.hass.async_create_task(zone_select.async_select_option(was_mode))
+                # Change mode to Bypass
+                if zone_select and self.get_zone_mode(climate_id) != ZONE_MODE_BYPASS:
+                    self.hass.async_create_task(zone_select.async_select_option(ZONE_MODE_BYPASS))
+                    
+            elif new_state.state == "off":
+                # Window CLOSED
+                _LOGGER.debug("Window closed (%s), restoring zone %s", sensor_id, climate_id)
+                if climate_id in self._pre_window_state:
+                    was_mode = self._pre_window_state.pop(climate_id)
+                    self.hass.async_create_task(self._async_save_storage())
+                    
+                    # Restore the mode
+                    if zone_select and self.get_zone_mode(climate_id) != was_mode:
+                        self.hass.async_create_task(zone_select.async_select_option(was_mode))
 
     @callback
     def _async_on_presence_changed(self, event: Event) -> None:
