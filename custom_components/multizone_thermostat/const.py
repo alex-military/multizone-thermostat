@@ -9,6 +9,7 @@ CONF_ZONE_NAME = "name"
 CONF_ZONE_CLIMATE = "climate_entity"
 CONF_ZONE_TRV_SYNC = "trv_preset_sync"
 CONF_ZONE_WINDOW_SENSOR = "window_sensor"
+CONF_ZONE_ANTI_SEIZE = "anti_seize_zone_enable"
 
 # Geofencing keys
 CONF_GEOFENCING_ENABLED = "geofencing_enabled"
@@ -18,6 +19,12 @@ CONF_PRESENCE_SENSOR = "presence_sensor"
 CONF_MIN_CYCLE_ON = "min_cycle_on"
 CONF_MIN_CYCLE_OFF = "min_cycle_off"
 CONF_VALVE_DELAY = "valve_opening_delay"
+
+# Anti-seize configuration constants
+CONF_ANTI_SEIZE_ENABLED = "anti_seize_enabled"
+CONF_ANTI_SEIZE_IDLE_DAYS = "anti_seize_idle_days"
+CONF_ANTI_SEIZE_DURATION = "anti_seize_duration_mins"
+CONF_ANTI_SEIZE_BOILER = "anti_seize_boiler_enable"
 
 
 # HVAC
@@ -58,6 +65,11 @@ ZONE_MODES = [ZONE_MODE_PRIMARY, ZONE_MODE_SECONDARY, ZONE_MODE_BYPASS]
 KEY_AUTO_NIGHT_MODE = "auto_night_mode"
 KEY_GEOFENCING_TOGGLE = "geofencing_toggle"
 KEY_PRE_AWAY_PRESET = "pre_away_preset"
+
+# Persistent State Keys (Anti-seize)
+KEY_ANTI_SEIZE_ENABLED = "anti_seize_enabled"
+KEY_ANTI_SEIZE_IDLE_DAYS = "anti_seize_idle_days"
+KEY_ANTI_SEIZE_DURATION = "anti_seize_duration"
 
 # Default values
 DEFAULT_TRV_SYNC = False

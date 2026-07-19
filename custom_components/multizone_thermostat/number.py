@@ -18,6 +18,8 @@ from .const import (
     DEFAULT_MIN_CYCLE_OFF,
     DEFAULT_VALVE_DELAY,
     DOMAIN,
+    KEY_ANTI_SEIZE_IDLE_DAYS,
+    KEY_ANTI_SEIZE_DURATION,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -79,6 +81,32 @@ async def async_setup_entry(
             unit_of_measurement="s",
             icon="mdi:valve",
             default_val=DEFAULT_VALVE_DELAY,
+            device_info=device_info,
+        ),
+        MultizonePersistentNumber(
+            coordinator=coordinator,
+            entry_id=config_entry.entry_id,
+            key=KEY_ANTI_SEIZE_IDLE_DAYS,
+            name="Anti-seize Idle Days",
+            min_value=1,
+            max_value=30,
+            step=1,
+            unit_of_measurement="days",
+            icon="mdi:calendar-clock",
+            default_val=15,
+            device_info=device_info,
+        ),
+        MultizonePersistentNumber(
+            coordinator=coordinator,
+            entry_id=config_entry.entry_id,
+            key=KEY_ANTI_SEIZE_DURATION,
+            name="Anti-seize Duration",
+            min_value=1,
+            max_value=15,
+            step=1,
+            unit_of_measurement="min",
+            icon="mdi:timer-outline",
+            default_val=2,
             device_info=device_info,
         ),
     ]
@@ -154,3 +182,47 @@ class MultizoneProtectionNumber(RestoreNumber):
             self._coordinator.set_min_cycle_off(value)
         elif self._key == CONF_VALVE_DELAY:
             self._coordinator.set_valve_delay(value)
+
+class MultizonePersistentNumber(NumberEntity):
+    """Generic Number entity that saves its state to the coordinator persistent storage."""
+
+    _attr_has_entity_name = True
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(
+        self,
+        coordinator,
+        entry_id: str,
+        key: str,
+        name: str,
+        min_value: float,
+        max_value: float,
+        step: float,
+        unit_of_measurement: str,
+        icon: str,
+        default_val: float,
+        device_info: DeviceInfo,
+    ) -> None:
+        """Initialize the number entity."""
+        self._coordinator = coordinator
+        self._key = key
+        self._default_val = default_val
+
+        self._attr_unique_id = f"{DOMAIN}_{entry_id}_{key}"
+        self._attr_name = name
+        self._attr_native_min_value = min_value
+        self._attr_native_max_value = max_value
+        self._attr_native_step = step
+        self._attr_native_unit_of_measurement = unit_of_measurement
+        self._attr_icon = icon
+        self._attr_device_info = device_info
+
+    @property
+    def native_value(self) -> float:
+        """Return the current value."""
+        return self._coordinator.get_persistent_data(self._key, self._default_val)
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Update the value."""
+        await self._coordinator.async_set_persistent_data(self._key, value)
+        self.async_write_ha_state()

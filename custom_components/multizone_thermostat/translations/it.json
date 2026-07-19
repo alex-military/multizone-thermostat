@@ -20,13 +20,14 @@
       },
       "create_virtual_thermostat": {
         "title": "Crea Termostato Virtuale",
-        "description": "Crea un termostato virtuale da un sensore di temperatura e uno switch/relè riscaldamento.",
+        "description": "Crea una zona gestita da un termostato virtuale usando un sensore di temperatura e un interruttore di riscaldamento.\nSe è abilitata la protezione estiva, puoi disabilitarla per questa singola zona deselezionando l'apposita casella.",
         "data": {
-          "name": "Nome Zona",
-          "temperature_sensor": "Sensore Temperatura",
+          "vt_name": "Nome della Zona (Termostato Virtuale)",
+          "temp_sensor": "Sensore di Temperatura",
           "heater_switch": "Switch / Relè Riscaldamento",
           "target_temperature": "Temperatura Target Iniziale (°C)",
           "tolerance": "Tolleranza (°C)",
+          "anti_seize": "Abilita Antigrippaggio (Protezione Estiva) per questa zona",
           "window_sensor": "Sensore Finestra (Opzionale)"
         },
         "data_description": {
@@ -118,30 +119,32 @@
           "heater_switch": "Switch / Relè Riscaldamento",
           "target_temperature": "Temperatura Target Iniziale (°C)",
           "tolerance": "Tolleranza (°C)",
-          "window_sensor": "Sensore Finestra (Opzionale)"
-        }
-      },
       "remove_virtual_thermostat": {
         "title": "Rimuovi Termostato Virtuale",
         "description": "Seleziona il termostato virtuale da rimuovere. Anche la zona associata verrà rimossa.",
         "data": {
-          "virtual_thermostat": "Termostato Virtuale"
+          "zone_type": "Tipo di Zona"
         }
       },
-      "remove_zone": {
-        "title": "Rimuovi una Zona",
-        "description": "Seleziona la zona da rimuovere. Anche l'entità switch per questa zona verrà rimossa.",
+      "add_zone": {
+        "title": "Aggiungi una zona",
+        "description": "Seleziona un'entità termostato (climate) esistente per aggiungerla a questa zona.\nPuoi configurare altre opzioni come il sensore finestra opzionale e la sincronizzazione TRV.\nSe è abilitata la protezione estiva, puoi disabilitarla per questa singola zona deselezionando l'apposita casella.",
         "data": {
-          "zone_climate": "Zona da Rimuovere"
+          "zone_climate": "Entità Climate (Termostato)",
+          "zone_name": "Nome Zona",
+          "trv_sync": "Sincronizza modalità Termostato (TRV) -> Centrale",
+          "anti_seize": "Abilita Antigrippaggio (Protezione Estiva) per questa zona",
+          "window_sensor": "Sensore Finestra (opzionale)"
         }
       },
       "edit_zone": {
-        "title": "Modifica Impostazioni Zona",
-        "description": "Modifica le impostazioni per una zona.",
+        "title": "Modifica Zona",
+        "description": "Modifica le impostazioni per questa zona.\nSe è abilitata la protezione estiva, puoi disabilitarla per questa singola zona deselezionando l'apposita casella.",
         "data": {
-          "zone_climate": "Zona",
-          "trv_preset_sync": "Abilita Sincronizzazione TRV",
-          "window_sensor": "Sensore Finestra (Opzionale)"
+          "zone_climate": "Seleziona la zona da modificare",
+          "trv_sync": "Sincronizza modalità Termostato (TRV) -> Centrale",
+          "anti_seize": "Abilita Antigrippaggio (Protezione Estiva) per questa zona",
+          "window_sensor": "Sensore Finestra (opzionale)"
         }
       },
       "edit_geofencing": {

@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "minor_version": 1,
+  "key": "lovelace_resources",
+  "data": {
+    "items": [
+      {
+        "id": "c69a1acd81624d3aa0fa4b671641c0db",
+        "url": "/multizone_thermostat_card/multizone-thermostat-card.js?v=2.7.8",
+        "type": "module"
+      }
+    ]
+  }
+}

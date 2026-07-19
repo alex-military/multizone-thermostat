@@ -27,6 +27,7 @@
           "heater_switch": "Heater Switch / Relay",
           "target_temperature": "Initial Target Temperature (°C)",
           "tolerance": "Tolerance (°C)",
+          "anti_seize": "Enable Anti-seize (Summer Protection) for this zone",
           "window_sensor": "Window Sensor (Optional)"
         },
         "data_description": {
@@ -44,6 +45,7 @@
           "climate_entity": "Climate Entity",
           "name": "Zone Name",
           "trv_preset_sync": "Enable TRV Preset Sync",
+          "anti_seize": "Enable Anti-seize (Summer Protection) for this zone",
           "window_sensor": "Window Sensor (Optional)"
         },
         "data_description": {
@@ -97,6 +99,7 @@
           "climate_entity": "Climate Entity",
           "name": "Zone Name",
           "trv_preset_sync": "Enable TRV Preset Sync",
+          "anti_seize": "Enable Anti-seize (Summer Protection) for this zone",
           "window_sensor": "Window Sensor (Optional)"
         }
       },
@@ -109,6 +112,7 @@
           "heater_switch": "Heater Switch / Relay",
           "target_temperature": "Initial Target Temperature (°C)",
           "tolerance": "Tolerance (°C)",
+          "anti_seize": "Enable Anti-seize (Summer Protection) for this zone",
           "window_sensor": "Window Sensor (Optional)"
         }
       },
@@ -132,6 +136,7 @@
         "data": {
           "zone_climate": "Zone",
           "trv_preset_sync": "Enable TRV Preset Sync",
+          "anti_seize": "Enable Anti-seize (Summer Protection) for this zone",
           "window_sensor": "Window Sensor (Optional)"
         }
       }

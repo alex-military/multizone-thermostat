@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timedelta, time
+from datetime import datetime, timedelta, time as dt_time
 import logging
+import time
 from typing import Any
 
 import homeassistant.util.dt as dt_util
@@ -19,12 +20,21 @@ from homeassistant.const import (
     SERVICE_TURN_OFF,
     SERVICE_TURN_ON,
     STATE_ON,
+    STATE_OFF,
 )
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers.event import async_track_state_change_event, async_track_time_interval
 from homeassistant.helpers.storage import Store
 
 from .const import (
+    CONF_BOILER_SWITCH,
+    CONF_ZONES,
+    CONF_PRESENCE_SENSOR,
+    CONF_ANTI_SEIZE_ENABLED,
+    CONF_ANTI_SEIZE_IDLE_DAYS,
+    CONF_ANTI_SEIZE_DURATION,
+    CONF_ANTI_SEIZE_BOILER,
+    CONF_ZONE_ANTI_SEIZE,
     CONF_ZONE_CLIMATE,
     CONF_ZONE_TRV_SYNC,
     CONF_ZONE_WINDOW_SENSOR,
@@ -70,29 +80,32 @@ class MultizoneCoordinator:
     def __init__(
         self,
         hass: HomeAssistant,
-        entry_id: str,
-        boiler_switch: str,
-        zones: list[dict],
-        presence_sensor: str | None = None,
+        entry: Any,
     ) -> None:
         """Initialize the coordinator."""
         self.hass = hass
-        self.entry_id = entry_id
-        self.boiler_switch = boiler_switch
-        self.zones = zones
-        self.presence_sensor = presence_sensor
+        self.entry_id = entry.entry_id
+        self.boiler_switch = entry.data.get(CONF_BOILER_SWITCH)
+        self.zones = entry.data.get(CONF_ZONES, [])
+        self.presence_sensor = entry.data.get(CONF_PRESENCE_SENSOR)
         
-        # These will be updated by the number entities
-        self._min_cycle_on = 5
-        self._min_cycle_off = 5
-        self._valve_delay = 0
-
-        # State: master on/off and per-zone on/off
-        # Loaded/saved externally by entities using RestoreState
+        # Internal state tracking
         self._master_state: bool = False
         self._zone_modes: dict[str, str] = {
-            z[CONF_ZONE_CLIMATE]: ZONE_MODE_PRIMARY for z in zones
+            z[CONF_ZONE_CLIMATE]: ZONE_MODE_PRIMARY for z in self.zones
         }
+        self._pre_window_state: dict[str, str] = {}
+        self._pre_anti_seize_state: dict[str, str] = {}
+        self._select_entities = {}
+        self._min_cycle_on = 0.0
+        self._min_cycle_off = 0.0
+        self._valve_delay = 0.0
+        self._boiler_state = STATE_OFF
+        self._last_boiler_change = 0.0
+        self._last_active_time = time.time() # Default to now until loaded
+        self._anti_seize_running = False
+        
+        self._store = Store(hass, WINDOW_STORAGE_VERSION, WINDOW_STORAGE_KEY)
 
         self._boiler_locked_on_until: datetime | None = None
         self._boiler_locked_off_until: datetime | None = None
@@ -284,6 +297,15 @@ class MultizoneCoordinator:
                 timedelta(minutes=1),
             )
         )
+        
+        # Listen every hour for Anti-Seize check
+        self._unsub_listeners.append(
+            async_track_time_interval(
+                self.hass,
+                self._async_check_anti_seize,
+                timedelta(hours=1),
+            )
+        )
 
     @callback
     def async_teardown_listeners(self) -> None:
@@ -413,8 +435,8 @@ class MultizoneCoordinator:
                 n_hour, n_minute = map(int, night_time_str.split(":"))
                 m_hour, m_minute = map(int, morning_time_str.split(":"))
                 now = dt_util.now().time()
-                night_time = time(n_hour, n_minute)
-                morning_time = time(m_hour, m_minute)
+                night_time = dt_time(n_hour, n_minute)
+                morning_time = dt_time(m_hour, m_minute)
                 
                 if night_time > morning_time:
                     if now >= night_time or now <= morning_time:
@@ -499,6 +521,10 @@ class MultizoneCoordinator:
 
     async def _async_update_boiler(self, emergency_off: bool = False) -> None:
         """Turn boiler ON if any zone is heating, OFF if all are idle/off."""
+        if self._anti_seize_running:
+            _LOGGER.debug("Anti-seize is running, skipping normal boiler update")
+            return
+
         now = dt_util.utcnow()
 
         if emergency_off:
@@ -529,6 +555,10 @@ class MultizoneCoordinator:
 
         boiler_state = self.hass.states.get(self.boiler_switch)
         current_boiler_on = boiler_state is not None and boiler_state.state == STATE_ON
+        
+        # Track activity for anti-seize
+        if current_boiler_on or any_primary_heating:
+            self._last_active_time = time.time()
 
         if any_primary_heating and not current_boiler_on:
             # Want to turn ON
@@ -678,4 +708,104 @@ class MultizoneCoordinator:
             {ATTR_ENTITY_ID: climate_entity, ATTR_HVAC_MODE: mode},
             blocking=False,
         )
+
+    @callback
+    def _async_check_anti_seize(self, now: datetime) -> None:
+        """Check if we need to run the anti-seize routine."""
+        if not self.get_persistent_data(KEY_ANTI_SEIZE_ENABLED, False):
+            return
+            
+        if self._anti_seize_running:
+            return
+            
+        idle_seconds = time.time() - self._last_active_time
+        idle_days = idle_seconds / 86400.0
+        anti_seize_idle_days = self.get_persistent_data(KEY_ANTI_SEIZE_IDLE_DAYS, 15)
+        
+        if idle_days >= anti_seize_idle_days:
+            _LOGGER.info("Anti-seize triggered. System idle for %.1f days (threshold: %d days).", idle_days, anti_seize_idle_days)
+            self.hass.async_create_task(self._async_execute_anti_seize())
+
+    async def _async_execute_anti_seize(self) -> None:
+        """Execute the anti-seize routine."""
+        self._anti_seize_running = True
+        
+        try:
+            _LOGGER.info("Starting Anti-seize routine...")
+            
+            # 1. Save current state of all enabled zones and open them
+            self._pre_anti_seize_state.clear()
+            zones_to_open = []
+            
+            for zone in self.zones:
+                climate_id = zone[CONF_ZONE_CLIMATE]
+                # Check if zone has anti-seize enabled
+                if not zone.get(CONF_ZONE_ANTI_SEIZE, True):
+                    _LOGGER.debug("Skipping zone %s (anti-seize disabled)", climate_id)
+                    continue
+                    
+                state = self.hass.states.get(climate_id)
+                if state:
+                    self._pre_anti_seize_state[climate_id] = state.state
+                    zones_to_open.append(climate_id)
+            
+            if not zones_to_open:
+                _LOGGER.info("No zones enabled for anti-seize. Skipping routine.")
+                self._last_active_time = time.time()
+                return
+                
+            _LOGGER.debug("Opening zones: %s", zones_to_open)
+            for climate_id in zones_to_open:
+                # To force open, we set to Heat. If it's a TRV, it will open. If it's a VT, it will turn on relay.
+                # Ideally, we should also set temperature to max, but just turning to HEAT usually opens it fully 
+                # or enough to move the mechanism.
+                await self._async_set_hvac_mode(climate_id, HVAC_MODE_HEAT)
+                
+            # 2. Wait for valves to open
+            if self._valve_delay > 0:
+                _LOGGER.debug("Waiting %s seconds for valves to open...", self._valve_delay)
+                await asyncio.sleep(self._valve_delay)
+                
+            # 3. Fire boiler if configured
+            anti_seize_boiler = self.get_persistent_data(CONF_ANTI_SEIZE_BOILER, False)
+            if anti_seize_boiler:
+                _LOGGER.debug("Activating boiler for anti-seize...")
+                await self.hass.services.async_call(
+                    "switch",
+                    SERVICE_TURN_ON,
+                    {ATTR_ENTITY_ID: self.boiler_switch},
+                    blocking=False,
+                )
+                
+            # 4. Wait for the duration
+            anti_seize_duration = self.get_persistent_data(KEY_ANTI_SEIZE_DURATION, 2)
+            duration_seconds = anti_seize_duration * 60
+            _LOGGER.debug("Running anti-seize for %d secondi...", duration_seconds)
+            await asyncio.sleep(duration_seconds)
+            
+            # 5. Turn off boiler if we turned it on
+            if anti_seize_boiler:
+                _LOGGER.debug("Deactivating boiler after anti-seize...")
+                await self.hass.services.async_call(
+                    "switch",
+                    SERVICE_TURN_OFF,
+                    {ATTR_ENTITY_ID: self.boiler_switch},
+                    blocking=False,
+                )
+                
+            # 6. Restore all zones
+            _LOGGER.debug("Restoring zones to pre-anti-seize state...")
+            for climate_id, old_state in self._pre_anti_seize_state.items():
+                if old_state in [HVAC_MODE_HEAT, HVAC_MODE_OFF]:
+                    await self._async_set_hvac_mode(climate_id, old_state)
+                    
+            _LOGGER.info("Anti-seize routine completed successfully.")
+            self._last_active_time = time.time()
+            
+        except Exception as e:
+            _LOGGER.error("Error during anti-seize routine: %s", e)
+        finally:
+            self._anti_seize_running = False
+            # Re-evaluate boiler state just in case something changed while we were running
+            self.hass.async_create_task(self._async_update_boiler())
 

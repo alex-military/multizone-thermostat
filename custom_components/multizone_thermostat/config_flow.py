@@ -28,7 +28,12 @@ from .const import (
     CONF_ZONE_NAME,
     CONF_ZONE_TRV_SYNC,
     CONF_ZONE_WINDOW_SENSOR,
+    CONF_ZONE_ANTI_SEIZE,
     CONF_ZONES,
+    CONF_ANTI_SEIZE_ENABLED,
+    CONF_ANTI_SEIZE_IDLE_DAYS,
+    CONF_ANTI_SEIZE_DURATION,
+    CONF_ANTI_SEIZE_BOILER,
     DEFAULT_TRV_SYNC,
     DEFAULT_VT_TARGET_TEMP,
     DEFAULT_VT_TOLERANCE,
@@ -213,6 +218,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_ZONE_NAME: vt_name,
                     CONF_ZONE_CLIMATE: vt_entity_id,
                     CONF_ZONE_TRV_SYNC: False,
+                    CONF_ZONE_ANTI_SEIZE: user_input.get(CONF_ZONE_ANTI_SEIZE, True),
                 }
                 if window_sensor and window_sensor != "none":
                     zone_data[CONF_ZONE_WINDOW_SENSOR] = window_sensor
@@ -235,6 +241,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             vol.Required(CONF_VT_HEATER_SWITCH): vol.In(switches),
             vol.Optional(CONF_VT_TARGET_TEMP, default=DEFAULT_VT_TARGET_TEMP): vol.Coerce(float),
             vol.Optional(CONF_VT_TOLERANCE, default=DEFAULT_VT_TOLERANCE): vol.Coerce(float),
+            vol.Optional(CONF_ZONE_ANTI_SEIZE, default=True): bool,
             vol.Optional(CONF_ZONE_WINDOW_SENSOR, default="none"): vol.In(window_sensors),
         })
 
@@ -270,6 +277,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_ZONE_NAME: zone_name,
                     CONF_ZONE_CLIMATE: climate_entity,
                     CONF_ZONE_TRV_SYNC: trv_sync,
+                    CONF_ZONE_ANTI_SEIZE: user_input.get(CONF_ZONE_ANTI_SEIZE, True),
                 }
                 if user_input.get(CONF_ZONE_WINDOW_SENSOR) and user_input[CONF_ZONE_WINDOW_SENSOR] != "none":
                     zone_data[CONF_ZONE_WINDOW_SENSOR] = user_input[CONF_ZONE_WINDOW_SENSOR]
@@ -288,6 +296,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             vol.Required(CONF_ZONE_CLIMATE): vol.In(available_climates),
             vol.Required(CONF_ZONE_NAME, default=default_name): str,
             vol.Optional(CONF_ZONE_TRV_SYNC, default=DEFAULT_TRV_SYNC): bool,
+            vol.Optional(CONF_ZONE_ANTI_SEIZE, default=True): bool,
             vol.Optional(CONF_ZONE_WINDOW_SENSOR, default="none"): vol.In(sensors),
         })
 
@@ -431,12 +440,13 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         """Initialize."""
         self._config_entry = config_entry
-        self._zones: list[dict] = list(config_entry.data.get(CONF_ZONES, []))
+        self._zones: list[dict[str, Any]] = list(config_entry.data.get(CONF_ZONES, []))
         self._boiler_switch: str = config_entry.data.get(CONF_BOILER_SWITCH, "")
         self._virtual_thermostats: list[dict] = list(config_entry.data.get(CONF_VIRTUAL_THERMOSTATS, []))
         self._geofencing_enabled: bool = config_entry.data.get(CONF_GEOFENCING_ENABLED, False)
         self._presence_sensor: str | None = config_entry.data.get(CONF_PRESENCE_SENSOR)
         self._current_zone_id: str | None = None
+        self._current_zone_idx = 0
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -522,6 +532,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                     CONF_ZONE_CLIMATE: climate_id,
                     CONF_ZONE_NAME: name,
                     CONF_ZONE_TRV_SYNC: user_input.get(CONF_ZONE_TRV_SYNC, DEFAULT_TRV_SYNC),
+                    CONF_ZONE_ANTI_SEIZE: user_input.get(CONF_ZONE_ANTI_SEIZE, True),
                 }
                 if user_input.get(CONF_ZONE_WINDOW_SENSOR) and user_input[CONF_ZONE_WINDOW_SENSOR] != "none":
                     zone_data[CONF_ZONE_WINDOW_SENSOR] = user_input[CONF_ZONE_WINDOW_SENSOR]
@@ -535,6 +546,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             vol.Required(CONF_ZONE_CLIMATE): vol.In(available_climates),
             vol.Required(CONF_ZONE_NAME): str,
             vol.Optional(CONF_ZONE_TRV_SYNC, default=DEFAULT_TRV_SYNC): bool,
+            vol.Optional(CONF_ZONE_ANTI_SEIZE, default=True): bool,
             vol.Optional(CONF_ZONE_WINDOW_SENSOR, default="none"): vol.In(sensors),
         })
 
@@ -605,6 +617,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                     CONF_ZONE_NAME: vt_name,
                     CONF_ZONE_CLIMATE: vt_entity_id,
                     CONF_ZONE_TRV_SYNC: False,
+                    CONF_ZONE_ANTI_SEIZE: user_input.get(CONF_ZONE_ANTI_SEIZE, True),
                 }
                 if window_sensor and window_sensor != "none":
                     zone_data[CONF_ZONE_WINDOW_SENSOR] = window_sensor
@@ -627,6 +640,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             vol.Required(CONF_VT_HEATER_SWITCH): vol.In(switches),
             vol.Optional(CONF_VT_TARGET_TEMP, default=DEFAULT_VT_TARGET_TEMP): vol.Coerce(float),
             vol.Optional(CONF_VT_TOLERANCE, default=DEFAULT_VT_TOLERANCE): vol.Coerce(float),
+            vol.Optional(CONF_ZONE_ANTI_SEIZE, default=True): bool,
             vol.Optional(CONF_ZONE_WINDOW_SENSOR, default="none"): vol.In(window_sensors),
         })
 
@@ -694,10 +708,11 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
 
         if user_input is not None:
             if self._current_zone_id is not None:
-                # Find and update
-                for i, zone in enumerate(self._zones):
-                    if zone[CONF_ZONE_CLIMATE] == self._current_zone_id:
+                # Second step: edit the zone
+                for i, z in enumerate(self._zones):
+                    if z[CONF_ZONE_CLIMATE] == self._current_zone_id:
                         self._zones[i][CONF_ZONE_TRV_SYNC] = user_input[CONF_ZONE_TRV_SYNC]
+                        self._zones[i][CONF_ZONE_ANTI_SEIZE] = user_input.get(CONF_ZONE_ANTI_SEIZE, True)
                         if user_input.get(CONF_ZONE_WINDOW_SENSOR) and user_input[CONF_ZONE_WINDOW_SENSOR] != "none":
                             self._zones[i][CONF_ZONE_WINDOW_SENSOR] = user_input[CONF_ZONE_WINDOW_SENSOR]
                         else:
@@ -719,6 +734,10 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                 vol.Required(
                     CONF_ZONE_TRV_SYNC, 
                     default=zone_data.get(CONF_ZONE_TRV_SYNC, DEFAULT_TRV_SYNC) if zone_data else DEFAULT_TRV_SYNC
+                ): bool,
+                vol.Optional(
+                    CONF_ZONE_ANTI_SEIZE,
+                    default=zone_data.get(CONF_ZONE_ANTI_SEIZE, True) if zone_data else True
                 ): bool,
                 vol.Optional(CONF_ZONE_WINDOW_SENSOR, default=current_sensor): vol.In(sensors),
             })

@@ -68,8 +68,10 @@ The project is structured in phases to evolve from a simple aggregator to a full
 - [x] **Geofencing Zero-Code**: Automatic preset switching based on home occupancy (Away/Comfort).
 - [x] **Room Priority Selector**: Replace the zone bypass switch with a multi-state selector (Primary / Secondary / Bypassed). *Primary* zones can turn on the boiler; *Secondary* zones can open their valves to receive heat but cannot turn on the boiler; *Bypassed* zones are excluded entirely.
 
+- 🛡️ **Boiler & Valve Protection** — Native `number` entities for anti-short-cycle, valve opening delay, and **Summer Anti-seize protection**
+
 ### PHASE 3 — Quality of Life & Dashboards
-- [ ] **Summer Valve Protection (Anti-seize)**: Cyclical safety activation during summer to prevent mechanical seizing of valves and circulator pumps.
+- [x] **Summer Valve Protection (Anti-seize)**: Cyclical safety activation during summer to prevent mechanical seizing of valves and circulator pumps. Includes global toggle, custom interval/duration settings, and per-zone exclusion.
 - [ ] **Auto-Generated Lovelace Dashboard**: The integration will automatically generate (and keep updated) a full Home Assistant dashboard page with premium climate-dedicated graphics, including all our custom cards — zero-code required.
 
 ### PHASE 4 — Advanced Energy Optimization

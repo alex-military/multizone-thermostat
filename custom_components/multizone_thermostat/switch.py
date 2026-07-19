@@ -20,6 +20,7 @@ from .const import (
     CONF_GEOFENCING_ENABLED,
     KEY_GEOFENCING_TOGGLE,
     KEY_AUTO_NIGHT_MODE,
+    KEY_ANTI_SEIZE_ENABLED,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -48,6 +49,9 @@ async def async_setup_entry(
     # Geofencing (if enabled)
     if config_entry.data.get(CONF_GEOFENCING_ENABLED, True):
         entities.append(MultizoneGeofencingSwitch(coordinator, config_entry.entry_id))
+
+    # Anti-seize Switch
+    entities.append(MultizoneAntiSeizeSwitch(coordinator, config_entry.entry_id))
 
     async_add_entities(entities, True)
 
@@ -189,5 +193,34 @@ class MultizoneGeofencingSwitch(SwitchEntity):
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Disable geofencing."""
         await self._coordinator.async_set_persistent_data(KEY_GEOFENCING_TOGGLE, False)
+        self.async_write_ha_state()
+
+class MultizoneAntiSeizeSwitch(SwitchEntity):
+    """Switch to dynamically enable/disable Anti-Seize (Summer Protection)."""
+
+    _attr_has_entity_name = True
+    _attr_name = "Anti-seize (Summer Protection)"
+    _attr_icon = "mdi:valve-open"
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(self, coordinator: Any, entry_id: str) -> None:
+        """Initialize switch."""
+        self._coordinator = coordinator
+        self._attr_unique_id = f"{DOMAIN}_{entry_id}_anti_seize"
+        self._attr_device_info = _make_device_info(entry_id)
+
+    @property
+    def is_on(self) -> bool:
+        """Return true if anti-seize is enabled."""
+        return self._coordinator.get_persistent_data(KEY_ANTI_SEIZE_ENABLED, False)
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Enable anti-seize."""
+        await self._coordinator.async_set_persistent_data(KEY_ANTI_SEIZE_ENABLED, True)
+        self.async_write_ha_state()
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Disable anti-seize."""
+        await self._coordinator.async_set_persistent_data(KEY_ANTI_SEIZE_ENABLED, False)
         self.async_write_ha_state()
 

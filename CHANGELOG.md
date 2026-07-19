@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.6.12] - 2026-07-19
+
+### Added
+- **Summer Valve Protection (Anti-seize):** Cyclical safety activation during summer to prevent mechanical seizing of valves and circulator pumps. Configurable directly from Home Assistant UI via dedicated `switch` and `number` entities.
+  - Global ON/OFF toggle switch
+  - Settable Idle Days (threshold for triggering the cycle)
+  - Settable Duration (minutes to run the routine)
+  - Per-zone exclusion option available in the Options flow
+
 ## [2.3.0] - 2026-07-16
 
 ### Added

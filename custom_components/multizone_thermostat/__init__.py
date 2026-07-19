@@ -39,10 +39,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Create coordinator
     coordinator = MultizoneCoordinator(
         hass=hass,
-        entry_id=entry.entry_id,
-        boiler_switch=boiler_switch,
-        zones=zones,
-        presence_sensor=entry.data.get(CONF_PRESENCE_SENSOR),
+        entry=entry,
     )
 
     # Load persistent data
