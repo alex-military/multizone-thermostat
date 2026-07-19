@@ -334,19 +334,23 @@ class MultizoneCoordinator:
         sensor_id = event.data.get("entity_id")
         new_state = event.data.get("new_state")
         
+        _LOGGER.error("!!! WINDOW LISTENER FIRED: %s -> %s", sensor_id, new_state.state if new_state else "None")
+
         if new_state is None:
             return
             
         # Find ALL zones this sensor belongs to
         matching_zones = [z for z in self.zones if z.get(CONF_ZONE_WINDOW_SENSOR) == sensor_id]
+        _LOGGER.error("!!! WINDOW LISTENER: Matching zones: %s", matching_zones)
         if not matching_zones:
             return
             
         for zone in matching_zones:
             climate_id = zone[CONF_ZONE_CLIMATE]
             zone_select = self._select_entities.get(f"zone_mode_{climate_id}")
+            _LOGGER.error("!!! WINDOW LISTENER: zone_select for %s: %s", climate_id, zone_select)
             
-            if new_state.state == STATE_ON:
+            if new_state.state == "on":
                 # Window OPENED
                 _LOGGER.debug("Window opened (%s), bypassing zone %s", sensor_id, climate_id)
                 # Save current state if not already saved

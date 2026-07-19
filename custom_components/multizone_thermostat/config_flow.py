@@ -792,4 +792,10 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
         self.hass.config_entries.async_update_entry(
             self._config_entry, data=data
         )
+        
+        # Explicitly reload the entry since we updated data, not options
+        self.hass.async_create_task(
+            self.hass.config_entries.async_reload(self._config_entry.entry_id)
+        )
+        
         return self.async_create_entry(title="", data={})
