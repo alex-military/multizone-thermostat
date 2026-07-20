@@ -1676,3 +1676,117 @@ if (!customElements.get("multizone-thermostat-preset-card")) {
 if (!customElements.get("multizone-thermostat-preset-card-editor")) {
   customElements.define("multizone-thermostat-preset-card-editor", MultizoneThermostatPresetCardEditor);
 }
+
+/* ==================== DASHBOARD STRATEGY ==================== */
+class MultizoneThermostatDashboardStrategy {
+  static async generateDashboard(info) {
+    const view = await this.generateView(info);
+    return {
+      title: "Multizone Thermostat",
+      views: [
+        {
+          title: "Home",
+          path: "home",
+          panel: true,
+          cards: view.cards,
+        }
+      ]
+    };
+  }
+
+  static async generateView(info) {
+    const hass = info.hass;
+    
+    // Find master switch
+    const masterEntity = findMasterEntity(hass);
+    // Find preset entity
+    const presetEntity = findPresetEntity(hass);
+    
+    // Find all zones (by finding all zone_mode selects)
+    const zones = [];
+    for (const entityId of Object.keys(hass.states)) {
+      if (entityId.startsWith("select.") && entityId.includes("_zone_mode_")) {
+        const climateId = hass.states[entityId].attributes.climate_entity;
+        const climateState = hass.states[climateId];
+        if (climateId && climateState) {
+          zones.push({
+            climate: climateId,
+            switch: entityId,
+            title: climateState.attributes.friendly_name || climateId,
+          });
+        }
+      }
+    }
+    
+    // Sort zones by title
+    zones.sort((a, b) => a.title.localeCompare(b.title));
+    
+    // Build top row
+    const topRowCards = [];
+    if (presetEntity) {
+      topRowCards.push({
+        type: "custom:multizone-thermostat-preset-card",
+        entity: presetEntity,
+        title: ""
+      });
+    }
+    
+    topRowCards.push({
+      type: "custom:multizone-thermostat-status-card",
+      card_mod: {
+        style: "ha-card { height: 150px !important; width: 550px; border-radius: 20px; }"
+      }
+    });
+
+    const stackCards = [
+      {
+        type: "horizontal-stack",
+        cards: topRowCards
+      }
+    ];
+    
+    // Build zone rows (3 per row)
+    const columns = 3;
+    for (let i = 0; i < zones.length; i += columns) {
+      const chunk = zones.slice(i, i + columns);
+      const rowCards = chunk.map(zone => ({
+        type: "custom:multizone-thermostat-dial-card",
+        entity: zone.climate,
+        switch: zone.switch,
+        title: zone.title,
+        card_mod: {
+          style: "ha-card { min-height: 300px !important; max-height: 400px !important; padding: 1px !important; }"
+        }
+      }));
+      
+      stackCards.push({
+        type: "horizontal-stack",
+        cards: rowCards
+      });
+    }
+
+    return {
+      cards: [
+        {
+          type: "vertical-stack",
+          cards: stackCards
+        }
+      ]
+    };
+  }
+}
+
+// Register Strategy
+window.customStrategies = window.customStrategies || [];
+window.customStrategies.push({
+  type: "multizone-thermostat-dashboard",
+  name: "Multizone Thermostat Dashboard",
+  description: "Auto-generated dashboard for your heating system."
+});
+
+if (!customElements.get("ll-strategy-dashboard-multizone-thermostat-dashboard")) {
+  customElements.define("ll-strategy-dashboard-multizone-thermostat-dashboard", MultizoneThermostatDashboardStrategy);
+}
+if (!customElements.get("ll-strategy-view-multizone-thermostat-dashboard")) {
+  customElements.define("ll-strategy-view-multizone-thermostat-dashboard", MultizoneThermostatDashboardStrategy);
+}

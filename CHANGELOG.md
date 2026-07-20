@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.7.2] - 2026-07-20
+
+### Fixed
+- Fixed Lovelace strategy registration tags to support both `strategy: type: custom:multizone-thermostat-dashboard` and `strategy: type: custom:multizone-thermostat-dashboard` inside views.
+
 ## [2.7.1] - 2026-07-20
 
 ### Fixed
