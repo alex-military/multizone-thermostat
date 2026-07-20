@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.6.13] - 2026-07-20
+
+### Documentation
+- **Configuration Guide:** Added detailed documentation about the new Anti-seize functionality to `configuration.md`, including descriptions of the new entities and how the feature works.
+
 ## [2.6.12] - 2026-07-19
 
 ### Added

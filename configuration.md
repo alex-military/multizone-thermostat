@@ -51,6 +51,9 @@ Virtual thermostats can also be created **after installation** from the Options 
 | `number.multizone_thermostat_min_cycle_on` | Minimum boiler ON time (minutes, default: 5) |
 | `number.multizone_thermostat_min_cycle_off` | Minimum boiler OFF time (minutes, default: 5) |
 | `number.multizone_thermostat_valve_delay` | Valve opening delay before boiler starts (seconds, default: 0) |
+| `switch.multizone_thermostat_anti_seize_summer_protection` | Global ON/OFF toggle for the Summer Anti-seize protection |
+| `number.multizone_thermostat_anti_seize_idle_days` | Number of idle days before triggering the Anti-seize cycle (default: 15) |
+| `number.multizone_thermostat_anti_seize_duration` | Duration in minutes of the Anti-seize cycle (default: 2) |
 | `binary_sensor.multizone_thermostat_boiler_status` | Status of the boiler |
 
 ---
@@ -98,7 +101,7 @@ Go to **Settings → Devices & Services → Multizone Thermostat → Configure**
 - Create a new virtual thermostat (sensor + switch → climate entity)
 - Remove a zone
 - Remove a virtual thermostat (removes both the climate entity and the associated zone)
-- Edit a zone (TRV preset sync, Window Sensor)
+- Edit a zone (TRV preset sync, Window Sensor, Anti-seize exclusion)
 
 ---
 
@@ -109,3 +112,21 @@ When enabled for a zone, the integration automatically syncs the TRV preset mode
 - HVAC mode `off` → preset `off`
 
 Only enable this for zones with physical TRV valves that support preset modes.
+
+---
+
+## Summer Anti-seize Protection
+
+During the summer months, thermostatic valves and boiler circulator pumps can remain inactive for long periods, which may cause them to mechanically seize or become stuck.
+The integration includes a built-in safety mechanism to periodically cycle them:
+
+1. Enable the `switch.multizone_thermostat_anti_seize_summer_protection` entity.
+2. The system tracks the exact time since the heating was last turned on.
+3. If the system remains completely idle for the configured number of days (`number.multizone_thermostat_anti_seize_idle_days`, default 15 days), the integration will:
+   - Save the current state of all zones.
+   - Force all zones that have the anti-seize feature enabled to turn ON (opening their valves).
+   - Wait for the configured valve opening delay.
+   - Wait for the configured duration (`number.multizone_thermostat_anti_seize_duration`, default 2 minutes).
+   - Restore all zones to their previous state.
+
+**Note**: You can selectively disable the Anti-seize protection for specific zones (e.g., fancoil units that don't have moving mechanical valves) through the UI Options flow (**Edit a zone** -> Disable "Enable Anti-seize (Summer Protection) for this zone").
