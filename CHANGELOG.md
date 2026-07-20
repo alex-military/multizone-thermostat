@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.7.1] - 2026-07-20
+
+### Fixed
+- Fixed an invalid JSON syntax in `it.json` that was preventing the integration from loading after the latest update.
+
 ## [2.7.0] - 2026-07-20
 
 ### Added

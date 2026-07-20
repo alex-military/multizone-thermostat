@@ -119,6 +119,10 @@
           "heater_switch": "Switch / Relè Riscaldamento",
           "target_temperature": "Temperatura Target Iniziale (°C)",
           "tolerance": "Tolleranza (°C)",
+          "anti_seize": "Abilita Antigrippaggio (Protezione Estiva) per questa zona",
+          "window_sensor": "Sensore Finestra (Opzionale)"
+        }
+      },
       "remove_virtual_thermostat": {
         "title": "Rimuovi Termostato Virtuale",
         "description": "Seleziona il termostato virtuale da rimuovere. Anche la zona associata verrà rimossa.",
