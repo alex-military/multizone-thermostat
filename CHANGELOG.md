@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.8.3] - 2026-07-21
+
+### Fixed
+- **Backend Hotfix**: Fixed a critical `NameError` in the background scheduler that prevented the Summer Anti-seize routine from executing properly due to missing constants imports.
+
 ## [2.8.2] - 2026-07-21
 
 ### Fixed
