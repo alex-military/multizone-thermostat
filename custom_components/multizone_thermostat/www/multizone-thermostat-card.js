@@ -1805,13 +1805,6 @@ class MultizoneThermostatDashboardStrategy extends HTMLElement {
         title: zone.title,
       }));
       
-      // Fill the rest of the row with spacers to maintain grid alignment
-      while (rowCards.length < columns) {
-        rowCards.push({
-          type: "custom:multizone-thermostat-spacer"
-        });
-      }
-      
       stackCards.push({
         type: "horizontal-stack",
         cards: rowCards
