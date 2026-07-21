@@ -1826,5 +1826,5 @@ if (!customElements.get("ll-strategy-dashboard-multizone-thermostat-dashboard"))
   customElements.define("ll-strategy-dashboard-multizone-thermostat-dashboard", MultizoneThermostatDashboardStrategy);
 }
 if (!customElements.get("ll-strategy-view-multizone-thermostat-dashboard")) {
-  customElements.define("ll-strategy-view-multizone-thermostat-dashboard", MultizoneThermostatDashboardStrategy);
+  customElements.define("ll-strategy-view-multizone-thermostat-dashboard", class extends MultizoneThermostatDashboardStrategy {});
 }

@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.8.1] - 2026-07-21
+
+### Fixed
+- **Hotfix**: Fixed `DOMException: Failed to execute 'define' on 'CustomElementRegistry'` which prevented the dashboard strategy from loading when used as a View Strategy instead of a Dashboard Strategy.
+
 ## [2.8.0] - 2026-07-21
 
 ### Added
