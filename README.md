@@ -70,9 +70,9 @@ The project is structured in phases to evolve from a simple aggregator to a full
 
 - 🛡️ **Boiler & Valve Protection** — Native `number` entities for anti-short-cycle, valve opening delay, and **Summer Anti-seize protection**
 
-### PHASE 3 — Quality of Life & Dashboards
+### PHASE 3 — Quality of Life & Dashboards (Completed) ✅
 - [x] **Summer Valve Protection (Anti-seize)**: Cyclical safety activation during summer to prevent mechanical seizing of valves and circulator pumps. Includes global toggle, custom interval/duration settings, and per-zone exclusion.
-- [ ] **Auto-Generated Lovelace Dashboard**: The integration will automatically generate (and keep updated) a full Home Assistant dashboard page with premium climate-dedicated graphics, including all our custom cards — zero-code required.
+- [x] **Auto-Generated Lovelace Dashboard**: The integration automatically generates (and keeps updated) a full Home Assistant dashboard page with premium climate-dedicated graphics, including all our custom cards — zero-code required. Supports dynamic grid sizing (columns).
 
 ### PHASE 4 — Advanced Energy Optimization
 - [ ] **Self-Learning PID Auto-Tuning**: Advanced self-learning PID algorithm that studies the thermal inertia of the house and regulates proportional modulation (PWM) autonomously to eliminate temperature swings.

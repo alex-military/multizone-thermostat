@@ -82,5 +82,41 @@ type: custom:multizone-thermostat-preset-card
 
 > **Tip**: To find your exact entity IDs, go to **Settings → Devices & Services → Multizone Thermostat** and click on any entity. The entity ID is shown at the bottom of the entity page.
 
+---
+
+## 5. Auto-Generated Dashboard Strategy (`custom:multizone-thermostat-dashboard`)
+If you want a complete, ready-to-use dashboard without writing any YAML for individual cards, you can use the built-in Dashboard Strategy. This strategy automatically discovers all your heating zones, virtual thermostats, presets, and the master switch, generating a beautifully structured layout instantly.
+
+### Features
+- **Zero Configuration**: Automatically finds and connects all your entities.
+- **Dynamic Grid**: Automatically calculates rows and columns based on your preference.
+- **Clean Titles**: Automatically strips out the technical "Virtual Thermostats VT" prefix from your zones.
+- **Native Styling**: Smooth rounded corners and perfectly sized cards without needing external plugins like `card-mod`.
+
+### How to use
+You can add it as a new View in your existing dashboard. Open the Raw Configuration Editor and add this under `views:`:
+
+```yaml
+views:
+  - title: Clima
+    path: clima
+    icon: mdi:thermostat
+    strategy:
+      type: custom:multizone-thermostat-dashboard
+      columns: 3   # Optional: Set the number of columns (default is 3)
+```
+
+### Layout Customization
+You can customize the number of columns to perfectly fit your device screen (e.g., tablet vs phone) simply by changing the `columns` parameter.
+
+#### 2 Columns Layout (`columns: 2`)
+![Dashboard 2 Columns](images/dashboard_col1.png)
+
+#### 3 Columns Layout (`columns: 3`)
+![Dashboard 3 Columns](images/dashboard_col2.png)
+
+#### 4 Columns Layout (`columns: 4`)
+![Dashboard 4 Columns](images/dashboard_col3.png)
+
 > **Note**: If you installed via HACS, the Lovelace card resource is registered automatically. If cards don't appear, add the resource manually:
 > Go to **Settings → Dashboards → Resources** → Add `/multizone_thermostat_card/multizone-thermostat-card.js` as **JavaScript Module**.
