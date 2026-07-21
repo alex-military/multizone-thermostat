@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.8.4] - 2026-07-21
+
+### Fixed
+- **Frontend Hotfix**: Fixed an issue where the Dashboard Strategy failed to load the Global Preset card on non-English Home Assistant setups. The auto-discovery algorithm now correctly identifies the preset entity via its options array instead of relying on a hardcoded English `entity_id`.
+
 ## [2.8.3] - 2026-07-21
 
 ### Fixed
