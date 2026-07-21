@@ -110,13 +110,13 @@ views:
 You can customize the number of columns to perfectly fit your device screen (e.g., tablet vs phone) simply by changing the `columns` parameter.
 
 #### 2 Columns Layout (`columns: 2`)
-![Dashboard 2 Columns](images/dashboard_col1.png)
+![Dashboard 2 Columns](images/dashboard_col3.png)
 
 #### 3 Columns Layout (`columns: 3`)
-![Dashboard 3 Columns](images/dashboard_col2.png)
+![Dashboard 3 Columns](images/dashboard_col1.png)
 
 #### 4 Columns Layout (`columns: 4`)
-![Dashboard 4 Columns](images/dashboard_col3.png)
+![Dashboard 4 Columns](images/dashboard_col2.png)
 
 > **Note**: If you installed via HACS, the Lovelace card resource is registered automatically. If cards don't appear, add the resource manually:
 > Go to **Settings → Dashboards → Resources** → Add `/multizone_thermostat_card/multizone-thermostat-card.js` as **JavaScript Module**.
