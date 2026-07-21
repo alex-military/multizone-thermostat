@@ -1782,8 +1782,8 @@ class MultizoneThermostatDashboardStrategy extends HTMLElement {
       type: "custom:multizone-thermostat-status-card",
     });
 
-    // Fill the rest of the top row with spacers to match columns width
-    while (topRowCards.length < columns) {
+    // Fill the rest of the top row with spacers so it's always exactly 3 blocks wide
+    while (topRowCards.length < 3) {
       topRowCards.push({
         type: "custom:multizone-thermostat-spacer"
       });
