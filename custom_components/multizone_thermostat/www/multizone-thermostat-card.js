@@ -1703,8 +1703,8 @@ if (!customElements.get("multizone-thermostat-preset-card-editor")) {
 
 /* ==================== SPACER CARD ==================== */
 class MultizoneThermostatSpacer extends HTMLElement {
-  setConfig() {}
-  set hass() {}
+  setConfig(config) {}
+  set hass(hass) {}
 }
 
 if (!customElements.get("multizone-thermostat-spacer")) {
