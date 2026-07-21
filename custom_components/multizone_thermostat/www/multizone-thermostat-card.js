@@ -1775,11 +1775,13 @@ class MultizoneThermostatDashboardStrategy extends HTMLElement {
         type: "custom:multizone-thermostat-preset-card",
         entity: presetEntity,
         title: "",
+        border_radius: "20px",
       });
     }
     
     topRowCards.push({
       type: "custom:multizone-thermostat-status-card",
+      border_radius: "20px",
     });
 
     // Fill the rest of the top row with spacers so it's always exactly 3 blocks wide
@@ -1803,6 +1805,10 @@ class MultizoneThermostatDashboardStrategy extends HTMLElement {
         entity: zone.climate,
         switch: zone.switch,
         title: zone.title,
+        min_height: "300px",
+        max_height: "400px",
+        padding: "1px",
+        border_radius: "20px",
       }));
       
       stackCards.push({
