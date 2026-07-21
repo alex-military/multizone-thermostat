@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.8.0] - 2026-07-21
+
+### Added
+- **Dashboard Strategy Completion**: Added native strategy to auto-generate the complete UI dashboard. Simply use `type: custom:multizone-thermostat-dashboard` in a view strategy. It supports dynamic configuration (e.g. `columns: 2`), removes virtual thermostat prefixing automatically, and eliminates the need for `card-mod` by natively applying rounded corners and heights.
+
+### Fixed
+- Fixed SyntaxError during parsing of the dashboard strategy JavaScript.
+- Fixed grid iteration when `columns` config is passed as string from YAML.
+
 ## [2.7.2] - 2026-07-20
 
 ### Fixed

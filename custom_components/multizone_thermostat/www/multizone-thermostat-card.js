@@ -694,6 +694,16 @@ class MultizoneThermostatDialCard extends HTMLElement {
   updateCard() {
     if (!this._hass || !this._config) return;
 
+    const card = this.shadowRoot.querySelector('ha-card');
+    if (card) {
+      if (this._config.height) card.style.height = this._config.height;
+      if (this._config.width) card.style.width = this._config.width;
+      if (this._config.border_radius) card.style.borderRadius = this._config.border_radius;
+      if (this._config.min_height) card.style.minHeight = this._config.min_height;
+      if (this._config.max_height) card.style.maxHeight = this._config.max_height;
+      if (this._config.padding) card.style.padding = this._config.padding;
+    }
+
     const climateEntity = this._config.entity;
     let switchEntity = this._config.switch;
     
@@ -713,10 +723,19 @@ class MultizoneThermostatDialCard extends HTMLElement {
     const climateState = this._hass.states[climateEntity];
     const switchState = switchEntity ? this._hass.states[switchEntity] : null;
 
-
     if (!climateState) {
       this.renderError(getTranslation(this._hass, 'custom_error') + `: ${climateEntity} not found.`);
       return;
+    }
+
+    let displayTitle = this._config.title || climateState.attributes.friendly_name || climateEntity;
+    if (displayTitle) {
+      displayTitle = displayTitle.replace(/^Virtual Thermostats VT /i, '');
+    }
+
+    const titleEl = this.shadowRoot.querySelector('.title');
+    if (titleEl) {
+      titleEl.textContent = displayTitle;
     }
 
     // Use temporary switch state if toggled locally to avoid flickering
@@ -746,13 +765,6 @@ class MultizoneThermostatDialCard extends HTMLElement {
     const disabledMsgBox = this.shadowRoot.querySelector('.disabled-msg-box');
     if (disabledMsgBox) {
       disabledMsgBox.innerHTML = `<ha-icon icon="mdi:alert-circle-outline" style="margin-right: 6px;"></ha-icon>${getTranslation(this._hass, 'bypass_msg')}`;
-    }
-
-    // Update title
-    const title = this._config.title || climateState.attributes.friendly_name || getTranslation(this._hass, 'thermostat');
-    const titleEl = this.shadowRoot.querySelector('#card-title');
-    if (titleEl) {
-      titleEl.textContent = title;
     }
 
     // Update status text
@@ -802,6 +814,7 @@ class MultizoneThermostatDialCard extends HTMLElement {
         align-items: center;
         margin-bottom: 4px;
         padding-bottom: 4px;
+        padding-left: 8px;
         position: relative;
         z-index: 20;
       }
@@ -1335,10 +1348,13 @@ class MultizoneThermostatStatusCard extends HTMLElement {
       }
     }
 
-    // Update the ha-card element's background color
+    // Update the ha-card element's background color and custom styles
     const card = this.shadowRoot.querySelector('ha-card');
     if (card) {
       card.style.backgroundColor = bgColor;
+      if (this._config.height) card.style.height = this._config.height;
+      if (this._config.width) card.style.width = this._config.width;
+      if (this._config.border_radius) card.style.borderRadius = this._config.border_radius;
     }
 
     // Update title / name
@@ -1528,6 +1544,14 @@ class MultizoneThermostatPresetCard extends HTMLElement {
   updateCard() {
     if (!this._hass) return;
 
+    // Apply custom styling from config
+    const card = this.shadowRoot.querySelector('ha-card');
+    if (card && this._config) {
+      if (this._config.height) card.style.height = this._config.height;
+      if (this._config.width) card.style.width = this._config.width;
+      if (this._config.border_radius) card.style.borderRadius = this._config.border_radius;
+    }
+
     // Title
     const titleEl = this.shadowRoot.getElementById('card-title');
     titleEl.textContent = (this._config && this._config.title) || getTranslation(this._hass, 'preset_card_title');
@@ -1696,24 +1720,31 @@ class MultizoneThermostatDashboardStrategy {
 
   static async generateView(info) {
     const hass = info.hass;
+    // In view strategies, config is usually in info.config.strategy or info.strategy
+    const strategyConfig = info.config?.strategy || info.strategy || info.config || {};
     
     // Find master switch
     const masterEntity = findMasterEntity(hass);
     // Find preset entity
     const presetEntity = findPresetEntity(hass);
     
-    // Find all zones (by finding all zone_mode selects)
+    // Find all zones (by checking for climate_entity attribute)
     const zones = [];
     for (const entityId of Object.keys(hass.states)) {
-      if (entityId.startsWith("select.") && entityId.includes("_zone_mode_")) {
-        const climateId = hass.states[entityId].attributes.climate_entity;
-        const climateState = hass.states[climateId];
-        if (climateId && climateState) {
-          zones.push({
-            climate: climateId,
-            switch: entityId,
-            title: climateState.attributes.friendly_name || climateId,
-          });
+      if (entityId.startsWith("select.")) {
+        const stateObj = hass.states[entityId];
+        const climateId = stateObj.attributes ? stateObj.attributes.climate_entity : null;
+        if (climateId) {
+          const climateState = hass.states[climateId];
+          if (climateState) {
+            let title = climateState.attributes.friendly_name || climateId;
+            title = title.replace(/^Virtual Thermostats VT /i, '');
+            zones.push({
+              climate: climateId,
+              switch: entityId,
+              title: title,
+            });
+          }
         }
       }
     }
@@ -1727,15 +1758,17 @@ class MultizoneThermostatDashboardStrategy {
       topRowCards.push({
         type: "custom:multizone-thermostat-preset-card",
         entity: presetEntity,
-        title: ""
+        title: "",
+        height: "150px",
+        border_radius: "20px"
       });
     }
     
     topRowCards.push({
       type: "custom:multizone-thermostat-status-card",
-      card_mod: {
-        style: "ha-card { height: 150px !important; width: 550px; border-radius: 20px; }"
-      }
+      height: "150px",
+      width: "550px",
+      border_radius: "20px"
     });
 
     const stackCards = [
@@ -1745,8 +1778,12 @@ class MultizoneThermostatDashboardStrategy {
       }
     ];
     
-    // Build zone rows (3 per row)
-    const columns = 3;
+    // Build zone rows
+    let columns = parseInt(strategyConfig.columns, 10);
+    if (isNaN(columns) || columns < 1) {
+      columns = 3;
+    }
+
     for (let i = 0; i < zones.length; i += columns) {
       const chunk = zones.slice(i, i + columns);
       const rowCards = chunk.map(zone => ({
@@ -1754,9 +1791,10 @@ class MultizoneThermostatDashboardStrategy {
         entity: zone.climate,
         switch: zone.switch,
         title: zone.title,
-        card_mod: {
-          style: "ha-card { min-height: 300px !important; max-height: 400px !important; padding: 1px !important; }"
-        }
+        min_height: "300px",
+        max_height: "400px",
+        padding: "1px",
+        border_radius: "20px"
       }));
       
       stackCards.push({
