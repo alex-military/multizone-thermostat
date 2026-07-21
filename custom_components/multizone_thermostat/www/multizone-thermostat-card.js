@@ -147,6 +147,22 @@ function findMasterEntity(hass) {
 // Helper function to auto-discover the preset select entity
 function findPresetEntity(hass) {
   if (!hass) return null;
+  
+  // Robust method: find the select entity that has our specific global presets
+  const found = Object.keys(hass.states).find(key => {
+    if (!key.startsWith('select.')) return false;
+    const state = hass.states[key];
+    if (state && state.attributes && state.attributes.options) {
+      const opts = state.attributes.options;
+      if (opts.includes('manual') && opts.includes('eco') && opts.includes('comfort')) {
+        return true;
+      }
+    }
+    return false;
+  });
+  if (found) return found;
+
+  // Fallback
   return Object.keys(hass.states).find(key => {
     return key.startsWith('select.') && key.includes('global_preset');
   }) || null;
