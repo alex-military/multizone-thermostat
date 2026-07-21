@@ -1762,6 +1762,12 @@ class MultizoneThermostatDashboardStrategy extends HTMLElement {
     // Sort zones by title
     zones.sort((a, b) => a.title.localeCompare(b.title));
     
+    // Build zone rows to get 'columns' config first
+    let columns = parseInt(strategyConfig.columns, 10);
+    if (isNaN(columns) || columns < 1) {
+      columns = 3;
+    }
+
     // Build top row
     const topRowCards = [];
     if (presetEntity) {
@@ -1776,18 +1782,19 @@ class MultizoneThermostatDashboardStrategy extends HTMLElement {
       type: "custom:multizone-thermostat-status-card",
     });
 
+    // Fill the rest of the top row with spacers to match columns width
+    while (topRowCards.length < columns) {
+      topRowCards.push({
+        type: "custom:multizone-thermostat-spacer"
+      });
+    }
+
     const stackCards = [
       {
         type: "horizontal-stack",
         cards: topRowCards
       }
     ];
-    
-    // Build zone rows
-    let columns = parseInt(strategyConfig.columns, 10);
-    if (isNaN(columns) || columns < 1) {
-      columns = 3;
-    }
 
     for (let i = 0; i < zones.length; i += columns) {
       const chunk = zones.slice(i, i + columns);
