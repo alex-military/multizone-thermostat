@@ -1,6 +1,9 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+## [2.8.2] - 2026-07-21
+
+### Fixed
+- **Hotfix 2**: Ensure Dashboard and View strategies properly extend `HTMLElement` to strictly comply with Web Components specifications, fixing issues on some browsers where custom element registration would time out or fail.
 
 ## [2.8.1] - 2026-07-21
 

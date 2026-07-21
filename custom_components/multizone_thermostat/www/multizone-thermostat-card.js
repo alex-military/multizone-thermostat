@@ -1702,7 +1702,7 @@ if (!customElements.get("multizone-thermostat-preset-card-editor")) {
 }
 
 /* ==================== DASHBOARD STRATEGY ==================== */
-class MultizoneThermostatDashboardStrategy {
+class MultizoneThermostatDashboardStrategy extends HTMLElement {
   static async generateDashboard(info) {
     const view = await this.generateView(info);
     return {
@@ -1822,9 +1822,11 @@ window.customStrategies.push({
   description: "Auto-generated dashboard for your heating system."
 });
 
+class MultizoneThermostatViewStrategy extends MultizoneThermostatDashboardStrategy {}
+
 if (!customElements.get("ll-strategy-dashboard-multizone-thermostat-dashboard")) {
   customElements.define("ll-strategy-dashboard-multizone-thermostat-dashboard", MultizoneThermostatDashboardStrategy);
 }
 if (!customElements.get("ll-strategy-view-multizone-thermostat-dashboard")) {
-  customElements.define("ll-strategy-view-multizone-thermostat-dashboard", class extends MultizoneThermostatDashboardStrategy {});
+  customElements.define("ll-strategy-view-multizone-thermostat-dashboard", MultizoneThermostatViewStrategy);
 }
