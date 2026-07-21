@@ -1701,6 +1701,16 @@ if (!customElements.get("multizone-thermostat-preset-card-editor")) {
   customElements.define("multizone-thermostat-preset-card-editor", MultizoneThermostatPresetCardEditor);
 }
 
+/* ==================== SPACER CARD ==================== */
+class MultizoneThermostatSpacer extends HTMLElement {
+  setConfig() {}
+  set hass() {}
+}
+
+if (!customElements.get("multizone-thermostat-spacer")) {
+  customElements.define("multizone-thermostat-spacer", MultizoneThermostatSpacer);
+}
+
 /* ==================== DASHBOARD STRATEGY ==================== */
 class MultizoneThermostatDashboardStrategy extends HTMLElement {
   static async generateDashboard(info) {
@@ -1759,16 +1769,11 @@ class MultizoneThermostatDashboardStrategy extends HTMLElement {
         type: "custom:multizone-thermostat-preset-card",
         entity: presetEntity,
         title: "",
-        height: "150px",
-        border_radius: "20px"
       });
     }
     
     topRowCards.push({
       type: "custom:multizone-thermostat-status-card",
-      height: "150px",
-      width: "550px",
-      border_radius: "20px"
     });
 
     const stackCards = [
@@ -1791,11 +1796,14 @@ class MultizoneThermostatDashboardStrategy extends HTMLElement {
         entity: zone.climate,
         switch: zone.switch,
         title: zone.title,
-        min_height: "300px",
-        max_height: "400px",
-        padding: "1px",
-        border_radius: "20px"
       }));
+      
+      // Fill the rest of the row with spacers to maintain grid alignment
+      while (rowCards.length < columns) {
+        rowCards.push({
+          type: "custom:multizone-thermostat-spacer"
+        });
+      }
       
       stackCards.push({
         type: "horizontal-stack",
