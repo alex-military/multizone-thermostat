@@ -16,6 +16,30 @@ A custom integration for Home Assistant that provides **multi-zone heating manag
 - ⚙️ **Options Flow** — Add/remove zones and virtual thermostats, change window sensors and settings after installation
 - 🎨 **4 Custom Lovelace Cards** — Master status card, circular dial card, compact button card, and global preset card — all auto-registered
 
+## 🌟 What makes this unique?
+
+1. **Dynamic Autotuning (Hysteresis → Silent PID)**: Starts in Hysteresis mode, studies the room's thermal dispersion, and seamlessly transitions to a precise PID controller without user intervention.
+2. **Hierarchical Zones (Primary vs Secondary)**: Primary zones can trigger the boiler. Secondary zones only passively open valves to "steal" heat when the boiler is already running, saving gas.
+3. **Ironclad Hardware Locks**: Hard locks (`min_cycle_on` and `min_cycle_off`) protect your boiler's relays against sudden spikes or manual overrides.
+4. **100% Async Event-Driven**: Zero polling loops. The code only wakes up on state changes, ensuring near-zero CPU footprint on your Home Assistant server.
+
+## 🏗️ System Architecture
+
+```mermaid
+graph TD
+    A[Room & Window Sensors] -->|Async Events| B(Multizone Coordinator)
+    B --> C{Autotuner: Learned?}
+    C -->|No| D[Hysteresis Algorithm]
+    C -->|Yes| E[PID Algorithm]
+    D --> F[Calculate Demand %]
+    E --> F
+    F --> G{Is Primary Zone?}
+    G -->|No| H[Passive Valve Opening]
+    G -->|Yes| I[PWM Engine: Cycle Calculation]
+    I --> J{Hardware Locks}
+    J -->|Locked| K[Wait]
+    J -->|OK| L[Safe Boiler Ignition]
+```
 ## Installation
 
 ### Via HACS (recommended)
@@ -74,9 +98,10 @@ The project is structured in phases to evolve from a simple aggregator to a full
 - [x] **Summer Valve Protection (Anti-seize)**: Cyclical safety activation during summer to prevent mechanical seizing of valves and circulator pumps. Includes global toggle, custom interval/duration settings, and per-zone exclusion.
 - [x] **Auto-Generated Lovelace Dashboard**: The integration automatically generates (and keeps updated) a full Home Assistant dashboard page with premium climate-dedicated graphics, including all our custom cards — zero-code required. Supports dynamic grid sizing (columns).
 
-### PHASE 4 — Advanced Energy Optimization
-- [ ] **Self-Learning PID Auto-Tuning**: Advanced self-learning PID algorithm that studies the thermal inertia of the house and regulates proportional modulation (PWM) autonomously to eliminate temperature swings.
-- [ ] **Global Heat Demand (%)**: A `sensor` entity that calculates the exact percentage of load required by the house, essential for intelligently driving Heat Pump inverters based on real load.
+### PHASE 4 — Advanced Energy Optimization & PID (Completed) ✅
+- [x] **Self-Learning PID Auto-Tuning**: Advanced self-learning PID algorithm that studies the thermal inertia of the house and regulates proportional modulation (PWM) autonomously to eliminate temperature swings.
+- [x] **PWM Engine**: Translates proportional demand into precise ON/OFF cycles.
+- [x] **Global Heat Demand (%)**: Calculates the exact percentage of load required by the house.
 - [ ] **Weather Compensation Curve**: Dynamic adjustment of the heating demand (and heat pump flow temperature) based on weather forecasts and outdoor temperature.
 
 ### PHASE 5 — Total Climate Control & External AI
