@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.txt
+*.json
+!hacs.json
+!manifest.json
+!strings.json
+!translations/*.json
+simulate*.py
+test_*.py
+.agents/
+reset_integration.py
