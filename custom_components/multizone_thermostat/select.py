@@ -2,11 +2,9 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from homeassistant.components.select import SelectEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -65,8 +63,8 @@ class MultizoneGlobalPresetSelect(RestoreEntity, SelectEntity):
         return DeviceInfo(
             identifiers={(DOMAIN, self._entry_id)},
             name="Multizone Thermostat",
-            manufacturer="alex-military",
-            model="Heating Controller",
+            manufacturer="Custom Integration",
+            model="Multizone Thermostat",
         )
 
     @property

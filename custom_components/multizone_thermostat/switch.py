@@ -13,9 +13,6 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import (
-    CONF_ZONE_CLIMATE,
-    CONF_ZONE_NAME,
-    CONF_ZONES,
     DOMAIN,
     CONF_GEOFENCING_ENABLED,
     KEY_GEOFENCING_TOGGLE,
@@ -33,7 +30,6 @@ async def async_setup_entry(
 ) -> None:
     """Set up switch entities from a config entry."""
     coordinator = hass.data[DOMAIN][config_entry.entry_id]["coordinator"]
-    zones = config_entry.data.get(CONF_ZONES, [])
 
     entities: list[SwitchEntity] = []
 

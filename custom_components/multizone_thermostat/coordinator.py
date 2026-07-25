@@ -23,7 +23,10 @@ from homeassistant.const import (
     STATE_OFF,
 )
 from homeassistant.core import Event, HomeAssistant, callback
-from homeassistant.helpers.event import async_track_state_change_event, async_track_time_interval
+from homeassistant.helpers.event import (
+    async_track_state_change_event,
+    async_track_time_interval,
+)
 from homeassistant.helpers.storage import Store
 
 from .const import (
@@ -68,6 +71,7 @@ from .const import (
     ZONE_MODE_SECONDARY,
     ZONE_MODE_BYPASS,
 )
+from .pwm_engine import PWMEngine
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -103,6 +107,9 @@ class MultizoneCoordinator:
         self._zone_modes: dict[str, str] = {
             z[CONF_ZONE_CLIMATE]: ZONE_MODE_PRIMARY for z in self.zones
         }
+        self._zone_demands: dict[str, float] = {
+            z[CONF_ZONE_CLIMATE]: 0.0 for z in self.zones
+        }
         self._pre_window_state: dict[str, str] = {}
         self._pre_anti_seize_state: dict[str, str] = {}
         self._select_entities = {}
@@ -116,15 +123,25 @@ class MultizoneCoordinator:
         
         self._store = Store(hass, WINDOW_STORAGE_VERSION, WINDOW_STORAGE_KEY)
 
-        self._boiler_locked_on_until: datetime | None = None
-        self._boiler_locked_off_until: datetime | None = None
         self._pending_boiler_task: asyncio.Task | None = None
 
+        self._boiler_pwm = PWMEngine(pwm_interval=900.0, min_on=self._min_cycle_on * 60, min_off=self._min_cycle_off * 60)
+        
         self._unsub_listeners: list = []
         self._select_entities: dict[str, Any] = {}  # key -> select object
         
-        self._store = Store(hass, WINDOW_STORAGE_VERSION, WINDOW_STORAGE_KEY)
-        self._pre_window_state: dict[str, bool] = {}
+        # Centralized PIDs for all zones (TRVs and Virtual)
+        from .pid_wrapper import MultizonePID
+        from .autotune import PassiveAutotuneObserver
+        self._pids: dict[str, MultizonePID] = {}
+        self._autotuners: dict[str, PassiveAutotuneObserver] = {}
+        for zone in self.zones:
+            climate_id = zone[CONF_ZONE_CLIMATE]
+            # Default Kp=100, Ki=0, Kd=0 (will be overridden by Autolearning later)
+            self._pids[climate_id] = MultizonePID(kp=100.0, ki=0.0, kd=0.0, out_min=0.0, out_max=100.0, sensor_timeout=7200.0)
+            self._autotuners[climate_id] = PassiveAutotuneObserver(climate_id, required_cycles=3)
+
+
 
         self._preset_store = Store(hass, PRESET_STORAGE_VERSION, PRESET_STORAGE_KEY)
         self._presets: dict[str, dict[str, dict[str, Any]]] = {}
@@ -161,10 +178,26 @@ class MultizoneCoordinator:
         if settings_stored and isinstance(settings_stored, dict):
             self._settings = settings_stored
             _LOGGER.debug("Loaded settings from storage: %s", self._settings)
+            
+            # Load autotuner states
+            autotune_data = self._settings.get("autotuners", {})
+            for climate_id, tuner in self._autotuners.items():
+                if climate_id in autotune_data:
+                    tuner.load_state(autotune_data[climate_id])
+                    # If already completed, apply the calculated PID parameters!
+                    if tuner.state == tuner.STATE_COMPLETED:
+                        self._pids[climate_id].set_pid_param(kp=tuner.kp, ki=tuner.ki, kd=tuner.kd)
+                        _LOGGER.info("Restored Smart PID for %s: Kp=%.1f, Ki=%.4f, Kd=%.1f", 
+                                     climate_id, tuner.kp, tuner.ki, tuner.kd)
 
     async def _async_save_storage(self) -> None:
         """Save window states to storage."""
         await self._store.async_save(self._pre_window_state)
+
+    async def _async_save_autotuner_states(self) -> None:
+        """Save autotuner learning progress to storage."""
+        data = {climate_id: tuner.dump_state() for climate_id, tuner in self._autotuners.items()}
+        await self.async_set_persistent_data("autotuners", data)
 
     async def _async_save_presets_storage(self) -> None:
         """Save presets to storage."""
@@ -181,6 +214,18 @@ class MultizoneCoordinator:
     def get_zone_mode(self, climate_entity: str) -> str:
         """Get current zone mode."""
         return self._zone_modes.get(climate_entity, ZONE_MODE_PRIMARY)
+        
+    def get_zone_demand(self, climate_id: str) -> float:
+        """Get the PID demand for a zone (0-100%)."""
+        return self._zone_demands.get(climate_id, 0.0)
+
+    def set_zone_demand(self, climate_id: str, demand: float) -> None:
+        """Set the PID demand for a zone."""
+        self._zone_demands[climate_id] = demand
+
+    def get_pid(self, climate_id: str):
+        """Get the PID controller for a zone."""
+        return self._pids.get(climate_id)
 
     def set_zone_mode(self, climate_entity: str, mode: str) -> None:
         """Set zone mode (called by zone select entity)."""
@@ -287,6 +332,16 @@ class MultizoneCoordinator:
                 "Listening to window state changes for: %s", window_sensors
             )
 
+        # Start periodic PWM evaluation (every 10 seconds)
+        from datetime import timedelta
+        self._unsub_listeners.append(
+            async_track_time_interval(
+                self.hass,
+                self._async_pwm_tick,
+                timedelta(seconds=10)
+            )
+        )
+
         # Listen to presence sensor if configured
         if self.presence_sensor:
             self._unsub_listeners.append(
@@ -323,15 +378,65 @@ class MultizoneCoordinator:
             unsub()
         self._unsub_listeners.clear()
 
-    @callback
-    def _async_on_climate_state_changed(self, event: Event) -> None:
-        """Handle climate state changes → manage boiler and TRV preset sync."""
+    async def _async_on_climate_state_changed(self, event: Event) -> None:
+        """Handle state changes of any managed climate entity."""
         entity_id = event.data.get("entity_id")
         new_state = event.data.get("new_state")
+        old_state = event.data.get("old_state")
 
-        if new_state is None:
+        if not new_state:
             return
 
+        # Phase 4: Calculate PID demand for this zone
+        current_temp = new_state.attributes.get("current_temperature")
+        target_temp = new_state.attributes.get("temperature")
+        
+        if current_temp is not None and target_temp is not None:
+            # Check mode (don't calculate if off/bypass)
+            hvac_mode = new_state.state
+            zone_mode = self.get_zone_mode(entity_id)
+            if hvac_mode == HVAC_MODE_HEAT and zone_mode != ZONE_MODE_BYPASS:
+                
+                # Update Autotuner
+                tuner = self._autotuners[entity_id]
+                was_completed = (tuner.state == tuner.STATE_COMPLETED)
+                tuner.update(current_temp, self.get_zone_demand(entity_id) > 0)
+                is_completed = (tuner.state == tuner.STATE_COMPLETED)
+                
+                # Check if learning just finished!
+                if is_completed and not was_completed:
+                    self._pids[entity_id].set_pid_param(kp=tuner.kp, ki=tuner.ki, kd=tuner.kd)
+                    _LOGGER.info("Autotuning just completed for %s! Smart PID activated.", entity_id)
+                    # Save states
+                    await self._async_save_autotuner_states()
+                    
+                if tuner.state != tuner.STATE_COMPLETED:
+                    # Hysteresis Fallback Mode (Learning phase)
+                    tolerance = 0.3
+                    current_demand = self.get_zone_demand(entity_id)
+                    if current_temp <= target_temp - tolerance:
+                        demand = 100.0
+                    elif current_temp >= target_temp + tolerance:
+                        demand = 0.0
+                    else:
+                        demand = current_demand # Keep previous demand inside the hysteresis band
+                else:
+                    # Smart PID Mode
+                    demand = self._pids[entity_id].calc(current_temp, target_temp)
+            else:
+                demand = 0.0
+                
+            self.set_zone_demand(entity_id, demand)
+            
+            # Feed Autotuner again if we just changed demand
+            tuner = self._autotuners[entity_id]
+            if tuner.state != tuner.STATE_COMPLETED:
+                tuner.update(current_temp, demand > 0)
+                
+            _LOGGER.debug("Zone '%s' Demand updated: %.1f%% (Temp: %s, Target: %s, Mode: %s)", 
+                          entity_id, demand, current_temp, target_temp, "PID" if tuner.state == tuner.STATE_COMPLETED else "Hysteresis")
+
+        # Trigger boiler update if action changed (Legacy fallback check)
         _LOGGER.debug("Climate state changed: %s → %s", entity_id, new_state.state)
 
         # 0. Check for target temperature changes to save to preset memory
@@ -349,8 +454,7 @@ class MultizoneCoordinator:
                 self.hass.async_create_task(self._async_save_presets_storage())
                 _LOGGER.debug("Saved new target temp %s for %s in preset %s", new_temp, entity_id, self._current_global_preset)
 
-        # 1. Manage boiler demand
-        self.hass.async_create_task(self._async_update_boiler())
+        # 1. Boiler demand is managed by the periodic PWM tick
 
         # 2. TRV preset sync (if enabled for this zone)
         zone = self._get_zone(entity_id)
@@ -365,21 +469,21 @@ class MultizoneCoordinator:
         sensor_id = event.data.get("entity_id")
         new_state = event.data.get("new_state")
         
-        _LOGGER.error("!!! WINDOW LISTENER FIRED: %s -> %s", sensor_id, new_state.state if new_state else "None")
+        _LOGGER.debug("Window listener fired: %s -> %s", sensor_id, new_state.state if new_state else "None")
 
         if new_state is None:
             return
             
         # Find ALL zones this sensor belongs to
         matching_zones = [z for z in self.zones if z.get(CONF_ZONE_WINDOW_SENSOR) == sensor_id]
-        _LOGGER.error("!!! WINDOW LISTENER: Matching zones: %s", matching_zones)
+        _LOGGER.debug("Window listener: matching zones: %s", matching_zones)
         if not matching_zones:
             return
             
         for zone in matching_zones:
             climate_id = zone[CONF_ZONE_CLIMATE]
             zone_select = self._select_entities.get(f"zone_mode_{climate_id}")
-            _LOGGER.error("!!! WINDOW LISTENER: zone_select for %s: %s", climate_id, zone_select)
+            _LOGGER.debug("Window listener: zone_select for %s: %s", climate_id, zone_select)
             
             if new_state.state == "on":
                 # Window OPENED
@@ -454,9 +558,9 @@ class MultizoneCoordinator:
                     if now >= night_time and now <= morning_time:
                         is_night = True
                         
-                _LOGGER.error("GEOFENCING DEBUG: night_time=%s, morning_time=%s, now=%s, is_night=%s", night_time, morning_time, now, is_night)
+                _LOGGER.debug("Geofencing schedule: night_time=%s, morning_time=%s, now=%s, is_night=%s", night_time, morning_time, now, is_night)
             except Exception as ex:
-                _LOGGER.error("GEOFENCING DEBUG EXCEPTION: %s", ex)
+                _LOGGER.warning("Geofencing schedule exception: %s", ex)
                 
             if is_night:
                 _LOGGER.info("Geofencing: Returned at night. Setting Sleep mode.")
@@ -515,96 +619,97 @@ class MultizoneCoordinator:
     def set_min_cycle_on(self, value: int) -> None:
         """Set the min cycle on time (minutes)."""
         self._min_cycle_on = value
-        self._boiler_locked_on_until = None
-        self.hass.async_create_task(self._async_update_boiler())
+        self._boiler_pwm.set_params(min_on=value * 60)
         
     def set_min_cycle_off(self, value: int) -> None:
         """Set the min cycle off time (minutes)."""
         self._min_cycle_off = value
-        self._boiler_locked_off_until = None
-        self.hass.async_create_task(self._async_update_boiler())
+        self._boiler_pwm.set_params(min_off=value * 60)
         
     def set_valve_delay(self, value: int) -> None:
         """Set the valve delay time (seconds)."""
         self._valve_delay = value
 
-    async def _async_update_boiler(self, emergency_off: bool = False) -> None:
-        """Turn boiler ON if any zone is heating, OFF if all are idle/off."""
-        if self._anti_seize_running:
-            _LOGGER.debug("Anti-seize is running, skipping normal boiler update")
+    async def _async_pwm_tick(self, now: datetime) -> None:
+        """Periodic PWM tick for boiler (Peak Load)."""
+        if not self._master_state or self._anti_seize_running:
             return
-
-        now = dt_util.utcnow()
-
-        if emergency_off:
-            _LOGGER.debug("Emergency OFF triggered. Resetting locks and stopping boiler.")
-            if self._pending_boiler_task:
-                self._pending_boiler_task.cancel()
-                self._pending_boiler_task = None
-            self._boiler_locked_on_until = None
-            self._boiler_locked_off_until = None
-            await self._force_boiler_off()
-            return
-
-        any_primary_heating = False
+            
+        # Phase 4: Calculate Peak Demand
+        peak_demand = 0.0
         for zone in self.zones:
             climate_id = zone[CONF_ZONE_CLIMATE]
             mode = self.get_zone_mode(climate_id)
-            
-            # Boiler only turns on if a PRIMARY zone needs heat
             if mode != ZONE_MODE_PRIMARY:
                 continue
+            demand = self.get_zone_demand(climate_id)
+            if demand > peak_demand:
+                peak_demand = demand
                 
-            state = self.hass.states.get(climate_id)
-            if state is None:
-                continue
-            if state.attributes.get(ATTR_HVAC_ACTION, "") == HVAC_ACTION_HEATING:
-                any_primary_heating = True
-                break
-
+        # Feed Peak Load to PWM Engine
+        wanted_state = self._boiler_pwm.calculate(peak_demand)
+        
         boiler_state = self.hass.states.get(self.boiler_switch)
         current_boiler_on = boiler_state is not None and boiler_state.state == STATE_ON
         
         # Track activity for anti-seize
-        if current_boiler_on or any_primary_heating:
+        if current_boiler_on or peak_demand > 0:
             self._last_active_time = time.time()
-
-        if any_primary_heating and not current_boiler_on:
-            # Want to turn ON
-            if self._boiler_locked_off_until and now < self._boiler_locked_off_until:
-                delay = (self._boiler_locked_off_until - now).total_seconds()
-                _LOGGER.debug("Boiler is locked OFF. Retrying in %s seconds.", delay)
-                self._schedule_boiler_check(delay)
+            
+        if wanted_state and not current_boiler_on:
+            # Hard lock: prevent turning ON if min_cycle_off hasn't elapsed
+            time_since_change = time.time() - self._last_boiler_change
+            min_off_sec = self._min_cycle_off * 60
+            if time_since_change < min_off_sec:
+                _LOGGER.debug("PWM Tick: Boiler wants to turn ON, but min_cycle_off (%.0fs) hasn't elapsed. Waiting...", min_off_sec)
                 return
-
-            _LOGGER.debug("Boiler → ON (at least one zone heating)")
+                
+            _LOGGER.debug("PWM Tick: Boiler → ON (Peak Demand: %.1f%%)", peak_demand)
             if self._valve_delay > 0:
-                _LOGGER.debug("Waiting %s seconds for valves to open...", self._valve_delay)
-                self._schedule_boiler_check(self._valve_delay)
-                return
+                if not self._pending_boiler_task:
+                    _LOGGER.debug("Waiting %s seconds for valves to open...", self._valve_delay)
+                    self._schedule_boiler_check(self._valve_delay, True)
             else:
                 await self._force_boiler_on()
-
-        elif not any_primary_heating and current_boiler_on:
-            # Want to turn OFF
-            if self._boiler_locked_on_until and now < self._boiler_locked_on_until:
-                delay = (self._boiler_locked_on_until - now).total_seconds()
-                _LOGGER.debug("Boiler is locked ON. Retrying in %s seconds.", delay)
-                self._schedule_boiler_check(delay)
+        elif not wanted_state:
+            # Hard lock: prevent turning OFF if min_cycle_on hasn't elapsed
+            # (unless it's already off, then we just ensure pending tasks are cancelled)
+            time_since_change = time.time() - self._last_boiler_change
+            min_on_sec = self._min_cycle_on * 60
+            if current_boiler_on and time_since_change < min_on_sec:
+                _LOGGER.debug("PWM Tick: Boiler wants to turn OFF, but min_cycle_on (%.0fs) hasn't elapsed. Waiting...", min_on_sec)
                 return
+                
+            # Cancel any pending valve-delay task even if boiler isn't on yet
+            if self._pending_boiler_task:
+                _LOGGER.debug("PWM Tick: Cancelling pending valve-delay task (Peak Demand: %.1f%%)", peak_demand)
+                self._pending_boiler_task.cancel()
+                self._pending_boiler_task = None
+            if current_boiler_on:
+                _LOGGER.debug("PWM Tick: Boiler → OFF (Peak Demand: %.1f%%)", peak_demand)
+                await self._force_boiler_off()
 
-            _LOGGER.debug("Boiler → OFF (no zones heating)")
+    async def _async_update_boiler(self, emergency_off: bool = False) -> None:
+        """Fallback for emergency off and anti-seize."""
+        if emergency_off:
+            _LOGGER.debug("Emergency OFF triggered. Stopping boiler.")
+            if self._pending_boiler_task:
+                self._pending_boiler_task.cancel()
+                self._pending_boiler_task = None
             await self._force_boiler_off()
 
-    def _schedule_boiler_check(self, delay_seconds: float) -> None:
-        """Schedule a delayed boiler update (used for min-cycle locks and valve delay)."""
+    def _schedule_boiler_check(self, delay_seconds: float, turn_on: bool) -> None:
+        """Schedule a delayed boiler update (used for valve delay)."""
         if self._pending_boiler_task:
             self._pending_boiler_task.cancel()
 
         async def _delayed_check():
             try:
                 await asyncio.sleep(delay_seconds)
-                await self._async_update_boiler()
+                if turn_on:
+                    await self._force_boiler_on()
+                else:
+                    await self._force_boiler_off()
             except asyncio.CancelledError:
                 pass
 
@@ -622,8 +727,8 @@ class MultizoneCoordinator:
             {ATTR_ENTITY_ID: self.boiler_switch},
             blocking=False,
         )
-        if self._min_cycle_on > 0:
-            self._boiler_locked_on_until = dt_util.utcnow() + timedelta(minutes=self._min_cycle_on)
+        self._last_boiler_change = time.time()
+        _LOGGER.debug("Boiler forced ON")
 
     async def _force_boiler_off(self) -> None:
         """Actually turn the boiler off and set locks."""
@@ -637,8 +742,8 @@ class MultizoneCoordinator:
             {ATTR_ENTITY_ID: self.boiler_switch},
             blocking=False,
         )
-        if self._min_cycle_off > 0:
-            self._boiler_locked_off_until = dt_util.utcnow() + timedelta(minutes=self._min_cycle_off)
+        self._last_boiler_change = time.time()
+        _LOGGER.debug("Boiler forced OFF")
 
     async def _async_sync_trv_preset(self, climate_entity: str, hvac_mode: str) -> None:
         """Sync TRV preset mode based on HVAC mode."""
@@ -805,8 +910,7 @@ class MultizoneCoordinator:
             # 6. Restore all zones
             _LOGGER.debug("Restoring zones to pre-anti-seize state...")
             for climate_id, old_state in self._pre_anti_seize_state.items():
-                if old_state in [HVAC_MODE_HEAT, HVAC_MODE_OFF]:
-                    await self._async_set_hvac_mode(climate_id, old_state)
+                await self._async_set_hvac_mode(climate_id, old_state)
                     
             _LOGGER.info("Anti-seize routine completed successfully.")
             self._last_active_time = time.time()
@@ -815,6 +919,4 @@ class MultizoneCoordinator:
             _LOGGER.error("Error during anti-seize routine: %s", e)
         finally:
             self._anti_seize_running = False
-            # Re-evaluate boiler state just in case something changed while we were running
-            self.hass.async_create_task(self._async_update_boiler())
 

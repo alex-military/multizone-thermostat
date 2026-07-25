@@ -24,7 +24,10 @@ from homeassistant.const import (
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.event import async_track_state_change_event
+from homeassistant.helpers.event import (
+    async_track_state_change_event,
+    async_track_time_interval,
+)
 from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import (
@@ -71,6 +74,7 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
+from .pwm_engine import PWMEngine
 
 class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
     """A virtual thermostat that controls a heater switch based on a temperature sensor."""
@@ -95,7 +99,6 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
     ) -> None:
         """Initialize the virtual thermostat."""
         self.hass = hass
-        self._entry_id = entry_id
         self._name = name
         self._temp_sensor = temp_sensor
         self._heater_switch = heater_switch
@@ -105,6 +108,11 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         self._hvac_mode = HVACMode.OFF
         self._target_temperature = target_temp
         self._current_temperature: float | None = None
+        
+        self._coordinator = hass.data[DOMAIN][entry_id]["coordinator"]
+        
+        # PWM Engine for local zone valve
+        self._valve_pwm = PWMEngine(pwm_interval=900.0, min_on=0.0, min_off=0.0)
 
         # Entity setup
         vt_entity_id = make_vt_entity_id(name)
@@ -225,6 +233,16 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
                 self._async_on_heater_changed,
             )
         )
+        
+        # Start periodic PWM evaluation for the zone valve (every 10 seconds)
+        from datetime import timedelta
+        self._unsub_listeners.append(
+            async_track_time_interval(
+                self.hass,
+                self._async_pwm_tick,
+                timedelta(seconds=10)
+            )
+        )
 
         # Initial control pass
         if self._hvac_mode == HVACMode.HEAT:
@@ -272,32 +290,43 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         self.async_write_ha_state()
 
     async def _async_control(self) -> None:
-        """Core thermostat logic: turn heater on/off based on temperature."""
+        """Calculate PID demand when state changes."""
         if self._current_temperature is None:
             return
 
         if self._hvac_mode != HVACMode.HEAT:
+            self._coordinator.set_zone_demand(self.entity_id, 0.0)
             return
 
-        too_cold = self._current_temperature < (self._target_temperature - self._tolerance)
-        too_hot = self._current_temperature > (self._target_temperature + self._tolerance)
+        # Calculate PID Demand
+        # The PID demand is now calculated by the Coordinator in _async_on_climate_state_changed
+        demand = self._coordinator.get_zone_demand(self.entity_id)
+        if demand is not None:
+            _LOGGER.debug("VT '%s': Reading PID Demand from coordinator: %.1f%%", self._name, demand)
+        else:
+            _LOGGER.debug("VT '%s': No demand available yet from coordinator", self._name)
+        
+        # We immediately call the PWM tick so the valve responds without waiting 10s
+        from datetime import datetime
+        await self._async_pwm_tick(datetime.now())
 
+    async def _async_pwm_tick(self, now) -> None:
+        """Periodic tick to evaluate PWM state for the zone valve."""
+        if self._hvac_mode != HVACMode.HEAT or not self._coordinator.get_master_state():
+            await self._async_heater_turn_off()
+            return
+            
+        demand = self._coordinator.get_zone_demand(self.entity_id)
+        wanted_state = self._valve_pwm.calculate(demand)
+        
         heater_state = self.hass.states.get(self._heater_switch)
         heater_on = heater_state is not None and heater_state.state == STATE_ON
-
-        if too_cold and not heater_on:
-            _LOGGER.debug(
-                "VT '%s': temp %.1f < target %.1f - tol %.1f → heater ON",
-                self._name, self._current_temperature,
-                self._target_temperature, self._tolerance,
-            )
+        
+        if wanted_state and not heater_on:
+            _LOGGER.debug("VT '%s': PWM Valve → ON", self._name)
             await self._async_heater_turn_on()
-        elif too_hot and heater_on:
-            _LOGGER.debug(
-                "VT '%s': temp %.1f > target %.1f + tol %.1f → heater OFF",
-                self._name, self._current_temperature,
-                self._target_temperature, self._tolerance,
-            )
+        elif not wanted_state and heater_on:
+            _LOGGER.debug("VT '%s': PWM Valve → OFF", self._name)
             await self._async_heater_turn_off()
 
     async def _async_heater_turn_on(self) -> None:
