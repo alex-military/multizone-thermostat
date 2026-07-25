@@ -108,6 +108,10 @@ The project is structured in phases to evolve from a simple aggregator to a full
 - [ ] **Hybrid Support (Heating / Cooling)**: Complete rewrite of the configuration engine to simultaneously manage and easily switch between Winter (Heating) and Summer (Cooling) modes, supporting reversible heat pumps.
 - [ ] **External AI Integration (Predictive Optimization)**: Dedicated API/Sensors interface allowing external AIs to read historical data and constantly optimize PID parameters, weather compensation curves, and predictive geofencing. *(Note: This phase is exploratory. We need to evaluate if existing AI solutions can be integrated or if we need to develop something completely from scratch).*
 
+## Acknowledgments
+
+A special thanks to the creators of [SmartThermostat](https://github.com/ScratMan/HASmartThermostat) and [vindaalex/multizone-thermostat](https://github.com/vindaalex/multizone-thermostat). The core mathematical logic for the PID controller and the Autotuning algorithm in this project were deeply inspired by and adapted from their fantastic open-source work.
+
 ## License
 
 This project is licensed under the MIT License.
