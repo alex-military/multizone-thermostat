@@ -13,6 +13,7 @@ from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN
 from homeassistant.components.binary_sensor import DOMAIN as BINARY_SENSOR_DOMAIN
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import selector
 
 from .const import (
     CONF_BOILER_SWITCH,
@@ -156,7 +157,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return await self.async_step_choose_zone_type()
 
         schema = vol.Schema({
-            vol.Required(CONF_BOILER_SWITCH): vol.In(switches),
+            vol.Required(CONF_BOILER_SWITCH): selector.EntitySelector(selector.EntitySelectorConfig(domain=SWITCH_DOMAIN)),
         })
 
         return self.async_show_form(
@@ -237,12 +238,12 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         schema = vol.Schema({
             vol.Required(CONF_VT_NAME): str,
-            vol.Required(CONF_VT_TEMP_SENSOR): vol.In(temp_sensors),
-            vol.Required(CONF_VT_HEATER_SWITCH): vol.In(switches),
+            vol.Required(CONF_VT_TEMP_SENSOR): selector.EntitySelector(selector.EntitySelectorConfig(domain=SENSOR_DOMAIN, device_class="temperature")),
+            vol.Required(CONF_VT_HEATER_SWITCH): selector.EntitySelector(selector.EntitySelectorConfig(domain=SWITCH_DOMAIN)),
             vol.Optional(CONF_VT_TARGET_TEMP, default=DEFAULT_VT_TARGET_TEMP): vol.Coerce(float),
             vol.Optional(CONF_VT_TOLERANCE, default=DEFAULT_VT_TOLERANCE): vol.Coerce(float),
             vol.Optional(CONF_ZONE_ANTI_SEIZE, default=True): bool,
-            vol.Optional(CONF_ZONE_WINDOW_SENSOR, default="none"): vol.In(window_sensors),
+            vol.Optional(CONF_ZONE_WINDOW_SENSOR): selector.EntitySelector(selector.EntitySelectorConfig(domain=BINARY_SENSOR_DOMAIN)),
         })
 
         return self.async_show_form(
@@ -270,7 +271,9 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             zone_name = user_input[CONF_ZONE_NAME].strip()
             trv_sync = user_input.get(CONF_ZONE_TRV_SYNC, DEFAULT_TRV_SYNC)
 
-            if not zone_name:
+            if climate_entity in already_added:
+                errors[CONF_ZONE_CLIMATE] = "climate_already_added"
+            elif not zone_name:
                 errors[CONF_ZONE_NAME] = "zone_name_required"
             else:
                 zone_data = {
@@ -293,11 +296,11 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         sensors = _get_binary_sensor_entities(self.hass)
 
         schema = vol.Schema({
-            vol.Required(CONF_ZONE_CLIMATE): vol.In(available_climates),
-            vol.Required(CONF_ZONE_NAME, default=default_name): str,
+            vol.Required(CONF_ZONE_CLIMATE): selector.EntitySelector(selector.EntitySelectorConfig(domain=CLIMATE_DOMAIN)),
+            vol.Required(CONF_ZONE_NAME): str,
             vol.Optional(CONF_ZONE_TRV_SYNC, default=DEFAULT_TRV_SYNC): bool,
             vol.Optional(CONF_ZONE_ANTI_SEIZE, default=True): bool,
-            vol.Optional(CONF_ZONE_WINDOW_SENSOR, default="none"): vol.In(sensors),
+            vol.Optional(CONF_ZONE_WINDOW_SENSOR): selector.EntitySelector(selector.EntitySelectorConfig(domain=BINARY_SENSOR_DOMAIN)),
         })
 
         zones_added = len(self._zones)
@@ -378,7 +381,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         schema = vol.Schema({
             vol.Required(CONF_GEOFENCING_ENABLED, default=True): bool,
-            vol.Optional(CONF_PRESENCE_SENSOR, default="zone.home"): vol.In(presence_entities),
+            vol.Optional(CONF_PRESENCE_SENSOR, default="zone.home"): selector.EntitySelector(selector.EntitySelectorConfig(domain=["person", "group", "zone", "input_boolean"])),
         })
 
         return self.async_show_form(
@@ -504,7 +507,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             return self._save_options()
 
         schema = vol.Schema({
-            vol.Required(CONF_BOILER_SWITCH, default=self._boiler_switch): vol.In(switches),
+            vol.Required(CONF_BOILER_SWITCH, default=self._boiler_switch): selector.EntitySelector(selector.EntitySelectorConfig(domain=SWITCH_DOMAIN)),
         })
 
         return self.async_show_form(step_id="change_boiler", data_schema=schema)
@@ -525,7 +528,9 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             climate_id = user_input[CONF_ZONE_CLIMATE]
             name = user_input[CONF_ZONE_NAME].strip()
             
-            if not name:
+            if climate_id in already_added:
+                errors[CONF_ZONE_CLIMATE] = "climate_already_added"
+            elif not name:
                 errors[CONF_ZONE_NAME] = "zone_name_required"
             else:
                 zone_data = {
@@ -543,11 +548,11 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
         sensors = _get_binary_sensor_entities(self.hass)
 
         schema = vol.Schema({
-            vol.Required(CONF_ZONE_CLIMATE): vol.In(available_climates),
+            vol.Required(CONF_ZONE_CLIMATE): selector.EntitySelector(selector.EntitySelectorConfig(domain=CLIMATE_DOMAIN)),
             vol.Required(CONF_ZONE_NAME): str,
             vol.Optional(CONF_ZONE_TRV_SYNC, default=DEFAULT_TRV_SYNC): bool,
             vol.Optional(CONF_ZONE_ANTI_SEIZE, default=True): bool,
-            vol.Optional(CONF_ZONE_WINDOW_SENSOR, default="none"): vol.In(sensors),
+            vol.Optional(CONF_ZONE_WINDOW_SENSOR): selector.EntitySelector(selector.EntitySelectorConfig(domain=BINARY_SENSOR_DOMAIN)),
         })
 
         return self.async_show_form(
@@ -636,12 +641,12 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
 
         schema = vol.Schema({
             vol.Required(CONF_VT_NAME): str,
-            vol.Required(CONF_VT_TEMP_SENSOR): vol.In(temp_sensors),
-            vol.Required(CONF_VT_HEATER_SWITCH): vol.In(switches),
+            vol.Required(CONF_VT_TEMP_SENSOR): selector.EntitySelector(selector.EntitySelectorConfig(domain=SENSOR_DOMAIN, device_class="temperature")),
+            vol.Required(CONF_VT_HEATER_SWITCH): selector.EntitySelector(selector.EntitySelectorConfig(domain=SWITCH_DOMAIN)),
             vol.Optional(CONF_VT_TARGET_TEMP, default=DEFAULT_VT_TARGET_TEMP): vol.Coerce(float),
             vol.Optional(CONF_VT_TOLERANCE, default=DEFAULT_VT_TOLERANCE): vol.Coerce(float),
             vol.Optional(CONF_ZONE_ANTI_SEIZE, default=True): bool,
-            vol.Optional(CONF_ZONE_WINDOW_SENSOR, default="none"): vol.In(window_sensors),
+            vol.Optional(CONF_ZONE_WINDOW_SENSOR): selector.EntitySelector(selector.EntitySelectorConfig(domain=BINARY_SENSOR_DOMAIN)),
         })
 
         return self.async_show_form(
@@ -739,7 +744,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                     CONF_ZONE_ANTI_SEIZE,
                     default=zone_data.get(CONF_ZONE_ANTI_SEIZE, True) if zone_data else True
                 ): bool,
-                vol.Optional(CONF_ZONE_WINDOW_SENSOR, default=current_sensor): vol.In(sensors),
+                vol.Optional(CONF_ZONE_WINDOW_SENSOR, description={"suggested_value": current_sensor} if current_sensor != "none" else {}): selector.EntitySelector(selector.EntitySelectorConfig(domain=BINARY_SENSOR_DOMAIN)),
             })
             return self.async_show_form(step_id="edit_zone", data_schema=schema)
 
@@ -786,7 +791,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
 
         schema = vol.Schema({
             vol.Required(CONF_GEOFENCING_ENABLED, default=self._geofencing_enabled): bool,
-            vol.Optional(CONF_PRESENCE_SENSOR, default=self._presence_sensor or "zone.home"): vol.In(presence_entities),
+            vol.Optional(CONF_PRESENCE_SENSOR, default=self._presence_sensor or "zone.home"): selector.EntitySelector(selector.EntitySelectorConfig(domain=["person", "group", "zone", "input_boolean"])),
         })
 
         return self.async_show_form(

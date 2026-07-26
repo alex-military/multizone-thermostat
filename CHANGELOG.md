@@ -1,5 +1,9 @@
 # Changelog
 
+## [3.0.1] - 2026-07-26
+### 🛠️ Improvements
+- **UI Config Flow**: Upgraded all dropdown menus in the configuration and options flow to use the native Home Assistant `EntitySelector`. This introduces a search bar, entity icons, and area grouping for much easier device selection (resolving community feedback).
+
 ## [3.0.0] - 2026-07-25
 ### 🚀 Major Features & Full Rewrite
 - **Dynamic Autotuning (Hysteresis → PID)**: Starts in Hysteresis mode to learn the room's thermal behavior, then seamlessly switches to a highly precise PID algorithm for zero-swing temperature control.
