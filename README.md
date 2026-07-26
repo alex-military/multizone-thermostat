@@ -43,9 +43,12 @@ graph TD
 ## Installation
 
 ### Via HACS (recommended)
-1. Open **HACS** from the sidebar
-2. Go to **Integrations**, click the 3-dot menu (top right) → **Custom repositories**
-3. Add `https://github.com/alex-military/multizone-thermostat` with category **Integration**
+
+[![Open your Home Assistant instance and open HACS.](https://my.home-assistant.io/badges/hacs.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=alex-military&repository=multizone-thermostat&category=integration)
+
+1. Open HACS in your Home Assistant instance.
+2. Click the three dots in the top right corner and select **Custom repositories**.
+3. Add `https://github.com/alex-military/multizone-thermostat` as an **Integration**.
 4. Search for **"Multizone Thermostat"** in HACS and click **Download**
 5. Restart Home Assistant
 
