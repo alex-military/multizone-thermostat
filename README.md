@@ -44,7 +44,7 @@ graph TD
 
 ### Via HACS (recommended)
 
-[![Open your Home Assistant instance and open HACS.](https://my.home-assistant.io/badges/hacs.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=alex-military&repository=multizone-thermostat&category=integration)
+[![Open your Home Assistant instance and open HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=alex-military&repository=multizone-thermostat&category=integration)
 
 1. Open HACS in your Home Assistant instance.
 2. Click the three dots in the top right corner and select **Custom repositories**.
