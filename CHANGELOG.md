@@ -1,5 +1,8 @@
 # Changelog
 
+## [3.1.0] - 2026-07-28
+### 🚀 Features
+- **Weather Compensation (Feed-Forward)**: Added dynamic adjustment of heating demand based on outdoor temperature sensor. This allows the system to proactively adjust boiler PWM cycles when it gets colder outside, preventing the house from losing temperature before the PID reacts. Configurable natively from the integration's Options Flow via a dedicated `Number` entity (Weather Curve).
 ## [3.0.1] - 2026-07-26
 ### 🛠️ Improvements
 - **UI Config Flow**: Upgraded all dropdown menus in the configuration and options flow to use the native Home Assistant `EntitySelector`. This introduces a search bar, entity icons, and area grouping for much easier device selection (resolving community feedback).
