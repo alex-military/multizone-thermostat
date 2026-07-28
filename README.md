@@ -12,6 +12,7 @@ A custom integration for Home Assistant that provides **multi-zone heating manag
 - 🛡️ **Boiler Protection** — Native `number` entities for anti-short-cycle (min cycle on/off) and valve opening delay
 - 🪟 **Window Sensor Detection** — Automatically bypass zones when a window is opened, and restore them when closed
 - 🌡️ **Virtual Thermostats** — Create virtual thermostat entities directly from the UI by combining a temperature sensor and a heater switch — no YAML needed
+- 🌤️ **Weather Compensation** — Dynamic "Feed-Forward" heating adjustment based on an outdoor temperature sensor
 - 🔄 **TRV Preset Sync** — Optional per-zone preset synchronization for physical TRV valves
 - ⚙️ **Options Flow** — Add/remove zones and virtual thermostats, change window sensors and settings after installation
 - 🎨 **4 Custom Lovelace Cards** — Master status card, circular dial card, compact button card, and global preset card — all auto-registered
@@ -105,7 +106,7 @@ The project is structured in phases to evolve from a simple aggregator to a full
 - [x] **Self-Learning PID Auto-Tuning**: Advanced self-learning PID algorithm that studies the thermal inertia of the house and regulates proportional modulation (PWM) autonomously to eliminate temperature swings.
 - [x] **PWM Engine**: Translates proportional demand into precise ON/OFF cycles.
 - [x] **Global Heat Demand (%)**: Calculates the exact percentage of load required by the house.
-- [ ] **Weather Compensation Curve**: Dynamic adjustment of the heating demand (and heat pump flow temperature) based on weather forecasts and outdoor temperature.
+- [x] **Weather Compensation Curve**: Dynamic adjustment of the heating demand based on an outdoor temperature sensor (Feed-Forward algorithm).
 
 ### PHASE 5 — Total Climate Control & External AI
 - [ ] **Hybrid Support (Heating / Cooling)**: Complete rewrite of the configuration engine to simultaneously manage and easily switch between Winter (Heating) and Summer (Cooling) modes, supporting reversible heat pumps.
