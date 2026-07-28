@@ -11,6 +11,13 @@
           "boiler_switch": "The switch/relay that controls the boiler circulator pump"
         }
       },
+      "weather": {
+        "title": "Weather Compensation",
+        "description": "Select an outdoor temperature sensor to enable automatic weather compensation.",
+        "data": {
+          "weather_sensor": "Outdoor Temperature Sensor"
+        }
+      },
       "choose_zone_type": {
         "title": "Add Zone — Choose Type",
         "description": "Do you want to use an existing thermostat or create a virtual one?",

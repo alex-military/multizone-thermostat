@@ -31,6 +31,7 @@ from .const import (
     CONF_ZONE_WINDOW_SENSOR,
     CONF_ZONE_ANTI_SEIZE,
     CONF_ZONES,
+    CONF_WEATHER_SENSOR,
     CONF_ANTI_SEIZE_ENABLED,
     CONF_ANTI_SEIZE_IDLE_DAYS,
     CONF_ANTI_SEIZE_DURATION,
@@ -137,6 +138,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._virtual_thermostats: list[dict] = []
         self._geofencing_enabled: bool = True
         self._presence_sensor: str | None = None
+        self._weather_sensor: str | None = None
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -264,8 +266,8 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         available_climates = {k: v for k, v in climates.items() if k not in already_added}
 
         if not available_climates:
-            # No more climates to add, go to geofencing
-            return await self.async_step_geofencing()
+            # No more climates to add, go to weather
+            return await self.async_step_weather()
         if user_input is not None:
             climate_entity = user_input[CONF_ZONE_CLIMATE]
             zone_name = user_input[CONF_ZONE_NAME].strip()
@@ -322,7 +324,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if user_input.get("add_another", False):
                 return await self.async_step_choose_zone_type()
             else:
-                return await self.async_step_geofencing()
+                return await self.async_step_weather()
 
         climates = _get_climate_entities(self.hass)
         already_added = {z[CONF_ZONE_CLIMATE] for z in self._zones}
@@ -340,6 +342,28 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "zones_list": ", ".join(z[CONF_ZONE_NAME] for z in self._zones),
                 "remaining": str(remaining),
             },
+        )
+
+    async def async_step_weather(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.FlowResult:
+        """Step: Weather Compensation Setup."""
+        if user_input is not None:
+            if user_input.get(CONF_WEATHER_SENSOR) and user_input[CONF_WEATHER_SENSOR] != "none":
+                self._weather_sensor = user_input[CONF_WEATHER_SENSOR]
+            return await self.async_step_geofencing()
+
+        temp_sensors = _get_temperature_sensor_entities(self.hass)
+        sensor_options = {"none": "None (Disable Weather Compensation)"}
+        sensor_options.update(temp_sensors)
+
+        schema = vol.Schema({
+            vol.Optional(CONF_WEATHER_SENSOR, default="none"): vol.In(sensor_options),
+        })
+
+        return self.async_show_form(
+            step_id="weather",
+            data_schema=schema,
         )
 
     async def async_step_geofencing(
@@ -407,6 +431,8 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 data[CONF_PRESENCE_SENSOR] = self._presence_sensor
             if self._virtual_thermostats:
                 data[CONF_VIRTUAL_THERMOSTATS] = self._virtual_thermostats
+            if self._weather_sensor:
+                data[CONF_WEATHER_SENSOR] = self._weather_sensor
             return self.async_create_entry(
                 title="Multizone Thermostat",
                 data=data,
@@ -448,6 +474,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
         self._virtual_thermostats: list[dict] = list(config_entry.data.get(CONF_VIRTUAL_THERMOSTATS, []))
         self._geofencing_enabled: bool = config_entry.data.get(CONF_GEOFENCING_ENABLED, False)
         self._presence_sensor: str | None = config_entry.data.get(CONF_PRESENCE_SENSOR)
+        self._weather_sensor: str | None = config_entry.data.get(CONF_WEATHER_SENSOR)
         self._current_zone_id: str | None = None
         self._current_zone_idx = 0
 
@@ -467,6 +494,8 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                 return await self.async_step_edit_zone()
             elif action == "edit_geofencing":
                 return await self.async_step_edit_geofencing()
+            elif action == "edit_weather_comp":
+                return await self.async_step_edit_weather_comp()
             elif action == "create_virtual":
                 return await self.async_step_create_virtual_thermostat()
             elif action == "remove_virtual":
@@ -475,6 +504,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
         menu_options = {
             "change_boiler": "Change boiler switch",
             "add_zone": "Add a zone (existing thermostat)",
+            "edit_weather_comp": "Edit Weather Compensation",
             "edit_geofencing": "Edit Geofencing Settings",
             "create_virtual": "Create virtual thermostat",
             "remove_zone": "Remove a zone",
@@ -801,6 +831,33 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
         )
 
     @callback
+    async def async_step_edit_weather_comp(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.FlowResult:
+        """Edit weather compensation settings."""
+        if user_input is not None:
+            if user_input.get(CONF_WEATHER_SENSOR) and user_input[CONF_WEATHER_SENSOR] != "none":
+                self._weather_sensor = user_input[CONF_WEATHER_SENSOR]
+            else:
+                self._weather_sensor = None
+            return self._save_options()
+
+        temp_sensors = _get_temperature_sensor_entities(self.hass)
+        sensor_options = {"none": "None (Disable Weather Compensation)"}
+        sensor_options.update(temp_sensors)
+
+        schema = vol.Schema({
+            vol.Optional(
+                CONF_WEATHER_SENSOR, 
+                default=self._weather_sensor or "none"
+            ): vol.In(sensor_options),
+        })
+
+        return self.async_show_form(
+            step_id="edit_weather_comp",
+            data_schema=schema,
+        )
+
     def _save_options(self) -> config_entries.FlowResult:
         """Save updated options into entry.data and reload entry."""
         data = {
@@ -813,6 +870,9 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             
         if self._virtual_thermostats:
             data[CONF_VIRTUAL_THERMOSTATS] = self._virtual_thermostats
+        if self._weather_sensor:
+            data[CONF_WEATHER_SENSOR] = self._weather_sensor
+
         self.hass.config_entries.async_update_entry(
             self._config_entry, data=data
         )

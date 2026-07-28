@@ -11,6 +11,13 @@
           "boiler_switch": "Lo switch/relè che controlla la pompa del circolatore della caldaia"
         }
       },
+      "weather": {
+        "title": "Compensazione Climatica",
+        "description": "Seleziona un sensore di temperatura esterna per abilitare la compensazione climatica automatica.",
+        "data": {
+          "weather_sensor": "Sensore Temperatura Esterna"
+        }
+      },
       "choose_zone_type": {
         "title": "Aggiungi Zona — Scegli Tipo",
         "description": "Vuoi usare un termostato esistente o crearne uno virtuale?",

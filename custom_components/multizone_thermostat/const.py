@@ -26,6 +26,10 @@ CONF_ANTI_SEIZE_IDLE_DAYS = "anti_seize_idle_days"
 CONF_ANTI_SEIZE_DURATION = "anti_seize_duration_mins"
 CONF_ANTI_SEIZE_BOILER = "anti_seize_boiler_enable"
 
+# Weather Compensation
+CONF_WEATHER_SENSOR = "weather_sensor"
+KEY_WEATHER_CURVE = "weather_curve"
+
 
 # HVAC
 HVAC_MODE_HEAT = "heat"

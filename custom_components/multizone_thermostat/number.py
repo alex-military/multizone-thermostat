@@ -20,6 +20,7 @@ from .const import (
     DOMAIN,
     KEY_ANTI_SEIZE_IDLE_DAYS,
     KEY_ANTI_SEIZE_DURATION,
+    KEY_WEATHER_CURVE,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -107,6 +108,19 @@ async def async_setup_entry(
             unit_of_measurement="min",
             icon="mdi:timer-outline",
             default_val=2,
+            device_info=device_info,
+        ),
+        MultizonePersistentNumber(
+            coordinator=coordinator,
+            entry_id=config_entry.entry_id,
+            key=KEY_WEATHER_CURVE,
+            name="Weather Curve",
+            min_value=0.0,
+            max_value=3.0,
+            step=0.1,
+            unit_of_measurement="",
+            icon="mdi:chart-bell-curve-cumulative",
+            default_val=0.0,
             device_info=device_info,
         ),
     ]

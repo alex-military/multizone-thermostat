@@ -101,6 +101,7 @@ class MultizoneCoordinator:
         self.boiler_switch = entry.data.get(CONF_BOILER_SWITCH)
         self.zones = entry.data.get(CONF_ZONES, [])
         self.presence_sensor = entry.data.get(CONF_PRESENCE_SENSOR)
+        self.weather_sensor_id = entry.data.get("weather_sensor")
         
         # Internal state tracking
         self._master_state: bool = False
@@ -423,6 +424,19 @@ class MultizoneCoordinator:
                 else:
                     # Smart PID Mode
                     demand = self._pids[entity_id].calc(current_temp, target_temp)
+                    
+                    # Apply Weather Compensation (Feed Forward)
+                    curve_val = self.get_persistent_data("weather_curve", 0.0)
+                    if curve_val > 0.0 and self.weather_sensor_id:
+                        weather_state = self.hass.states.get(self.weather_sensor_id)
+                        if weather_state and weather_state.state not in ("unavailable", "unknown"):
+                            try:
+                                outdoor_temp = float(weather_state.state)
+                                ff_demand = (20.0 - outdoor_temp) * curve_val
+                                demand = min(100.0, max(0.0, demand + ff_demand))
+                                _LOGGER.debug("Applied weather comp to %s: Outdoor=%.1f, Curve=%.1f, FF=+%.1f%%, Final=%.1f%%", entity_id, outdoor_temp, curve_val, ff_demand, demand)
+                            except ValueError:
+                                pass
             else:
                 demand = 0.0
                 
