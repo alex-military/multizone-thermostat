@@ -154,7 +154,7 @@ function findPresetEntity(hass) {
     const state = hass.states[key];
     if (state && state.attributes && state.attributes.options) {
       const opts = state.attributes.options;
-        if (opts.includes('manual') && opts.includes('home') && opts.includes('sleep')) {
+        if (opts.includes('manual') && opts.includes('comfort') && opts.includes('sleep')) {
           return true;
         }
     }
