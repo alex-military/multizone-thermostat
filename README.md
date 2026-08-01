@@ -8,7 +8,7 @@ A custom integration for Home Assistant that provides **multi-zone heating manag
 
 1. **Dynamic Autotuning (Hysteresis → Silent PID)**: Starts in Hysteresis mode, studies the room's thermal dispersion over time, and seamlessly transitions to a precise PID controller without user intervention to eliminate temperature swings.
 2. **Hierarchical Zones (Primary vs Secondary)**: Primary zones can trigger the boiler. Secondary zones only passively open valves to "steal" heat when the boiler is already running, saving gas.
-3. **TRV Sensor Override (The Magic)**: Have a TRV attached to a boiling hot radiator that reads wrong temperatures? Just assign a clean, external Zigbee sensor to the zone. The Multizone Coordinator will intercept the TRV and inject mathematical offsets or fake targets to force the TRV to obey the true room temperature.
+3. **TRV Sensor Override**: The Multizone Coordinator intercepts TRVs attached to hot radiators and injects mathematical offsets or fake targets to force the TRV to obey the true room temperature provided by a clean, external Zigbee sensor.
 4. **100% Async Event-Driven**: Zero polling loops. The code only wakes up on state changes, ensuring near-zero CPU footprint on your Home Assistant server.
 5. **Zero-Code Auto Dashboard**: Automatically generates a stunning, premium, fully responsive climate dashboard with our custom cards.
 
@@ -23,6 +23,8 @@ A custom integration for Home Assistant that provides **multi-zone heating manag
 - 🪟 **Window Sensor Detection** — Automatically bypass zones when a window is opened, and restore them when closed
 - 🌡️ **Virtual Thermostats** — Create virtual thermostat entities directly from the UI by combining a temperature sensor and a heater switch
 - 🌤️ **Weather Compensation** — Dynamic "Feed-Forward" heating adjustment based on an outdoor physical or meteorological sensor
+- 🧠 **Multi-TRV Aggregation** — Group multiple TRVs in the same room. The system automatically calculates their average temperature and syncs their targets.
+- 📉 **Dynamic Heat Demand (%)** — Calculates the exact percentage of heating load required by the house in real-time.
 - 🔄 **Global Presets & Dynamic Memory** — Manual, Eco, Comfort, Sleep, Away. The system remembers the specific temperature and bypass state of *each zone* per preset.
 - 🎨 **4 Custom Lovelace Cards** — Master status card, circular dial card, compact button card, and global preset card — all auto-registered
 

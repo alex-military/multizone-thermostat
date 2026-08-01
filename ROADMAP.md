@@ -31,11 +31,7 @@ The project is structured in phases to evolve from a simple aggregator to a full
 
 ## 🚀 Future Roadmap & Next Priorities
 
-### PHASE 5 — Total Climate Control & External AI
-- [ ] **Hybrid Support (Heating / Cooling)**: Complete rewrite of the configuration engine to simultaneously manage and easily switch between Winter (Heating) and Summer (Cooling) modes, supporting reversible heat pumps.
-- [ ] **External AI Integration (Predictive Optimization)**: Dedicated API/Sensors interface allowing external AIs to read historical data and constantly optimize PID parameters, weather compensation curves, and predictive geofencing.
-
-### 🛠️ Recommended Order of Development (Phases 6+)
+### PHASE 5 — Advanced Algorithms & Analytics
 1. **Advanced Room Thermal Model (SAT)**: Learning of thermal capacity and dispersion, heating/cooling speed, and thermal inertia.
 2. **Future Temperature Prediction (SAT)**: Predictive early start and predictive shutdown based on thermal data.
 3. **Adaptive Climate Curve**: Self-learning and continuous adaptation of the weather compensation curve based on history.
@@ -51,3 +47,9 @@ The project is structured in phases to evolve from a simple aggregator to a full
   - **TPI Mode:** Alternative to pure PID for users who prefer Time Proportional & Integral.
   - **Advanced TRV Management:** Direct sending of the opening percentage (for valves that natively expose the % position of the pin).
   - **Advanced Dashboards & Statistics:** Graphical display of efficiency, PID, PWM, histories.
+
+### 🔬 Future Research
+- [ ] **Hybrid Support (Heating / Cooling)**: Complete rewrite of the configuration engine to simultaneously manage and easily switch between Winter (Heating) and Summer (Cooling) modes, supporting reversible heat pumps.
+- [ ] **External AI Integration (Predictive Optimization)**: Dedicated API/Sensors interface allowing external AIs to read historical data and constantly optimize PID parameters, weather compensation curves, and predictive geofencing.
+
+
