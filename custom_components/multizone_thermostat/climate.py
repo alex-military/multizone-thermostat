@@ -41,6 +41,10 @@ from .const import (
     DEFAULT_VT_TOLERANCE,
     DOMAIN,
     make_vt_entity_id,
+    # ===== НОВЫЕ ИМПОРТЫ =====
+    CONF_VT_COOLER_SWITCH,
+    CONF_VT_COOL_TOLERANCE,
+    DEFAULT_VT_COOL_TOLERANCE,
 )
 
 _LOGGER = logging.getLogger(__name__)
