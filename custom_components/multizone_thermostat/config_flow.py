@@ -43,10 +43,17 @@ from .const import (
     CONF_VT_COOLER_SWITCH,
     CONF_VT_COOL_TOLERANCE,
     DOMAIN,
-    make_vt_entity_id,
+    # make_vt_entity_id — УДАЛЯЕМ
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+# ===== ЛОКАЛЬНАЯ ФУНКЦИЯ =====
+def make_vt_entity_id(name: str) -> str:
+    """Generate entity_id for a virtual thermostat."""
+    safe_name = name.lower().replace(" ", "_")
+    safe_name = "".join(c for c in safe_name if c.isalnum() or c == "_")
+    return f"climate.vt_{safe_name}"
 
 
 def _get_switch_entities(hass: HomeAssistant) -> dict[str, str]:
@@ -58,7 +65,6 @@ def _get_switch_entities(hass: HomeAssistant) -> dict[str, str]:
             state = hass.states.get(entry.entity_id)
             name = state.attributes.get("friendly_name", entry.entity_id) if state else entry.entity_id
             switches[entry.entity_id] = name
-    # Also include states not in registry
     for state in hass.states.async_all(SWITCH_DOMAIN):
         if state.entity_id not in switches:
             switches[state.entity_id] = state.attributes.get("friendly_name", state.entity_id)
@@ -146,13 +152,10 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.FlowResult:
         """Step 1: Select boiler switch."""
-        # Only allow one instance
         await self.async_set_unique_id(DOMAIN)
         self._abort_if_unique_id_configured()
 
-        errors: dict[str, str] = {}
         switches = _get_switch_entities(self.hass)
-
         if not switches:
             return self.async_abort(reason="no_switches_found")
 
@@ -167,9 +170,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="user",
             data_schema=schema,
-            description_placeholders={
-                "switch_count": str(len(switches)),
-            },
+            description_placeholders={"switch_count": str(len(switches))},
         )
 
     async def async_step_choose_zone_type(
@@ -177,8 +178,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     ) -> config_entries.FlowResult:
         """Choose between existing climate or virtual thermostat."""
         if user_input is not None:
-            zone_type = user_input.get("zone_type", "existing")
-            if zone_type == "virtual":
+            if user_input.get("zone_type") == "virtual":
                 return await self.async_step_create_virtual_thermostat()
             return await self.async_step_add_zone()
 
@@ -189,10 +189,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             }),
         })
 
-        return self.async_show_form(
-            step_id="choose_zone_type",
-            data_schema=schema,
-        )
+        return self.async_show_form(step_id="choose_zone_type", data_schema=schema)
 
     async def async_step_create_virtual_thermostat(
         self, user_input: dict[str, Any] | None = None
@@ -211,15 +208,12 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_VT_HEATER_SWITCH: user_input[CONF_VT_HEATER_SWITCH],
                     CONF_VT_TARGET_TEMP: user_input.get(CONF_VT_TARGET_TEMP, DEFAULT_VT_TARGET_TEMP),
                     CONF_VT_TOLERANCE: user_input.get(CONF_VT_TOLERANCE, DEFAULT_VT_TOLERANCE),
-                    # NEW cooling fields
                     CONF_VT_COOLER_SWITCH: user_input.get(CONF_VT_COOLER_SWITCH),
                     CONF_VT_COOL_TOLERANCE: user_input.get(CONF_VT_COOL_TOLERANCE, DEFAULT_VT_COOL_TOLERANCE),
                 }
                 self._virtual_thermostats.append(vt_config)
 
-                # Auto-add as zone
                 vt_entity_id = make_vt_entity_id(vt_name)
-                sensors = _get_binary_sensor_entities(self.hass)
                 window_sensor = user_input.get(CONF_ZONE_WINDOW_SENSOR)
 
                 zone_data = {
@@ -236,7 +230,6 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         temp_sensors = _get_temperature_sensor_entities(self.hass)
         switches = _get_switch_entities(self.hass)
-        window_sensors = _get_binary_sensor_entities(self.hass)
 
         if not temp_sensors:
             return self.async_abort(reason="no_temp_sensors_found")
@@ -249,7 +242,6 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             vol.Required(CONF_VT_HEATER_SWITCH): selector.EntitySelector(selector.EntitySelectorConfig(domain=SWITCH_DOMAIN)),
             vol.Optional(CONF_VT_TARGET_TEMP, default=DEFAULT_VT_TARGET_TEMP): vol.Coerce(float),
             vol.Optional(CONF_VT_TOLERANCE, default=DEFAULT_VT_TOLERANCE): vol.Coerce(float),
-            # NEW cooling fields
             vol.Optional(CONF_VT_COOLER_SWITCH): selector.EntitySelector(selector.EntitySelectorConfig(domain=SWITCH_DOMAIN)),
             vol.Optional(CONF_VT_COOL_TOLERANCE, default=DEFAULT_VT_COOL_TOLERANCE): vol.All(
                 vol.Coerce(float), vol.Range(min=0.1, max=5.0)
@@ -271,13 +263,12 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
         climates = _get_climate_entities(self.hass)
 
-        # Filter out already-added climates
         already_added = {z[CONF_ZONE_CLIMATE] for z in self._zones}
         available_climates = {k: v for k, v in climates.items() if k not in already_added}
 
         if not available_climates:
-            # No more climates to add, go to weather
             return await self.async_step_weather()
+
         if user_input is not None:
             climate_entity = user_input[CONF_ZONE_CLIMATE]
             zone_name = user_input[CONF_ZONE_NAME].strip()
@@ -296,16 +287,12 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 }
                 if user_input.get(CONF_ZONE_WINDOW_SENSOR) and user_input[CONF_ZONE_WINDOW_SENSOR] != "none":
                     zone_data[CONF_ZONE_WINDOW_SENSOR] = user_input[CONF_ZONE_WINDOW_SENSOR]
-                    
-                self._zones.append(zone_data)
 
-                # Ask if user wants to add another zone
+                self._zones.append(zone_data)
                 return await self.async_step_another_zone()
 
-        # Pre-populate zone name with first available climate's friendly name
         first_climate_id = next(iter(available_climates))
         default_name = _friendly_name_from_climate(self.hass, first_climate_id)
-        sensors = _get_binary_sensor_entities(self.hass)
 
         schema = vol.Schema({
             vol.Required(CONF_ZONE_CLIMATE): selector.EntitySelector(selector.EntitySelectorConfig(domain=CLIMATE_DOMAIN)),
@@ -333,8 +320,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             if user_input.get("add_another", False):
                 return await self.async_step_choose_zone_type()
-            else:
-                return await self.async_step_weather()
+            return await self.async_step_weather()
 
         climates = _get_climate_entities(self.hass)
         already_added = {z[CONF_ZONE_CLIMATE] for z in self._zones}
@@ -371,25 +357,18 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             vol.Optional(CONF_WEATHER_SENSOR, default="none"): vol.In(sensor_options),
         })
 
-        return self.async_show_form(
-            step_id="weather",
-            data_schema=schema,
-        )
+        return self.async_show_form(step_id="weather", data_schema=schema)
 
     async def async_step_geofencing(
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.FlowResult:
         """Step: Geofencing Setup."""
         errors: dict[str, str] = {}
-        
-        # Get persons, zones, and groups for presence sensing
         entity_reg = er.async_get(self.hass)
         presence_entities = {}
-        # Pre-populate with zone.home which always exists
         state = self.hass.states.get("zone.home")
         if state:
             presence_entities["zone.home"] = state.attributes.get("friendly_name", "Home")
-            
         for entry in entity_reg.entities.values():
             if entry.domain in ("person", "group", "zone", "input_boolean") and not entry.disabled:
                 st = self.hass.states.get(entry.entity_id)
@@ -398,7 +377,6 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         for st in self.hass.states.async_all(("person", "group", "zone", "input_boolean")):
             if st.entity_id not in presence_entities:
                 presence_entities[st.entity_id] = st.attributes.get("friendly_name", st.entity_id)
-                
         presence_entities = dict(sorted(presence_entities.items(), key=lambda x: x[1]))
 
         if user_input is not None:
@@ -449,7 +427,6 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
 
         schema = vol.Schema({})
-
         return self.async_show_form(
             step_id="confirm",
             data_schema=schema,
@@ -567,7 +544,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
         if user_input is not None:
             climate_id = user_input[CONF_ZONE_CLIMATE]
             name = user_input[CONF_ZONE_NAME].strip()
-            
+
             if climate_id in already_added:
                 errors[CONF_ZONE_CLIMATE] = "climate_already_added"
             elif not name:
@@ -581,11 +558,9 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                 }
                 if user_input.get(CONF_ZONE_WINDOW_SENSOR) and user_input[CONF_ZONE_WINDOW_SENSOR] != "none":
                     zone_data[CONF_ZONE_WINDOW_SENSOR] = user_input[CONF_ZONE_WINDOW_SENSOR]
-                    
+
                 self._zones.append(zone_data)
                 return self._save_options()
-
-        sensors = _get_binary_sensor_entities(self.hass)
 
         schema = vol.Schema({
             vol.Required(CONF_ZONE_CLIMATE): selector.EntitySelector(selector.EntitySelectorConfig(domain=CLIMATE_DOMAIN)),
@@ -595,11 +570,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             vol.Optional(CONF_ZONE_WINDOW_SENSOR): selector.EntitySelector(selector.EntitySelectorConfig(domain=BINARY_SENSOR_DOMAIN)),
         })
 
-        return self.async_show_form(
-            step_id="add_zone",
-            data_schema=schema,
-            errors=errors
-        )
+        return self.async_show_form(step_id="add_zone", data_schema=schema, errors=errors)
 
     async def async_step_remove_zone(
         self, user_input: dict[str, Any] | None = None
@@ -612,12 +583,8 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
 
         if user_input is not None:
             climate_to_remove = user_input["zone_climate"]
-            zone_name = zone_options[climate_to_remove]
-            
-            # Remove the zone config
             self._zones = [z for z in self._zones if z[CONF_ZONE_CLIMATE] != climate_to_remove]
-            
-            # Remove the associated select entity from registry
+
             ent_reg = er.async_get(self.hass)
             safe_climate = climate_to_remove.replace('.', '_').replace('-', '_')
             unique_id = f"{DOMAIN}_{self._config_entry.entry_id}_zone_mode_{safe_climate}"
@@ -625,7 +592,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             if entity_id:
                 ent_reg.async_remove(entity_id)
                 _LOGGER.debug("Removed orphaned select entity %s from registry", entity_id)
-            
+
             return self._save_options()
 
         schema = vol.Schema({
@@ -651,13 +618,11 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                     CONF_VT_HEATER_SWITCH: user_input[CONF_VT_HEATER_SWITCH],
                     CONF_VT_TARGET_TEMP: user_input.get(CONF_VT_TARGET_TEMP, DEFAULT_VT_TARGET_TEMP),
                     CONF_VT_TOLERANCE: user_input.get(CONF_VT_TOLERANCE, DEFAULT_VT_TOLERANCE),
-                    # NEW cooling fields
                     CONF_VT_COOLER_SWITCH: user_input.get(CONF_VT_COOLER_SWITCH),
                     CONF_VT_COOL_TOLERANCE: user_input.get(CONF_VT_COOL_TOLERANCE, DEFAULT_VT_COOL_TOLERANCE),
                 }
                 self._virtual_thermostats.append(vt_config)
 
-                # Auto-add as zone
                 vt_entity_id = make_vt_entity_id(vt_name)
                 window_sensor = user_input.get(CONF_ZONE_WINDOW_SENSOR)
 
@@ -675,7 +640,6 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
 
         temp_sensors = _get_temperature_sensor_entities(self.hass)
         switches = _get_switch_entities(self.hass)
-        window_sensors = _get_binary_sensor_entities(self.hass)
 
         if not temp_sensors:
             return self.async_abort(reason="no_temp_sensors_found")
@@ -688,7 +652,6 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             vol.Required(CONF_VT_HEATER_SWITCH): selector.EntitySelector(selector.EntitySelectorConfig(domain=SWITCH_DOMAIN)),
             vol.Optional(CONF_VT_TARGET_TEMP, default=DEFAULT_VT_TARGET_TEMP): vol.Coerce(float),
             vol.Optional(CONF_VT_TOLERANCE, default=DEFAULT_VT_TOLERANCE): vol.Coerce(float),
-            # NEW cooling fields
             vol.Optional(CONF_VT_COOLER_SWITCH): selector.EntitySelector(selector.EntitySelectorConfig(domain=SWITCH_DOMAIN)),
             vol.Optional(CONF_VT_COOL_TOLERANCE, default=DEFAULT_VT_COOL_TOLERANCE): vol.All(
                 vol.Coerce(float), vol.Range(min=0.1, max=5.0)
@@ -717,25 +680,19 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
 
         if user_input is not None:
             vt_to_remove = user_input["virtual_thermostat"]
-            
-            # Find the VT config to get its name before removal
             vt_name = next((vt[CONF_VT_NAME] for vt in self._virtual_thermostats if make_vt_entity_id(vt[CONF_VT_NAME]) == vt_to_remove), None)
-            
-            # Remove the VT config
+
             self._virtual_thermostats = [
                 vt for vt in self._virtual_thermostats
                 if make_vt_entity_id(vt[CONF_VT_NAME]) != vt_to_remove
             ]
-            # Remove the associated zone
             self._zones = [
                 z for z in self._zones
                 if z[CONF_ZONE_CLIMATE] != vt_to_remove
             ]
-            
+
             if vt_name:
-                # Remove VT entity from registry
                 _remove_entity_from_registry(self.hass, vt_to_remove)
-                # Remove associated zone select from registry
                 ent_reg = er.async_get(self.hass)
                 safe_vt = vt_to_remove.replace('.', '_').replace('-', '_')
                 unique_id = f"{DOMAIN}_{self._config_entry.entry_id}_zone_mode_{safe_vt}"
@@ -743,7 +700,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                 if entity_id:
                     ent_reg.async_remove(entity_id)
                     _LOGGER.debug("Removed orphaned VT select entity %s from registry", entity_id)
-                
+
             return self._save_options()
 
         schema = vol.Schema({
@@ -761,7 +718,6 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
 
         if user_input is not None:
             if self._current_zone_id is not None:
-                # Second step: edit the zone
                 for i, z in enumerate(self._zones):
                     if z[CONF_ZONE_CLIMATE] == self._current_zone_id:
                         self._zones[i][CONF_ZONE_TRV_SYNC] = user_input[CONF_ZONE_TRV_SYNC]
@@ -774,10 +730,8 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                 self._current_zone_id = None
                 return self._save_options()
 
-            # First step: select zone to edit
             self._current_zone_id = user_input["zone_climate"]
             zone_data = next((z for z in self._zones if z[CONF_ZONE_CLIMATE] == self._current_zone_id), None)
-            
             sensors = _get_binary_sensor_entities(self.hass)
             current_sensor = zone_data.get(CONF_ZONE_WINDOW_SENSOR, "none") if zone_data else "none"
             if current_sensor not in sensors:
@@ -785,7 +739,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
 
             schema = vol.Schema({
                 vol.Required(
-                    CONF_ZONE_TRV_SYNC, 
+                    CONF_ZONE_TRV_SYNC,
                     default=zone_data.get(CONF_ZONE_TRV_SYNC, DEFAULT_TRV_SYNC) if zone_data else DEFAULT_TRV_SYNC
                 ): bool,
                 vol.Optional(
@@ -807,13 +761,11 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
     ) -> config_entries.FlowResult:
         """Edit geofencing settings."""
         errors: dict[str, str] = {}
-        
         entity_reg = er.async_get(self.hass)
         presence_entities = {}
         state = self.hass.states.get("zone.home")
         if state:
             presence_entities["zone.home"] = state.attributes.get("friendly_name", "Home")
-            
         for entry in entity_reg.entities.values():
             if entry.domain in ("person", "group", "zone", "input_boolean") and not entry.disabled:
                 st = self.hass.states.get(entry.entity_id)
@@ -822,7 +774,6 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
         for st in self.hass.states.async_all(("person", "group", "zone", "input_boolean")):
             if st.entity_id not in presence_entities:
                 presence_entities[st.entity_id] = st.attributes.get("friendly_name", st.entity_id)
-                
         presence_entities = dict(sorted(presence_entities.items(), key=lambda x: x[1]))
 
         if user_input is not None:
@@ -866,7 +817,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
 
         schema = vol.Schema({
             vol.Optional(
-                CONF_WEATHER_SENSOR, 
+                CONF_WEATHER_SENSOR,
                 default=self._weather_sensor or "none"
             ): vol.In(sensor_options),
         })
@@ -885,7 +836,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
         }
         if self._geofencing_enabled and self._presence_sensor:
             data[CONF_PRESENCE_SENSOR] = self._presence_sensor
-            
+
         if self._virtual_thermostats:
             data[CONF_VIRTUAL_THERMOSTATS] = self._virtual_thermostats
         if self._weather_sensor:
@@ -894,10 +845,9 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
         self.hass.config_entries.async_update_entry(
             self._config_entry, data=data
         )
-        
-        # Explicitly reload the entry since we updated data, not options
+
         self.hass.async_create_task(
             self.hass.config_entries.async_reload(self._config_entry.entry_id)
         )
-        
+
         return self.async_create_entry(title="", data={})
