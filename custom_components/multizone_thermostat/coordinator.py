@@ -435,10 +435,18 @@ class MultizoneCoordinator:
                         weather_state = self.hass.states.get(self.weather_sensor_id)
                         if weather_state and weather_state.state not in ("unavailable", "unknown"):
                             try:
-                                outdoor_temp = float(weather_state.state)
-                                ff_demand = (20.0 - outdoor_temp) * curve_val
-                                demand = min(100.0, max(0.0, demand + ff_demand))
-                                _LOGGER.debug("Applied weather comp to %s: Outdoor=%.1f, Curve=%.1f, FF=+%.1f%%, Final=%.1f%%", entity_id, outdoor_temp, curve_val, ff_demand, demand)
+                                outdoor_temp = None
+                                if weather_state.domain == "weather":
+                                    temp_attr = weather_state.attributes.get("temperature")
+                                    if temp_attr is not None:
+                                        outdoor_temp = float(temp_attr)
+                                else:
+                                    outdoor_temp = float(weather_state.state)
+                                    
+                                if outdoor_temp is not None:
+                                    ff_demand = (20.0 - outdoor_temp) * curve_val
+                                    demand = min(100.0, max(0.0, demand + ff_demand))
+                                    _LOGGER.debug("Applied weather comp to %s: Outdoor=%.1f, Curve=%.1f, FF=+%.1f%%, Final=%.1f%%", entity_id, outdoor_temp, curve_val, ff_demand, demand)
                             except ValueError:
                                 pass
             else:

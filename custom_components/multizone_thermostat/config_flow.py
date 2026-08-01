@@ -85,19 +85,20 @@ def _get_binary_sensor_entities(hass: HomeAssistant) -> dict[str, str]:
 
 
 def _get_temperature_sensor_entities(hass: HomeAssistant) -> dict[str, str]:
-    """Return all temperature sensor entities as {entity_id: friendly_name}."""
+    """Return all temperature sensor and weather entities as {entity_id: friendly_name}."""
     entity_reg = er.async_get(hass)
     sensors = {}
-    for entry in entity_reg.entities.values():
-        if entry.domain == SENSOR_DOMAIN and not entry.disabled:
-            state = hass.states.get(entry.entity_id)
-            if state and state.attributes.get("device_class") == "temperature":
-                name = state.attributes.get("friendly_name", entry.entity_id)
-                sensors[entry.entity_id] = name
-    for state in hass.states.async_all(SENSOR_DOMAIN):
-        if state.entity_id not in sensors:
-            if state.attributes.get("device_class") == "temperature":
-                sensors[state.entity_id] = state.attributes.get("friendly_name", state.entity_id)
+    
+    # 1. Fetch from entity registry (for disabled/hidden checks if needed, but states is better)
+    for state in hass.states.async_all():
+        domain = state.domain
+        if domain == "weather":
+            name = state.attributes.get("friendly_name", state.entity_id)
+            sensors[state.entity_id] = name
+        elif domain == SENSOR_DOMAIN and state.attributes.get("device_class") == "temperature":
+            name = state.attributes.get("friendly_name", state.entity_id)
+            sensors[state.entity_id] = name
+            
     return dict(sorted(sensors.items(), key=lambda x: x[1]))
 
 
