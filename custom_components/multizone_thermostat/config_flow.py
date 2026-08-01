@@ -39,9 +39,9 @@ from .const import (
     DEFAULT_TRV_SYNC,
     DEFAULT_VT_TARGET_TEMP,
     DEFAULT_VT_TOLERANCE,
-    DEFAULT_VT_COOL_TOLERANCE,          # NEW
-    CONF_VT_COOLER_SWITCH,              # NEW
-    CONF_VT_COOL_TOLERANCE,             # NEW
+    DEFAULT_VT_COOL_TOLERANCE,
+    CONF_VT_COOLER_SWITCH,
+    CONF_VT_COOL_TOLERANCE,
     DOMAIN,
     make_vt_entity_id,
 )
