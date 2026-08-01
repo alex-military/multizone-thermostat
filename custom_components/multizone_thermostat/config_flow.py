@@ -42,12 +42,19 @@ from .const import (
     DEFAULT_VT_COOL_TOLERANCE,
     CONF_VT_COOLER_SWITCH,
     CONF_VT_COOL_TOLERANCE,
+    CONF_VT_PRESET_TEMPS,
+    CONF_VT_PRESET_MANUAL,
+    CONF_VT_PRESET_ECO,
+    CONF_VT_PRESET_COMFORT,
+    CONF_VT_PRESET_SLEEP,
+    CONF_VT_PRESET_AWAY,
+    DEFAULT_VT_PRESET_TEMPS,
     DOMAIN,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
-# ===== ЛОКАЛЬНАЯ ФУНКЦИЯ =====
+# ===== ЛОКАЛЬНАЯ ФУНКЦИЯ (вместо импорта из const) =====
 def make_vt_entity_id(name: str) -> str:
     """Generate entity_id for a virtual thermostat."""
     safe_name = name.lower().replace(" ", "_")
@@ -193,7 +200,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_create_virtual_thermostat(
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.FlowResult:
-        """Create a virtual thermostat from a temp sensor + heater switch (with optional cooling)."""
+        """Create a virtual thermostat with optional cooling and preset temperatures."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -201,6 +208,15 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if not vt_name:
                 errors[CONF_VT_NAME] = "zone_name_required"
             else:
+                # Build preset temperatures dict
+                preset_temps = {
+                    "manual": user_input.get(CONF_VT_PRESET_MANUAL, DEFAULT_VT_PRESET_TEMPS["manual"]),
+                    "eco": user_input.get(CONF_VT_PRESET_ECO, DEFAULT_VT_PRESET_TEMPS["eco"]),
+                    "comfort": user_input.get(CONF_VT_PRESET_COMFORT, DEFAULT_VT_PRESET_TEMPS["comfort"]),
+                    "sleep": user_input.get(CONF_VT_PRESET_SLEEP, DEFAULT_VT_PRESET_TEMPS["sleep"]),
+                    "away": user_input.get(CONF_VT_PRESET_AWAY, DEFAULT_VT_PRESET_TEMPS["away"]),
+                }
+
                 vt_config = {
                     CONF_VT_NAME: vt_name,
                     CONF_VT_TEMP_SENSOR: user_input[CONF_VT_TEMP_SENSOR],
@@ -209,6 +225,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_VT_TOLERANCE: user_input.get(CONF_VT_TOLERANCE, DEFAULT_VT_TOLERANCE),
                     CONF_VT_COOLER_SWITCH: user_input.get(CONF_VT_COOLER_SWITCH),
                     CONF_VT_COOL_TOLERANCE: user_input.get(CONF_VT_COOL_TOLERANCE, DEFAULT_VT_COOL_TOLERANCE),
+                    CONF_VT_PRESET_TEMPS: preset_temps,
                 }
                 self._virtual_thermostats.append(vt_config)
 
@@ -235,6 +252,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if not switches:
             return self.async_abort(reason="no_switches_found")
 
+        # Build schema with preset fields
         schema = vol.Schema({
             vol.Required(CONF_VT_NAME): str,
             vol.Required(CONF_VT_TEMP_SENSOR): selector.EntitySelector(selector.EntitySelectorConfig(domain=SENSOR_DOMAIN, device_class="temperature")),
@@ -245,6 +263,12 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             vol.Optional(CONF_VT_COOL_TOLERANCE, default=DEFAULT_VT_COOL_TOLERANCE): vol.All(
                 vol.Coerce(float), vol.Range(min=0.1, max=5.0)
             ),
+            # Preset temperatures
+            vol.Optional(CONF_VT_PRESET_MANUAL, default=DEFAULT_VT_PRESET_TEMPS["manual"]): vol.Coerce(float),
+            vol.Optional(CONF_VT_PRESET_ECO, default=DEFAULT_VT_PRESET_TEMPS["eco"]): vol.Coerce(float),
+            vol.Optional(CONF_VT_PRESET_COMFORT, default=DEFAULT_VT_PRESET_TEMPS["comfort"]): vol.Coerce(float),
+            vol.Optional(CONF_VT_PRESET_SLEEP, default=DEFAULT_VT_PRESET_TEMPS["sleep"]): vol.Coerce(float),
+            vol.Optional(CONF_VT_PRESET_AWAY, default=DEFAULT_VT_PRESET_TEMPS["away"]): vol.Coerce(float),
             vol.Optional(CONF_ZONE_ANTI_SEIZE, default=True): bool,
             vol.Optional(CONF_ZONE_WINDOW_SENSOR): selector.EntitySelector(selector.EntitySelectorConfig(domain=BINARY_SENSOR_DOMAIN)),
         })
@@ -462,7 +486,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
         self._presence_sensor: str | None = config_entry.data.get(CONF_PRESENCE_SENSOR)
         self._weather_sensor: str | None = config_entry.data.get(CONF_WEATHER_SENSOR)
         self._current_zone_id: str | None = None
-        self._current_zone_idx = 0
+        self._current_vt_name: str | None = None  # для редактирования VT
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -486,6 +510,8 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                 return await self.async_step_create_virtual_thermostat()
             elif action == "remove_virtual":
                 return await self.async_step_remove_virtual_thermostat()
+            elif action == "edit_virtual":
+                return await self.async_step_edit_virtual_thermostat()
 
         menu_options = {
             "change_boiler": "Change boiler switch",
@@ -498,6 +524,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
         }
         if self._virtual_thermostats:
             menu_options["remove_virtual"] = "Remove virtual thermostat"
+            menu_options["edit_virtual"] = "Edit virtual thermostat"
 
         schema = vol.Schema({
             vol.Required("action"): vol.In(menu_options),
@@ -603,7 +630,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
     async def async_step_create_virtual_thermostat(
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.FlowResult:
-        """Create a virtual thermostat (with optional cooling) in options."""
+        """Create a virtual thermostat (with optional cooling and presets) in options."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -611,6 +638,14 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             if not vt_name:
                 errors[CONF_VT_NAME] = "zone_name_required"
             else:
+                preset_temps = {
+                    "manual": user_input.get(CONF_VT_PRESET_MANUAL, DEFAULT_VT_PRESET_TEMPS["manual"]),
+                    "eco": user_input.get(CONF_VT_PRESET_ECO, DEFAULT_VT_PRESET_TEMPS["eco"]),
+                    "comfort": user_input.get(CONF_VT_PRESET_COMFORT, DEFAULT_VT_PRESET_TEMPS["comfort"]),
+                    "sleep": user_input.get(CONF_VT_PRESET_SLEEP, DEFAULT_VT_PRESET_TEMPS["sleep"]),
+                    "away": user_input.get(CONF_VT_PRESET_AWAY, DEFAULT_VT_PRESET_TEMPS["away"]),
+                }
+
                 vt_config = {
                     CONF_VT_NAME: vt_name,
                     CONF_VT_TEMP_SENSOR: user_input[CONF_VT_TEMP_SENSOR],
@@ -619,6 +654,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                     CONF_VT_TOLERANCE: user_input.get(CONF_VT_TOLERANCE, DEFAULT_VT_TOLERANCE),
                     CONF_VT_COOLER_SWITCH: user_input.get(CONF_VT_COOLER_SWITCH),
                     CONF_VT_COOL_TOLERANCE: user_input.get(CONF_VT_COOL_TOLERANCE, DEFAULT_VT_COOL_TOLERANCE),
+                    CONF_VT_PRESET_TEMPS: preset_temps,
                 }
                 self._virtual_thermostats.append(vt_config)
 
@@ -655,6 +691,11 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             vol.Optional(CONF_VT_COOL_TOLERANCE, default=DEFAULT_VT_COOL_TOLERANCE): vol.All(
                 vol.Coerce(float), vol.Range(min=0.1, max=5.0)
             ),
+            vol.Optional(CONF_VT_PRESET_MANUAL, default=DEFAULT_VT_PRESET_TEMPS["manual"]): vol.Coerce(float),
+            vol.Optional(CONF_VT_PRESET_ECO, default=DEFAULT_VT_PRESET_TEMPS["eco"]): vol.Coerce(float),
+            vol.Optional(CONF_VT_PRESET_COMFORT, default=DEFAULT_VT_PRESET_TEMPS["comfort"]): vol.Coerce(float),
+            vol.Optional(CONF_VT_PRESET_SLEEP, default=DEFAULT_VT_PRESET_TEMPS["sleep"]): vol.Coerce(float),
+            vol.Optional(CONF_VT_PRESET_AWAY, default=DEFAULT_VT_PRESET_TEMPS["away"]): vol.Coerce(float),
             vol.Optional(CONF_ZONE_ANTI_SEIZE, default=True): bool,
             vol.Optional(CONF_ZONE_WINDOW_SENSOR): selector.EntitySelector(selector.EntitySelectorConfig(domain=BINARY_SENSOR_DOMAIN)),
         })
@@ -664,6 +705,69 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             data_schema=schema,
             errors=errors,
         )
+
+    async def async_step_edit_virtual_thermostat(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.FlowResult:
+        """Edit preset temperatures of an existing virtual thermostat."""
+        if not self._virtual_thermostats:
+            return self.async_abort(reason="no_virtual_thermostats")
+
+        vt_options = {
+            make_vt_entity_id(vt[CONF_VT_NAME]): vt[CONF_VT_NAME]
+            for vt in self._virtual_thermostats
+        }
+
+        if user_input is not None:
+            if "vt_to_edit" in user_input:
+                # User selected a VT, now show the edit form
+                self._current_vt_name = user_input["vt_to_edit"]
+                vt_config = next(
+                    (vt for vt in self._virtual_thermostats if make_vt_entity_id(vt[CONF_VT_NAME]) == self._current_vt_name),
+                    None
+                )
+                if vt_config is None:
+                    return self.async_abort(reason="vt_not_found")
+
+                preset_temps = vt_config.get(CONF_VT_PRESET_TEMPS, DEFAULT_VT_PRESET_TEMPS)
+                schema = vol.Schema({
+                    vol.Optional(CONF_VT_PRESET_MANUAL, default=preset_temps.get("manual", DEFAULT_VT_PRESET_TEMPS["manual"])): vol.Coerce(float),
+                    vol.Optional(CONF_VT_PRESET_ECO, default=preset_temps.get("eco", DEFAULT_VT_PRESET_TEMPS["eco"])): vol.Coerce(float),
+                    vol.Optional(CONF_VT_PRESET_COMFORT, default=preset_temps.get("comfort", DEFAULT_VT_PRESET_TEMPS["comfort"])): vol.Coerce(float),
+                    vol.Optional(CONF_VT_PRESET_SLEEP, default=preset_temps.get("sleep", DEFAULT_VT_PRESET_TEMPS["sleep"])): vol.Coerce(float),
+                    vol.Optional(CONF_VT_PRESET_AWAY, default=preset_temps.get("away", DEFAULT_VT_PRESET_TEMPS["away"])): vol.Coerce(float),
+                })
+                return self.async_show_form(
+                    step_id="edit_virtual_thermostat",
+                    data_schema=schema,
+                    description_placeholders={"vt_name": vt_config[CONF_VT_NAME]},
+                )
+            else:
+                # User submitted new preset temperatures
+                vt_config = next(
+                    (vt for vt in self._virtual_thermostats if make_vt_entity_id(vt[CONF_VT_NAME]) == self._current_vt_name),
+                    None
+                )
+                if vt_config is None:
+                    return self.async_abort(reason="vt_not_found")
+
+                new_preset_temps = {
+                    "manual": user_input.get(CONF_VT_PRESET_MANUAL, DEFAULT_VT_PRESET_TEMPS["manual"]),
+                    "eco": user_input.get(CONF_VT_PRESET_ECO, DEFAULT_VT_PRESET_TEMPS["eco"]),
+                    "comfort": user_input.get(CONF_VT_PRESET_COMFORT, DEFAULT_VT_PRESET_TEMPS["comfort"]),
+                    "sleep": user_input.get(CONF_VT_PRESET_SLEEP, DEFAULT_VT_PRESET_TEMPS["sleep"]),
+                    "away": user_input.get(CONF_VT_PRESET_AWAY, DEFAULT_VT_PRESET_TEMPS["away"]),
+                }
+                # Update the VT config
+                vt_config[CONF_VT_PRESET_TEMPS] = new_preset_temps
+                self._current_vt_name = None
+                return self._save_options()
+
+        # First step: select VT
+        schema = vol.Schema({
+            vol.Required("vt_to_edit"): vol.In(vt_options),
+        })
+        return self.async_show_form(step_id="edit_virtual_thermostat", data_schema=schema)
 
     async def async_step_remove_virtual_thermostat(
         self, user_input: dict[str, Any] | None = None
