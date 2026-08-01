@@ -75,7 +75,7 @@ async def async_setup_entry(
 class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
     """A Hybrid Master Virtual Thermostat that controls sub-slave TRVs and Switches."""
 
-    _attr_has_entity_name = True
+    _attr_has_entity_name = False
     _attr_hvac_modes = [HVACMode.HEAT, HVACMode.OFF]
     _attr_supported_features = ClimateEntityFeature.TARGET_TEMPERATURE
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
@@ -92,6 +92,7 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         """Initialize the virtual thermostat."""
         self.hass = hass
         self._name = zone_data[CONF_ZONE_NAME]
+        self._attr_name = self._name
         self._temp_sensor = zone_data.get(CONF_ZONE_TEMP_SENSOR)
         self._climates = zone_data.get(CONF_ZONE_CLIMATES, [])
         self._switches = zone_data.get(CONF_ZONE_SWITCHES, [])
