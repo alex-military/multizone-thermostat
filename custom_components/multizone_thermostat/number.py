@@ -1,4 +1,4 @@
-"""Number platform for Multizone Thermostat: boiler protection parameters."""
+"""Number platform for Multizone Thermostat."""
 from __future__ import annotations
 
 import logging
@@ -6,9 +6,10 @@ import logging
 from homeassistant.components.number import NumberEntity, RestoreNumber
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import (
     CONF_MIN_CYCLE_ON,
@@ -21,6 +22,15 @@ from .const import (
     KEY_ANTI_SEIZE_IDLE_DAYS,
     KEY_ANTI_SEIZE_DURATION,
     KEY_WEATHER_CURVE,
+    CONF_VIRTUAL_THERMOSTATS,
+    CONF_VT_NAME,
+    CONF_VT_PRESET_TEMPS_SUMMER,
+    CONF_VT_PRESET_TEMPS_WINTER,
+    SEASON_SUMMER,
+    SEASON_WINTER,
+    GLOBAL_PRESETS,
+    DEFAULT_SUMMER_PRESET_TEMPS,
+    DEFAULT_WINTER_PRESET_TEMPS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -31,7 +41,7 @@ async def async_setup_entry(
     config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up number entities from a config entry."""
+    """Set up number entities."""
     coordinator = hass.data[DOMAIN][config_entry.entry_id]["coordinator"]
 
     def _make_device_info() -> DeviceInfo:
@@ -45,6 +55,7 @@ async def async_setup_entry(
     device_info = _make_device_info()
 
     entities = [
+        # Protection parameters
         MultizoneProtectionNumber(
             coordinator=coordinator,
             entry_id=config_entry.entry_id,
@@ -125,6 +136,52 @@ async def async_setup_entry(
         ),
     ]
 
+    # Add preset temperature numbers for each virtual thermostat
+    virtual_thermostats = config_entry.data.get(CONF_VIRTUAL_THERMOSTATS, [])
+    for vt_config in virtual_thermostats:
+        vt_name = vt_config[CONF_VT_NAME]
+        safe_vt = vt_name.lower().replace(" ", "_").replace("-", "_")
+        # Очищаем от недопустимых символов
+        safe_vt = "".join(c for c in safe_vt if c.isalnum() or c == "_")
+        summer_temps = vt_config.get(CONF_VT_PRESET_TEMPS_SUMMER, DEFAULT_SUMMER_PRESET_TEMPS)
+        winter_temps = vt_config.get(CONF_VT_PRESET_TEMPS_WINTER, DEFAULT_WINTER_PRESET_TEMPS)
+        
+        # Уникальное устройство для этого VT
+        vt_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"{config_entry.entry_id}_vt_{safe_vt}")},
+            name=f"{vt_name} Thermostat",
+            manufacturer="Custom Integration",
+            model="Virtual Thermostat",
+            via_device=(DOMAIN, config_entry.entry_id),
+        )
+        
+        # Сначала добавляем все летние пресеты
+        for preset in GLOBAL_PRESETS:
+            entities.append(
+                PresetNumber(
+                    hass,
+                    config_entry.entry_id,
+                    vt_name,
+                    preset,
+                    SEASON_SUMMER,
+                    summer_temps.get(preset, DEFAULT_SUMMER_PRESET_TEMPS.get(preset, 20.0)),
+                    vt_device_info,
+                )
+            )
+        # Затем все зимние пресеты
+        for preset in GLOBAL_PRESETS:
+            entities.append(
+                PresetNumber(
+                    hass,
+                    config_entry.entry_id,
+                    vt_name,
+                    preset,
+                    SEASON_WINTER,
+                    winter_temps.get(preset, DEFAULT_WINTER_PRESET_TEMPS.get(preset, 20.0)),
+                    vt_device_info,
+                )
+            )
+
     async_add_entities(entities)
 
 
@@ -162,7 +219,6 @@ class MultizoneProtectionNumber(RestoreNumber):
         self._attr_icon = icon
         self._attr_device_info = device_info
 
-        # State
         self._attr_native_value = float(default_val)
 
     async def async_added_to_hass(self) -> None:
@@ -178,7 +234,6 @@ class MultizoneProtectionNumber(RestoreNumber):
         else:
             self._attr_native_value = float(self._default_val)
             
-        # Push the restored/default value to the coordinator
         self._update_coordinator(int(self._attr_native_value))
         self.async_write_ha_state()
 
@@ -196,6 +251,7 @@ class MultizoneProtectionNumber(RestoreNumber):
             self._coordinator.set_min_cycle_off(value)
         elif self._key == CONF_VALVE_DELAY:
             self._coordinator.set_valve_delay(value)
+
 
 class MultizonePersistentNumber(NumberEntity):
     """Generic Number entity that saves its state to the coordinator persistent storage."""
@@ -240,3 +296,83 @@ class MultizonePersistentNumber(NumberEntity):
         """Update the value."""
         await self._coordinator.async_set_persistent_data(self._key, value)
         self.async_write_ha_state()
+
+
+class PresetNumber(RestoreEntity, NumberEntity):
+    """Number entity for a specific preset temperature (summer or winter)."""
+
+    _attr_has_entity_name = True
+    _attr_native_min_value = 5.0
+    _attr_native_max_value = 35.0
+    _attr_native_step = 0.5
+
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        entry_id: str,
+        vt_name: str,
+        preset: str,
+        season: str,
+        initial_value: float,
+        device_info: DeviceInfo,
+    ) -> None:
+        """Initialize."""
+        self.hass = hass
+        self._vt_name = vt_name
+        self._preset = preset
+        self._season = season
+        self._entry_id = entry_id
+        self._attr_native_value = initial_value
+
+        safe_vt = vt_name.lower().replace(" ", "_").replace("-", "_")
+        safe_vt = "".join(c for c in safe_vt if c.isalnum() or c == "_")
+        self._attr_unique_id = f"{DOMAIN}_{entry_id}_vt_{safe_vt}_{season}_{preset}_temp"
+        # НЕ устанавливаем entity_id вручную!
+
+        self._attr_device_info = device_info
+
+        # Имена на русском
+        season_name = "Лето" if season == SEASON_SUMMER else "Зима"
+        preset_names = {
+            "manual": "Ручной",
+            "eco": "Эко",
+            "comfort": "Комфорт",
+            "sleep": "Сон",
+            "away": "Отъезд",
+        }
+        self._attr_name = f"{season_name} {preset_names.get(preset, preset.capitalize())}"
+
+    @property
+    def available(self) -> bool:
+        """Return if entity is available."""
+        return True
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Update the preset temperature."""
+        self._attr_native_value = value
+        self.async_write_ha_state()
+
+        # Update the config entry data
+        entry = self.hass.config_entries.async_get_entry(self._entry_id)
+        if not entry:
+            return
+
+        data = dict(entry.data)
+        virtual_thermostats = list(data.get(CONF_VIRTUAL_THERMOSTATS, []))
+        for vt in virtual_thermostats:
+            if vt.get(CONF_VT_NAME) == self._vt_name:
+                if self._season == SEASON_SUMMER:
+                    season_key = CONF_VT_PRESET_TEMPS_SUMMER
+                else:
+                    season_key = CONF_VT_PRESET_TEMPS_WINTER
+                if season_key not in vt:
+                    vt[season_key] = {}
+                vt[season_key][self._preset] = value
+                break
+
+        data[CONF_VIRTUAL_THERMOSTATS] = virtual_thermostats
+        self.hass.config_entries.async_update_entry(entry, data=data)
+
+        # Reload the entry to apply changes to the climate entities
+        await self.hass.config_entries.async_reload(self._entry_id)
+        _LOGGER.debug("Updated %s preset %s temp to %.1f", self._vt_name, self._preset, value)
