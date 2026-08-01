@@ -1,4 +1,4 @@
-// window.customCards definition to register the cards in Lovelace UI card picker
+﻿// window.customCards definition to register the cards in Lovelace UI card picker
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "multizone-thermostat-button-card",
@@ -58,7 +58,7 @@ const TRANSLATIONS = {
     preset_sleep: "Notte",
     preset_away: "Fuori Casa",
     preset_card_title: "Preset Globale",
-    edit_preset: "Entità Preset (Opzionale)"
+    edit_preset: "EntitÃ  Preset (Opzionale)"
   },
   en: {
     enabled: "Enabled",
@@ -289,10 +289,10 @@ class MultizoneThermostatButtonCard extends HTMLElement {
     // Update temperatures
     const tempCurrentEl = this.shadowRoot.querySelector('.temp-current');
     if (tempCurrentEl) {
-      const curStr = currentTemp !== undefined ? `${currentTemp}°C` : '--°C';
+      const curStr = currentTemp !== undefined ? `${currentTemp}Â°C` : '--Â°C';
       tempCurrentEl.innerHTML = `<span class="temp-current-val">${curStr}</span>`;
     }
-    this.shadowRoot.querySelector('.temp-target-val').textContent = targetTemp !== undefined ? `${targetTemp}°C` : '--°C';
+    this.shadowRoot.querySelector('.temp-target-val').textContent = targetTemp !== undefined ? `${targetTemp}Â°C` : '--Â°C';
     
     const tempTargetEl = this.shadowRoot.querySelector('.temp-target');
     if (tempTargetEl) {
@@ -541,9 +541,9 @@ class MultizoneThermostatButtonCard extends HTMLElement {
             <button class="btn-temp" id="temp-down">-</button>
             <div class="temp-display">
               <div class="temp-target">
-                <span class="temp-target-val">--°C</span>
+                <span class="temp-target-val">--Â°C</span>
               </div>
-              <div class="temp-current"><span class="temp-current-val">--°C</span></div>
+              <div class="temp-current"><span class="temp-current-val">--Â°C</span></div>
             </div>
             <button class="btn-temp" id="temp-up">+</button>
           </div>
@@ -746,7 +746,7 @@ class MultizoneThermostatDialCard extends HTMLElement {
 
     let displayTitle = this._config.title || climateState.attributes.friendly_name || climateEntity;
     if (displayTitle) {
-      displayTitle = displayTitle.replace(/^Virtual Thermostats VT /i, '');
+      displayTitle = displayTitle.replace(/^Virtual Thermostats VT /i, '').replace(/^Heating Zones(?: Zone)? /i, '');
     }
 
     const titleEl = this.shadowRoot.querySelector('.title');
@@ -1791,7 +1791,7 @@ class MultizoneThermostatDashboardStrategy extends HTMLElement {
           const climateState = hass.states[climateId];
           if (climateState) {
             let title = climateState.attributes.friendly_name || climateId;
-            title = title.replace(/^Virtual Thermostats VT /i, '');
+            title = title.replace(/^Virtual Thermostats VT /i, '').replace(/^Heating Zones(?: Zone)? /i, '');
             zones.push({
               climate: climateId,
               switch: entityId,
@@ -1887,3 +1887,4 @@ if (!customElements.get("ll-strategy-dashboard-multizone-thermostat-dashboard"))
 if (!customElements.get("ll-strategy-view-multizone-thermostat-dashboard")) {
   customElements.define("ll-strategy-view-multizone-thermostat-dashboard", MultizoneThermostatViewStrategy);
 }
+

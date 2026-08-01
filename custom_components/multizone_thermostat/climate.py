@@ -306,6 +306,14 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         if not new_state or not old_state:
             return
             
+        # If there is no external temperature sensor, track TRV temperature changes
+        if not self._temp_sensor:
+            new_current = new_state.attributes.get("current_temperature")
+            old_current = old_state.attributes.get("current_temperature")
+            if new_current is not None and new_current != old_current:
+                self._update_current_temp()
+                self.async_write_ha_state()
+                
         new_temp = new_state.attributes.get(ATTR_TEMPERATURE)
         old_temp = self._last_known_trv_targets.get(entity_id)
         
