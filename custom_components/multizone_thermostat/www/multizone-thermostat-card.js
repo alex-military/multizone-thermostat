@@ -1346,7 +1346,7 @@ class MultizoneThermostatStatusCard extends HTMLElement {
     }
 
     // Try to find the boiler switch directly or through climate attributes
-    let boilerEntity = this._config.entity || this._config.boiler_entity;
+    boilerEntity = this._config.entity || this._config.boiler_entity;
     if (!boilerEntity) {
       // First try to find a climate entity that has the boiler_entity_id attribute
       const zoneClimate = Object.values(this._hass.states).find(s => 
