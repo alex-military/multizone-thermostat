@@ -1,5 +1,4 @@
 """Constants for Multizone Thermostat integration."""
-
 DOMAIN = "multizone_thermostat"
 
 # Config keys
@@ -30,7 +29,6 @@ CONF_ANTI_SEIZE_BOILER = "anti_seize_boiler_enable"
 CONF_WEATHER_SENSOR = "weather_sensor"
 KEY_WEATHER_CURVE = "weather_curve"
 
-
 # HVAC
 HVAC_MODE_HEAT = "heat"
 HVAC_MODE_OFF = "off"
@@ -47,7 +45,6 @@ GLOBAL_PRESET_ECO = "eco"
 GLOBAL_PRESET_COMFORT = "comfort"
 GLOBAL_PRESET_SLEEP = "sleep"
 GLOBAL_PRESET_AWAY = "away"
-
 GLOBAL_PRESETS = [
     GLOBAL_PRESET_MANUAL,
     GLOBAL_PRESET_ECO,
@@ -66,6 +63,7 @@ ZONE_MODE_PRIMARY = "primary"
 ZONE_MODE_SECONDARY = "secondary"
 ZONE_MODE_BYPASS = "bypass"
 ZONE_MODES = [ZONE_MODE_PRIMARY, ZONE_MODE_SECONDARY, ZONE_MODE_BYPASS]
+
 KEY_AUTO_NIGHT_MODE = "auto_night_mode"
 KEY_GEOFENCING_TOGGLE = "geofencing_toggle"
 KEY_PRE_AWAY_PRESET = "pre_away_preset"
@@ -90,10 +88,3 @@ CONF_VT_TARGET_TEMP = "target_temperature"
 CONF_VT_TOLERANCE = "tolerance"
 DEFAULT_VT_TARGET_TEMP = 20.0
 DEFAULT_VT_TOLERANCE = 0.5
-
-
-def make_vt_entity_id(name: str) -> str:
-    """Generate a predictable entity_id for a virtual thermostat."""
-    safe = name.lower().replace(" ", "_").replace("-", "_")
-    safe = "".join(c for c in safe if c.isalnum() or c == "_")
-    return f"climate.{DOMAIN}_vt_{safe}"
