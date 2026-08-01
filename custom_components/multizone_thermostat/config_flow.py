@@ -39,6 +39,9 @@ from .const import (
     DEFAULT_TRV_SYNC,
     DEFAULT_VT_TARGET_TEMP,
     DEFAULT_VT_TOLERANCE,
+    DEFAULT_VT_COOL_TOLERANCE,          # NEW
+    CONF_VT_COOLER_SWITCH,              # NEW
+    CONF_VT_COOL_TOLERANCE,             # NEW
     DOMAIN,
     make_vt_entity_id,
 )
@@ -107,7 +110,6 @@ def _get_temperature_sensor_entities(hass: HomeAssistant) -> dict[str, str]:
             if state.attributes.get("device_class") == "temperature":
                 sensors[state.entity_id] = state.attributes.get("friendly_name", state.entity_id)
     return dict(sorted(sensors.items(), key=lambda x: x[1]))
-
 
 
 def _remove_entity_from_registry(hass: HomeAssistant, entity_id: str) -> None:
@@ -195,7 +197,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_create_virtual_thermostat(
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.FlowResult:
-        """Create a virtual thermostat from a temp sensor + heater switch."""
+        """Create a virtual thermostat from a temp sensor + heater switch (with optional cooling)."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -209,6 +211,9 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_VT_HEATER_SWITCH: user_input[CONF_VT_HEATER_SWITCH],
                     CONF_VT_TARGET_TEMP: user_input.get(CONF_VT_TARGET_TEMP, DEFAULT_VT_TARGET_TEMP),
                     CONF_VT_TOLERANCE: user_input.get(CONF_VT_TOLERANCE, DEFAULT_VT_TOLERANCE),
+                    # NEW cooling fields
+                    CONF_VT_COOLER_SWITCH: user_input.get(CONF_VT_COOLER_SWITCH),
+                    CONF_VT_COOL_TOLERANCE: user_input.get(CONF_VT_COOL_TOLERANCE, DEFAULT_VT_COOL_TOLERANCE),
                 }
                 self._virtual_thermostats.append(vt_config)
 
@@ -244,6 +249,11 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             vol.Required(CONF_VT_HEATER_SWITCH): selector.EntitySelector(selector.EntitySelectorConfig(domain=SWITCH_DOMAIN)),
             vol.Optional(CONF_VT_TARGET_TEMP, default=DEFAULT_VT_TARGET_TEMP): vol.Coerce(float),
             vol.Optional(CONF_VT_TOLERANCE, default=DEFAULT_VT_TOLERANCE): vol.Coerce(float),
+            # NEW cooling fields
+            vol.Optional(CONF_VT_COOLER_SWITCH): selector.EntitySelector(selector.EntitySelectorConfig(domain=SWITCH_DOMAIN)),
+            vol.Optional(CONF_VT_COOL_TOLERANCE, default=DEFAULT_VT_COOL_TOLERANCE): vol.All(
+                vol.Coerce(float), vol.Range(min=0.1, max=5.0)
+            ),
             vol.Optional(CONF_ZONE_ANTI_SEIZE, default=True): bool,
             vol.Optional(CONF_ZONE_WINDOW_SENSOR): selector.EntitySelector(selector.EntitySelectorConfig(domain=BINARY_SENSOR_DOMAIN)),
         })
@@ -627,7 +637,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
     async def async_step_create_virtual_thermostat(
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.FlowResult:
-        """Create a virtual thermostat."""
+        """Create a virtual thermostat (with optional cooling) in options."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -641,6 +651,9 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                     CONF_VT_HEATER_SWITCH: user_input[CONF_VT_HEATER_SWITCH],
                     CONF_VT_TARGET_TEMP: user_input.get(CONF_VT_TARGET_TEMP, DEFAULT_VT_TARGET_TEMP),
                     CONF_VT_TOLERANCE: user_input.get(CONF_VT_TOLERANCE, DEFAULT_VT_TOLERANCE),
+                    # NEW cooling fields
+                    CONF_VT_COOLER_SWITCH: user_input.get(CONF_VT_COOLER_SWITCH),
+                    CONF_VT_COOL_TOLERANCE: user_input.get(CONF_VT_COOL_TOLERANCE, DEFAULT_VT_COOL_TOLERANCE),
                 }
                 self._virtual_thermostats.append(vt_config)
 
@@ -675,6 +688,11 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             vol.Required(CONF_VT_HEATER_SWITCH): selector.EntitySelector(selector.EntitySelectorConfig(domain=SWITCH_DOMAIN)),
             vol.Optional(CONF_VT_TARGET_TEMP, default=DEFAULT_VT_TARGET_TEMP): vol.Coerce(float),
             vol.Optional(CONF_VT_TOLERANCE, default=DEFAULT_VT_TOLERANCE): vol.Coerce(float),
+            # NEW cooling fields
+            vol.Optional(CONF_VT_COOLER_SWITCH): selector.EntitySelector(selector.EntitySelectorConfig(domain=SWITCH_DOMAIN)),
+            vol.Optional(CONF_VT_COOL_TOLERANCE, default=DEFAULT_VT_COOL_TOLERANCE): vol.All(
+                vol.Coerce(float), vol.Range(min=0.1, max=5.0)
+            ),
             vol.Optional(CONF_ZONE_ANTI_SEIZE, default=True): bool,
             vol.Optional(CONF_ZONE_WINDOW_SENSOR): selector.EntitySelector(selector.EntitySelectorConfig(domain=BINARY_SENSOR_DOMAIN)),
         })
