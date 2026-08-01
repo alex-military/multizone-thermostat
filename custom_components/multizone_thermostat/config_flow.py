@@ -42,13 +42,23 @@ from .const import (
     DEFAULT_VT_COOL_TOLERANCE,
     CONF_VT_COOLER_SWITCH,
     CONF_VT_COOL_TOLERANCE,
-    CONF_VT_PRESET_TEMPS,
-    CONF_VT_PRESET_MANUAL,
-    CONF_VT_PRESET_ECO,
-    CONF_VT_PRESET_COMFORT,
-    CONF_VT_PRESET_SLEEP,
-    CONF_VT_PRESET_AWAY,
-    DEFAULT_VT_PRESET_TEMPS,
+    CONF_VT_PRESET_TEMPS_SUMMER,
+    CONF_VT_PRESET_TEMPS_WINTER,
+    CONF_VT_SUMMER_MANUAL,
+    CONF_VT_SUMMER_ECO,
+    CONF_VT_SUMMER_COMFORT,
+    CONF_VT_SUMMER_SLEEP,
+    CONF_VT_SUMMER_AWAY,
+    CONF_VT_WINTER_MANUAL,
+    CONF_VT_WINTER_ECO,
+    CONF_VT_WINTER_COMFORT,
+    CONF_VT_WINTER_SLEEP,
+    CONF_VT_WINTER_AWAY,
+    DEFAULT_SUMMER_PRESET_TEMPS,
+    DEFAULT_WINTER_PRESET_TEMPS,
+    CONF_SEASON,
+    DEFAULT_SEASON,
+    SEASONS,
     DOMAIN,
 )
 
@@ -200,7 +210,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_create_virtual_thermostat(
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.FlowResult:
-        """Create a virtual thermostat with optional cooling and preset temperatures."""
+        """Create a virtual thermostat with optional cooling and separate summer/winter presets."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -208,13 +218,20 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if not vt_name:
                 errors[CONF_VT_NAME] = "zone_name_required"
             else:
-                # Build preset temperatures dict
-                preset_temps = {
-                    "manual": user_input.get(CONF_VT_PRESET_MANUAL, DEFAULT_VT_PRESET_TEMPS["manual"]),
-                    "eco": user_input.get(CONF_VT_PRESET_ECO, DEFAULT_VT_PRESET_TEMPS["eco"]),
-                    "comfort": user_input.get(CONF_VT_PRESET_COMFORT, DEFAULT_VT_PRESET_TEMPS["comfort"]),
-                    "sleep": user_input.get(CONF_VT_PRESET_SLEEP, DEFAULT_VT_PRESET_TEMPS["sleep"]),
-                    "away": user_input.get(CONF_VT_PRESET_AWAY, DEFAULT_VT_PRESET_TEMPS["away"]),
+                # Build summer and winter preset dicts
+                summer_preset_temps = {
+                    "manual": user_input.get(CONF_VT_SUMMER_MANUAL, DEFAULT_SUMMER_PRESET_TEMPS["manual"]),
+                    "eco": user_input.get(CONF_VT_SUMMER_ECO, DEFAULT_SUMMER_PRESET_TEMPS["eco"]),
+                    "comfort": user_input.get(CONF_VT_SUMMER_COMFORT, DEFAULT_SUMMER_PRESET_TEMPS["comfort"]),
+                    "sleep": user_input.get(CONF_VT_SUMMER_SLEEP, DEFAULT_SUMMER_PRESET_TEMPS["sleep"]),
+                    "away": user_input.get(CONF_VT_SUMMER_AWAY, DEFAULT_SUMMER_PRESET_TEMPS["away"]),
+                }
+                winter_preset_temps = {
+                    "manual": user_input.get(CONF_VT_WINTER_MANUAL, DEFAULT_WINTER_PRESET_TEMPS["manual"]),
+                    "eco": user_input.get(CONF_VT_WINTER_ECO, DEFAULT_WINTER_PRESET_TEMPS["eco"]),
+                    "comfort": user_input.get(CONF_VT_WINTER_COMFORT, DEFAULT_WINTER_PRESET_TEMPS["comfort"]),
+                    "sleep": user_input.get(CONF_VT_WINTER_SLEEP, DEFAULT_WINTER_PRESET_TEMPS["sleep"]),
+                    "away": user_input.get(CONF_VT_WINTER_AWAY, DEFAULT_WINTER_PRESET_TEMPS["away"]),
                 }
 
                 vt_config = {
@@ -225,7 +242,8 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_VT_TOLERANCE: user_input.get(CONF_VT_TOLERANCE, DEFAULT_VT_TOLERANCE),
                     CONF_VT_COOLER_SWITCH: user_input.get(CONF_VT_COOLER_SWITCH),
                     CONF_VT_COOL_TOLERANCE: user_input.get(CONF_VT_COOL_TOLERANCE, DEFAULT_VT_COOL_TOLERANCE),
-                    CONF_VT_PRESET_TEMPS: preset_temps,
+                    CONF_VT_PRESET_TEMPS_SUMMER: summer_preset_temps,
+                    CONF_VT_PRESET_TEMPS_WINTER: winter_preset_temps,
                 }
                 self._virtual_thermostats.append(vt_config)
 
@@ -252,7 +270,6 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if not switches:
             return self.async_abort(reason="no_switches_found")
 
-        # Build schema with preset fields
         schema = vol.Schema({
             vol.Required(CONF_VT_NAME): str,
             vol.Required(CONF_VT_TEMP_SENSOR): selector.EntitySelector(selector.EntitySelectorConfig(domain=SENSOR_DOMAIN, device_class="temperature")),
@@ -263,12 +280,18 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             vol.Optional(CONF_VT_COOL_TOLERANCE, default=DEFAULT_VT_COOL_TOLERANCE): vol.All(
                 vol.Coerce(float), vol.Range(min=0.1, max=5.0)
             ),
-            # Preset temperatures
-            vol.Optional(CONF_VT_PRESET_MANUAL, default=DEFAULT_VT_PRESET_TEMPS["manual"]): vol.Coerce(float),
-            vol.Optional(CONF_VT_PRESET_ECO, default=DEFAULT_VT_PRESET_TEMPS["eco"]): vol.Coerce(float),
-            vol.Optional(CONF_VT_PRESET_COMFORT, default=DEFAULT_VT_PRESET_TEMPS["comfort"]): vol.Coerce(float),
-            vol.Optional(CONF_VT_PRESET_SLEEP, default=DEFAULT_VT_PRESET_TEMPS["sleep"]): vol.Coerce(float),
-            vol.Optional(CONF_VT_PRESET_AWAY, default=DEFAULT_VT_PRESET_TEMPS["away"]): vol.Coerce(float),
+            # Summer presets
+            vol.Optional(CONF_VT_SUMMER_MANUAL, default=DEFAULT_SUMMER_PRESET_TEMPS["manual"]): vol.Coerce(float),
+            vol.Optional(CONF_VT_SUMMER_ECO, default=DEFAULT_SUMMER_PRESET_TEMPS["eco"]): vol.Coerce(float),
+            vol.Optional(CONF_VT_SUMMER_COMFORT, default=DEFAULT_SUMMER_PRESET_TEMPS["comfort"]): vol.Coerce(float),
+            vol.Optional(CONF_VT_SUMMER_SLEEP, default=DEFAULT_SUMMER_PRESET_TEMPS["sleep"]): vol.Coerce(float),
+            vol.Optional(CONF_VT_SUMMER_AWAY, default=DEFAULT_SUMMER_PRESET_TEMPS["away"]): vol.Coerce(float),
+            # Winter presets
+            vol.Optional(CONF_VT_WINTER_MANUAL, default=DEFAULT_WINTER_PRESET_TEMPS["manual"]): vol.Coerce(float),
+            vol.Optional(CONF_VT_WINTER_ECO, default=DEFAULT_WINTER_PRESET_TEMPS["eco"]): vol.Coerce(float),
+            vol.Optional(CONF_VT_WINTER_COMFORT, default=DEFAULT_WINTER_PRESET_TEMPS["comfort"]): vol.Coerce(float),
+            vol.Optional(CONF_VT_WINTER_SLEEP, default=DEFAULT_WINTER_PRESET_TEMPS["sleep"]): vol.Coerce(float),
+            vol.Optional(CONF_VT_WINTER_AWAY, default=DEFAULT_WINTER_PRESET_TEMPS["away"]): vol.Coerce(float),
             vol.Optional(CONF_ZONE_ANTI_SEIZE, default=True): bool,
             vol.Optional(CONF_ZONE_WINDOW_SENSOR): selector.EntitySelector(selector.EntitySelectorConfig(domain=BINARY_SENSOR_DOMAIN)),
         })
@@ -437,6 +460,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 CONF_BOILER_SWITCH: self._boiler_switch,
                 CONF_ZONES: self._zones,
                 CONF_GEOFENCING_ENABLED: self._geofencing_enabled,
+                CONF_SEASON: DEFAULT_SEASON,  # default season
             }
             if self._geofencing_enabled and self._presence_sensor:
                 data[CONF_PRESENCE_SENSOR] = self._presence_sensor
@@ -630,7 +654,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
     async def async_step_create_virtual_thermostat(
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.FlowResult:
-        """Create a virtual thermostat (with optional cooling and presets) in options."""
+        """Create a virtual thermostat (with cooling and presets) in options."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -638,12 +662,19 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             if not vt_name:
                 errors[CONF_VT_NAME] = "zone_name_required"
             else:
-                preset_temps = {
-                    "manual": user_input.get(CONF_VT_PRESET_MANUAL, DEFAULT_VT_PRESET_TEMPS["manual"]),
-                    "eco": user_input.get(CONF_VT_PRESET_ECO, DEFAULT_VT_PRESET_TEMPS["eco"]),
-                    "comfort": user_input.get(CONF_VT_PRESET_COMFORT, DEFAULT_VT_PRESET_TEMPS["comfort"]),
-                    "sleep": user_input.get(CONF_VT_PRESET_SLEEP, DEFAULT_VT_PRESET_TEMPS["sleep"]),
-                    "away": user_input.get(CONF_VT_PRESET_AWAY, DEFAULT_VT_PRESET_TEMPS["away"]),
+                summer_preset_temps = {
+                    "manual": user_input.get(CONF_VT_SUMMER_MANUAL, DEFAULT_SUMMER_PRESET_TEMPS["manual"]),
+                    "eco": user_input.get(CONF_VT_SUMMER_ECO, DEFAULT_SUMMER_PRESET_TEMPS["eco"]),
+                    "comfort": user_input.get(CONF_VT_SUMMER_COMFORT, DEFAULT_SUMMER_PRESET_TEMPS["comfort"]),
+                    "sleep": user_input.get(CONF_VT_SUMMER_SLEEP, DEFAULT_SUMMER_PRESET_TEMPS["sleep"]),
+                    "away": user_input.get(CONF_VT_SUMMER_AWAY, DEFAULT_SUMMER_PRESET_TEMPS["away"]),
+                }
+                winter_preset_temps = {
+                    "manual": user_input.get(CONF_VT_WINTER_MANUAL, DEFAULT_WINTER_PRESET_TEMPS["manual"]),
+                    "eco": user_input.get(CONF_VT_WINTER_ECO, DEFAULT_WINTER_PRESET_TEMPS["eco"]),
+                    "comfort": user_input.get(CONF_VT_WINTER_COMFORT, DEFAULT_WINTER_PRESET_TEMPS["comfort"]),
+                    "sleep": user_input.get(CONF_VT_WINTER_SLEEP, DEFAULT_WINTER_PRESET_TEMPS["sleep"]),
+                    "away": user_input.get(CONF_VT_WINTER_AWAY, DEFAULT_WINTER_PRESET_TEMPS["away"]),
                 }
 
                 vt_config = {
@@ -654,7 +685,8 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                     CONF_VT_TOLERANCE: user_input.get(CONF_VT_TOLERANCE, DEFAULT_VT_TOLERANCE),
                     CONF_VT_COOLER_SWITCH: user_input.get(CONF_VT_COOLER_SWITCH),
                     CONF_VT_COOL_TOLERANCE: user_input.get(CONF_VT_COOL_TOLERANCE, DEFAULT_VT_COOL_TOLERANCE),
-                    CONF_VT_PRESET_TEMPS: preset_temps,
+                    CONF_VT_PRESET_TEMPS_SUMMER: summer_preset_temps,
+                    CONF_VT_PRESET_TEMPS_WINTER: winter_preset_temps,
                 }
                 self._virtual_thermostats.append(vt_config)
 
@@ -691,11 +723,18 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             vol.Optional(CONF_VT_COOL_TOLERANCE, default=DEFAULT_VT_COOL_TOLERANCE): vol.All(
                 vol.Coerce(float), vol.Range(min=0.1, max=5.0)
             ),
-            vol.Optional(CONF_VT_PRESET_MANUAL, default=DEFAULT_VT_PRESET_TEMPS["manual"]): vol.Coerce(float),
-            vol.Optional(CONF_VT_PRESET_ECO, default=DEFAULT_VT_PRESET_TEMPS["eco"]): vol.Coerce(float),
-            vol.Optional(CONF_VT_PRESET_COMFORT, default=DEFAULT_VT_PRESET_TEMPS["comfort"]): vol.Coerce(float),
-            vol.Optional(CONF_VT_PRESET_SLEEP, default=DEFAULT_VT_PRESET_TEMPS["sleep"]): vol.Coerce(float),
-            vol.Optional(CONF_VT_PRESET_AWAY, default=DEFAULT_VT_PRESET_TEMPS["away"]): vol.Coerce(float),
+            # Summer presets
+            vol.Optional(CONF_VT_SUMMER_MANUAL, default=DEFAULT_SUMMER_PRESET_TEMPS["manual"]): vol.Coerce(float),
+            vol.Optional(CONF_VT_SUMMER_ECO, default=DEFAULT_SUMMER_PRESET_TEMPS["eco"]): vol.Coerce(float),
+            vol.Optional(CONF_VT_SUMMER_COMFORT, default=DEFAULT_SUMMER_PRESET_TEMPS["comfort"]): vol.Coerce(float),
+            vol.Optional(CONF_VT_SUMMER_SLEEP, default=DEFAULT_SUMMER_PRESET_TEMPS["sleep"]): vol.Coerce(float),
+            vol.Optional(CONF_VT_SUMMER_AWAY, default=DEFAULT_SUMMER_PRESET_TEMPS["away"]): vol.Coerce(float),
+            # Winter presets
+            vol.Optional(CONF_VT_WINTER_MANUAL, default=DEFAULT_WINTER_PRESET_TEMPS["manual"]): vol.Coerce(float),
+            vol.Optional(CONF_VT_WINTER_ECO, default=DEFAULT_WINTER_PRESET_TEMPS["eco"]): vol.Coerce(float),
+            vol.Optional(CONF_VT_WINTER_COMFORT, default=DEFAULT_WINTER_PRESET_TEMPS["comfort"]): vol.Coerce(float),
+            vol.Optional(CONF_VT_WINTER_SLEEP, default=DEFAULT_WINTER_PRESET_TEMPS["sleep"]): vol.Coerce(float),
+            vol.Optional(CONF_VT_WINTER_AWAY, default=DEFAULT_WINTER_PRESET_TEMPS["away"]): vol.Coerce(float),
             vol.Optional(CONF_ZONE_ANTI_SEIZE, default=True): bool,
             vol.Optional(CONF_ZONE_WINDOW_SENSOR): selector.EntitySelector(selector.EntitySelectorConfig(domain=BINARY_SENSOR_DOMAIN)),
         })
@@ -709,7 +748,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
     async def async_step_edit_virtual_thermostat(
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.FlowResult:
-        """Edit preset temperatures of an existing virtual thermostat."""
+        """Edit preset temperatures of an existing virtual thermostat (summer and winter)."""
         if not self._virtual_thermostats:
             return self.async_abort(reason="no_virtual_thermostats")
 
@@ -720,7 +759,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
 
         if user_input is not None:
             if "vt_to_edit" in user_input:
-                # User selected a VT, now show the edit form
+                # User selected a VT, now show the edit form (both summer and winter presets)
                 self._current_vt_name = user_input["vt_to_edit"]
                 vt_config = next(
                     (vt for vt in self._virtual_thermostats if make_vt_entity_id(vt[CONF_VT_NAME]) == self._current_vt_name),
@@ -729,13 +768,22 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                 if vt_config is None:
                     return self.async_abort(reason="vt_not_found")
 
-                preset_temps = vt_config.get(CONF_VT_PRESET_TEMPS, DEFAULT_VT_PRESET_TEMPS)
+                summer_temps = vt_config.get(CONF_VT_PRESET_TEMPS_SUMMER, DEFAULT_SUMMER_PRESET_TEMPS)
+                winter_temps = vt_config.get(CONF_VT_PRESET_TEMPS_WINTER, DEFAULT_WINTER_PRESET_TEMPS)
+
                 schema = vol.Schema({
-                    vol.Optional(CONF_VT_PRESET_MANUAL, default=preset_temps.get("manual", DEFAULT_VT_PRESET_TEMPS["manual"])): vol.Coerce(float),
-                    vol.Optional(CONF_VT_PRESET_ECO, default=preset_temps.get("eco", DEFAULT_VT_PRESET_TEMPS["eco"])): vol.Coerce(float),
-                    vol.Optional(CONF_VT_PRESET_COMFORT, default=preset_temps.get("comfort", DEFAULT_VT_PRESET_TEMPS["comfort"])): vol.Coerce(float),
-                    vol.Optional(CONF_VT_PRESET_SLEEP, default=preset_temps.get("sleep", DEFAULT_VT_PRESET_TEMPS["sleep"])): vol.Coerce(float),
-                    vol.Optional(CONF_VT_PRESET_AWAY, default=preset_temps.get("away", DEFAULT_VT_PRESET_TEMPS["away"])): vol.Coerce(float),
+                    # Summer presets
+                    vol.Optional(CONF_VT_SUMMER_MANUAL, default=summer_temps.get("manual", DEFAULT_SUMMER_PRESET_TEMPS["manual"])): vol.Coerce(float),
+                    vol.Optional(CONF_VT_SUMMER_ECO, default=summer_temps.get("eco", DEFAULT_SUMMER_PRESET_TEMPS["eco"])): vol.Coerce(float),
+                    vol.Optional(CONF_VT_SUMMER_COMFORT, default=summer_temps.get("comfort", DEFAULT_SUMMER_PRESET_TEMPS["comfort"])): vol.Coerce(float),
+                    vol.Optional(CONF_VT_SUMMER_SLEEP, default=summer_temps.get("sleep", DEFAULT_SUMMER_PRESET_TEMPS["sleep"])): vol.Coerce(float),
+                    vol.Optional(CONF_VT_SUMMER_AWAY, default=summer_temps.get("away", DEFAULT_SUMMER_PRESET_TEMPS["away"])): vol.Coerce(float),
+                    # Winter presets
+                    vol.Optional(CONF_VT_WINTER_MANUAL, default=winter_temps.get("manual", DEFAULT_WINTER_PRESET_TEMPS["manual"])): vol.Coerce(float),
+                    vol.Optional(CONF_VT_WINTER_ECO, default=winter_temps.get("eco", DEFAULT_WINTER_PRESET_TEMPS["eco"])): vol.Coerce(float),
+                    vol.Optional(CONF_VT_WINTER_COMFORT, default=winter_temps.get("comfort", DEFAULT_WINTER_PRESET_TEMPS["comfort"])): vol.Coerce(float),
+                    vol.Optional(CONF_VT_WINTER_SLEEP, default=winter_temps.get("sleep", DEFAULT_WINTER_PRESET_TEMPS["sleep"])): vol.Coerce(float),
+                    vol.Optional(CONF_VT_WINTER_AWAY, default=winter_temps.get("away", DEFAULT_WINTER_PRESET_TEMPS["away"])): vol.Coerce(float),
                 })
                 return self.async_show_form(
                     step_id="edit_virtual_thermostat",
@@ -743,7 +791,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                     description_placeholders={"vt_name": vt_config[CONF_VT_NAME]},
                 )
             else:
-                # User submitted new preset temperatures
+                # User submitted new preset temperatures (both seasons)
                 vt_config = next(
                     (vt for vt in self._virtual_thermostats if make_vt_entity_id(vt[CONF_VT_NAME]) == self._current_vt_name),
                     None
@@ -751,15 +799,22 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                 if vt_config is None:
                     return self.async_abort(reason="vt_not_found")
 
-                new_preset_temps = {
-                    "manual": user_input.get(CONF_VT_PRESET_MANUAL, DEFAULT_VT_PRESET_TEMPS["manual"]),
-                    "eco": user_input.get(CONF_VT_PRESET_ECO, DEFAULT_VT_PRESET_TEMPS["eco"]),
-                    "comfort": user_input.get(CONF_VT_PRESET_COMFORT, DEFAULT_VT_PRESET_TEMPS["comfort"]),
-                    "sleep": user_input.get(CONF_VT_PRESET_SLEEP, DEFAULT_VT_PRESET_TEMPS["sleep"]),
-                    "away": user_input.get(CONF_VT_PRESET_AWAY, DEFAULT_VT_PRESET_TEMPS["away"]),
+                new_summer_temps = {
+                    "manual": user_input.get(CONF_VT_SUMMER_MANUAL, DEFAULT_SUMMER_PRESET_TEMPS["manual"]),
+                    "eco": user_input.get(CONF_VT_SUMMER_ECO, DEFAULT_SUMMER_PRESET_TEMPS["eco"]),
+                    "comfort": user_input.get(CONF_VT_SUMMER_COMFORT, DEFAULT_SUMMER_PRESET_TEMPS["comfort"]),
+                    "sleep": user_input.get(CONF_VT_SUMMER_SLEEP, DEFAULT_SUMMER_PRESET_TEMPS["sleep"]),
+                    "away": user_input.get(CONF_VT_SUMMER_AWAY, DEFAULT_SUMMER_PRESET_TEMPS["away"]),
                 }
-                # Update the VT config
-                vt_config[CONF_VT_PRESET_TEMPS] = new_preset_temps
+                new_winter_temps = {
+                    "manual": user_input.get(CONF_VT_WINTER_MANUAL, DEFAULT_WINTER_PRESET_TEMPS["manual"]),
+                    "eco": user_input.get(CONF_VT_WINTER_ECO, DEFAULT_WINTER_PRESET_TEMPS["eco"]),
+                    "comfort": user_input.get(CONF_VT_WINTER_COMFORT, DEFAULT_WINTER_PRESET_TEMPS["comfort"]),
+                    "sleep": user_input.get(CONF_VT_WINTER_SLEEP, DEFAULT_WINTER_PRESET_TEMPS["sleep"]),
+                    "away": user_input.get(CONF_VT_WINTER_AWAY, DEFAULT_WINTER_PRESET_TEMPS["away"]),
+                }
+                vt_config[CONF_VT_PRESET_TEMPS_SUMMER] = new_summer_temps
+                vt_config[CONF_VT_PRESET_TEMPS_WINTER] = new_winter_temps
                 self._current_vt_name = None
                 return self._save_options()
 
@@ -936,6 +991,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             CONF_BOILER_SWITCH: self._boiler_switch,
             CONF_ZONES: self._zones,
             CONF_GEOFENCING_ENABLED: self._geofencing_enabled,
+            CONF_SEASON: self._config_entry.data.get(CONF_SEASON, DEFAULT_SEASON),  # сохраняем сезон
         }
         if self._geofencing_enabled and self._presence_sensor:
             data[CONF_PRESENCE_SENSOR] = self._presence_sensor
