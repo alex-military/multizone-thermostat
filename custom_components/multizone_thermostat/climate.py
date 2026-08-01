@@ -44,9 +44,15 @@ from .const import (
     CONF_VT_COOLER_SWITCH,
     CONF_VT_COOL_TOLERANCE,
     DEFAULT_VT_COOL_TOLERANCE,
-    CONF_VT_PRESET_TEMPS,
-    DEFAULT_VT_PRESET_TEMPS,
+    CONF_VT_PRESET_TEMPS_SUMMER,
+    CONF_VT_PRESET_TEMPS_WINTER,
     GLOBAL_PRESETS,
+    SEASON_SUMMER,
+    SEASON_WINTER,
+    CONF_SEASON,
+    DEFAULT_SEASON,
+    DEFAULT_SUMMER_PRESET_TEMPS,
+    DEFAULT_WINTER_PRESET_TEMPS,
 )
 from .pwm_engine import PWMEngine
 
@@ -67,9 +73,11 @@ async def async_setup_entry(
 ) -> None:
     """Set up virtual thermostat climate entities from a config entry."""
     virtual_thermostats = config_entry.data.get(CONF_VIRTUAL_THERMOSTATS, [])
-
     if not virtual_thermostats:
         return
+
+    # Get current season from config
+    season = config_entry.data.get(CONF_SEASON, DEFAULT_SEASON)
 
     entities = []
     for vt_config in virtual_thermostats:
@@ -84,17 +92,21 @@ async def async_setup_entry(
                 tolerance=vt_config.get(CONF_VT_TOLERANCE, DEFAULT_VT_TOLERANCE),
                 cooler_switch=vt_config.get(CONF_VT_COOLER_SWITCH),
                 cool_tolerance=vt_config.get(CONF_VT_COOL_TOLERANCE, DEFAULT_VT_COOL_TOLERANCE),
-                preset_temperatures=vt_config.get(CONF_VT_PRESET_TEMPS, DEFAULT_VT_PRESET_TEMPS),
+                preset_temps_summer=vt_config.get(CONF_VT_PRESET_TEMPS_SUMMER, DEFAULT_SUMMER_PRESET_TEMPS),
+                preset_temps_winter=vt_config.get(CONF_VT_PRESET_TEMPS_WINTER, DEFAULT_WINTER_PRESET_TEMPS),
+                season=season,
             )
         )
     async_add_entities(entities)
 
 
 class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
-    """A virtual thermostat that controls a heater and optionally a cooler switch, with presets."""
+    """A virtual thermostat that controls a heater and optionally a cooler switch, with presets and season."""
 
     _attr_has_entity_name = True
-    _attr_supported_features = ClimateEntityFeature.TARGET_TEMPERATURE
+    _attr_supported_features = (
+        ClimateEntityFeature.TARGET_TEMPERATURE | ClimateEntityFeature.PRESET_MODE
+    )
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_min_temp = 5.0
     _attr_max_temp = 35.0
@@ -112,7 +124,9 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         tolerance: float,
         cooler_switch: str | None = None,
         cool_tolerance: float = DEFAULT_VT_COOL_TOLERANCE,
-        preset_temperatures: dict[str, float] = DEFAULT_VT_PRESET_TEMPS,
+        preset_temps_summer: dict[str, float] = None,
+        preset_temps_winter: dict[str, float] = None,
+        season: str = DEFAULT_SEASON,
     ) -> None:
         """Initialize the virtual thermostat."""
         self.hass = hass
@@ -122,10 +136,20 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         self._tolerance = tolerance
         self._cooler_switch = cooler_switch
         self._cool_tolerance = cool_tolerance
-        self._preset_temperatures = preset_temperatures
+        self._preset_temps_summer = preset_temps_summer or DEFAULT_SUMMER_PRESET_TEMPS
+        self._preset_temps_winter = preset_temps_winter or DEFAULT_WINTER_PRESET_TEMPS
+        self._season = season
+
+        # Choose active preset dict based on current season
+        self._preset_temperatures = self._get_active_preset_temps()
 
         # State
-        self._hvac_mode = HVACMode.OFF
+        # Set initial hvac mode based on season
+        if season == SEASON_WINTER:
+            self._hvac_mode = HVACMode.HEAT
+        else:
+            self._hvac_mode = HVACMode.COOL if cooler_switch is not None else HVACMode.OFF
+
         self._target_temperature = target_temp
         self._current_temperature: float | None = None
         self._preset_mode: str | None = None
@@ -144,15 +168,22 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         safe_name = "".join(c for c in safe_name if c.isalnum() or c == "_")
         self._attr_unique_id = f"{DOMAIN}_{entry_id}_vt_{safe_name}"
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, f"{entry_id}_virtual_thermostats")},
-            name="Virtual Thermostats",
+            identifiers={(DOMAIN, f"{entry_id}_vt_{safe_name}")},
+            name=f"{name} Thermostat",
             manufacturer="Custom Integration",
-            model="Virtual Thermostats",
+            model="Virtual Thermostat",
             via_device=(DOMAIN, entry_id),
         )
-        self.entity_id = vt_entity_id
+        # НЕ устанавливаем entity_id вручную
 
         self._unsub_listeners: list = []
+
+    def _get_active_preset_temps(self) -> dict[str, float]:
+        """Return the preset temperatures for the current season."""
+        if self._season == SEASON_SUMMER:
+            return self._preset_temps_summer
+        else:
+            return self._preset_temps_winter
 
     @property
     def name(self) -> str:
@@ -208,6 +239,7 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             "heater_switch": self._heater_switch,
             "tolerance": self._tolerance,
             "virtual_thermostat": True,
+            "season": self._season,
         }
         if self._cooler_switch is not None:
             attrs["cooler_switch"] = self._cooler_switch
@@ -257,13 +289,15 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         """Restore state and set up listeners."""
         await super().async_added_to_hass()
 
+        # ===== РЕГИСТРАЦИЯ В КООРДИНАТОРЕ ДЛЯ ГЛОБАЛЬНОГО ПРЕСЕТА =====
+        self._coordinator.register_virtual_climate(self)
+
         last_state = await self.async_get_last_state()
         if last_state is not None:
             if last_state.state in (HVACMode.HEAT, HVACMode.COOL, HVACMode.HEAT_COOL, HVACMode.OFF):
                 self._hvac_mode = HVACMode(last_state.state)
             if last_state.attributes.get(ATTR_TEMPERATURE) is not None:
                 self._target_temperature = float(last_state.attributes[ATTR_TEMPERATURE])
-            # Restore preset mode if saved
             if last_state.attributes.get("preset_mode") in self._attr_preset_modes:
                 self._preset_mode = last_state.attributes["preset_mode"]
             _LOGGER.debug(
@@ -273,6 +307,7 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
 
         self._update_current_temp()
 
+        # Listen for temperature sensor changes
         self._unsub_listeners.append(
             async_track_state_change_event(
                 self.hass,
@@ -281,6 +316,7 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             )
         )
 
+        # Listen for heater switch changes
         self._unsub_listeners.append(
             async_track_state_change_event(
                 self.hass,
@@ -289,6 +325,7 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             )
         )
 
+        # Listen for cooler switch changes
         if self._cooler_switch is not None:
             self._unsub_listeners.append(
                 async_track_state_change_event(
@@ -298,6 +335,17 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
                 )
             )
 
+        # Listen for season changes
+        season_entity_id = f"select.{DOMAIN}_season"
+        self._unsub_listeners.append(
+            async_track_state_change_event(
+                self.hass,
+                [season_entity_id],
+                self._async_on_season_changed,
+            )
+        )
+
+        # Periodic PWM tick
         self._unsub_listeners.append(
             async_track_time_interval(
                 self.hass,
@@ -310,6 +358,9 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
 
     async def async_will_remove_from_hass(self) -> None:
         """Clean up listeners."""
+        # ===== ОТПИСКА ОТ КООРДИНАТОРА =====
+        self._coordinator.unregister_virtual_climate(self)
+
         for unsub in self._unsub_listeners:
             unsub()
         self._unsub_listeners.clear()
@@ -357,6 +408,42 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         if state is not None:
             self._cooler_state = state.state == STATE_ON
         self.async_write_ha_state()
+
+    @callback
+    def _async_on_season_changed(self, event: Event) -> None:
+        """Handle season selector state changes."""
+        new_state = event.data.get("new_state")
+        if new_state is None or new_state.state not in (SEASON_SUMMER, SEASON_WINTER):
+            return
+        self._season = new_state.state
+        # Update preset temperatures according to new season
+        self._preset_temperatures = self._get_active_preset_temps()
+        # If current preset is active, update target temperature
+        if self._preset_mode is not None and self._preset_mode in self._preset_temperatures:
+            self._target_temperature = self._preset_temperatures[self._preset_mode]
+            _LOGGER.debug("VT '%s' season changed to %s, updated target to %.1f°C",
+                          self._name, self._season, self._target_temperature)
+
+        # Auto-switch HVAC mode based on season
+        if self._season == SEASON_WINTER:
+            # Winter: always HEAT (if boiler is available)
+            if self._hvac_mode != HVACMode.HEAT:
+                self._hvac_mode = HVACMode.HEAT
+                _LOGGER.debug("VT '%s' auto-switched to HEAT for winter", self._name)
+        else:  # SUMMER
+            if self._cooler_switch is not None:
+                # If cooler available, switch to COOL
+                if self._hvac_mode != HVACMode.COOL:
+                    self._hvac_mode = HVACMode.COOL
+                    _LOGGER.debug("VT '%s' auto-switched to COOL for summer", self._name)
+            else:
+                # No cooler, turn off
+                if self._hvac_mode != HVACMode.OFF:
+                    self._hvac_mode = HVACMode.OFF
+                    _LOGGER.debug("VT '%s' auto-switched to OFF for summer (no cooler)", self._name)
+
+        self.async_write_ha_state()
+        self.hass.async_create_task(self._async_control())
 
     async def _async_control(self) -> None:
         """Main control logic: decide what to turn on/off based on mode."""
