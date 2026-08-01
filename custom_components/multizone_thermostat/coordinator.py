@@ -48,7 +48,6 @@ from .const import (
     HVAC_MODE_OFF,
     PRESET_MANUAL,
     PRESET_OFF,
-    CONF_PRESENCE_SENSOR,
     KEY_NIGHT_TIME,
     KEY_MORNING_TIME,
     KEY_AUTO_NIGHT_MODE,
@@ -70,6 +69,7 @@ from .const import (
     ZONE_MODE_PRIMARY,
     ZONE_MODE_SECONDARY,
     ZONE_MODE_BYPASS,
+    GLOBAL_PRESETS,
 )
 from .pwm_engine import PWMEngine
 
@@ -142,8 +142,6 @@ class MultizoneCoordinator:
             self._pids[climate_id] = MultizonePID(kp=100.0, ki=0.0, kd=0.0, out_min=0.0, out_max=100.0, sensor_timeout=7200.0)
             self._autotuners[climate_id] = PassiveAutotuneObserver(climate_id, required_cycles=3)
 
-
-
         self._preset_store = Store(hass, PRESET_STORAGE_VERSION, PRESET_STORAGE_KEY)
         self._presets: dict[str, dict[str, dict[str, Any]]] = {}
         self._current_global_preset: str = GLOBAL_PRESET_MANUAL
@@ -153,6 +151,22 @@ class MultizoneCoordinator:
         
         self._last_night_trigger_date: datetime.date | None = None
         self._last_morning_trigger_date: datetime.date | None = None
+
+        # ===== НОВОЕ: список зарегистрированных виртуальных термостатов =====
+        self._virtual_climates: list = []
+
+    # ===== МЕТОДЫ РЕГИСТРАЦИИ ВИРТУАЛЬНЫХ ТЕРМОСТАТОВ =====
+    def register_virtual_climate(self, climate_entity) -> None:
+        """Register a virtual thermostat for global preset control."""
+        if climate_entity not in self._virtual_climates:
+            self._virtual_climates.append(climate_entity)
+            _LOGGER.debug("Registered climate %s", climate_entity.entity_id)
+
+    def unregister_virtual_climate(self, climate_entity) -> None:
+        """Unregister a virtual thermostat."""
+        if climate_entity in self._virtual_climates:
+            self._virtual_climates.remove(climate_entity)
+            _LOGGER.debug("Unregistered climate %s", climate_entity.entity_id)
 
     def get_persistent_data(self, key: str, default: Any = None) -> Any:
         """Get a persistent setting."""
@@ -256,43 +270,71 @@ class MultizoneCoordinator:
         return self._current_global_preset
 
     async def async_set_global_preset(self, preset: str) -> None:
-        """Set the global preset and apply it to all zones."""
+        """Set the global preset and apply it to all zones (including virtual thermostats)."""
+        if preset not in GLOBAL_PRESETS:
+            _LOGGER.warning("Invalid global preset: %s", preset)
+            return
+
         self._current_global_preset = preset
-        _LOGGER.debug("Global preset changed to: %s", preset)
+        _LOGGER.info("Global preset changed to: %s", preset)
         
         # Notify the UI select entity if it's registered
         if "global_preset" in self._select_entities:
             self._select_entities["global_preset"].async_write_ha_state()
 
-        if preset not in self._presets:
-            return
-            
-        preset_data = self._presets[preset]
-        for climate_entity, data in preset_data.items():
-            if "target_temp" in data:
-                try:
-                    await self.hass.services.async_call(
-                        "climate",
-                        "set_temperature",
-                        {"entity_id": climate_entity, "temperature": data["target_temp"]},
-                        blocking=False,
+        # ===== НОВОЕ: применить ко всем зарегистрированным виртуальным термостатам =====
+        if self._virtual_climates:
+            tasks = []
+            for climate in self._virtual_climates:
+                # Проверяем, поддерживает ли термостат этот пресет
+                if hasattr(climate, 'preset_modes') and preset in climate.preset_modes:
+                    tasks.append(climate.async_set_preset_mode(preset))
+                else:
+                    _LOGGER.warning(
+                        "Climate %s does not support preset %s, skipping",
+                        climate.entity_id, preset
                     )
-                except Exception as ex:
-                    _LOGGER.warning("Could not set temperature for %s: %s", climate_entity, ex)
-            
-            # Legacy preset support
-            mode = ZONE_MODE_PRIMARY
-            if "mode" in data:
-                mode = data["mode"]
-            elif "bypassed" in data:
-                mode = ZONE_MODE_BYPASS if data["bypassed"] else ZONE_MODE_PRIMARY
+            if tasks:
+                await asyncio.gather(*tasks, return_exceptions=True)
+                _LOGGER.debug("Applied global preset %s to %d thermostats", preset, len(tasks))
 
-            zone_select = self._select_entities.get(f"zone_mode_{climate_entity}")
-            if zone_select:
-                try:
-                    await zone_select.async_select_option(mode)
-                except Exception as ex:
-                    _LOGGER.warning("Could not set zone mode for %s: %s", climate_entity, ex)
+        # Применяем к остальным зонам (TRV, не виртуальные) через температуру и режим
+        if preset in self._presets:
+            preset_data = self._presets[preset]
+            for climate_entity, data in preset_data.items():
+                # Если это виртуальный термостат, он уже обработан выше, но мы всё равно применим температуру,
+                # чтобы быть уверенными (но осторожно, чтобы не конфликтовать)
+                # Для виртуальных термостатов мы уже вызвали async_set_preset_mode, которая сама установит температуру.
+                # Поэтому пропускаем виртуальные, чтобы не перезаписывать.
+                # Определим, виртуальный ли это термостат, по наличию в _virtual_climates
+                is_virtual = any(cl.entity_id == climate_entity for cl in self._virtual_climates)
+                if is_virtual:
+                    continue  # уже обработано
+
+                if "target_temp" in data:
+                    try:
+                        await self.hass.services.async_call(
+                            "climate",
+                            "set_temperature",
+                            {"entity_id": climate_entity, "temperature": data["target_temp"]},
+                            blocking=False,
+                        )
+                    except Exception as ex:
+                        _LOGGER.warning("Could not set temperature for %s: %s", climate_entity, ex)
+                
+                # Legacy preset support
+                mode = ZONE_MODE_PRIMARY
+                if "mode" in data:
+                    mode = data["mode"]
+                elif "bypassed" in data:
+                    mode = ZONE_MODE_BYPASS if data["bypassed"] else ZONE_MODE_PRIMARY
+
+                zone_select = self._select_entities.get(f"zone_mode_{climate_entity}")
+                if zone_select:
+                    try:
+                        await zone_select.async_select_option(mode)
+                    except Exception as ex:
+                        _LOGGER.warning("Could not set zone mode for %s: %s", climate_entity, ex)
 
     def get_master_state(self) -> bool:
         """Get current master state."""
@@ -816,8 +858,6 @@ class MultizoneCoordinator:
         # but we also force it off here for safety ignoring locks
         await self._async_update_boiler(emergency_off=True)
 
-
-
     async def _async_set_hvac_mode(self, climate_entity: str, mode: str) -> None:
         """Set HVAC mode on a climate entity."""
         state = self.hass.states.get(climate_entity)
@@ -933,4 +973,3 @@ class MultizoneCoordinator:
             _LOGGER.error("Error during anti-seize routine: %s", e)
         finally:
             self._anti_seize_running = False
-
