@@ -37,15 +37,10 @@ The project is structured in phases to evolve from a simple aggregator to a full
 3. **Adaptive Climate Curve**: Self-learning and continuous adaptation of the weather compensation curve based on history.
 4. **Full OpenTherm Support**: Modulation of flame flow temperature, diagnostic reading, and DHW management, mapping the Demand % (0-100%).
 5. **Advanced Diagnostics & Anomaly Analysis**: Detection of stuck valves, overshoots, PID cycles, and reporting for each room.
-6. **Energy Optimization**: Dynamic tariff, energy cost, and automatic consumption optimization.
-7. **Photovoltaic Integration & Pre-heating**: Exploiting PV surplus for intelligent pre-heating (thermal storage in the structure).
+
 
 ### 📋 Additional Priorities
-- **HIGH Priority (★★★★☆)**
   - **Intelligent Multi-Sensor Management:** Weighted average and priorities among multiple sensors in a room.
-- **MEDIUM Priority (★★★☆☆)**
-  - **TPI Mode:** Alternative to pure PID for users who prefer Time Proportional & Integral.
-  - **Advanced TRV Management:** Direct sending of the opening percentage (for valves that natively expose the % position of the pin).
   - **Advanced Dashboards & Statistics:** Graphical display of efficiency, PID, PWM, histories.
 
 ### 🔬 Future Research
