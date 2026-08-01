@@ -154,9 +154,9 @@ function findPresetEntity(hass) {
     const state = hass.states[key];
     if (state && state.attributes && state.attributes.options) {
       const opts = state.attributes.options;
-      if (opts.includes('manual') && opts.includes('eco') && opts.includes('comfort')) {
-        return true;
-      }
+        if (opts.includes('manual') && opts.includes('home') && opts.includes('sleep')) {
+          return true;
+        }
     }
     return false;
   });
@@ -1309,36 +1309,63 @@ class MultizoneThermostatStatusCard extends HTMLElement {
   }
 
   handleTap() {
-    const masterEntity = findMasterEntity(this._hass);
-    if (!masterEntity) return;
+    const presetEntity = findPresetEntity(this._hass);
+    if (!presetEntity) return;
 
-    const domain = masterEntity.split('.')[0];
-    this._hass.callService(domain, "toggle", {
-      entity_id: masterEntity
+    const presetState = this._hass.states[presetEntity];
+    if (!presetState) return;
+
+    // Toggle between manual (off) and the first available heating preset (like 'home')
+    const options = presetState.attributes.options || [];
+    let newPreset = "manual";
+    if (presetState.state === "manual" && options.length > 1) {
+        // Find the first option that isn't manual
+        newPreset = options.find(o => o !== "manual") || "manual";
+    }
+
+    const domain = presetEntity.split('.')[0];
+    this._hass.callService(domain, "select_option", {
+      entity_id: presetEntity,
+      option: newPreset
     });
   }
 
   updateCard() {
     if (!this._hass || !this._rendered) return;
 
-    const masterEntity = findMasterEntity(this._hass);
-    if (!masterEntity) {
-      const stateEl = this.shadowRoot.querySelector('.state');
-      if (stateEl) stateEl.textContent = getTranslation(this._hass, 'master_not_found');
-      const nameEl = this.shadowRoot.querySelector('.name');
-      if (nameEl) nameEl.textContent = getTranslation(this._hass, 'master_title');
-      const card = this.shadowRoot.querySelector('ha-card');
-      if (card) card.style.backgroundColor = "#7f8c8d";
-      return;
+    // We no longer rely on a master switch, we use the global preset to determine if system is ON
+    const presetEntity = findPresetEntity(this._hass);
+    let isMasterOn = false;
+    let boilerEntity = null;
+
+    if (presetEntity) {
+      const presetState = this._hass.states[presetEntity];
+      if (presetState) {
+        isMasterOn = presetState.state !== "manual" && presetState.state !== "off";
+      }
     }
 
-    const masterState = this._hass.states[masterEntity];
-    if (!masterState) return;
-
-    const boilerEntity = masterState.attributes ? masterState.attributes.boiler_switch : null;
+    // Try to find the boiler switch directly or through climate attributes
+    let boilerEntity = this._config.entity || this._config.boiler_entity;
+    if (!boilerEntity) {
+      // First try to find a climate entity that has the boiler_entity_id attribute
+      const zoneClimate = Object.values(this._hass.states).find(s => 
+        s.entity_id.startsWith('climate.') && s.attributes && s.attributes.hybrid_zone === true && s.attributes.boiler_entity_id
+      );
+      
+      if (zoneClimate) {
+        boilerEntity = zoneClimate.attributes.boiler_entity_id;
+      } else {
+        // Fallback to name heuristic
+        const boilerFound = Object.keys(this._hass.states).find(key => {
+          return key.startsWith('switch.') && (key.includes('boiler') || key.includes('caldaia'));
+        });
+        if (boilerFound) {
+           boilerEntity = boilerFound;
+        }
+      }
+    }
     const boilerState = boilerEntity ? this._hass.states[boilerEntity] : null;
-
-    const isMasterOn = masterState.state === "on";
     const isBoilerOn = boilerState ? boilerState.state === "on" : false;
 
     let bgColor = "#37474f"; // grigio quando spento

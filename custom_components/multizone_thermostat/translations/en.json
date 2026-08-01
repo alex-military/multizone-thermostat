@@ -18,55 +18,41 @@
           "weather_sensor": "Outdoor Temperature Sensor"
         }
       },
-      "choose_zone_type": {
-        "title": "Add Zone — Choose Type",
-        "description": "Do you want to use an existing thermostat or create a virtual one?",
-        "data": {
-          "zone_type": "Zone type"
-        }
-      },
-      "create_virtual_thermostat": {
-        "title": "Create Virtual Thermostat",
-        "description": "Create a virtual thermostat from a temperature sensor and a heater switch/relay.",
-        "data": {
-          "name": "Zone Name",
-          "temperature_sensor": "Temperature Sensor",
-          "heater_switch": "Heater Switch / Relay",
-          "target_temperature": "Initial Target Temperature (°C)",
-          "tolerance": "Tolerance (°C)",
-          "anti_seize": "Enable Anti-seize (Summer Protection) for this zone",
-          "window_sensor": "Window Sensor (Optional)"
-        },
-        "data_description": {
-          "temperature_sensor": "The sensor that reads the current room temperature",
-          "heater_switch": "The switch/relay that controls the heater in this zone",
-          "target_temperature": "The initial target temperature for this zone",
-          "tolerance": "Hysteresis: heater turns on below target-tolerance, off above target+tolerance",
-          "window_sensor": "Automatically bypass the zone when this sensor is open"
-        }
-      },
       "add_zone": {
         "title": "Add Heating Zone ({zone_number})",
         "description": "Configure a heating zone. {zones_added} zone(s) already added.",
         "data": {
-          "climate_entity": "Climate Entity",
+          "climate_entities": "Climate Entity",
           "name": "Zone Name",
           "trv_preset_sync": "Enable TRV Preset Sync",
-          "anti_seize": "Enable Anti-seize (Summer Protection) for this zone",
+          "anti_seize_zone_enable": "Enable Anti-seize (Summer Protection) for this zone",
           "window_sensor": "Window Sensor (Optional)"
         },
         "data_description": {
-          "climate_entity": "The climate entity for this room/zone",
+          "climate_entities": "The climate entity for this room/zone",
           "name": "A friendly name for this zone (pre-filled from climate entity name)",
           "trv_preset_sync": "Automatically sync preset mode when HVAC mode changes (for physical TRV valves)",
           "window_sensor": "Automatically bypass the zone when this sensor is open"
         }
       },
+      "trv_calibration": {
+        "title": "TRV Configuration (Offset Sensor)",
+        "description": "Select the temperature offset (calibration) entities for each TRV in zone {zone_name}. These are usually `number` entities provided by your TRV integration (e.g. Better Thermostat, Z2M, ZHA). If left empty, we will use 'Target Temperature Compensation' (faking the target temp to match the external sensor).",
+        "data": {}
+      },
       "another_zone": {
         "title": "Add Another Zone?",
-        "description": "You have added {zones_added} zone(s): {zones_list}.\n\n{remaining} climate entities still available.",
+        "description": "You have added {zones_added} zone(s): {zones_list}.",
         "data": {
           "add_another": "Add another zone"
+        }
+      },
+      "geofencing": {
+        "title": "Geofencing & Smart Schedule",
+        "description": "Do you want to enable Geofencing and Auto-Night mode? If enabled, select a presence sensor (e.g. zone.home or a person entity).",
+        "data": {
+          "geofencing_enabled": "Enable Geofencing & Auto-Night",
+          "presence_sensor": "Presence Sensor"
         }
       },
       "confirm": {
@@ -82,7 +68,8 @@
       "no_temp_sensors_found": "No temperature sensors found in Home Assistant."
     },
     "error": {
-      "zone_name_required": "Zone name cannot be empty."
+      "zone_name_required": "Zone name cannot be empty.",
+      "presence_sensor_required": "You must select a presence sensor if Geofencing is enabled."
     }
   },
   "options": {
@@ -103,31 +90,17 @@
       "add_zone": {
         "title": "Add New Zone",
         "data": {
-          "climate_entity": "Climate Entity",
+          "climate_entities": "Climate Entity",
           "name": "Zone Name",
           "trv_preset_sync": "Enable TRV Preset Sync",
-          "anti_seize": "Enable Anti-seize (Summer Protection) for this zone",
+          "anti_seize_zone_enable": "Enable Anti-seize (Summer Protection) for this zone",
           "window_sensor": "Window Sensor (Optional)"
-        }
-      },
-      "create_virtual_thermostat": {
-        "title": "Create Virtual Thermostat",
-        "description": "Create a virtual thermostat from a temperature sensor and a heater switch/relay.",
-        "data": {
-          "name": "Zone Name",
-          "temperature_sensor": "Temperature Sensor",
-          "heater_switch": "Heater Switch / Relay",
-          "target_temperature": "Initial Target Temperature (°C)",
-          "tolerance": "Tolerance (°C)",
-          "anti_seize": "Enable Anti-seize (Summer Protection) for this zone",
-          "window_sensor": "Window Sensor (Optional)"
-        }
-      },
-      "remove_virtual_thermostat": {
-        "title": "Remove Virtual Thermostat",
-        "description": "Select the virtual thermostat to remove. The associated zone will also be removed.",
-        "data": {
-          "virtual_thermostat": "Virtual Thermostat"
+        },
+        "data_description": {
+          "climate_entities": "The climate entity for this room/zone",
+          "name": "A friendly name for this zone (pre-filled from climate entity name)",
+          "trv_preset_sync": "Automatically sync preset mode when HVAC mode changes (for physical TRV valves)",
+          "window_sensor": "Automatically bypass the zone when this sensor is open"
         }
       },
       "remove_zone": {
@@ -143,8 +116,33 @@
         "data": {
           "zone_climate": "Zone",
           "trv_preset_sync": "Enable TRV Preset Sync",
-          "anti_seize": "Enable Anti-seize (Summer Protection) for this zone",
+          "anti_seize_zone_enable": "Enable Anti-seize (Summer Protection) for this zone",
           "window_sensor": "Window Sensor (Optional)"
+        }
+      },
+      "edit_geofencing": {
+        "title": "Geofencing & Smart Schedule",
+        "description": "Enable or disable Geofencing and select the presence sensor.",
+        "data": {
+          "geofencing_enabled": "Enable Geofencing & Auto-Night",
+          "presence_sensor": "Presence Sensor"
+        }
+      },
+      "trv_calibration_add": {
+        "title": "TRV Configuration (Offset Sensor) (Add)",
+        "description": "Select the temperature offset (calibration) entities for each TRV in zone {zone_name}. These are usually `number` entities provided by your TRV integration (e.g. Better Thermostat, Z2M, ZHA). If left empty, we will use 'Target Temperature Compensation' (faking the target temp to match the external sensor).",
+        "data": {}
+      },
+      "trv_calibration_edit": {
+        "title": "TRV Configuration (Offset Sensor) (Edit)",
+        "description": "Select the temperature offset (calibration) entities for each TRV in zone {zone_name}. These are usually `number` entities provided by your TRV integration (e.g. Better Thermostat, Z2M, ZHA). If left empty, we will use 'Target Temperature Compensation' (faking the target temp to match the external sensor).",
+        "data": {}
+      },
+      "edit_weather_comp": {
+        "title": "Edit Weather Compensation",
+        "description": "Select an outdoor temperature sensor to enable automatic weather compensation.",
+        "data": {
+          "weather_sensor": "Outdoor Temperature Sensor"
         }
       }
     },

@@ -37,10 +37,12 @@ from .const import (
     CONF_ANTI_SEIZE_IDLE_DAYS,
     CONF_ANTI_SEIZE_DURATION,
     CONF_ANTI_SEIZE_BOILER,
-    CONF_ZONE_ANTI_SEIZE,
-    CONF_ZONE_CLIMATE,
-    CONF_ZONE_TRV_SYNC,
+    CONF_ZONE_NAME,
+    make_zone_entity_id,
     CONF_ZONE_WINDOW_SENSOR,
+    CONF_ZONE_TRV_SYNC,
+    CONF_ZONE_ANTI_SEIZE,
+    CONF_ZONE_CLIMATES,
     DOMAIN,
     GLOBAL_PRESET_MANUAL,
     HVAC_ACTION_HEATING,
@@ -48,7 +50,6 @@ from .const import (
     HVAC_MODE_OFF,
     PRESET_MANUAL,
     PRESET_OFF,
-    CONF_PRESENCE_SENSOR,
     KEY_NIGHT_TIME,
     KEY_MORNING_TIME,
     KEY_AUTO_NIGHT_MODE,
@@ -106,26 +107,26 @@ class MultizoneCoordinator:
         # Internal state tracking
         self._master_state: bool = False
         self._zone_modes: dict[str, str] = {
-            z[CONF_ZONE_CLIMATE]: ZONE_MODE_PRIMARY for z in self.zones
+            make_zone_entity_id(z[CONF_ZONE_NAME]): ZONE_MODE_PRIMARY for z in self.zones
         }
         self._zone_demands: dict[str, float] = {
-            z[CONF_ZONE_CLIMATE]: 0.0 for z in self.zones
+            make_zone_entity_id(z[CONF_ZONE_NAME]): 0.0 for z in self.zones
         }
         self._pre_window_state: dict[str, str] = {}
         self._pre_anti_seize_state: dict[str, str] = {}
-        self._select_entities = {}
         self._min_cycle_on = 0.0
         self._min_cycle_off = 0.0
         self._valve_delay = 0.0
-        self._boiler_state = STATE_OFF
+        self._climate_callbacks = {}
         self._last_boiler_change = 0.0
         self._last_active_time = time.time() # Default to now until loaded
         self._anti_seize_running = False
         
         self._store = Store(hass, WINDOW_STORAGE_VERSION, WINDOW_STORAGE_KEY)
+        self._preset_store = Store(hass, PRESET_STORAGE_VERSION, f"{DOMAIN}_{entry.entry_id}_presets")
+        self._settings_store = Store(hass, SETTINGS_STORAGE_VERSION, f"{DOMAIN}_{entry.entry_id}_settings")
 
         self._pending_boiler_task: asyncio.Task | None = None
-
         self._boiler_pwm = PWMEngine(pwm_interval=900.0, min_on=self._min_cycle_on * 60, min_off=self._min_cycle_off * 60)
         
         self._unsub_listeners: list = []
@@ -137,22 +138,24 @@ class MultizoneCoordinator:
         self._pids: dict[str, MultizonePID] = {}
         self._autotuners: dict[str, PassiveAutotuneObserver] = {}
         for zone in self.zones:
-            climate_id = zone[CONF_ZONE_CLIMATE]
+            climate_id = make_zone_entity_id(zone[CONF_ZONE_NAME])
             # Default Kp=100, Ki=0, Kd=0 (will be overridden by Autolearning later)
             self._pids[climate_id] = MultizonePID(kp=100.0, ki=0.0, kd=0.0, out_min=0.0, out_max=100.0, sensor_timeout=7200.0)
             self._autotuners[climate_id] = PassiveAutotuneObserver(climate_id, required_cycles=3)
 
 
 
-        self._preset_store = Store(hass, PRESET_STORAGE_VERSION, PRESET_STORAGE_KEY)
         self._presets: dict[str, dict[str, dict[str, Any]]] = {}
         self._current_global_preset: str = GLOBAL_PRESET_MANUAL
         
-        self._settings_store = Store(hass, SETTINGS_STORAGE_VERSION, SETTINGS_STORAGE_KEY)
         self._settings: dict[str, Any] = {}
         
         self._last_night_trigger_date: datetime.date | None = None
         self._last_morning_trigger_date: datetime.date | None = None
+
+    def register_climate(self, entity_id: str, callback) -> None:
+        """Register a climate entity for state updates."""
+        self._climate_callbacks[entity_id] = callback
 
     def get_persistent_data(self, key: str, default: Any = None) -> Any:
         """Get a persistent setting."""
@@ -222,7 +225,10 @@ class MultizoneCoordinator:
 
     def set_zone_demand(self, climate_id: str, demand: float) -> None:
         """Set the PID demand for a zone."""
+        old_demand = self._zone_demands.get(climate_id)
         self._zone_demands[climate_id] = demand
+        if old_demand != demand and climate_id in self._climate_callbacks:
+            self._climate_callbacks[climate_id]()
 
     def get_pid(self, climate_id: str):
         """Get the PID controller for a zone."""
@@ -301,7 +307,7 @@ class MultizoneCoordinator:
     @callback
     def async_setup_listeners(self) -> None:
         """Set up state change listeners for all climate entities."""
-        climate_entities = [z[CONF_ZONE_CLIMATE] for z in self.zones]
+        climate_entities = [make_zone_entity_id(z[CONF_ZONE_NAME]) for z in self.zones]
 
         if climate_entities:
             self._unsub_listeners.append(
@@ -334,7 +340,6 @@ class MultizoneCoordinator:
             )
 
         # Start periodic PWM evaluation (every 10 seconds)
-        from datetime import timedelta
         self._unsub_listeners.append(
             async_track_time_interval(
                 self.hass,
@@ -401,7 +406,6 @@ class MultizoneCoordinator:
                 # Update Autotuner
                 tuner = self._autotuners[entity_id]
                 was_completed = (tuner.state == tuner.STATE_COMPLETED)
-                tuner.update(current_temp, self.get_zone_demand(entity_id) > 0)
                 is_completed = (tuner.state == tuner.STATE_COMPLETED)
                 
                 # Check if learning just finished!
@@ -450,6 +454,10 @@ class MultizoneCoordinator:
             _LOGGER.debug("Zone '%s' Demand updated: %.1f%% (Temp: %s, Target: %s, Mode: %s)", 
                           entity_id, demand, current_temp, target_temp, "PID" if tuner.state == tuner.STATE_COMPLETED else "Hysteresis")
 
+        else:
+            demand = 0.0
+            self.set_zone_demand(entity_id, 0.0)
+
         # Trigger boiler update if action changed (Legacy fallback check)
         _LOGGER.debug("Climate state changed: %s → %s", entity_id, new_state.state)
 
@@ -477,6 +485,45 @@ class MultizoneCoordinator:
                 self._async_sync_trv_preset(entity_id, new_state.state)
             )
 
+    async def _async_sync_trv_preset(self, zone_id: str, new_state: str) -> None:
+        """Sync TRV activation/presets based on Zone state (heat/off)."""
+        zone = self._get_zone(zone_id)
+        if not zone:
+            return
+            
+        climates = zone.get(CONF_ZONE_CLIMATES, [])
+        for trv in climates:
+            trv_state = self.hass.states.get(trv)
+            if not trv_state:
+                continue
+                
+            supported_presets = trv_state.attributes.get("preset_modes", [])
+            target_preset = None
+            
+            if new_state == HVAC_MODE_HEAT:
+                # Try to wake up the TRV
+                if "manual" in supported_presets:
+                    target_preset = "manual"
+                elif "none" in supported_presets:
+                    target_preset = "none"
+                elif "boost" in supported_presets:
+                    target_preset = "boost"
+            elif new_state == HVAC_MODE_OFF:
+                # Try to put the TRV to sleep
+                if "off" in supported_presets:
+                    target_preset = "off"
+                elif "none" in supported_presets:
+                    target_preset = "none"
+                    
+            if target_preset:
+                _LOGGER.debug("Syncing TRV preset for %s to %s (Zone is %s)", trv, target_preset, new_state)
+                await self.hass.services.async_call(
+                    CLIMATE_DOMAIN,
+                    SERVICE_SET_PRESET_MODE,
+                    {ATTR_ENTITY_ID: trv, ATTR_PRESET_MODE: target_preset},
+                    blocking=False,
+                )
+
     @callback
     def _async_on_window_state_changed(self, event: Event) -> None:
         """Handle window sensor state changes → bypass/restore zone."""
@@ -495,7 +542,7 @@ class MultizoneCoordinator:
             return
             
         for zone in matching_zones:
-            climate_id = zone[CONF_ZONE_CLIMATE]
+            climate_id = make_zone_entity_id(zone[CONF_ZONE_NAME])
             zone_select = self._select_entities.get(f"zone_mode_{climate_id}")
             _LOGGER.debug("Window listener: zone_select for %s: %s", climate_id, zone_select)
             
@@ -626,7 +673,7 @@ class MultizoneCoordinator:
     def _get_zone(self, climate_entity: str) -> dict | None:
         """Get zone config by climate entity ID."""
         for zone in self.zones:
-            if zone[CONF_ZONE_CLIMATE] == climate_entity:
+            if make_zone_entity_id(zone[CONF_ZONE_NAME]) == climate_entity:
                 return zone
         return None
 
@@ -652,7 +699,7 @@ class MultizoneCoordinator:
         # Phase 4: Calculate Peak Demand
         peak_demand = 0.0
         for zone in self.zones:
-            climate_id = zone[CONF_ZONE_CLIMATE]
+            climate_id = make_zone_entity_id(zone[CONF_ZONE_NAME])
             mode = self.get_zone_mode(climate_id)
             if mode != ZONE_MODE_PRIMARY:
                 continue
@@ -679,6 +726,40 @@ class MultizoneCoordinator:
                 return
                 
             _LOGGER.debug("PWM Tick: Boiler → ON (Peak Demand: %.1f%%)", peak_demand)
+            
+            # BOILER SAFETY: Check if TRVs are physically open (>10%)
+            trvs_ready = False
+            for zone in self.zones:
+                climate_id = make_zone_entity_id(zone[CONF_ZONE_NAME])
+                mode = self.get_zone_mode(climate_id)
+                if mode == ZONE_MODE_PRIMARY and self.get_zone_demand(climate_id) > 0:
+                    trv_list = zone.get(CONF_ZONE_CLIMATES) or []
+                    for trv in trv_list:
+                        trv_state = self.hass.states.get(trv)
+                        if trv_state:
+                            position = None
+                            for attr in ["position", "valve_position", "pi_heating_demand", "heating_demand", "valve_state"]:
+                                if attr in trv_state.attributes:
+                                    position = trv_state.attributes[attr]
+                                    break
+                            if position is not None:
+                                try:
+                                    if float(position) > 10.0:
+                                        trvs_ready = True
+                                        break
+                                except ValueError:
+                                    pass
+                            else:
+                                # Assume ready if TRV doesn't expose position
+                                trvs_ready = True
+                                break
+                if trvs_ready:
+                    break
+                    
+            if not trvs_ready and any((zone.get(CONF_ZONE_CLIMATES) or []) for zone in self.zones):
+                _LOGGER.warning("PWM Tick: Boiler wants to turn ON, but no TRVs are open > 10%. Delaying boiler ignition.")
+                return
+
             if self._valve_delay > 0:
                 if not self._pending_boiler_task:
                     _LOGGER.debug("Waiting %s seconds for valves to open...", self._valve_delay)
@@ -759,46 +840,11 @@ class MultizoneCoordinator:
         self._last_boiler_change = time.time()
         _LOGGER.debug("Boiler forced OFF")
 
-    async def _async_sync_trv_preset(self, climate_entity: str, hvac_mode: str) -> None:
-        """Sync TRV preset mode based on HVAC mode."""
-        if hvac_mode == HVAC_MODE_HEAT:
-            preset = PRESET_MANUAL
-        elif hvac_mode == HVAC_MODE_OFF:
-            preset = PRESET_OFF
-        else:
-            return
-
-        state = self.hass.states.get(climate_entity)
-        if state is None:
-            return
-
-        # Check if climate supports presets
-        supported_features = state.attributes.get("supported_features", 0)
-        if not (supported_features & ClimateEntityFeature.PRESET_MODE):
-            _LOGGER.debug(
-                "Climate %s does not support presets, skipping sync", climate_entity
-            )
-            return
-
-        current_preset = state.attributes.get(ATTR_PRESET_MODE)
-        if current_preset == preset:
-            return
-
-        _LOGGER.debug(
-            "TRV preset sync: %s → %s (hvac_mode: %s)", climate_entity, preset, hvac_mode
-        )
-        await self.hass.services.async_call(
-            CLIMATE_DOMAIN,
-            SERVICE_SET_PRESET_MODE,
-            {ATTR_ENTITY_ID: climate_entity, ATTR_PRESET_MODE: preset},
-            blocking=False,
-        )
-
     async def async_apply_master_on(self) -> None:
         """Master turned ON: set heat mode for enabled zones, off for disabled."""
         _LOGGER.debug("Master ON → applying to all zones")
         for zone in self.zones:
-            climate_id = zone[CONF_ZONE_CLIMATE]
+            climate_id = make_zone_entity_id(zone[CONF_ZONE_NAME])
             mode = self._zone_modes.get(climate_id, ZONE_MODE_PRIMARY)
             zone_enabled = (mode != ZONE_MODE_BYPASS)
             if zone_enabled:
@@ -810,7 +856,7 @@ class MultizoneCoordinator:
         """Master turned OFF: turn off all zones and boiler."""
         _LOGGER.debug("Master OFF → turning off all zones")
         for zone in self.zones:
-            climate_id = zone[CONF_ZONE_CLIMATE]
+            climate_id = make_zone_entity_id(zone[CONF_ZONE_NAME])
             await self._async_set_hvac_mode(climate_id, HVAC_MODE_OFF)
         # Boiler will auto-turn off via state change listener,
         # but we also force it off here for safety ignoring locks
@@ -866,7 +912,7 @@ class MultizoneCoordinator:
             zones_to_open = []
             
             for zone in self.zones:
-                climate_id = zone[CONF_ZONE_CLIMATE]
+                climate_id = make_zone_entity_id(zone[CONF_ZONE_NAME])
                 # Check if zone has anti-seize enabled
                 if not zone.get(CONF_ZONE_ANTI_SEIZE, True):
                     _LOGGER.debug("Skipping zone %s (anti-seize disabled)", climate_id)

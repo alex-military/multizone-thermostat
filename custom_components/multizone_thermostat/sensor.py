@@ -8,7 +8,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.const import PERCENTAGE
 from homeassistant.helpers.event import async_track_state_change_event
 
-from .const import DOMAIN, CONF_ZONES
+from .const import DOMAIN, CONF_ZONES, CONF_ZONE_NAME, make_zone_entity_id
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -25,8 +25,8 @@ async def async_setup_entry(
 
     entities = []
     for zone in zones:
-        climate_entity_id = zone["climate_entity"]
-        name = zone.get("name", climate_entity_id.split(".")[-1].replace("_", " ").title())
+        climate_entity_id = make_zone_entity_id(zone[CONF_ZONE_NAME])
+        name = zone.get(CONF_ZONE_NAME, climate_entity_id.split(".")[-1].replace("_", " ").title())
         entities.append(DemandSensor(hass, config_entry.entry_id, name, climate_entity_id, coordinator))
         entities.append(AutotuneSensor(hass, config_entry.entry_id, name, climate_entity_id, coordinator))
 

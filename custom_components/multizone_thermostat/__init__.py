@@ -11,7 +11,6 @@ from .const import (
     CONF_BOILER_SWITCH,
     CONF_ZONES,
     DOMAIN,
-    CONF_PRESENCE_SENSOR,
 )
 from .coordinator import MultizoneCoordinator
 
@@ -25,7 +24,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
 
     boiler_switch = entry.data[CONF_BOILER_SWITCH]
-    zones = entry.data.get(CONF_ZONES, [])
+    zones = [dict(z) for z in list(entry.data.get(CONF_ZONES, []))]
 
     # Validate boiler switch exists
     boiler_state = hass.states.get(boiler_switch)
@@ -35,6 +34,40 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "control may not work until the entity is available.",
             boiler_switch,
         )
+
+    # Migrate old config format to new Hybrid Zones format
+    migrated = False
+    new_data = dict(entry.data)
+    
+    # 1. Migrate old virtual thermostats to new zones
+    old_vts = new_data.pop("virtual_thermostats", [])
+    if old_vts:
+        migrated = True
+        for vt in old_vts:
+            vt_zone = {
+                "name": vt.get("name", "Unknown VT"),
+                "climate_entities": [],
+                "switch_entities": [vt.get("heater_switch")] if vt.get("heater_switch") else [],
+                "temp_sensor": vt.get("temperature_sensor"),
+                "target_temperature": vt.get("target_temperature", 20.0),
+                "trv_preset_sync": False,
+                "anti_seize_zone_enable": True,
+            }
+            zones.append(vt_zone)
+            
+    # 2. Migrate old zones
+    for zone in zones:
+        if "climate_entity" in zone:
+            migrated = True
+            climate = zone.pop("climate_entity")
+            zone["climate_entities"] = [climate] if isinstance(climate, str) and climate else []
+            zone["switch_entities"] = []
+            zone["target_temperature"] = 20.0
+            
+    if migrated:
+        _LOGGER.info("Migrating Multizone Thermostat config to new Hybrid Zones format.")
+        new_data["zones"] = zones
+        hass.config_entries.async_update_entry(entry, data=new_data)
 
     # Create coordinator
     coordinator = MultizoneCoordinator(
@@ -131,6 +164,3 @@ async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> Non
     _LOGGER.debug(
         "Options updated: boiler=%s, zones=%d", new_boiler, len(new_zones)
     )
-
-    # Reload the entire entry to apply zone additions/removals
-    await hass.config_entries.async_reload(entry.entry_id)

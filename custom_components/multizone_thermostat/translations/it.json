@@ -18,52 +18,31 @@
           "weather_sensor": "Sensore Temperatura Esterna"
         }
       },
-      "choose_zone_type": {
-        "title": "Aggiungi Zona — Scegli Tipo",
-        "description": "Vuoi usare un termostato esistente o crearne uno virtuale?",
-        "data": {
-          "zone_type": "Tipo di zona"
-        }
-      },
-      "create_virtual_thermostat": {
-        "title": "Crea Termostato Virtuale",
-        "description": "Crea una zona gestita da un termostato virtuale usando un sensore di temperatura e un interruttore di riscaldamento.\nSe è abilitata la protezione estiva, puoi disabilitarla per questa singola zona deselezionando l'apposita casella.",
-        "data": {
-          "vt_name": "Nome della Zona (Termostato Virtuale)",
-          "temp_sensor": "Sensore di Temperatura",
-          "heater_switch": "Switch / Relè Riscaldamento",
-          "target_temperature": "Temperatura Target Iniziale (°C)",
-          "tolerance": "Tolleranza (°C)",
-          "anti_seize": "Abilita Antigrippaggio (Protezione Estiva) per questa zona",
-          "window_sensor": "Sensore Finestra (Opzionale)"
-        },
-        "data_description": {
-          "temperature_sensor": "Il sensore che legge la temperatura attuale della stanza",
-          "heater_switch": "Lo switch/relè che controlla il riscaldamento in questa zona",
-          "target_temperature": "La temperatura target iniziale per questa zona",
-          "tolerance": "Isteresi: il riscaldamento si accende sotto target-tolleranza, si spegne sopra target+tolleranza",
-          "window_sensor": "Bypassa automaticamente la zona quando questo sensore è aperto"
-        }
-      },
       "add_zone": {
         "title": "Aggiungi Zona di Riscaldamento ({zone_number})",
         "description": "Configura una zona di riscaldamento. {zones_added} zona/e già aggiunte.",
         "data": {
-          "climate_entity": "Entità Climate",
+          "climate_entities": "Entità Climate",
           "name": "Nome Zona",
           "trv_preset_sync": "Abilita Sincronizzazione Preset TRV",
+          "anti_seize_zone_enable": "Abilita Antigrippaggio (Protezione Estiva) per questa zona",
           "window_sensor": "Sensore Finestra (Opzionale)"
         },
         "data_description": {
-          "climate_entity": "L'entità climate per questa stanza/zona",
+          "climate_entities": "L'entità climate per questa stanza/zona",
           "name": "Un nome per questa zona (precompilato dal nome dell'entità climate)",
           "trv_preset_sync": "Sincronizza automaticamente la modalità preset quando cambia la modalità HVAC (per valvole TRV fisiche)",
           "window_sensor": "Bypassa automaticamente la zona quando questo sensore è aperto"
         }
       },
+      "trv_calibration": {
+        "title": "Configurazione TRV (Sensore Offset/Compensazione)",
+        "description": "Seleziona le entità di offset (calibrazione termostato) per ogni TRV nella zona {zone_name}. Spesso sono entità `number` create dall'integrazione della valvola (es. Z2M, ZHA). Se non selezioni nulla, useremo la 'Compensazione del Target' (ingannando la valvola alzando/abbassando il target). Tutte le tue valvole appariranno qui sotto, ognuna col suo campo opzionale.",
+        "data": {}
+      },
       "another_zone": {
-        "title": "Aggiungere un'altra zona?",
-        "description": "Hai aggiunto {zones_added} zone: {zones_list}.\n\nCi sono ancora {remaining} entità clima disponibili.",
+        "title": "Aggiungere un'altra Zona?",
+        "description": "Hai aggiunto {zones_added} zona/e: {zones_list}.",
         "data": {
           "add_another": "Aggiungi un'altra zona"
         }
@@ -111,41 +90,24 @@
       "add_zone": {
         "title": "Aggiungi Nuova Zona",
         "data": {
-          "climate_entity": "Entità Climate",
+          "climate_entities": "Entità Climate",
           "name": "Nome Zona",
           "trv_preset_sync": "Abilita Sincronizzazione Preset TRV",
+          "anti_seize_zone_enable": "Abilita Antigrippaggio (Protezione Estiva) per questa zona",
           "window_sensor": "Sensore Finestra (Opzionale)"
+        },
+        "data_description": {
+          "climate_entities": "L'entità climate per questa stanza/zona",
+          "name": "Un nome per questa zona (precompilato dal nome dell'entità climate)",
+          "trv_preset_sync": "Sincronizza automaticamente la modalità preset quando cambia la modalità HVAC (per valvole TRV fisiche)",
+          "window_sensor": "Bypassa automaticamente la zona quando questo sensore è aperto"
         }
       },
-      "create_virtual_thermostat": {
-        "title": "Crea Termostato Virtuale",
-        "description": "Crea un termostato virtuale da un sensore di temperatura e uno switch/relè riscaldamento.",
+      "remove_zone": {
+        "title": "Rimuovi una Zona",
+        "description": "Seleziona la zona da rimuovere. L'entità switch per questa zona verrà anch'essa rimossa.",
         "data": {
-          "name": "Nome Zona",
-          "temperature_sensor": "Sensore Temperatura",
-          "heater_switch": "Switch / Relè Riscaldamento",
-          "target_temperature": "Temperatura Target Iniziale (°C)",
-          "tolerance": "Tolleranza (°C)",
-          "anti_seize": "Abilita Antigrippaggio (Protezione Estiva) per questa zona",
-          "window_sensor": "Sensore Finestra (Opzionale)"
-        }
-      },
-      "remove_virtual_thermostat": {
-        "title": "Rimuovi Termostato Virtuale",
-        "description": "Seleziona il termostato virtuale da rimuovere. Anche la zona associata verrà rimossa.",
-        "data": {
-          "zone_type": "Tipo di Zona"
-        }
-      },
-      "add_zone": {
-        "title": "Aggiungi una zona",
-        "description": "Seleziona un'entità termostato (climate) esistente per aggiungerla a questa zona.\nPuoi configurare altre opzioni come il sensore finestra opzionale e la sincronizzazione TRV.\nSe è abilitata la protezione estiva, puoi disabilitarla per questa singola zona deselezionando l'apposita casella.",
-        "data": {
-          "zone_climate": "Entità Climate (Termostato)",
-          "zone_name": "Nome Zona",
-          "trv_sync": "Sincronizza modalità Termostato (TRV) -> Centrale",
-          "anti_seize": "Abilita Antigrippaggio (Protezione Estiva) per questa zona",
-          "window_sensor": "Sensore Finestra (opzionale)"
+          "zone_climate": "Zona da Rimuovere"
         }
       },
       "edit_zone": {
@@ -153,8 +115,8 @@
         "description": "Modifica le impostazioni per questa zona.\nSe è abilitata la protezione estiva, puoi disabilitarla per questa singola zona deselezionando l'apposita casella.",
         "data": {
           "zone_climate": "Seleziona la zona da modificare",
-          "trv_sync": "Sincronizza modalità Termostato (TRV) -> Centrale",
-          "anti_seize": "Abilita Antigrippaggio (Protezione Estiva) per questa zona",
+          "trv_preset_sync": "Sincronizza modalità Termostato (TRV) -> Centrale",
+          "anti_seize_zone_enable": "Abilita Antigrippaggio (Protezione Estiva) per questa zona",
           "window_sensor": "Sensore Finestra (opzionale)"
         }
       },
@@ -164,6 +126,23 @@
         "data": {
           "geofencing_enabled": "Abilita Geofencing & Auto-Notte",
           "presence_sensor": "Sensore di Presenza"
+        }
+      },
+      "trv_calibration_add": {
+        "title": "Configurazione TRV (Sensore Offset/Compensazione) (Aggiungi)",
+        "description": "Seleziona le entità di offset (calibrazione termostato) per ogni TRV nella zona {zone_name}. Spesso sono entità `number` create dall'integrazione della valvola (es. Z2M, ZHA). Se non selezioni nulla, useremo la 'Compensazione del Target' (ingannando la valvola alzando/abbassando il target). Tutte le tue valvole appariranno qui sotto, ognuna col suo campo opzionale.",
+        "data": {}
+      },
+      "trv_calibration_edit": {
+        "title": "Configurazione TRV (Sensore Offset/Compensazione) (Modifica)",
+        "description": "Seleziona le entità di offset (calibrazione termostato) per ogni TRV nella zona {zone_name}. Spesso sono entità `number` create dall'integrazione della valvola (es. Z2M, ZHA). Se non selezioni nulla, useremo la 'Compensazione del Target' (ingannando la valvola alzando/abbassando il target). Tutte le tue valvole appariranno qui sotto, ognuna col suo campo opzionale.",
+        "data": {}
+      },
+      "edit_weather_comp": {
+        "title": "Modifica Compensazione Climatica",
+        "description": "Seleziona un sensore di temperatura esterna per abilitare la compensazione climatica automatica.",
+        "data": {
+          "weather_sensor": "Sensore Temperatura Esterna"
         }
       }
     },

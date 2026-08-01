@@ -6,10 +6,14 @@ DOMAIN = "multizone_thermostat"
 CONF_BOILER_SWITCH = "boiler_switch"
 CONF_ZONES = "zones"
 CONF_ZONE_NAME = "name"
-CONF_ZONE_CLIMATE = "climate_entity"
+CONF_ZONE_CLIMATES = "climate_entities"
+CONF_ZONE_SWITCHES = "switch_entities"
+CONF_ZONE_TEMP_SENSOR = "temp_sensor"
+CONF_ZONE_TARGET_TEMP = "target_temperature"
 CONF_ZONE_TRV_SYNC = "trv_preset_sync"
 CONF_ZONE_WINDOW_SENSOR = "window_sensor"
 CONF_ZONE_ANTI_SEIZE = "anti_seize_zone_enable"
+CONF_ZONE_CALIBRATIONS = "calibrations"
 
 # Geofencing keys
 CONF_GEOFENCING_ENABLED = "geofencing_enabled"
@@ -92,8 +96,8 @@ DEFAULT_VT_TARGET_TEMP = 20.0
 DEFAULT_VT_TOLERANCE = 0.5
 
 
-def make_vt_entity_id(name: str) -> str:
-    """Generate a predictable entity_id for a virtual thermostat."""
+def make_zone_entity_id(name: str) -> str:
+    """Generate a predictable entity_id for a zone master thermostat."""
     safe = name.lower().replace(" ", "_").replace("-", "_")
     safe = "".join(c for c in safe if c.isalnum() or c == "_")
-    return f"climate.{DOMAIN}_vt_{safe}"
+    return f"climate.{DOMAIN}_{safe}"

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 
+from homeassistant.components.climate import HVACMode
 from homeassistant.components.select import SelectEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -16,8 +17,10 @@ from .const import (
     GLOBAL_PRESETS,
     ZONE_MODES,
     ZONE_MODE_PRIMARY,
-    CONF_ZONE_CLIMATE,
+    ZONE_MODE_SECONDARY,
+    ZONE_MODE_BYPASS,
     CONF_ZONE_NAME,
+    make_zone_entity_id,
 )
 from .coordinator import MultizoneCoordinator
 
@@ -35,9 +38,8 @@ async def async_setup_entry(
     entities: list[SelectEntity] = [MultizoneGlobalPresetSelect(coordinator, entry.entry_id)]
     
     for zone in coordinator.zones:
-        climate_id = zone[CONF_ZONE_CLIMATE]
-        zone_name = zone.get(CONF_ZONE_NAME, climate_id)
-        entities.append(MultizoneZoneSelect(coordinator, entry.entry_id, climate_id, zone_name))
+        zone_name = zone[CONF_ZONE_NAME]
+        entities.append(MultizoneZoneSelect(coordinator, entry.entry_id, zone_name))
         
     async_add_entities(entities)
 
@@ -98,18 +100,19 @@ class MultizoneZoneSelect(RestoreEntity, SelectEntity):
 
     _attr_has_entity_name = True
 
-    def __init__(self, coordinator: MultizoneCoordinator, entry_id: str, climate_entity: str, zone_name: str) -> None:
+    def __init__(self, coordinator: MultizoneCoordinator, entry_id: str, zone_name: str) -> None:
         """Initialize the zone mode selector."""
         self._coordinator = coordinator
         self._entry_id = entry_id
-        self._climate_entity = climate_entity
         self._zone_name = zone_name
-        self._attr_unique_id = f"{DOMAIN}_{entry_id}_zone_mode_{climate_entity.replace('.', '_').replace('-', '_')}"
+        self._climate_id = make_zone_entity_id(zone_name)
+        self._attr_unique_id = f"{DOMAIN}_{entry_id}_zone_mode_{self._climate_id.replace('.', '_')}"
         self._attr_name = f"{zone_name} Mode"
         
         self._attr_options = ZONE_MODES
         self._attr_extra_state_attributes = {
-            "climate_entity": climate_entity
+            "zone_name": zone_name,
+            "climate_entity": self._climate_id
         }
 
     @property
@@ -127,27 +130,27 @@ class MultizoneZoneSelect(RestoreEntity, SelectEntity):
     def icon(self) -> str:
         """Return the icon based on the current option."""
         opt = self.current_option
-        if opt == "secondary":
+        if opt == ZONE_MODE_SECONDARY:
             return "mdi:link-variant"
-        if opt == "bypass":
+        if opt == ZONE_MODE_BYPASS:
             return "mdi:cancel"
         return "mdi:star-circle-outline"
 
     @property
     def current_option(self) -> str:
         """Return the current selected option."""
-        return self._coordinator.get_zone_mode(self._climate_entity)
+        return self._coordinator.get_zone_mode(self._climate_id)
 
     async def async_added_to_hass(self) -> None:
         """Restore previous state."""
         await super().async_added_to_hass()
         last_state = await self.async_get_last_state()
         if last_state is not None and last_state.state in self.options:
-            self._coordinator.set_zone_mode(self._climate_entity, last_state.state)
+            self._coordinator.set_zone_mode(self._climate_id, last_state.state)
         else:
-            self._coordinator.set_zone_mode(self._climate_entity, ZONE_MODE_PRIMARY)
+            self._coordinator.set_zone_mode(self._climate_id, ZONE_MODE_PRIMARY)
             
-        self._coordinator.register_select(f"zone_mode_{self._climate_entity}", self)
+        self._coordinator.register_select(f"zone_mode_{self._climate_id}", self)
 
     async def async_select_option(self, option: str) -> None:
         """Change the selected option."""
@@ -155,34 +158,32 @@ class MultizoneZoneSelect(RestoreEntity, SelectEntity):
             _LOGGER.warning("Invalid option: %s", option)
             return
 
-        self._coordinator.set_zone_mode(self._climate_entity, option)
+        # Notify coordinator
+        self._coordinator.set_zone_mode(self._climate_id, option)
         self.async_write_ha_state()
         
         # Turn off climate if bypass, or turn on if primary/secondary and master is on
-        climate_state = self.hass.states.get(self._climate_entity)
-        if option == "bypass":
-            if climate_state and climate_state.state != "off":
+        climate_state = self.hass.states.get(self._climate_id)
+        if option == ZONE_MODE_BYPASS:
+            if climate_state and climate_state.state != HVACMode.OFF:
                 try:
                     await self.hass.services.async_call(
                         "climate",
                         "set_hvac_mode",
-                        {"entity_id": self._climate_entity, "hvac_mode": "off"},
+                        {"entity_id": self._climate_id, "hvac_mode": HVACMode.OFF},
                         blocking=False,
                     )
                 except Exception as ex:
-                    _LOGGER.warning("Could not turn off climate %s: %s", self._climate_entity, ex)
+                    _LOGGER.warning("Could not turn off climate %s: %s", self._climate_id, ex)
         else:
-            if self._coordinator.get_master_state() and climate_state and climate_state.state != "heat":
+            if self._coordinator.get_master_state() and climate_state and climate_state.state != HVACMode.HEAT:
                 try:
                     await self.hass.services.async_call(
                         "climate",
                         "set_hvac_mode",
-                        {"entity_id": self._climate_entity, "hvac_mode": "heat"},
+                        {"entity_id": self._climate_id, "hvac_mode": HVACMode.HEAT},
                         blocking=False,
                     )
                 except Exception as ex:
-                    _LOGGER.warning("Could not turn on climate %s: %s", self._climate_entity, ex)
+                    _LOGGER.warning("Could not turn on climate %s: %s", self._climate_id, ex)
                     
-        # Trigger an update of boiler logic (to stop/start boiler)
-        # Note: _async_update_boiler is async but we don't need to await it directly if we use create_task
-        self.hass.async_create_task(self._coordinator._async_update_boiler())
