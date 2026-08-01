@@ -72,9 +72,11 @@ async def async_setup_entry(
                 heater_switch=vt_config[CONF_VT_HEATER_SWITCH],
                 target_temp=vt_config.get(CONF_VT_TARGET_TEMP, DEFAULT_VT_TARGET_TEMP),
                 tolerance=vt_config.get(CONF_VT_TOLERANCE, DEFAULT_VT_TOLERANCE),
+                # ===== НОВЫЕ ПАРАМЕТРЫ =====
+                cooler_switch=vt_config.get(CONF_VT_COOLER_SWITCH),
+                cool_tolerance=vt_config.get(CONF_VT_COOL_TOLERANCE, DEFAULT_VT_COOL_TOLERANCE),
             )
         )
-
     async_add_entities(entities)
 
 
