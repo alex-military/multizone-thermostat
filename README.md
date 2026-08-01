@@ -1,28 +1,30 @@
-# Multizone Thermostat — Home Assistant Custom Integration
+# Multizone Thermostat — Home Assistant Custom Integration (V3)
 
-A custom integration for Home Assistant that provides **multi-zone heating management** with **centralized boiler control**. No YAML scripting or manual automations required — everything is configured through the HA UI.
+A custom integration for Home Assistant that provides **multi-zone heating management** with **centralized boiler control** and **advanced PID autotuning**. No YAML scripting or manual automations required — everything is configured through the Home Assistant UI.
+
+![Dashboard Preview](images/dashboard_3col.png)
+
+## 🌟 What makes this unique?
+
+1. **Dynamic Autotuning (Hysteresis → Silent PID)**: Starts in Hysteresis mode, studies the room's thermal dispersion over time, and seamlessly transitions to a precise PID controller without user intervention to eliminate temperature swings.
+2. **Hierarchical Zones (Primary vs Secondary)**: Primary zones can trigger the boiler. Secondary zones only passively open valves to "steal" heat when the boiler is already running, saving gas.
+3. **TRV Sensor Override (The Magic)**: Have a TRV attached to a boiling hot radiator that reads wrong temperatures? Just assign a clean, external Zigbee sensor to the zone. The Multizone Coordinator will intercept the TRV and inject mathematical offsets or fake targets to force the TRV to obey the true room temperature.
+4. **100% Async Event-Driven**: Zero polling loops. The code only wakes up on state changes, ensuring near-zero CPU footprint on your Home Assistant server.
+5. **Zero-Code Auto Dashboard**: Automatically generates a stunning, premium, fully responsive climate dashboard with our custom cards.
 
 ## Features
 
 - 🖥️ **100% UI Config Flow** — Setup wizard: select your boiler relay and add zones directly from the HA interface
 - 🔘 **Master Switch** — One switch to enable/disable the entire heating system
-- 🏠 **Zone Modes (Primary/Secondary/Bypass)** — Advanced per-zone control. Primary zones trigger the boiler; Secondary zones only receive heat if the boiler is already running; Bypassed zones are excluded entirely.
-- 📍 **Geofencing & Auto-Sleep** — Automatically switch to Away or Sleep presets based on home occupancy (presence sensors) or time of day.
+- 🏠 **Zone Modes (Primary/Secondary/Bypass)** — Advanced per-zone control. 
+- 📍 **Geofencing & Auto-Sleep** — Automatically switch to Away or Sleep presets based on home occupancy (presence sensors).
 - 🔥 **Automatic Boiler Control** — Boiler turns ON when any Primary zone is heating, OFF when all zones are idle
-- 🛡️ **Boiler Protection** — Native `number` entities for anti-short-cycle (min cycle on/off) and valve opening delay
+- 🛡️ **Boiler & Valve Protection** — Native `number` entities for anti-short-cycle, valve opening delay, and **Summer Anti-seize protection**
 - 🪟 **Window Sensor Detection** — Automatically bypass zones when a window is opened, and restore them when closed
-- 🌡️ **Virtual Thermostats** — Create virtual thermostat entities directly from the UI by combining a temperature sensor and a heater switch — no YAML needed
-- 🌤️ **Weather Compensation** — Dynamic "Feed-Forward" heating adjustment based on an outdoor temperature sensor
-- 🔄 **TRV Preset Sync** — Optional per-zone preset synchronization for physical TRV valves
-- ⚙️ **Options Flow** — Add/remove zones and virtual thermostats, change window sensors and settings after installation
+- 🌡️ **Virtual Thermostats** — Create virtual thermostat entities directly from the UI by combining a temperature sensor and a heater switch
+- 🌤️ **Weather Compensation** — Dynamic "Feed-Forward" heating adjustment based on an outdoor physical or meteorological sensor
+- 🔄 **Global Presets & Dynamic Memory** — Manual, Eco, Comfort, Sleep, Away. The system remembers the specific temperature and bypass state of *each zone* per preset.
 - 🎨 **4 Custom Lovelace Cards** — Master status card, circular dial card, compact button card, and global preset card — all auto-registered
-
-## 🌟 What makes this unique?
-
-1. **Dynamic Autotuning (Hysteresis → Silent PID)**: Starts in Hysteresis mode, studies the room's thermal dispersion, and seamlessly transitions to a precise PID controller without user intervention.
-2. **Hierarchical Zones (Primary vs Secondary)**: Primary zones can trigger the boiler. Secondary zones only passively open valves to "steal" heat when the boiler is already running, saving gas.
-3. **Ironclad Hardware Locks**: Hard locks (`min_cycle_on` and `min_cycle_off`) protect your boiler's relays against sudden spikes or manual overrides.
-4. **100% Async Event-Driven**: Zero polling loops. The code only wakes up on state changes, ensuring near-zero CPU footprint on your Home Assistant server.
 
 ## 🏗️ System Architecture
 
@@ -57,60 +59,13 @@ graph TD
 1. Copy the `custom_components/multizone_thermostat` folder to your HA `custom_components` directory
 2. Restart Home Assistant
 
-## Configuration & Documentation
+## Documentation Hub
 
-The Multizone Thermostat is 100% configured via the Home Assistant UI, without needing any YAML. 
-It supports advanced features like Geofencing, Virtual Thermostats, and Zone Priorities.
+Everything about the Multizone Thermostat is documented in the following dedicated pages:
 
-👉 **[Click here to view the full Configuration Guide, Setup Instructions, and System Logic](configuration.md)**
-
-## Lovelace Cards
-
-This integration includes four custom Lovelace cards to control your heating zones, presets, and view the central heating status directly in your Home Assistant dashboards. The cards are **auto-registered** — no manual resource configuration needed.
-
-👉 **[Click here to view the documentation and screenshots for the Custom Lovelace Cards](cards.md)**
-
-## Requirements
-
-- Home Assistant 2024.x or newer
-- At least one `switch` entity (boiler relay/circulator)
-- At least one `climate` entity (thermostat/TRV) **OR** a temperature sensor + heater switch (to create a Virtual Thermostat)
-- **Note**: Currently supports only ON/OFF systems with a relay or actuator. Proportional modulation (PWM/PID) or OpenTherm will be added in future phases.
-
-## Future Roadmap
-
-The project is structured in phases to evolve from a simple aggregator to a full-fledged smart climate manager.
-
-### PHASE 1 — System Safety ✅
-- [x] **Anti-short Cycle (`min_cycle_duration`)**: Prevents rapid boiler oscillations with minimum ON/OFF times (implemented via `number` entities).
-- [x] **Boiler Ignition Delay (`valve_opening_delay`)**: Delay in seconds to allow thermoelectric valves to open fully before firing the boiler (implemented via `number` entity).
-- [x] **Open Window Detection (`window_sensor`)**: Automatic zone bypass upon window opening, with state restoration and persistence across restarts.
-
-### PHASE 2 — Architectural Evolution (In Progress)
-- [x] **Virtual Thermostats via UI**: Automatic creation of `climate` entities from a temperature sensor and a simple switch (e.g., bare relays) without YAML.
-- [x] **Global Presets (Dynamic Memory)**: Presets (Manual / Eco / Comfort / Sleep / Away) act as "global scenes" with dynamic memory per individual zone. 
-  - Selecting a preset applies the saved settings for each zone.
-  - Modifying the temperature or bypass state of a zone while a preset is active permanently saves that change to the current preset.
-  - Upon subsequent selection of the same preset, the zone accurately returns to its previously configured state (target temp and bypass).
-- [x] **Quick Preset Card**: A dedicated custom Lovelace card for quick and centralized global preset selection.
-- [x] **Geofencing Zero-Code**: Automatic preset switching based on home occupancy (Away/Comfort).
-- [x] **Room Priority Selector**: Replace the zone bypass switch with a multi-state selector (Primary / Secondary / Bypassed). *Primary* zones can turn on the boiler; *Secondary* zones can open their valves to receive heat but cannot turn on the boiler; *Bypassed* zones are excluded entirely.
-
-- 🛡️ **Boiler & Valve Protection** — Native `number` entities for anti-short-cycle, valve opening delay, and **Summer Anti-seize protection**
-
-### PHASE 3 — Quality of Life & Dashboards (Completed) ✅
-- [x] **Summer Valve Protection (Anti-seize)**: Cyclical safety activation during summer to prevent mechanical seizing of valves and circulator pumps. Includes global toggle, custom interval/duration settings, and per-zone exclusion.
-- [x] **Auto-Generated Lovelace Dashboard**: The integration automatically generates (and keeps updated) a full Home Assistant dashboard page with premium climate-dedicated graphics, including all our custom cards — zero-code required. Supports dynamic grid sizing (columns).
-
-### PHASE 4 — Advanced Energy Optimization & PID (Completed) ✅
-- [x] **Self-Learning PID Auto-Tuning**: Advanced self-learning PID algorithm that studies the thermal inertia of the house and regulates proportional modulation (PWM) autonomously to eliminate temperature swings.
-- [x] **PWM Engine**: Translates proportional demand into precise ON/OFF cycles.
-- [x] **Global Heat Demand (%)**: Calculates the exact percentage of load required by the house.
-- [x] **Weather Compensation Curve**: Dynamic adjustment of the heating demand based on an outdoor temperature sensor (Feed-Forward algorithm).
-
-### PHASE 5 — Total Climate Control & External AI
-- [ ] **Hybrid Support (Heating / Cooling)**: Complete rewrite of the configuration engine to simultaneously manage and easily switch between Winter (Heating) and Summer (Cooling) modes, supporting reversible heat pumps.
-- [ ] **External AI Integration (Predictive Optimization)**: Dedicated API/Sensors interface allowing external AIs to read historical data and constantly optimize PID parameters, weather compensation curves, and predictive geofencing. *(Note: This phase is exploratory. We need to evaluate if existing AI solutions can be integrated or if we need to develop something completely from scratch).*
+- ⚙️ **[Configuration & Setup Guide](configuration.md)**: Learn how to configure the integration, set up Virtual Thermostats, understand the internal logic, and use features like Geofencing and Summer Anti-seize.
+- 🎨 **[Lovelace Custom Cards & Dashboard](cards.md)**: Explore the included custom cards, how to use them, and how to enable the **Zero-Code Auto Dashboard Strategy**.
+- 🚀 **[Project Roadmap](ROADMAP.md)**: View completed phases (System Safety, PID, UI) and our future plans (Cooling, Predictive AI, Energy Optimization).
 
 ## Acknowledgments
 

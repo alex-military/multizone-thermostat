@@ -1,5 +1,7 @@
 # Multizone Thermostat Custom Lovelace Cards
 
+[⬅️ Back to Main Readme](README.md)
+
 This integration includes three custom Lovelace cards to control your heating zones and view the central heating status directly in your Home Assistant dashboards. The cards are **auto-registered** — no manual resource configuration needed.
 
 ## 1. Central Heating Status Card (`custom:multizone-thermostat-status-card`)

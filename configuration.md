@@ -1,5 +1,7 @@
 # Configuration & Documentation
 
+[⬅️ Back to Main Readme](README.md)
+
 Everything you need to know to set up, configure, and understand how the Multizone Thermostat integration works.
 
 ## Setup Wizard
