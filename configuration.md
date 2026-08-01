@@ -9,12 +9,13 @@ Everything you need to know to set up, configure, and understand how the Multizo
 1. Go to **Settings → Devices & Services → Add Integration**
 2. Search for **"Multizone Thermostat"**
 3. Follow the setup wizard:
-   - **Step 1 (Global Settings)**: Select your central boiler relay, optional presence sensor for geofencing, and optional outdoor sensor for weather compensation.
-   - **Step 2 (Geofencing)**: If presence is enabled, choose the target presence presets (e.g., Comfort when home, Away when absent).
-   - **Step 3 (Weather Compensation)**: If an outdoor sensor is enabled, define your weather curve (Heat Demand multiplier based on outdoor temperature).
-   - **Step 4 (Add Zone)**: Create a new thermal zone. Give it a name.
-   - **Step 5 (Zone Hardware)**: Assign all `climate` TRVs for this room, OR assign a `switch` (fancoil/underfloor loop relay) and an external temperature sensor. You can also assign an optional Window Sensor and select whether to sync presets or disable summer anti-seize.
-   - **Step 6**: Add more zones or confirm and finish.
+   - **Step 1 (Global Heating)**: Select your central boiler relay / circulator pump (`switch`).
+   - **Step 2 (Add Zone)**: Create your first thermal zone. Here you can assign all its hardware in a single page: Name, Temperature Sensor (optional), TRVs (`climate`), Heater Switches (`switch`), Window Sensor, and toggle Anti-seize/Preset Sync.
+   - **Step 3 (TRV Calibration - Conditional)**: If in Step 2 you assigned *both* TRVs and a pure external Temperature Sensor, you will be asked if you want to assign a `Local Temperature Calibration` entity to each TRV (for the mathematical offset injection).
+   - **Step 4 (More Zones)**: Choose whether to add another zone or proceed to global settings.
+   - **Step 5 (Weather Compensation)**: Select an optional outdoor sensor (physical or `weather` domain) to enable the Feed-Forward heating curve.
+   - **Step 6 (Geofencing)**: Select an optional presence sensor (`binary_sensor` or `device_tracker` or `zone`) and choose the target presets for when you leave or return home.
+   - **Step 7**: Confirm and finish.
 
 ---
 
