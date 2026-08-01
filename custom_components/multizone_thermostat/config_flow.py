@@ -43,7 +43,6 @@ from .const import (
     CONF_VT_COOLER_SWITCH,
     CONF_VT_COOL_TOLERANCE,
     DOMAIN,
-    # make_vt_entity_id — УДАЛЯЕМ
 )
 
 _LOGGER = logging.getLogger(__name__)
