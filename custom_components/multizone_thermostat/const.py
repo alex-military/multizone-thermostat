@@ -99,11 +99,3 @@ VT_MODE_HEAT = "heat"
 VT_MODE_COOL = "cool"
 VT_MODE_AUTO = "auto"
 VT_MODES = [VT_MODE_HEAT, VT_MODE_COOL, VT_MODE_AUTO]
-
-
-# ===== ФУНКЦИЯ ДЛЯ ГЕНЕРАЦИИ ENTITY_ID =====
-def make_vt_entity_id(name: str) -> str:
-    """Generate entity_id for a virtual thermostat."""
-    safe_name = name.lower().replace(" ", "_")
-    safe_name = "".join(c for c in safe_name if c.isalnum() or c == "_")
-    return f"climate.vt_{safe_name}"
