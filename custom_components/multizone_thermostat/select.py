@@ -1,14 +1,14 @@
-"""Select platform for Multizone Thermostat: Global Preset."""
+"""Select platform for Multizone Thermostat."""
 from __future__ import annotations
 
 import logging
 
 from homeassistant.components.select import SelectEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.restore_state import RestoreEntity
+from homeassistant.helpers.restore_state import RestoreEntity  # <-- ВАЖНО!
 
 from .const import (
     DOMAIN,
@@ -18,6 +18,11 @@ from .const import (
     ZONE_MODE_PRIMARY,
     CONF_ZONE_CLIMATE,
     CONF_ZONE_NAME,
+    SEASONS,
+    SEASON_SUMMER,
+    SEASON_WINTER,
+    CONF_SEASON,
+    DEFAULT_SEASON,
 )
 from .coordinator import MultizoneCoordinator
 
@@ -32,7 +37,10 @@ async def async_setup_entry(
     """Set up the select platform."""
     coordinator: MultizoneCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
 
-    entities: list[SelectEntity] = [MultizoneGlobalPresetSelect(coordinator, entry.entry_id)]
+    entities: list[SelectEntity] = [
+        MultizoneGlobalPresetSelect(coordinator, entry.entry_id),
+        SeasonSelect(coordinator, entry.entry_id, entry.data.get(CONF_SEASON, DEFAULT_SEASON)),
+    ]
     
     for zone in coordinator.zones:
         climate_id = zone[CONF_ZONE_CLIMATE]
@@ -54,7 +62,6 @@ class MultizoneGlobalPresetSelect(RestoreEntity, SelectEntity):
         self._coordinator = coordinator
         self._entry_id = entry_id
         self._attr_unique_id = f"{DOMAIN}_{entry_id}_global_preset"
-        
         self._attr_options = GLOBAL_PRESETS
 
     @property
@@ -80,7 +87,6 @@ class MultizoneGlobalPresetSelect(RestoreEntity, SelectEntity):
             self._coordinator.set_global_preset(last_state.state)
         else:
             self._coordinator.set_global_preset(GLOBAL_PRESET_MANUAL)
-            
         self._coordinator.register_select("global_preset", self)
 
     async def async_select_option(self, option: str) -> None:
@@ -88,9 +94,72 @@ class MultizoneGlobalPresetSelect(RestoreEntity, SelectEntity):
         if option not in self.options:
             _LOGGER.warning("Invalid option: %s", option)
             return
-
-        # Notify coordinator to apply the new preset to all zones
         await self._coordinator.async_set_global_preset(option)
+
+
+class SeasonSelect(RestoreEntity, SelectEntity):
+    """Season selector (summer/winter)."""
+
+    _attr_has_entity_name = True
+    _attr_icon = "mdi:weather-sunny"
+
+    def __init__(self, coordinator: MultizoneCoordinator, entry_id: str, current_season: str) -> None:
+        """Initialize the season selector."""
+        self._coordinator = coordinator
+        self._entry_id = entry_id
+        self._attr_unique_id = f"{DOMAIN}_{entry_id}_season"
+        self._attr_options = SEASONS
+        self._attr_name = "Season"
+        self._current_season = current_season
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device info."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._entry_id)},
+            name="Multizone Thermostat",
+            manufacturer="Custom Integration",
+            model="Multizone Thermostat",
+        )
+
+    @property
+    def current_option(self) -> str:
+        """Return the current selected option."""
+        return self._current_season
+
+    async def async_added_to_hass(self) -> None:
+        """Restore previous state."""
+        await super().async_added_to_hass()
+        # Восстанавливаем из entry.data (единственный источник истины)
+        entry = self.hass.config_entries.async_get_entry(self._entry_id)
+        if entry:
+            saved_season = entry.data.get(CONF_SEASON, DEFAULT_SEASON)
+            if saved_season in self.options:
+                self._current_season = saved_season
+            else:
+                self._current_season = DEFAULT_SEASON
+                # Сохраняем дефолтное значение в entry.data
+                data = dict(entry.data)
+                data[CONF_SEASON] = self._current_season
+                self.hass.config_entries.async_update_entry(entry, data=data)
+        else:
+            self._current_season = DEFAULT_SEASON
+        self.async_write_ha_state()
+
+    async def async_select_option(self, option: str) -> None:
+        """Change the selected option."""
+        if option not in self.options:
+            _LOGGER.warning("Invalid season: %s", option)
+            return
+        self._current_season = option
+        # Save to config entry
+        entry = self.hass.config_entries.async_get_entry(self._entry_id)
+        if entry:
+            data = dict(entry.data)
+            data[CONF_SEASON] = option
+            self.hass.config_entries.async_update_entry(entry, data=data)
+            _LOGGER.debug("Season set to %s", option)
+        self.async_write_ha_state()
 
 
 class MultizoneZoneSelect(RestoreEntity, SelectEntity):
@@ -106,7 +175,6 @@ class MultizoneZoneSelect(RestoreEntity, SelectEntity):
         self._zone_name = zone_name
         self._attr_unique_id = f"{DOMAIN}_{entry_id}_zone_mode_{climate_entity.replace('.', '_').replace('-', '_')}"
         self._attr_name = f"{zone_name} Mode"
-        
         self._attr_options = ZONE_MODES
         self._attr_extra_state_attributes = {
             "climate_entity": climate_entity
@@ -146,7 +214,6 @@ class MultizoneZoneSelect(RestoreEntity, SelectEntity):
             self._coordinator.set_zone_mode(self._climate_entity, last_state.state)
         else:
             self._coordinator.set_zone_mode(self._climate_entity, ZONE_MODE_PRIMARY)
-            
         self._coordinator.register_select(f"zone_mode_{self._climate_entity}", self)
 
     async def async_select_option(self, option: str) -> None:
@@ -183,6 +250,5 @@ class MultizoneZoneSelect(RestoreEntity, SelectEntity):
                 except Exception as ex:
                     _LOGGER.warning("Could not turn on climate %s: %s", self._climate_entity, ex)
                     
-        # Trigger an update of boiler logic (to stop/start boiler)
-        # Note: _async_update_boiler is async but we don't need to await it directly if we use create_task
+        # Trigger an update of boiler logic
         self.hass.async_create_task(self._coordinator._async_update_boiler())
