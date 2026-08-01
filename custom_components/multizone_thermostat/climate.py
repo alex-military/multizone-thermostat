@@ -41,10 +41,12 @@ from .const import (
     DEFAULT_VT_TARGET_TEMP,
     DEFAULT_VT_TOLERANCE,
     DOMAIN,
-    # make_vt_entity_id - УДАЛЯЕМ
     CONF_VT_COOLER_SWITCH,
     CONF_VT_COOL_TOLERANCE,
     DEFAULT_VT_COOL_TOLERANCE,
+    CONF_VT_PRESET_TEMPS,
+    DEFAULT_VT_PRESET_TEMPS,
+    GLOBAL_PRESETS,
 )
 from .pwm_engine import PWMEngine
 
@@ -82,13 +84,14 @@ async def async_setup_entry(
                 tolerance=vt_config.get(CONF_VT_TOLERANCE, DEFAULT_VT_TOLERANCE),
                 cooler_switch=vt_config.get(CONF_VT_COOLER_SWITCH),
                 cool_tolerance=vt_config.get(CONF_VT_COOL_TOLERANCE, DEFAULT_VT_COOL_TOLERANCE),
+                preset_temperatures=vt_config.get(CONF_VT_PRESET_TEMPS, DEFAULT_VT_PRESET_TEMPS),
             )
         )
     async_add_entities(entities)
 
 
 class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
-    """A virtual thermostat that controls a heater and optionally a cooler switch."""
+    """A virtual thermostat that controls a heater and optionally a cooler switch, with presets."""
 
     _attr_has_entity_name = True
     _attr_supported_features = ClimateEntityFeature.TARGET_TEMPERATURE
@@ -96,6 +99,7 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
     _attr_min_temp = 5.0
     _attr_max_temp = 35.0
     _attr_target_temperature_step = 0.5
+    _attr_preset_modes = GLOBAL_PRESETS
 
     def __init__(
         self,
@@ -108,6 +112,7 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         tolerance: float,
         cooler_switch: str | None = None,
         cool_tolerance: float = DEFAULT_VT_COOL_TOLERANCE,
+        preset_temperatures: dict[str, float] = DEFAULT_VT_PRESET_TEMPS,
     ) -> None:
         """Initialize the virtual thermostat."""
         self.hass = hass
@@ -117,11 +122,13 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         self._tolerance = tolerance
         self._cooler_switch = cooler_switch
         self._cool_tolerance = cool_tolerance
+        self._preset_temperatures = preset_temperatures
 
         # State
         self._hvac_mode = HVACMode.OFF
         self._target_temperature = target_temp
         self._current_temperature: float | None = None
+        self._preset_mode: str | None = None
         self._coordinator = hass.data[DOMAIN][entry_id]["coordinator"]
 
         # PWM Engine for local zone valve (heating only)
@@ -189,6 +196,11 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         return self._target_temperature
 
     @property
+    def preset_mode(self) -> str | None:
+        """Return the current preset mode."""
+        return self._preset_mode
+
+    @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return extra attributes."""
         attrs = {
@@ -200,6 +212,8 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         if self._cooler_switch is not None:
             attrs["cooler_switch"] = self._cooler_switch
             attrs["cool_tolerance"] = self._cool_tolerance
+        if self._preset_mode is not None:
+            attrs["preset_mode"] = self._preset_mode
         return attrs
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
@@ -218,6 +232,24 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         if temperature is None:
             return
         self._target_temperature = temperature
+        # Manual change clears preset
+        self._preset_mode = None
+        self.async_write_ha_state()
+        await self._async_control()
+
+    async def async_set_preset_mode(self, preset_mode: str) -> None:
+        """Set new preset mode and update target temperature."""
+        if preset_mode not in self._attr_preset_modes:
+            raise ValueError(f"Unsupported preset mode: {preset_mode}")
+        if preset_mode not in self._preset_temperatures:
+            _LOGGER.warning("No temperature defined for preset %s, keeping current", preset_mode)
+            self._preset_mode = preset_mode
+            self.async_write_ha_state()
+            return
+
+        self._preset_mode = preset_mode
+        self._target_temperature = self._preset_temperatures[preset_mode]
+        _LOGGER.debug("VT '%s' preset %s set to %.1f°C", self._name, preset_mode, self._target_temperature)
         self.async_write_ha_state()
         await self._async_control()
 
@@ -231,9 +263,12 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
                 self._hvac_mode = HVACMode(last_state.state)
             if last_state.attributes.get(ATTR_TEMPERATURE) is not None:
                 self._target_temperature = float(last_state.attributes[ATTR_TEMPERATURE])
+            # Restore preset mode if saved
+            if last_state.attributes.get("preset_mode") in self._attr_preset_modes:
+                self._preset_mode = last_state.attributes["preset_mode"]
             _LOGGER.debug(
-                "VT '%s' restored: mode=%s, target=%s",
-                self._name, self._hvac_mode, self._target_temperature,
+                "VT '%s' restored: mode=%s, target=%s, preset=%s",
+                self._name, self._hvac_mode, self._target_temperature, self._preset_mode,
             )
 
         self._update_current_temp()
