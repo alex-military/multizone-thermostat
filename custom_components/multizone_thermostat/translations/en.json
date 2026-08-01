@@ -27,13 +27,15 @@
       },
       "create_virtual_thermostat": {
         "title": "Create Virtual Thermostat",
-        "description": "Create a virtual thermostat from a temperature sensor and a heater switch/relay.",
+        "description": "Create a virtual thermostat from a temperature sensor and a heater switch/relay. Optionally, you can also add a cooler switch for cooling support.",
         "data": {
           "name": "Zone Name",
           "temperature_sensor": "Temperature Sensor",
           "heater_switch": "Heater Switch / Relay",
           "target_temperature": "Initial Target Temperature (°C)",
           "tolerance": "Tolerance (°C)",
+          "cooler_switch": "Cooler Switch (Optional)",
+          "cool_tolerance": "Cooling Tolerance (°C)",
           "anti_seize": "Enable Anti-seize (Summer Protection) for this zone",
           "window_sensor": "Window Sensor (Optional)"
         },
@@ -42,6 +44,8 @@
           "heater_switch": "The switch/relay that controls the heater in this zone",
           "target_temperature": "The initial target temperature for this zone",
           "tolerance": "Hysteresis: heater turns on below target-tolerance, off above target+tolerance",
+          "cooler_switch": "Optional switch/relay that controls a cooling device (e.g. AC or fan) for this zone",
+          "cool_tolerance": "Hysteresis for cooling: cooler turns on above target+cool_tolerance, off below target-cool_tolerance",
           "window_sensor": "Automatically bypass the zone when this sensor is open"
         }
       },
@@ -112,15 +116,26 @@
       },
       "create_virtual_thermostat": {
         "title": "Create Virtual Thermostat",
-        "description": "Create a virtual thermostat from a temperature sensor and a heater switch/relay.",
+        "description": "Create a virtual thermostat from a temperature sensor and a heater switch/relay. Optionally, you can also add a cooler switch for cooling support.",
         "data": {
           "name": "Zone Name",
           "temperature_sensor": "Temperature Sensor",
           "heater_switch": "Heater Switch / Relay",
           "target_temperature": "Initial Target Temperature (°C)",
           "tolerance": "Tolerance (°C)",
+          "cooler_switch": "Cooler Switch (Optional)",
+          "cool_tolerance": "Cooling Tolerance (°C)",
           "anti_seize": "Enable Anti-seize (Summer Protection) for this zone",
           "window_sensor": "Window Sensor (Optional)"
+        },
+        "data_description": {
+          "temperature_sensor": "The sensor that reads the current room temperature",
+          "heater_switch": "The switch/relay that controls the heater in this zone",
+          "target_temperature": "The initial target temperature for this zone",
+          "tolerance": "Hysteresis: heater turns on below target-tolerance, off above target+tolerance",
+          "cooler_switch": "Optional switch/relay that controls a cooling device (e.g. AC or fan) for this zone",
+          "cool_tolerance": "Hysteresis for cooling: cooler turns on above target+cool_tolerance, off below target-cool_tolerance",
+          "window_sensor": "Automatically bypass the zone when this sensor is open"
         }
       },
       "remove_virtual_thermostat": {
