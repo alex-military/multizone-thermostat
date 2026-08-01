@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 from typing import Any
+from datetime import timedelta
 
 from homeassistant.components.climate import (
     ClimateEntity,
@@ -41,11 +42,11 @@ from .const import (
     DEFAULT_VT_TOLERANCE,
     DOMAIN,
     make_vt_entity_id,
-    # ===== НОВЫЕ ИМПОРТЫ =====
     CONF_VT_COOLER_SWITCH,
     CONF_VT_COOL_TOLERANCE,
     DEFAULT_VT_COOL_TOLERANCE,
 )
+from .pwm_engine import PWMEngine
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -72,7 +73,6 @@ async def async_setup_entry(
                 heater_switch=vt_config[CONF_VT_HEATER_SWITCH],
                 target_temp=vt_config.get(CONF_VT_TARGET_TEMP, DEFAULT_VT_TARGET_TEMP),
                 tolerance=vt_config.get(CONF_VT_TOLERANCE, DEFAULT_VT_TOLERANCE),
-                # ===== НОВЫЕ ПАРАМЕТРЫ =====
                 cooler_switch=vt_config.get(CONF_VT_COOLER_SWITCH),
                 cool_tolerance=vt_config.get(CONF_VT_COOL_TOLERANCE, DEFAULT_VT_COOL_TOLERANCE),
             )
@@ -80,13 +80,10 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-from .pwm_engine import PWMEngine
-
 class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
-    """A virtual thermostat that controls a heater switch based on a temperature sensor."""
+    """A virtual thermostat that controls a heater and optionally a cooler switch."""
 
     _attr_has_entity_name = True
-    _attr_hvac_modes = [HVACMode.HEAT, HVACMode.OFF]
     _attr_supported_features = ClimateEntityFeature.TARGET_TEMPERATURE
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_min_temp = 5.0
@@ -102,6 +99,8 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         heater_switch: str,
         target_temp: float,
         tolerance: float,
+        cooler_switch: str | None = None,
+        cool_tolerance: float = DEFAULT_VT_COOL_TOLERANCE,
     ) -> None:
         """Initialize the virtual thermostat."""
         self.hass = hass
@@ -109,21 +108,25 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         self._temp_sensor = temp_sensor
         self._heater_switch = heater_switch
         self._tolerance = tolerance
+        self._cooler_switch = cooler_switch
+        self._cool_tolerance = cool_tolerance
 
         # State
         self._hvac_mode = HVACMode.OFF
         self._target_temperature = target_temp
         self._current_temperature: float | None = None
-        
         self._coordinator = hass.data[DOMAIN][entry_id]["coordinator"]
-        
-        # PWM Engine for local zone valve
+
+        # PWM Engine for local zone valve (heating only)
         self._valve_pwm = PWMEngine(pwm_interval=900.0, min_on=0.0, min_off=0.0)
+
+        # State of switches (cached)
+        self._heater_state: bool | None = None
+        self._cooler_state: bool | None = None
 
         # Entity setup
         vt_entity_id = make_vt_entity_id(name)
-        # unique_id uses the entry_id to be unique per config entry
-        safe_name = name.lower().replace(" ", "_").replace("-", "_")
+        safe_name = name.lower().replace(" ", "_")
         safe_name = "".join(c for c in safe_name if c.isalnum() or c == "_")
         self._attr_unique_id = f"{DOMAIN}_{entry_id}_vt_{safe_name}"
         self._attr_device_info = DeviceInfo(
@@ -133,8 +136,6 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             model="Virtual Thermostats",
             via_device=(DOMAIN, entry_id),
         )
-
-        # We explicitly set entity_id so the zone config can reference it
         self.entity_id = vt_entity_id
 
         self._unsub_listeners: list = []
@@ -143,6 +144,15 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
     def name(self) -> str:
         """Return the name."""
         return f"VT {self._name}"
+
+    @property
+    def hvac_modes(self) -> list[HVACMode]:
+        """Return the list of available hvac modes."""
+        modes = [HVACMode.OFF, HVACMode.HEAT]
+        if self._cooler_switch is not None:
+            modes.append(HVACMode.COOL)
+            modes.append(HVACMode.HEAT_COOL)
+        return modes
 
     @property
     def hvac_mode(self) -> HVACMode:
@@ -155,10 +165,11 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         if self._hvac_mode == HVACMode.OFF:
             return HVACAction.OFF
 
-        # Check if the heater is actually on
-        heater_state = self.hass.states.get(self._heater_switch)
-        if heater_state and heater_state.state == STATE_ON:
+        # Check if heater or cooler is actually on
+        if self._heater_state:
             return HVACAction.HEATING
+        if self._cooler_state:
+            return HVACAction.COOLING
         return HVACAction.IDLE
 
     @property
@@ -174,34 +185,35 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return extra attributes."""
-        return {
+        attrs = {
             "temperature_sensor": self._temp_sensor,
             "heater_switch": self._heater_switch,
             "tolerance": self._tolerance,
             "virtual_thermostat": True,
         }
+        if self._cooler_switch is not None:
+            attrs["cooler_switch"] = self._cooler_switch
+            attrs["cool_tolerance"] = self._cool_tolerance
+        return attrs
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
-        """Set HVAC mode."""
+        """Set new target hvac mode."""
+        if hvac_mode not in self.hvac_modes:
+            raise ValueError(f"Unsupported HVAC mode: {hvac_mode}")
+        if hvac_mode == HVACMode.COOL and self._cooler_switch is None:
+            raise ValueError("Cooling not supported")
         self._hvac_mode = hvac_mode
-
-        if hvac_mode == HVACMode.OFF:
-            await self._async_heater_turn_off()
-        elif hvac_mode == HVACMode.HEAT:
-            await self._async_control()
-
         self.async_write_ha_state()
+        await self._async_control()
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
         """Set target temperature."""
         temperature = kwargs.get(ATTR_TEMPERATURE)
         if temperature is None:
             return
-
         self._target_temperature = temperature
-        if self._hvac_mode == HVACMode.HEAT:
-            await self._async_control()
         self.async_write_ha_state()
+        await self._async_control()
 
     async def async_added_to_hass(self) -> None:
         """Restore state and set up listeners."""
@@ -210,7 +222,7 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         # Restore previous state
         last_state = await self.async_get_last_state()
         if last_state is not None:
-            if last_state.state in (HVACMode.HEAT, HVACMode.OFF):
+            if last_state.state in (HVACMode.HEAT, HVACMode.COOL, HVACMode.HEAT_COOL, HVACMode.OFF):
                 self._hvac_mode = HVACMode(last_state.state)
             if last_state.attributes.get(ATTR_TEMPERATURE) is not None:
                 self._target_temperature = float(last_state.attributes[ATTR_TEMPERATURE])
@@ -239,9 +251,18 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
                 self._async_on_heater_changed,
             )
         )
-        
+
+        # Listen for cooler switch changes if defined
+        if self._cooler_switch is not None:
+            self._unsub_listeners.append(
+                async_track_state_change_event(
+                    self.hass,
+                    [self._cooler_switch],
+                    self._async_on_cooler_changed,
+                )
+            )
+
         # Start periodic PWM evaluation for the zone valve (every 10 seconds)
-        from datetime import timedelta
         self._unsub_listeners.append(
             async_track_time_interval(
                 self.hass,
@@ -251,8 +272,7 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         )
 
         # Initial control pass
-        if self._hvac_mode == HVACMode.HEAT:
-            await self._async_control()
+        await self._async_control()
 
     async def async_will_remove_from_hass(self) -> None:
         """Clean up listeners."""
@@ -279,76 +299,154 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         new_state = event.data.get("new_state")
         if new_state is None or new_state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
             return
-
         try:
             self._current_temperature = float(new_state.state)
         except (ValueError, TypeError):
             return
-
-        if self._hvac_mode == HVACMode.HEAT:
-            self.hass.async_create_task(self._async_control())
-
+        self.hass.async_create_task(self._async_control())
         self.async_write_ha_state()
 
     @callback
     def _async_on_heater_changed(self, event: Event) -> None:
-        """Handle heater switch state changes (update hvac_action display)."""
+        """Handle heater switch state changes."""
+        state = self.hass.states.get(self._heater_switch)
+        if state is not None:
+            self._heater_state = state.state == STATE_ON
+        self.async_write_ha_state()
+
+    @callback
+    def _async_on_cooler_changed(self, event: Event) -> None:
+        """Handle cooler switch state changes."""
+        if self._cooler_switch is None:
+            return
+        state = self.hass.states.get(self._cooler_switch)
+        if state is not None:
+            self._cooler_state = state.state == STATE_ON
         self.async_write_ha_state()
 
     async def _async_control(self) -> None:
-        """Calculate PID demand when state changes."""
+        """Main control logic: decide what to turn on/off based on mode."""
         if self._current_temperature is None:
             return
 
-        if self._hvac_mode != HVACMode.HEAT:
-            self._coordinator.set_zone_demand(self.entity_id, 0.0)
-            return
+        target = self._target_temperature
+        current = self._current_temperature
 
-        # Calculate PID Demand
-        # The PID demand is now calculated by the Coordinator in _async_on_climate_state_changed
-        demand = self._coordinator.get_zone_demand(self.entity_id)
-        if demand is not None:
-            _LOGGER.debug("VT '%s': Reading PID Demand from coordinator: %.1f%%", self._name, demand)
-        else:
-            _LOGGER.debug("VT '%s': No demand available yet from coordinator", self._name)
-        
-        # We immediately call the PWM tick so the valve responds without waiting 10s
-        from datetime import datetime
-        await self._async_pwm_tick(datetime.now())
+        # Determine needs
+        need_heat = current < target - self._tolerance
+        need_cool = current > target + self._cool_tolerance
+
+        # Handle each mode
+        if self._hvac_mode == HVACMode.OFF:
+            await self._async_set_heater(False)
+            await self._async_set_cooler(False)
+            self._coordinator.set_zone_demand(self.entity_id, 0.0)  # notify coordinator for heating
+
+        elif self._hvac_mode == HVACMode.HEAT:
+            await self._async_set_cooler(False)
+            # For heating, use PWM logic via coordinator (existing logic)
+            if self._coordinator.get_master_state():
+                # The coordinator will handle demand and PWM will adjust valve
+                # We just set the zone demand based on need_heat (simple on/off for demand)
+                demand = 100.0 if need_heat else 0.0
+                self._coordinator.set_zone_demand(self.entity_id, demand)
+            else:
+                self._coordinator.set_zone_demand(self.entity_id, 0.0)
+                await self._async_set_heater(False)
+            # PWM tick will handle actual switch state
+
+        elif self._hvac_mode == HVACMode.COOL:
+            await self._async_set_heater(False)
+            await self._async_set_cooler(need_cool)
+            # Notify coordinator that cooling demand is active? For now we don't.
+            # We could extend coordinator later.
+
+        elif self._hvac_mode == HVACMode.HEAT_COOL:
+            # Auto mode: choose between heat and cool
+            if need_heat and not need_cool:
+                await self._async_set_cooler(False)
+                # Similar to HEAT mode
+                if self._coordinator.get_master_state():
+                    demand = 100.0
+                    self._coordinator.set_zone_demand(self.entity_id, demand)
+                else:
+                    self._coordinator.set_zone_demand(self.entity_id, 0.0)
+                    await self._async_set_heater(False)
+            elif need_cool and not need_heat:
+                await self._async_set_heater(False)
+                await self._async_set_cooler(True)
+                self._coordinator.set_zone_demand(self.entity_id, 0.0)  # no heating demand
+            else:
+                # Within deadband: turn everything off
+                await self._async_set_heater(False)
+                await self._async_set_cooler(False)
+                self._coordinator.set_zone_demand(self.entity_id, 0.0)
 
     async def _async_pwm_tick(self, now) -> None:
-        """Periodic tick to evaluate PWM state for the zone valve."""
-        if self._hvac_mode != HVACMode.HEAT or not self._coordinator.get_master_state():
-            await self._async_heater_turn_off()
+        """Periodic tick to evaluate PWM state for the zone valve (heating only)."""
+        if self._hvac_mode != HVACMode.HEAT and self._hvac_mode != HVACMode.HEAT_COOL:
+            # In modes other than heating, ensure heater is off
+            await self._async_set_heater(False)
             return
-            
+
+        # If we are in HEAT_COOL and currently cooling, we skip PWM
+        if self._hvac_mode == HVACMode.HEAT_COOL and self._cooler_state:
+            # If cooler is on, we should not heat
+            await self._async_set_heater(False)
+            return
+
+        # Only apply PWM if master is on and we are in heating mode
+        if not self._coordinator.get_master_state():
+            await self._async_set_heater(False)
+            return
+
         demand = self._coordinator.get_zone_demand(self.entity_id)
+        if demand is None:
+            demand = 0.0
         wanted_state = self._valve_pwm.calculate(demand)
-        
-        heater_state = self.hass.states.get(self._heater_switch)
-        heater_on = heater_state is not None and heater_state.state == STATE_ON
-        
-        if wanted_state and not heater_on:
-            _LOGGER.debug("VT '%s': PWM Valve → ON", self._name)
-            await self._async_heater_turn_on()
-        elif not wanted_state and heater_on:
-            _LOGGER.debug("VT '%s': PWM Valve → OFF", self._name)
-            await self._async_heater_turn_off()
+        if wanted_state != self._heater_state:
+            await self._async_set_heater(wanted_state)
 
-    async def _async_heater_turn_on(self) -> None:
-        """Turn the heater switch on."""
-        await self.hass.services.async_call(
-            "switch",
-            SERVICE_TURN_ON,
-            {ATTR_ENTITY_ID: self._heater_switch},
-            blocking=False,
-        )
+    async def _async_set_heater(self, state: bool) -> None:
+        """Set heater switch to on/off."""
+        if state == self._heater_state:
+            return
+        self._heater_state = state
+        if state:
+            await self.hass.services.async_call(
+                "switch",
+                SERVICE_TURN_ON,
+                {ATTR_ENTITY_ID: self._heater_switch},
+                blocking=False,
+            )
+        else:
+            await self.hass.services.async_call(
+                "switch",
+                SERVICE_TURN_OFF,
+                {ATTR_ENTITY_ID: self._heater_switch},
+                blocking=False,
+            )
+        self.async_write_ha_state()
 
-    async def _async_heater_turn_off(self) -> None:
-        """Turn the heater switch off."""
-        await self.hass.services.async_call(
-            "switch",
-            SERVICE_TURN_OFF,
-            {ATTR_ENTITY_ID: self._heater_switch},
-            blocking=False,
-        )
+    async def _async_set_cooler(self, state: bool) -> None:
+        """Set cooler switch to on/off."""
+        if self._cooler_switch is None:
+            return
+        if state == self._cooler_state:
+            return
+        self._cooler_state = state
+        if state:
+            await self.hass.services.async_call(
+                "switch",
+                SERVICE_TURN_ON,
+                {ATTR_ENTITY_ID: self._cooler_switch},
+                blocking=False,
+            )
+        else:
+            await self.hass.services.async_call(
+                "switch",
+                SERVICE_TURN_OFF,
+                {ATTR_ENTITY_ID: self._cooler_switch},
+                blocking=False,
+            )
+        self.async_write_ha_state()
