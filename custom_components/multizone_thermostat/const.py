@@ -89,25 +89,51 @@ CONF_VT_TOLERANCE = "tolerance"
 DEFAULT_VT_TARGET_TEMP = 20.0
 DEFAULT_VT_TOLERANCE = 0.5
 
-# ===== НОВЫЕ КОНСТАНТЫ ДЛЯ ОХЛАЖДЕНИЯ =====
+# Cooling
 CONF_VT_COOLER_SWITCH = "cooler_switch"
 CONF_VT_COOL_TOLERANCE = "cool_tolerance"
 DEFAULT_VT_COOL_TOLERANCE = 0.5
 
-# Режимы работы виртуального термостата (heat/cool/auto)
 VT_MODE_HEAT = "heat"
 VT_MODE_COOL = "cool"
 VT_MODE_AUTO = "auto"
 VT_MODES = [VT_MODE_HEAT, VT_MODE_COOL, VT_MODE_AUTO]
 
-# ===== НОВЫЕ КОНСТАНТЫ ДЛЯ ПРЕСЕТОВ =====
-CONF_VT_PRESET_TEMPS = "preset_temperatures"
-CONF_VT_PRESET_MANUAL = "manual_temp"
-CONF_VT_PRESET_ECO = "eco_temp"
-CONF_VT_PRESET_COMFORT = "comfort_temp"
-CONF_VT_PRESET_SLEEP = "sleep_temp"
-CONF_VT_PRESET_AWAY = "away_temp"
-DEFAULT_VT_PRESET_TEMPS = {
+# ===== СЕЗОН =====
+CONF_SEASON = "season"
+SEASON_SUMMER = "summer"
+SEASON_WINTER = "winter"
+SEASONS = [SEASON_SUMMER, SEASON_WINTER]
+DEFAULT_SEASON = SEASON_WINTER
+
+# ===== ПРЕСЕТЫ ДЛЯ ЛЕТА И ЗИМЫ =====
+# Ключи для хранения в VT
+CONF_VT_PRESET_TEMPS_SUMMER = "preset_temperatures_summer"
+CONF_VT_PRESET_TEMPS_WINTER = "preset_temperatures_winter"
+
+# Поля для ввода в config_flow (летние)
+CONF_VT_SUMMER_MANUAL = "summer_manual_temp"
+CONF_VT_SUMMER_ECO = "summer_eco_temp"
+CONF_VT_SUMMER_COMFORT = "summer_comfort_temp"
+CONF_VT_SUMMER_SLEEP = "summer_sleep_temp"
+CONF_VT_SUMMER_AWAY = "summer_away_temp"
+
+# Поля для ввода в config_flow (зимние)
+CONF_VT_WINTER_MANUAL = "winter_manual_temp"
+CONF_VT_WINTER_ECO = "winter_eco_temp"
+CONF_VT_WINTER_COMFORT = "winter_comfort_temp"
+CONF_VT_WINTER_SLEEP = "winter_sleep_temp"
+CONF_VT_WINTER_AWAY = "winter_away_temp"
+
+# Значения по умолчанию
+DEFAULT_SUMMER_PRESET_TEMPS = {
+    "manual": 22.0,
+    "eco": 20.0,
+    "comfort": 24.0,
+    "sleep": 21.0,
+    "away": 18.0,
+}
+DEFAULT_WINTER_PRESET_TEMPS = {
     "manual": 20.0,
     "eco": 18.0,
     "comfort": 22.0,
