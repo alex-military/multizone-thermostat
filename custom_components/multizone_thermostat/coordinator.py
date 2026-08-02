@@ -122,6 +122,11 @@ class MultizoneCoordinator:
         self._last_active_time = time.time() # Default to now until loaded
         self._anti_seize_running = False
         
+        # === НОВЫЕ ПЕРЕМЕННЫЕ ДЛЯ ОХЛАДИТЕЛЯ ===
+        self._cooler_state = False
+        self._cooler_last_on = None
+        self._cooler_last_off = None
+        
         self._store = Store(hass, WINDOW_STORAGE_VERSION, WINDOW_STORAGE_KEY)
 
         self._pending_boiler_task: asyncio.Task | None = None
@@ -673,18 +678,53 @@ class MultizoneCoordinator:
         return None
 
     def set_min_cycle_on(self, value: int) -> None:
-        """Set the min cycle on time (minutes)."""
+        """Set the min cycle on time (minutes) for both boiler and cooler."""
         self._min_cycle_on = value
         self._boiler_pwm.set_params(min_on=value * 60)
         
     def set_min_cycle_off(self, value: int) -> None:
-        """Set the min cycle off time (minutes)."""
+        """Set the min cycle off time (minutes) for both boiler and cooler."""
         self._min_cycle_off = value
         self._boiler_pwm.set_params(min_off=value * 60)
         
     def set_valve_delay(self, value: int) -> None:
         """Set the valve delay time (seconds)."""
         self._valve_delay = value
+
+    # ===== МЕТОДЫ ДЛЯ УПРАВЛЕНИЯ ОХЛАДИТЕЛЕМ С ЗАЩИТОЙ =====
+    def can_cooler_turn_on(self) -> bool:
+        """Проверяет, можно ли включить охладитель (с учётом Min Cycle OFF)."""
+        if self._cooler_last_off is None:
+            return True
+        elapsed = time.time() - self._cooler_last_off
+        min_off_sec = self._min_cycle_off * 60
+        if elapsed < min_off_sec:
+            _LOGGER.debug("Cooler off-time not met (%.1f sec < %d sec), skipping turn-on", elapsed, min_off_sec)
+            return False
+        return True
+
+    def can_cooler_turn_off(self) -> bool:
+        """Проверяет, можно ли выключить охладитель (с учётом Min Cycle ON)."""
+        if self._cooler_last_on is None:
+            return True
+        elapsed = time.time() - self._cooler_last_on
+        min_on_sec = self._min_cycle_on * 60
+        if elapsed < min_on_sec:
+            _LOGGER.debug("Cooler on-time not met (%.1f sec < %d sec), skipping turn-off", elapsed, min_on_sec)
+            return False
+        return True
+
+    def cooler_turned_on(self) -> None:
+        """Обновляет тайминги после включения охладителя."""
+        self._cooler_state = True
+        self._cooler_last_on = time.time()
+        _LOGGER.debug("Cooler turned ON, last_on updated")
+
+    def cooler_turned_off(self) -> None:
+        """Обновляет тайминги после выключения охладителя."""
+        self._cooler_state = False
+        self._cooler_last_off = time.time()
+        _LOGGER.debug("Cooler turned OFF, last_off updated")
 
     async def _async_pwm_tick(self, now: datetime) -> None:
         """Periodic PWM tick for boiler (Peak Load)."""
