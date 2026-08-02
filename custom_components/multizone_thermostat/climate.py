@@ -534,11 +534,21 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         self.async_write_ha_state()
 
     async def _async_set_cooler(self, state: bool) -> None:
-        """Set cooler switch to on/off."""
+        """Set cooler switch to on/off с учётом защиты Min Cycle."""
         if self._cooler_switch is None:
             return
         if state == self._cooler_state:
             return
+
+        # Проверяем защиту
+        if state:
+            if not self._coordinator.can_cooler_turn_on():
+                return
+        else:
+            if not self._coordinator.can_cooler_turn_off():
+                return
+
+        # Выполняем действие
         self._cooler_state = state
         if state:
             await self.hass.services.async_call(
@@ -547,6 +557,7 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
                 {ATTR_ENTITY_ID: self._cooler_switch},
                 blocking=False,
             )
+            self._coordinator.cooler_turned_on()
         else:
             await self.hass.services.async_call(
                 "switch",
@@ -554,4 +565,5 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
                 {ATTR_ENTITY_ID: self._cooler_switch},
                 blocking=False,
             )
+            self._coordinator.cooler_turned_off()
         self.async_write_ha_state()
