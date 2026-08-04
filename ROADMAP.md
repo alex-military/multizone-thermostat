@@ -39,6 +39,14 @@ The project is structured in phases to evolve from a simple aggregator to a full
 5. **Advanced Diagnostics & Anomaly Analysis**: Detection of stuck valves, overshoots, PID cycles, and reporting for each room.
 
 
+### 🤝 Community Requests & Pull Requests
+Features proposed or requested by the community that we plan to implement:
+- [x] **Russian Translation (`ru.json`)**: Full Russian localization added natively.
+- [ ] **Hybrid Cooling & Summer Management**:
+  - **Split AC / Cooling Aggregation**: Allow adding independent AC units via the Config Flow strictly for UI grouping and dashboard integration. They will not be managed by the central PID, but can be controlled via manual overrides or grouped by a "Cooling Master".
+  - **Summer/Winter Switch**: Native transition logic between Heating and Cooling seasons (manual switch, scheduled, or linked to HA's season integration).
+  - **Dual Seasonal Presets**: Independent sets of Global Presets (Comfort, Eco, etc.) for Winter (Heating targets) and Summer (Cooling targets).
+
 ### 📋 Additional Priorities
   - **Intelligent Multi-Sensor Management:** Weighted average and priorities among multiple sensors in a room.
   - **Advanced Dashboards & Statistics:** Graphical display of efficiency, PID, PWM, histories.

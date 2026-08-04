@@ -5,7 +5,7 @@ __pycache__/
 !hacs.json
 !manifest.json
 !strings.json
-!translations/*.json
+!custom_components/multizone_thermostat/translations/*.json
 simulate*.py
 test_*.py
 .agents/
