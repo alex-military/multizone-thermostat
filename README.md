@@ -26,6 +26,8 @@ A custom integration for Home Assistant that provides **multi-zone heating manag
 - 🧠 **Multi-TRV Aggregation** — Group multiple TRVs in the same room. The system automatically calculates their average temperature and syncs their targets.
 - 📉 **Dynamic Heat Demand (%)** — Calculates the exact percentage of heating load required by the house in real-time.
 - 🔄 **Global Presets & Dynamic Memory** — Manual, Eco, Comfort, Sleep, Away. The system remembers the specific temperature and bypass state of *each zone* per preset.
+- 📅 **Global Calendar Integration** — Control the entire system via Home Assistant's native Local Calendar. Schedule global presets or highly specific per-zone overrides.
+- 🤖 **Predictive Smart Start & Thermal Modeling** — The system learns the unique heating and cooling rates of your rooms and can automatically start heating *before* a scheduled calendar event so the room reaches the target temperature exactly on time.
 - 🎨 **4 Custom Lovelace Cards** — Master status card, circular dial card, compact button card, and global preset card — all auto-registered
 
 ## 🏗️ System Architecture

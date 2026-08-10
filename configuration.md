@@ -113,3 +113,46 @@ The integration includes a built-in safety mechanism to periodically cycle them:
    - Restore all zones to their previous state.
 
 **Note**: You can selectively disable the Anti-seize protection for specific zones (e.g., fancoil units that don't have moving mechanical valves) through the UI Options flow (**Edit a zone** -> Disable "Enable Anti-seize (Summer Protection) for this zone").
+
+---
+
+## 📅 Global Calendar Integration & Smart Start
+
+You can control the entire Multizone Thermostat system natively using Home Assistant's `Local Calendar` integration. 
+Go to **Settings → Devices & Services → Multizone Thermostat → Configure** and select "Edit Global Calendar" to assign a calendar to the integration.
+
+### Syntax Rules
+
+When you create an event in the calendar, the integration reads the **Summary (Title)** of the event. The syntax is highly flexible.
+
+#### 1. Change the Global Preset
+Simply write the name of the preset:
+`Eco` or `Comfort` or `Sleep` or `Away` or `Manual`
+- *What it does*: The system switches to this preset for the duration of the event, and seamlessly restores the previous preset when the event ends.
+
+#### 2. Set a Global Temperature
+Simply write a number:
+`21.5`
+- *What it does*: Temporarily overrides all zones to 21.5°C for the duration of the event.
+
+#### 3. Advanced Per-Zone Overrides
+You can combine a global preset with specific overrides for individual zones. Separate commands with commas `,` and specify the zone name with a colon `:`.
+`Comfort, Bagno: 24, Camera: Bypass`
+- *What it does*: Sets the system to Comfort. However, it forces the "Bagno" zone to 24°C, and forces the "Camera" zone to Bypass mode. 
+- *When the event ends*: The system reverts to its previous state (restores previous preset, clears 24°C from Bagno, and restores Camera).
+
+#### 4. Multiple Commands per Zone
+You can send multiple commands to the same zone by separating them with spaces. Valid modes are `primary`, `secondary`, `bypass`, `standalone`, `off`.
+`Eco, Salone: 22.5 primary`
+- *What it does*: Sets global preset to Eco. Forces the "Salone" to 22.5°C AND forces its mode to Primary.
+
+#### 5. Permanent Overrides (The `SET` keyword)
+By default, all calendar overrides are temporary and vanish when the event ends. If you want a calendar event to permanently alter the underlying preset, add the word `SET` to the zone command:
+`Comfort, Bagno: 25 SET`
+- *What it does*: Changes the target temperature of the Bagno to 25°C and saves it permanently into the Comfort preset memory. When the event ends, the Bagno will still be 25°C next time Comfort is activated!
+
+### 🤖 Predictive Smart Start
+
+Because the Multizone Thermostat actively builds a **Thermal Model** of each room (learning its heating rate in °C/hour), it can predict exactly how long a room will take to heat up!
+
+If you schedule an event like `Comfort` at 08:00 AM, the system will look ahead in the calendar. If it predicts that your bedroom needs 45 minutes to reach the Comfort temperature, the boiler will automatically fire up at 07:15 AM (Smart Start), ensuring the room is exactly at the right temperature when your alarm rings at 08:00!

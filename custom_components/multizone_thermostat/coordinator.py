@@ -71,8 +71,11 @@ from .const import (
     ZONE_MODE_PRIMARY,
     ZONE_MODE_SECONDARY,
     ZONE_MODE_BYPASS,
+    CONF_GLOBAL_CALENDAR,
 )
 from .pwm_engine import PWMEngine
+from .thermal_model import ThermalObserver
+from .calendar_parser import parse_calendar_event, CalendarOverride
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -103,6 +106,7 @@ class MultizoneCoordinator:
         self.zones = entry.data.get(CONF_ZONES, [])
         self.presence_sensor = entry.data.get(CONF_PRESENCE_SENSOR)
         self.weather_sensor_id = entry.data.get("weather_sensor")
+        self.global_calendar_id = entry.data.get(CONF_GLOBAL_CALENDAR)
         
         # Internal state tracking
         self._master_state: bool = False
@@ -122,6 +126,11 @@ class MultizoneCoordinator:
         self._last_active_time = time.time() # Default to now until loaded
         self._anti_seize_running = False
         
+        self._calendar_active_event_id: str | None = None
+        self._calendar_temp_overrides: dict[str, float] = {}
+        self._calendar_mode_overrides: dict[str, str] = {}
+        self._pre_calendar_preset: str | None = None
+        
         self._store = Store(hass, WINDOW_STORAGE_VERSION, WINDOW_STORAGE_KEY)
         self._preset_store = Store(hass, PRESET_STORAGE_VERSION, f"{DOMAIN}_{entry.entry_id}_presets")
         self._settings_store = Store(hass, SETTINGS_STORAGE_VERSION, f"{DOMAIN}_{entry.entry_id}_settings")
@@ -137,11 +146,13 @@ class MultizoneCoordinator:
         from .autotune import PassiveAutotuneObserver
         self._pids: dict[str, MultizonePID] = {}
         self._autotuners: dict[str, PassiveAutotuneObserver] = {}
+        self._thermal_models: dict[str, ThermalObserver] = {}
         for zone in self.zones:
             climate_id = make_zone_entity_id(zone[CONF_ZONE_NAME])
             # Default Kp=100, Ki=0, Kd=0 (will be overridden by Autolearning later)
             self._pids[climate_id] = MultizonePID(kp=100.0, ki=0.0, kd=0.0, out_min=0.0, out_max=100.0, sensor_timeout=7200.0)
             self._autotuners[climate_id] = PassiveAutotuneObserver(climate_id, required_cycles=3)
+            self._thermal_models[climate_id] = ThermalObserver(climate_id)
 
 
 
@@ -194,6 +205,14 @@ class MultizoneCoordinator:
                         _LOGGER.info("Restored Smart PID for %s: Kp=%.1f, Ki=%.4f, Kd=%.1f", 
                                      climate_id, tuner.kp, tuner.ki, tuner.kd)
 
+            # Load thermal models states
+            thermal_data = self._settings.get("thermal_models", {})
+            for climate_id, model in self._thermal_models.items():
+                if climate_id in thermal_data:
+                    model.load_state(thermal_data[climate_id])
+                    _LOGGER.info("Restored Thermal Model for %s: Heating=%.2f, Cooling=%.2f, Inertia=%.2f", 
+                                 climate_id, model.heating_rate, model.cooling_rate, model.thermal_inertia)
+
     async def _async_save_storage(self) -> None:
         """Save window states to storage."""
         await self._store.async_save(self._pre_window_state)
@@ -202,6 +221,11 @@ class MultizoneCoordinator:
         """Save autotuner learning progress to storage."""
         data = {climate_id: tuner.dump_state() for climate_id, tuner in self._autotuners.items()}
         await self.async_set_persistent_data("autotuners", data)
+
+    async def _async_save_thermal_states(self) -> None:
+        """Save thermal model learning progress to storage."""
+        data = {climate_id: model.dump_state() for climate_id, model in self._thermal_models.items()}
+        await self.async_set_persistent_data("thermal_models", data)
 
     async def _async_save_presets_storage(self) -> None:
         """Save presets to storage."""
@@ -216,7 +240,9 @@ class MultizoneCoordinator:
         self._master_state = state
 
     def get_zone_mode(self, climate_entity: str) -> str:
-        """Get current zone mode."""
+        """Get current zone mode, prioritizing calendar overrides."""
+        if climate_entity in self._calendar_mode_overrides:
+            return self._calendar_mode_overrides[climate_entity]
         return self._zone_modes.get(climate_entity, ZONE_MODE_PRIMARY)
         
     def get_zone_demand(self, climate_id: str) -> float:
@@ -376,6 +402,18 @@ class MultizoneCoordinator:
                 timedelta(hours=1),
             )
         )
+        
+        # Listen every 5 minutes for Calendar API checks
+        if self.global_calendar_id:
+            self._unsub_listeners.append(
+                async_track_time_interval(
+                    self.hass,
+                    self._async_check_global_calendar,
+                    timedelta(minutes=5),
+                )
+            )
+            # Check immediately on startup
+            self.hass.async_create_task(self._async_check_global_calendar(dt_util.now()))
 
     @callback
     def async_teardown_listeners(self) -> None:
@@ -403,6 +441,14 @@ class MultizoneCoordinator:
             zone_mode = self.get_zone_mode(entity_id)
             if hvac_mode == HVAC_MODE_HEAT and zone_mode != ZONE_MODE_BYPASS:
                 
+                # Smart Stop: Calculate Effective Target based on learned Inertia
+                thermal_model = self._thermal_models[entity_id]
+                effective_target = target_temp
+                if thermal_model.thermal_inertia > 0.05:
+                    effective_target = target_temp - thermal_model.thermal_inertia
+                    # Limit to avoid lowering it too much if inertia is crazy high
+                    effective_target = max(target_temp - 1.0, effective_target)
+                
                 # Update Autotuner
                 tuner = self._autotuners[entity_id]
                 was_completed = (tuner.state == tuner.STATE_COMPLETED)
@@ -419,19 +465,19 @@ class MultizoneCoordinator:
                     # Hysteresis Fallback Mode (Learning phase)
                     tolerance = 0.3
                     current_demand = self.get_zone_demand(entity_id)
-                    if current_temp <= target_temp - tolerance:
+                    if current_temp <= effective_target - tolerance:
                         demand = 100.0
-                    elif current_temp >= target_temp + tolerance:
+                    elif current_temp >= effective_target + tolerance:
                         demand = 0.0
                     else:
                         demand = current_demand # Keep previous demand inside the hysteresis band
                 else:
                     # Smart PID Mode
-                    demand = self._pids[entity_id].calc(current_temp, target_temp)
+                    demand = self._pids[entity_id].calc(current_temp, effective_target)
                     
                     # Apply Weather Compensation (Feed Forward)
                     curve_val = self.get_persistent_data("weather_curve", 0.0)
-                    if curve_val > 0.0 and self.weather_sensor_id:
+                    if self.weather_sensor_id:
                         weather_state = self.hass.states.get(self.weather_sensor_id)
                         if weather_state and weather_state.state not in ("unavailable", "unknown"):
                             try:
@@ -444,9 +490,20 @@ class MultizoneCoordinator:
                                     outdoor_temp = float(weather_state.state)
                                     
                                 if outdoor_temp is not None:
-                                    ff_demand = (20.0 - outdoor_temp) * curve_val
-                                    demand = min(100.0, max(0.0, demand + ff_demand))
-                                    _LOGGER.debug("Applied weather comp to %s: Outdoor=%.1f, Curve=%.1f, FF=+%.1f%%, Final=%.1f%%", entity_id, outdoor_temp, curve_val, ff_demand, demand)
+                                    # Adaptive Curve Calculation
+                                    if thermal_model.heating_rate > 0.1 and thermal_model.cooling_rate > 0.01:
+                                        adaptive_demand = (thermal_model.cooling_rate / thermal_model.heating_rate) * 100.0
+                                        delta_t = 20.0 - outdoor_temp
+                                        if delta_t > 1.0:
+                                            curve_val = adaptive_demand / delta_t
+                                            _LOGGER.debug("[%s] Adaptive Curve: HeatingRate=%.2f, CoolingRate=%.2f, InjectedCurve=%.2f", 
+                                                          entity_id, thermal_model.heating_rate, thermal_model.cooling_rate, curve_val)
+
+                                    if curve_val > 0.0:
+                                        ff_demand = (20.0 - outdoor_temp) * curve_val
+                                        demand = min(100.0, max(0.0, demand + ff_demand))
+                                        _LOGGER.debug("Applied weather comp to %s: Outdoor=%.1f, Curve=%.1f, FF=+%.1f%%, Final=%.1f%%", 
+                                                      entity_id, outdoor_temp, curve_val, ff_demand, demand)
                             except ValueError:
                                 pass
             else:
@@ -458,6 +515,10 @@ class MultizoneCoordinator:
             tuner = self._autotuners[entity_id]
             if tuner.state != tuner.STATE_COMPLETED:
                 tuner.update(current_temp, demand > 0)
+                
+            # Feed Thermal Observer
+            self._thermal_models[entity_id].update(current_temp, demand > 0)
+            self.hass.async_create_task(self._async_save_thermal_states())
                 
             _LOGGER.debug("Zone '%s' Demand updated: %.1f%% (Temp: %s, Target: %s, Mode: %s)", 
                           entity_id, demand, current_temp, target_temp, "PID" if tuner.state == tuner.STATE_COMPLETED else "Hysteresis")
@@ -677,6 +738,189 @@ class MultizoneCoordinator:
                     self.hass.async_create_task(self.async_set_global_preset(pre_night))
         except Exception:
             pass
+
+    async def _async_check_global_calendar(self, now: datetime) -> None:
+        """Fetch and parse calendar events for scheduling and Smart Start."""
+        if not self.global_calendar_id:
+            return
+            
+        # 1. Fetch events from now to +24 hours
+        end_time = now + timedelta(hours=24)
+        try:
+            response = await self.hass.services.async_call(
+                "calendar",
+                "get_events",
+                {
+                    "entity_id": self.global_calendar_id,
+                    "start_date_time": now.isoformat(),
+                    "end_date_time": end_time.isoformat()
+                },
+                blocking=True,
+                return_response=True
+            )
+            
+            if not response or self.global_calendar_id not in response:
+                return
+                
+            events = response[self.global_calendar_id].get("events", [])
+            
+            # Find current and next event
+            current_event = None
+            next_event = None
+            
+            for event in events:
+                try:
+                    # calendar.get_events returns ISO strings
+                    start = dt_util.parse_datetime(event["start"])
+                    end = dt_util.parse_datetime(event["end"])
+                    
+                    if start and end:
+                        if start <= now < end:
+                            if not current_event:
+                                current_event = event
+                        elif now < start:
+                            if not next_event:
+                                next_event = event
+                                break # Found the immediate next
+                except Exception as ex:
+                    _LOGGER.warning("Error parsing calendar event dates: %s", ex)
+                    
+            await self._async_process_calendar_events(current_event, next_event, now)
+                
+        except Exception as ex:
+            _LOGGER.error("Error fetching calendar events: %s", ex)
+
+    async def _async_process_calendar_events(self, current_event: dict | None, next_event: dict | None, now: datetime) -> None:
+        """Process current and future events."""
+        # 1. Process Current Event
+        if current_event:
+            # We use a unique ID based on start time and title to avoid re-applying SET constantly
+            event_uid = f"{current_event['start']}_{current_event['summary']}"
+            
+            if self._calendar_active_event_id != event_uid:
+                _LOGGER.info("Calendar Event Started: %s", current_event["summary"])
+                self._calendar_active_event_id = event_uid
+                
+                if self._pre_calendar_preset is None:
+                    self._pre_calendar_preset = self._current_global_preset
+                
+                # Clear temporary overrides from previous events
+                self._calendar_temp_overrides.clear()
+                self._calendar_mode_overrides.clear()
+                
+                # Parse
+                parsed = parse_calendar_event(current_event["summary"])
+                
+                # Apply Global Settings
+                if parsed["global_preset"]:
+                    await self.async_set_global_preset(parsed["global_preset"])
+                    
+                if parsed["global_temperature"]:
+                    for zone in self.zones:
+                        climate_id = make_zone_entity_id(zone[CONF_ZONE_NAME])
+                        # Set temp temporarily
+                        self._calendar_temp_overrides[climate_id] = parsed["global_temperature"]
+                        
+                # Apply Zone Overrides
+                for zone_name, override in parsed["overrides"].items():
+                    # Find real entity_id
+                    climate_id = None
+                    for z in self.zones:
+                        if z[CONF_ZONE_NAME].lower() == zone_name:
+                            climate_id = make_zone_entity_id(z[CONF_ZONE_NAME])
+                            break
+                            
+                    if not climate_id:
+                        continue
+                        
+                    # Modes
+                    if override.mode:
+                        if override.is_permanent:
+                            zone_select = self._select_entities.get(f"zone_mode_{climate_id}")
+                            if zone_select:
+                                await zone_select.async_select_option(override.mode)
+                        else:
+                            self._calendar_mode_overrides[climate_id] = override.mode
+                            
+                    # Temperatures
+                    if override.temperature is not None:
+                        if override.is_permanent:
+                            # Save permanently to current preset
+                            if self._current_global_preset:
+                                if self._current_global_preset not in self._presets:
+                                    self._presets[self._current_global_preset] = {}
+                                if climate_id not in self._presets[self._current_global_preset]:
+                                    self._presets[self._current_global_preset][climate_id] = {}
+                                self._presets[self._current_global_preset][climate_id]["target_temp"] = override.temperature
+                                await self._async_save_presets_storage()
+                        else:
+                            # Save temporarily
+                            self._calendar_temp_overrides[climate_id] = override.temperature
+                            
+                # Trigger a refresh of climate entities
+                for cb in self._climate_callbacks.values():
+                    cb()
+        else:
+            if self._calendar_active_event_id is not None:
+                _LOGGER.info("Calendar Event Ended. Restoring base state.")
+                self._calendar_active_event_id = None
+                self._calendar_temp_overrides.clear()
+                self._calendar_mode_overrides.clear()
+                
+                if self._pre_calendar_preset is not None:
+                    await self.async_set_global_preset(self._pre_calendar_preset)
+                    self._pre_calendar_preset = None
+                    
+                for cb in self._climate_callbacks.values():
+                    cb()
+
+        # 2. Process Smart Start (Next Event)
+        # Check if next event requires pre-heating
+        if next_event:
+            start_time = dt_util.parse_datetime(next_event["start"])
+            if start_time:
+                parsed_next = parse_calendar_event(next_event["summary"])
+                # We only preheat if there is a target temperature shift
+                # For each zone, calculate if we need to start
+                for zone in self.zones:
+                    climate_id = make_zone_entity_id(zone[CONF_ZONE_NAME])
+                    target = None
+                    
+                    # Does next event have specific temp override?
+                    zone_name_lower = zone[CONF_ZONE_NAME].lower()
+                    if zone_name_lower in parsed_next["overrides"]:
+                        target = parsed_next["overrides"][zone_name_lower].temperature
+                        
+                    if target is None and parsed_next["global_temperature"]:
+                        target = parsed_next["global_temperature"]
+                        
+                    if target is None and parsed_next["global_preset"]:
+                        # Look up base preset temp for this zone
+                        target = self._presets.get(parsed_next["global_preset"], {}).get(climate_id, {}).get("target_temp")
+                        
+                    if target is not None:
+                        current_temp = None
+                        state = self.hass.states.get(climate_id)
+                        if state:
+                            current_temp = state.attributes.get("current_temperature")
+                            
+                        if current_temp is not None and current_temp < target:
+                            # We need to heat. Calculate time.
+                            thermal_model = self._thermal_models.get(climate_id)
+                            if thermal_model and thermal_model.heating_rate > 0.05: # At least 0.05 deg/hour
+                                delta_t = target - current_temp
+                                hours_needed = delta_t / thermal_model.heating_rate
+                                time_needed = timedelta(hours=hours_needed)
+                                
+                                if now + time_needed >= start_time:
+                                    _LOGGER.info("Smart Start Triggered for %s! Target: %.1f, Need: %s", climate_id, target, time_needed)
+                                    # Override current target temp temporarily
+                                    self._calendar_temp_overrides[climate_id] = target
+                                    # Wake up zone if in Sleep/Eco
+                                    if self._calendar_mode_overrides.get(climate_id) == "off":
+                                        del self._calendar_mode_overrides[climate_id]
+                                    if climate_id in self._climate_callbacks:
+                                        self._climate_callbacks[climate_id]()
 
     def _get_zone(self, climate_entity: str) -> dict | None:
         """Get zone config by climate entity ID."""

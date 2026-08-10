@@ -37,9 +37,9 @@ async def async_setup_entry(
     def _make_device_info() -> DeviceInfo:
         return DeviceInfo(
             identifiers={(DOMAIN, config_entry.entry_id)},
-            name="Multizone Thermostat",
+            name="Master Control",
             manufacturer="Custom Integration",
-            model="Multizone Thermostat",
+            model="Master Control",
         )
 
     device_info = _make_device_info()

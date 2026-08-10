@@ -13,9 +13,16 @@
       },
       "weather": {
         "title": "Weather Compensation",
-        "description": "Select an outdoor temperature sensor to enable automatic weather compensation.",
+        "description": "Select an external temperature or weather sensor to enable weather compensation. This will dynamically adjust the heating logic based on outdoor conditions.",
         "data": {
-          "weather_sensor": "Outdoor Temperature Sensor"
+          "weather_sensor": "External Temperature Sensor"
+        }
+      },
+      "calendar": {
+        "title": "Global Calendar",
+        "description": "Select a local calendar entity to control the multizone system schedule.",
+        "data": {
+          "global_calendar": "Calendar Entity"
         }
       },
       "add_zone": {
@@ -76,9 +83,16 @@
     "step": {
       "init": {
         "title": "Multizone Thermostat Options",
-        "description": "Current boiler: **{boiler_switch}**\nConfigured zones: **{zones_count}**\n\nWhat would you like to change?",
+        "description": "Choose an action",
         "data": {
           "action": "Action"
+        }
+      },
+      "edit_calendar": {
+        "title": "Global Calendar",
+        "description": "Select a local calendar entity to control the multizone system schedule.",
+        "data": {
+          "global_calendar": "Calendar Entity"
         }
       },
       "change_boiler": {

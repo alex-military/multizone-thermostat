@@ -31,6 +31,7 @@ from .const import (
     CONF_ZONE_CALIBRATIONS,
     CONF_ZONES,
     CONF_WEATHER_SENSOR,
+    CONF_GLOBAL_CALENDAR,
     DEFAULT_TRV_SYNC,
     DOMAIN,
     make_zone_entity_id,
@@ -122,6 +123,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._geofencing_enabled: bool = True
         self._presence_sensor: str | None = None
         self._weather_sensor: str | None = None
+        self._global_calendar: str | None = None
         self._current_zone_data: dict[str, Any] | None = None
 
     async def async_step_user(
@@ -250,7 +252,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if user_input.get("add_another", False):
                 return await self.async_step_add_zone()
             else:
-                return await self.async_step_weather()
+                return await self.async_step_calendar()
 
         schema = vol.Schema({
             vol.Required("add_another", default=False): bool,
@@ -263,6 +265,26 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "zones_added": str(len(self._zones)),
                 "zones_list": ", ".join(z[CONF_ZONE_NAME] for z in self._zones),
             },
+        )
+
+    async def async_step_calendar(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.FlowResult:
+        """Step: Calendar Setup."""
+        if user_input is not None:
+            if user_input.get(CONF_GLOBAL_CALENDAR) and user_input[CONF_GLOBAL_CALENDAR] != "none":
+                self._global_calendar = user_input[CONF_GLOBAL_CALENDAR]
+            else:
+                self._global_calendar = None
+            return await self.async_step_weather()
+
+        schema = vol.Schema({
+            vol.Optional(CONF_GLOBAL_CALENDAR): selector.EntitySelector(selector.EntitySelectorConfig(domain="calendar")),
+        })
+
+        return self.async_show_form(
+            step_id="calendar",
+            data_schema=schema,
         )
 
     async def async_step_weather(
@@ -333,6 +355,8 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 data[CONF_PRESENCE_SENSOR] = self._presence_sensor
             if self._weather_sensor:
                 data[CONF_WEATHER_SENSOR] = self._weather_sensor
+            if self._global_calendar:
+                data[CONF_GLOBAL_CALENDAR] = self._global_calendar
             return self.async_create_entry(
                 title="Multizone Thermostat",
                 data=data,
@@ -373,6 +397,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
         self._geofencing_enabled: bool = config_entry.data.get(CONF_GEOFENCING_ENABLED, False)
         self._presence_sensor: str | None = config_entry.data.get(CONF_PRESENCE_SENSOR)
         self._weather_sensor: str | None = config_entry.data.get(CONF_WEATHER_SENSOR)
+        self._global_calendar: str | None = config_entry.data.get(CONF_GLOBAL_CALENDAR)
         self._current_zone_name: str | None = None
         self._current_zone_data: dict[str, Any] | None = None
 
@@ -394,6 +419,8 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                 return await self.async_step_edit_geofencing()
             elif action == "edit_weather_comp":
                 return await self.async_step_edit_weather_comp()
+            elif action == "edit_calendar":
+                return await self.async_step_edit_calendar()
 
         menu_options = {
             "change_boiler": "Change boiler switch",
@@ -402,6 +429,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             "remove_zone": "Remove a zone",
             "edit_weather_comp": "Edit Weather Compensation",
             "edit_geofencing": "Edit Geofencing Settings",
+            "edit_calendar": "Edit Global Calendar",
         }
 
         schema = vol.Schema({
@@ -707,6 +735,35 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             data_schema=schema,
         )
 
+    @callback
+    async def async_step_edit_calendar(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.FlowResult:
+        """Edit global calendar settings."""
+        if user_input is not None:
+            if user_input.get(CONF_GLOBAL_CALENDAR) and user_input[CONF_GLOBAL_CALENDAR] != "none":
+                self._global_calendar = user_input[CONF_GLOBAL_CALENDAR]
+            else:
+                self._global_calendar = None
+            return self._save_options()
+
+        if self._global_calendar and self._global_calendar != "none":
+            schema = vol.Schema({
+                vol.Optional(
+                    CONF_GLOBAL_CALENDAR, 
+                    description={"suggested_value": self._global_calendar}
+                ): selector.EntitySelector(selector.EntitySelectorConfig(domain="calendar")),
+            })
+        else:
+            schema = vol.Schema({
+                vol.Optional(CONF_GLOBAL_CALENDAR): selector.EntitySelector(selector.EntitySelectorConfig(domain="calendar")),
+            })
+
+        return self.async_show_form(
+            step_id="edit_calendar",
+            data_schema=schema,
+        )
+
     def _save_options(self) -> config_entries.FlowResult:
         """Save updated options into entry.data and reload entry."""
         data = {
@@ -719,6 +776,9 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             
         if self._weather_sensor:
             data[CONF_WEATHER_SENSOR] = self._weather_sensor
+            
+        if self._global_calendar:
+            data[CONF_GLOBAL_CALENDAR] = self._global_calendar
 
         self.hass.config_entries.async_update_entry(
             self._config_entry, data=data

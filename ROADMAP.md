@@ -27,16 +27,19 @@ The project is structured in phases to evolve from a simple aggregator to a full
 - [x] **Weather Compensation Curve**: Dynamic adjustment of the heating demand based on an outdoor temperature sensor (Feed-Forward algorithm).
 - [x] **External Sensor TRV Override (Calibration/Fake Target)**: The PID engine intercepts TRVs attached to hot radiators and injects mathematical offsets based on a pure external room sensor, forcing perfect ambient temperatures.
 
+### PHASE 5 — Advanced Algorithms & Analytics
+- [x] **Advanced Room Thermal Model (SAT)**: Learning of thermal capacity and dispersion, heating/cooling speed, and thermal inertia.
+- [x] **Future Temperature Prediction (SAT) & Smart Start**: Predictive early start based on thermal data and calendar events.
+- [x] **Global Calendar Integration**: Scheduling of global presets and dynamic overrides natively tied into the Home Assistant Local Calendar.
+
 ---
 
 ## 🚀 Future Roadmap & Next Priorities
 
-### PHASE 5 — Advanced Algorithms & Analytics
-1. **Advanced Room Thermal Model (SAT)**: Learning of thermal capacity and dispersion, heating/cooling speed, and thermal inertia.
-2. **Future Temperature Prediction (SAT)**: Predictive early start and predictive shutdown based on thermal data.
-3. **Adaptive Climate Curve**: Self-learning and continuous adaptation of the weather compensation curve based on history.
-4. **Full OpenTherm Support**: Modulation of flame flow temperature, diagnostic reading, and DHW management, mapping the Demand % (0-100%).
-5. **Advanced Diagnostics & Anomaly Analysis**: Detection of stuck valves, overshoots, PID cycles, and reporting for each room.
+### PHASE 6 — Advanced AI & Optimization
+- [ ] **Adaptive Climate Curve**: Self-learning and continuous adaptation of the weather compensation curve based on history.
+- [ ] **Full OpenTherm Support**: Modulation of flame flow temperature, diagnostic reading, and DHW management, mapping the Demand % (0-100%).
+- [ ] **Advanced Diagnostics & Anomaly Analysis**: Detection of stuck valves, overshoots, PID cycles, and reporting for each room.
 
 
 ### 🤝 Community Requests & Pull Requests

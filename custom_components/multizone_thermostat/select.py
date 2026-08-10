@@ -64,9 +64,9 @@ class MultizoneGlobalPresetSelect(RestoreEntity, SelectEntity):
         """Return device info."""
         return DeviceInfo(
             identifiers={(DOMAIN, self._entry_id)},
-            name="Multizone Thermostat",
+            name="Master Control",
             manufacturer="Custom Integration",
-            model="Multizone Thermostat",
+            model="Master Control",
         )
 
     @property

@@ -73,9 +73,9 @@ def _make_device_info(entry_id: str, device_type: str = "main") -> DeviceInfo:
         
     return DeviceInfo(
         identifiers={(DOMAIN, entry_id)},
-        name="Multizone Thermostat",
+        name="Master Control",
         manufacturer="Custom Integration",
-        model="Multizone Thermostat",
+        model="Master Control",
     )
 
 

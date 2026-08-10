@@ -156,6 +156,10 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
 
     @property
     def target_temperature(self) -> float | None:
+        # Prioritize calendar override
+        override_temp = self._coordinator._calendar_temp_overrides.get(self.entity_id)
+        if override_temp is not None:
+            return override_temp
         return self._target_temperature
 
     @property
@@ -362,8 +366,8 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
                         )
                     
                     # Sync Target Temp & Calibration
-                    if self._target_temperature is not None and target_hvac_mode != HVACMode.OFF:
-                        trv_target = self._target_temperature
+                    if self.target_temperature is not None and target_hvac_mode != HVACMode.OFF:
+                        trv_target = self.target_temperature
                         
                         calib_entity = self._calibrations.get(trv)
                         trv_current = st.attributes.get("current_temperature")
@@ -387,7 +391,7 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
                                 )
                             # Scenario C: Ext Sensor + NO Calibration (Fake Target)
                             else:
-                                trv_target = self._target_temperature + (float(trv_current) - self._current_temperature)
+                                trv_target = self.target_temperature + (float(trv_current) - self._current_temperature)
                                 trv_target = max(5.0, min(35.0, trv_target))
                         
                         # Round target to TRV's native step to prevent rounding-induced feedback loops
