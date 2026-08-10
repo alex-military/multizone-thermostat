@@ -18,6 +18,13 @@
           "weather_sensor": "Sensore Temperatura Esterna"
         }
       },
+      "calendar": {
+        "title": "Calendario Globale",
+        "description": "Seleziona un'entità Calendario locale per controllare la pianificazione del sistema multizona.",
+        "data": {
+          "global_calendar": "Entità Calendario"
+        }
+      },
       "add_zone": {
         "title": "Aggiungi Zona di Riscaldamento ({zone_number})",
         "description": "Configura una zona di riscaldamento. {zones_added} zona/e già aggiunte.",
@@ -85,6 +92,13 @@
         "title": "Cambia Switch Caldaia",
         "data": {
           "boiler_switch": "Nuovo Switch Caldaia"
+        }
+      },
+      "edit_calendar": {
+        "title": "Calendario Globale",
+        "description": "Seleziona un'entità Calendario locale per controllare la pianificazione del sistema multizona.",
+        "data": {
+          "global_calendar": "Entità Calendario"
         }
       },
       "add_zone": {
