@@ -4,6 +4,16 @@
 
 Everything you need to know to set up, configure, and understand how the Multizone Thermostat integration works.
 
+## Prerequisite: Home Assistant Local Calendar
+
+If you want to use the **Global Calendar & Smart Start** feature, you must first create a local calendar in Home Assistant *before* starting the setup wizard:
+1. Go to **Settings → Devices & Services → Add Integration**
+2. Search for **"Local Calendar"** and install it.
+3. Name it something like "Thermostat Calendar".
+4. You will now see a "Calendar" tab in your main Home Assistant sidebar.
+
+---
+
 ## Setup Wizard
 
 1. Go to **Settings → Devices & Services → Add Integration**
@@ -13,9 +23,10 @@ Everything you need to know to set up, configure, and understand how the Multizo
    - **Step 2 (Add Zone)**: Create your first thermal zone. Here you can assign all its hardware in a single page: Name, Temperature Sensor (optional), TRVs (`climate`), Heater Switches (`switch`), Window Sensor, and toggle Anti-seize/Preset Sync.
    - **Step 3 (TRV Calibration - Conditional)**: If in Step 2 you assigned *both* TRVs and a pure external Temperature Sensor, you will be asked if you want to assign a `Local Temperature Calibration` entity to each TRV (for the mathematical offset injection).
    - **Step 4 (More Zones)**: Choose whether to add another zone or proceed to global settings.
-   - **Step 5 (Weather Compensation)**: Select an optional outdoor sensor (physical or `weather` domain) to enable the Feed-Forward heating curve.
-   - **Step 6 (Geofencing)**: Select an optional presence sensor (`binary_sensor` or `device_tracker` or `zone`) and choose the target presets for when you leave or return home.
-   - **Step 7**: Confirm and finish.
+   - **Step 5 (Global Calendar)**: Select the Local Calendar entity you created in the prerequisite step. Leave blank if you don't want to use calendar scheduling.
+   - **Step 6 (Weather Compensation)**: Select an optional outdoor sensor (physical or `weather` domain) to enable the Feed-Forward heating curve.
+   - **Step 7 (Geofencing)**: Select an optional presence sensor (`binary_sensor` or `device_tracker` or `zone`) and choose the target presets for when you leave or return home.
+   - **Step 8**: Confirm and finish.
 
 ---
 
@@ -81,6 +92,8 @@ Window Closed
 
 Go to **Settings → Devices & Services → Multizone Thermostat → Configure** to:
 - Change the boiler switch
+- Edit Global Calendar (change or remove the calendar entity)
+- Edit Weather Compensation (change or remove outdoor sensor)
 - Change the presence sensor for geofencing
 - Add a new zone
 - Remove a zone
