@@ -489,21 +489,19 @@ class MultizoneCoordinator:
                                 else:
                                     outdoor_temp = float(weather_state.state)
                                     
-                                if outdoor_temp is not None:
-                                    # Adaptive Curve Calculation
-                                    if thermal_model.heating_rate > 0.1 and thermal_model.cooling_rate > 0.01:
-                                        adaptive_demand = (thermal_model.cooling_rate / thermal_model.heating_rate) * 100.0
-                                        delta_t = 20.0 - outdoor_temp
-                                        if delta_t > 1.0:
-                                            curve_val = adaptive_demand / delta_t
-                                            _LOGGER.debug("[%s] Adaptive Curve: HeatingRate=%.2f, CoolingRate=%.2f, InjectedCurve=%.2f", 
-                                                          entity_id, thermal_model.heating_rate, thermal_model.cooling_rate, curve_val)
-
-                                    if curve_val > 0.0:
-                                        ff_demand = (20.0 - outdoor_temp) * curve_val
-                                        demand = min(100.0, max(0.0, demand + ff_demand))
-                                        _LOGGER.debug("Applied weather comp to %s: Outdoor=%.1f, Curve=%.1f, FF=+%.1f%%, Final=%.1f%%", 
-                                                      entity_id, outdoor_temp, curve_val, ff_demand, demand)
+                                    if outdoor_temp is not None:
+                                        # Adaptive Curve Calculation (SAT Math)
+                                        curve_val = thermal_model.get_weather_multiplier(manual_base_curve=curve_val)
+                                        
+                                        # (Target - OutdoorTemp) * Ke
+                                        delta_t = effective_target - outdoor_temp
+                                        if delta_t > 0.0 and curve_val > 0.0:
+                                            ff_demand = delta_t * curve_val
+                                            # Clamp the weather bonus to a max of +40% to avoid it dominating the PID
+                                            ff_demand = min(40.0, ff_demand)
+                                            demand = min(100.0, max(0.0, demand + ff_demand))
+                                            _LOGGER.debug("[%s] SAT Weather Comp: Target=%.1f, Outdoor=%.1f, Ke=%.2f, FF=+%.1f%%, Final=%.1f%%", 
+                                                          entity_id, effective_target, outdoor_temp, curve_val, ff_demand, demand)
                             except ValueError:
                                 pass
             else:
@@ -718,9 +716,10 @@ class MultizoneCoordinator:
             if local_now.hour == hour and local_now.minute == minute:
                 if self._last_night_trigger_date != current_date:
                     self._last_night_trigger_date = current_date
-                    _LOGGER.info("Auto Night Mode triggered. Setting Sleep mode.")
-                    # Save current preset before going to sleep (only if not already sleep)
-                    if self._current_global_preset != GLOBAL_PRESET_SLEEP:
+                    if self._current_global_preset in (GLOBAL_PRESET_MANUAL, "none"):
+                        _LOGGER.info("Auto Night Mode skipped because system is in Manual mode.")
+                    elif self._current_global_preset != GLOBAL_PRESET_SLEEP:
+                        _LOGGER.info("Auto Night Mode triggered. Setting Sleep mode.")
                         self.hass.async_create_task(self.async_set_persistent_data(KEY_PRE_NIGHT_PRESET, self._current_global_preset))
                         self.hass.async_create_task(self.async_set_global_preset(GLOBAL_PRESET_SLEEP))
         except Exception:
@@ -733,9 +732,12 @@ class MultizoneCoordinator:
             if local_now.hour == hour and local_now.minute == minute:
                 if self._last_morning_trigger_date != current_date:
                     self._last_morning_trigger_date = current_date
-                    pre_night = self.get_persistent_data(KEY_PRE_NIGHT_PRESET, GLOBAL_PRESET_COMFORT)
-                    _LOGGER.info("Auto Morning Mode triggered. Restoring mode: %s", pre_night)
-                    self.hass.async_create_task(self.async_set_global_preset(pre_night))
+                    if self._current_global_preset in (GLOBAL_PRESET_MANUAL, "none"):
+                        _LOGGER.info("Auto Morning Mode skipped because system is in Manual mode.")
+                    else:
+                        pre_night = self.get_persistent_data(KEY_PRE_NIGHT_PRESET, GLOBAL_PRESET_COMFORT)
+                        _LOGGER.info("Auto Morning Mode triggered. Restoring mode: %s", pre_night)
+                        self.hass.async_create_task(self.async_set_global_preset(pre_night))
         except Exception:
             pass
 
