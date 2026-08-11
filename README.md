@@ -22,7 +22,7 @@ A custom integration for Home Assistant that provides **multi-zone heating manag
 - 🛡️ **Boiler & Valve Protection** — Native `number` entities for anti-short-cycle, valve opening delay, and **Summer Anti-seize protection**
 - 🪟 **Window Sensor Detection** — Automatically bypass zones when a window is opened, and restore them when closed
 - 🌡️ **Virtual Thermostats** — Create virtual thermostat entities directly from the UI by combining a temperature sensor and a heater switch
-- 🌤️ **Weather Compensation** — Dynamic "Feed-Forward" heating adjustment based on an outdoor physical or meteorological sensor
+- 🌤️ **Adaptive Weather Compensation** — Dynamic "Feed-Forward" heating adjustment based on an outdoor physical or meteorological sensor. The system automatically learns the thermal dispersion of each room and adapts the compensation curve (SAT logic) without manual input!
 - 🧠 **Multi-TRV Aggregation** — Group multiple TRVs in the same room. The system automatically calculates their average temperature and syncs their targets.
 - 📉 **Dynamic Heat Demand (%)** — Calculates the exact percentage of heating load required by the house in real-time.
 - 🔄 **Global Presets & Dynamic Memory** — Manual, Eco, Comfort, Sleep, Away. The system remembers the specific temperature and bypass state of *each zone* per preset.

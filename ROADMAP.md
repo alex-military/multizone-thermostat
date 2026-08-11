@@ -25,6 +25,7 @@ The project is structured in phases to evolve from a simple aggregator to a full
 - [x] **PWM Engine**: Translates proportional demand into precise ON/OFF cycles.
 - [x] **Global Heat Demand (%)**: Calculates the exact percentage of load required by the house.
 - [x] **Weather Compensation Curve**: Dynamic adjustment of the heating demand based on an outdoor temperature sensor (Feed-Forward algorithm).
+- [x] **Adaptive Climate Curve (SAT Logic)**: The system learns the thermal dispersion of your rooms and automatically shapes the weather compensation multiplier for perfect efficiency.
 - [x] **External Sensor TRV Override (Calibration/Fake Target)**: The PID engine intercepts TRVs attached to hot radiators and injects mathematical offsets based on a pure external room sensor, forcing perfect ambient temperatures.
 
 ### PHASE 5 — Advanced Algorithms & Analytics
