@@ -38,7 +38,7 @@ The project is structured in phases to evolve from a simple aggregator to a full
 ## 🚀 Future Roadmap & Next Priorities
 
 ### PHASE 6 — Advanced AI & Optimization
-- [ ] **Adaptive Climate Curve**: Self-learning and continuous adaptation of the weather compensation curve based on history.
+- [x] **Adaptive Climate Curve**: Self-learning and continuous adaptation of the weather compensation curve based on history.
 - [ ] **Full OpenTherm Support**: Modulation of flame flow temperature, diagnostic reading, and DHW management, mapping the Demand % (0-100%).
 - [ ] **Advanced Diagnostics & Anomaly Analysis**: Detection of stuck valves, overshoots, PID cycles, and reporting for each room.
 
