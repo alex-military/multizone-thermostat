@@ -2,10 +2,10 @@
   "config": {
     "step": {
       "user": {
-        "title": "Multizone Thermostat — Configurazione Caldaia",
-        "description": "Seleziona l'entità switch che controlla il relè della caldaia (circolatore). Questo è il primo passo obbligatorio.",
+        "title": "Termostato Multizona — Modalità Caldaia",
+        "description": "Seleziona come vuoi controllare il tuo sistema di riscaldamento centrale (Relè ON/OFF o OpenTherm Modulante).",
         "data": {
-          "boiler_switch": "Switch Caldaia"
+          "boiler_mode": "Modalità Controllo Caldaia"
         },
         "data_description": {
           "boiler_switch": "Lo switch/relè che controlla la pompa del circolatore della caldaia"
@@ -64,8 +64,27 @@
       },
       "confirm": {
         "title": "Conferma Configurazione",
-        "description": "Pronto per configurare Multizone Thermostat con le seguenti impostazioni:\n\n**Switch Caldaia:** {boiler_switch}\n**Zone ({zones_count}):**\n{zones_list}\n\nClicca Invia per creare l'integrazione.",
+        "description": "Pronto a configurare il Termostato Multizona.\n\n**Zone ({zones_count}):**\n{zones_list}\n\nClicca Invia per completare.",
         "data": {}
+      },
+      "boiler_relay": {
+        "title": "Configurazione Relè Caldaia",
+        "description": "Seleziona l'entità switch che controlla il relè della caldaia (circolatore).",
+        "data": {
+          "boiler_switch": "Interruttore Caldaia"
+        },
+        "data_description": {
+          "boiler_switch": "Lo switch/relè che controlla la pompa o la caldaia"
+        }
+      },
+      "boiler_opentherm": {
+        "title": "Configurazione OpenTherm",
+        "description": "Seleziona l'entità OpenTherm che controlla la temperatura dell'acqua del riscaldamento centrale. Definisci anche i limiti minimo e massimo.",
+        "data": {
+          "opentherm_entity": "Entità OpenTherm (Climate / Scaldabagno)",
+          "opentherm_min_temp": "Temperatura Minima Acqua (°C)",
+          "opentherm_max_temp": "Temperatura Massima Acqua (°C)"
+        }
       }
     },
     "abort": {
@@ -76,22 +95,23 @@
     },
     "error": {
       "zone_name_required": "Il nome della zona non può essere vuoto.",
-      "presence_sensor_required": "Devi selezionare un sensore se abiliti il Geofencing."
+      "presence_sensor_required": "Devi selezionare un sensore se abiliti il Geofencing.",
+      "invalid_temp_range": "La temperatura minima deve essere inferiore alla temperatura massima."
     }
   },
   "options": {
     "step": {
       "init": {
         "title": "Opzioni Multizone Thermostat",
-        "description": "Caldaia attuale: **{boiler_switch}**\nZone configurate: **{zones_count}**\n\nCosa vuoi modificare?",
+        "description": "Zone configurate: **{zones_count}**\n\nCosa vorresti modificare?",
         "data": {
           "action": "Azione"
         }
       },
       "change_boiler": {
-        "title": "Cambia Switch Caldaia",
+        "title": "Cambia Modalità Caldaia",
         "data": {
-          "boiler_switch": "Nuovo Switch Caldaia"
+          "boiler_mode": "Modalità Controllo Caldaia"
         }
       },
       "edit_calendar": {
@@ -158,6 +178,25 @@
         "data": {
           "weather_sensor": "Sensore Temperatura Esterna"
         }
+      },
+      "boiler_relay": {
+        "title": "Configurazione Relè Caldaia",
+        "description": "Seleziona l'entità switch che controlla il relè della caldaia (circolatore).",
+        "data": {
+          "boiler_switch": "Interruttore Caldaia"
+        },
+        "data_description": {
+          "boiler_switch": "Lo switch/relè che controlla la pompa o la caldaia"
+        }
+      },
+      "boiler_opentherm": {
+        "title": "Configurazione OpenTherm",
+        "description": "Seleziona l'entità OpenTherm che controlla la temperatura dell'acqua del riscaldamento centrale. Definisci anche i limiti minimo e massimo.",
+        "data": {
+          "opentherm_entity": "Entità OpenTherm (Climate / Scaldabagno)",
+          "opentherm_min_temp": "Temperatura Minima Acqua (°C)",
+          "opentherm_max_temp": "Temperatura Massima Acqua (°C)"
+        }
       }
     },
     "abort": {
@@ -168,7 +207,8 @@
       "no_virtual_thermostats": "Nessun termostato virtuale configurato."
     },
     "error": {
-      "zone_name_required": "Il nome della zona non può essere vuoto."
+      "zone_name_required": "Il nome della zona non può essere vuoto.",
+      "invalid_temp_range": "La temperatura minima deve essere inferiore alla temperatura massima."
     }
   },
   "entity": {

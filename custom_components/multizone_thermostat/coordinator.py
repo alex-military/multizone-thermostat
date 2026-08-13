@@ -31,6 +31,12 @@ from homeassistant.helpers.storage import Store
 
 from .const import (
     CONF_BOILER_SWITCH,
+    CONF_BOILER_MODE,
+    MODE_RELAY,
+    MODE_OPENTHERM,
+    CONF_OPENTHERM_ENTITY,
+    CONF_OPENTHERM_MIN_TEMP,
+    CONF_OPENTHERM_MAX_TEMP,
     CONF_ZONES,
     CONF_PRESENCE_SENSOR,
     CONF_ANTI_SEIZE_ENABLED,
@@ -102,7 +108,11 @@ class MultizoneCoordinator:
         """Initialize the coordinator."""
         self.hass = hass
         self.entry_id = entry.entry_id
+        self.boiler_mode = entry.data.get(CONF_BOILER_MODE, MODE_RELAY)
         self.boiler_switch = entry.data.get(CONF_BOILER_SWITCH)
+        self.opentherm_entity = entry.data.get(CONF_OPENTHERM_ENTITY)
+        self.opentherm_min_temp = entry.data.get(CONF_OPENTHERM_MIN_TEMP, 35.0)
+        self.opentherm_max_temp = entry.data.get(CONF_OPENTHERM_MAX_TEMP, 75.0)
         self.zones = entry.data.get(CONF_ZONES, [])
         self.presence_sensor = entry.data.get(CONF_PRESENCE_SENSOR)
         self.weather_sensor_id = entry.data.get("weather_sensor")
@@ -961,15 +971,19 @@ class MultizoneCoordinator:
             if demand > peak_demand:
                 peak_demand = demand
                 
+        # Track activity for anti-seize (both modes)
+        if peak_demand > 0:
+            self._last_active_time = time.time()
+            
+        if self.boiler_mode == MODE_OPENTHERM:
+            await self._async_update_opentherm_boiler(peak_demand)
+            return
+
         # Feed Peak Load to PWM Engine
         wanted_state = self._boiler_pwm.calculate(peak_demand)
         
         boiler_state = self.hass.states.get(self.boiler_switch)
         current_boiler_on = boiler_state is not None and boiler_state.state == STATE_ON
-        
-        # Track activity for anti-seize
-        if current_boiler_on or peak_demand > 0:
-            self._last_active_time = time.time()
             
         if wanted_state and not current_boiler_on:
             # Hard lock: prevent turning ON if min_cycle_off hasn't elapsed
@@ -1038,14 +1052,61 @@ class MultizoneCoordinator:
                 _LOGGER.debug("PWM Tick: Boiler → OFF (Peak Demand: %.1f%%)", peak_demand)
                 await self._force_boiler_off()
 
+    async def _async_update_opentherm_boiler(self, demand: float) -> None:
+        """Map demand to OpenTherm target temperature."""
+        if not self.opentherm_entity:
+            return
+            
+        # Normalize demand from 0-100 to 0.0-1.0 and clamp
+        norm_demand = demand / 100.0 if demand > 1.0 else demand
+        norm_demand = max(0.0, min(1.0, norm_demand))
+            
+        target_temp = self.opentherm_min_temp + (norm_demand * (self.opentherm_max_temp - self.opentherm_min_temp))
+        target_temp = round(target_temp, 1)
+        
+        domain = self.opentherm_entity.split(".")[0]
+        
+        _LOGGER.debug("OpenTherm: Demand %.1f%% -> Target Water Temp: %.1f°C", norm_demand * 100, target_temp)
+        
+        try:
+            if domain in ["climate", "water_heater"]:
+                await self.hass.services.async_call(
+                    domain,
+                    "set_temperature",
+                    {"entity_id": self.opentherm_entity, "temperature": target_temp},
+                    blocking=False,
+                )
+                
+                # Turn OFF if demand is 0, otherwise HEAT
+                if domain == "climate":
+                    hvac_mode = "off" if norm_demand <= 0.0 else "heat"
+                    await self.hass.services.async_call(
+                        "climate",
+                        "set_hvac_mode",
+                        {"entity_id": self.opentherm_entity, "hvac_mode": hvac_mode},
+                        blocking=False,
+                    )
+            elif domain == "number":
+                await self.hass.services.async_call(
+                    "number",
+                    "set_value",
+                    {"entity_id": self.opentherm_entity, "value": target_temp},
+                    blocking=False,
+                )
+        except Exception as err:
+            _LOGGER.error("Failed to update OpenTherm entity %s: %s", self.opentherm_entity, err)
+
     async def _async_update_boiler(self, emergency_off: bool = False) -> None:
         """Fallback for emergency off and anti-seize."""
         if emergency_off:
             _LOGGER.debug("Emergency OFF triggered. Stopping boiler.")
-            if self._pending_boiler_task:
-                self._pending_boiler_task.cancel()
-                self._pending_boiler_task = None
-            await self._force_boiler_off()
+            if self.boiler_mode == MODE_OPENTHERM:
+                await self._async_update_opentherm_boiler(0.0)
+            else:
+                if self._pending_boiler_task:
+                    self._pending_boiler_task.cancel()
+                    self._pending_boiler_task = None
+                await self._force_boiler_off()
 
     def _schedule_boiler_check(self, delay_seconds: float, turn_on: bool) -> None:
         """Schedule a delayed boiler update (used for valve delay)."""
@@ -1066,6 +1127,9 @@ class MultizoneCoordinator:
 
     async def _force_boiler_on(self) -> None:
         """Actually turn the boiler on and set locks."""
+        if self.boiler_mode == MODE_OPENTHERM or not self.boiler_switch:
+            return
+
         if self._pending_boiler_task:
             self._pending_boiler_task.cancel()
             self._pending_boiler_task = None
@@ -1081,6 +1145,9 @@ class MultizoneCoordinator:
 
     async def _force_boiler_off(self) -> None:
         """Actually turn the boiler off and set locks."""
+        if self.boiler_mode == MODE_OPENTHERM or not self.boiler_switch:
+            return
+
         if self._pending_boiler_task:
             self._pending_boiler_task.cancel()
             self._pending_boiler_task = None
@@ -1198,12 +1265,15 @@ class MultizoneCoordinator:
             anti_seize_boiler = self.get_persistent_data(CONF_ANTI_SEIZE_BOILER, False)
             if anti_seize_boiler:
                 _LOGGER.debug("Activating boiler for anti-seize...")
-                await self.hass.services.async_call(
-                    "switch",
-                    SERVICE_TURN_ON,
-                    {ATTR_ENTITY_ID: self.boiler_switch},
-                    blocking=False,
-                )
+                if self.boiler_mode == MODE_OPENTHERM:
+                    await self._async_update_opentherm_boiler(1.0)
+                elif self.boiler_switch:
+                    await self.hass.services.async_call(
+                        "switch",
+                        SERVICE_TURN_ON,
+                        {ATTR_ENTITY_ID: self.boiler_switch},
+                        blocking=False,
+                    )
                 
             # 4. Wait for the duration
             anti_seize_duration = self.get_persistent_data(KEY_ANTI_SEIZE_DURATION, 2)
@@ -1214,12 +1284,15 @@ class MultizoneCoordinator:
             # 5. Turn off boiler if we turned it on
             if anti_seize_boiler:
                 _LOGGER.debug("Deactivating boiler after anti-seize...")
-                await self.hass.services.async_call(
-                    "switch",
-                    SERVICE_TURN_OFF,
-                    {ATTR_ENTITY_ID: self.boiler_switch},
-                    blocking=False,
-                )
+                if self.boiler_mode == MODE_OPENTHERM:
+                    await self._async_update_opentherm_boiler(0.0)
+                elif self.boiler_switch:
+                    await self.hass.services.async_call(
+                        "switch",
+                        SERVICE_TURN_OFF,
+                        {ATTR_ENTITY_ID: self.boiler_switch},
+                        blocking=False,
+                    )
                 
             # 6. Restore all zones
             _LOGGER.debug("Restoring zones to pre-anti-seize state...")

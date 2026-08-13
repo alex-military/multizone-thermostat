@@ -9,6 +9,10 @@ from homeassistant.core import HomeAssistant
 
 from .const import (
     CONF_BOILER_SWITCH,
+    CONF_BOILER_MODE,
+    CONF_OPENTHERM_ENTITY,
+    MODE_RELAY,
+    MODE_OPENTHERM,
     CONF_ZONES,
     DOMAIN,
 )
@@ -23,17 +27,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Multizone Thermostat from a config entry."""
     hass.data.setdefault(DOMAIN, {})
 
-    boiler_switch = entry.data[CONF_BOILER_SWITCH]
+    boiler_mode = entry.data.get(CONF_BOILER_MODE, MODE_RELAY)
+    boiler_switch = entry.data.get(CONF_BOILER_SWITCH)
+    opentherm_entity = entry.data.get(CONF_OPENTHERM_ENTITY)
     zones = [dict(z) for z in list(entry.data.get(CONF_ZONES, []))]
 
-    # Validate boiler switch exists
-    boiler_state = hass.states.get(boiler_switch)
-    if boiler_state is None:
-        _LOGGER.warning(
-            "Boiler switch '%s' not found. The integration will load but boiler "
-            "control may not work until the entity is available.",
-            boiler_switch,
-        )
+    # Validate primary entity exists
+    if boiler_mode == MODE_RELAY and boiler_switch:
+        boiler_state = hass.states.get(boiler_switch)
+        if boiler_state is None:
+            _LOGGER.warning(
+                "Boiler switch '%s' not found. The integration will load but boiler "
+                "control may not work until the entity is available.",
+                boiler_switch,
+            )
+    elif boiler_mode == MODE_OPENTHERM and opentherm_entity:
+        ot_state = hass.states.get(opentherm_entity)
+        if ot_state is None:
+            _LOGGER.warning(
+                "OpenTherm entity '%s' not found. The integration will load but modulating "
+                "control may not work until the entity is available.",
+                opentherm_entity,
+            )
 
     # Migrate old config format to new Hybrid Zones format
     migrated = False
@@ -64,6 +79,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             zone["switch_entities"] = []
             zone["target_temperature"] = 20.0
             
+    # Migrate boiler mode for pre-OpenTherm installations
+    if CONF_BOILER_MODE not in new_data:
+        new_data[CONF_BOILER_MODE] = MODE_RELAY
+        migrated = True
+
     if migrated:
         _LOGGER.info("Migrating Multizone Thermostat config to new Hybrid Zones format.")
         new_data["zones"] = zones
@@ -133,8 +153,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
 
     _LOGGER.info(
-        "Multizone Thermostat loaded: boiler=%s, zones=%d",
-        boiler_switch,
+        "Multizone Thermostat loaded: mode=%s, entity=%s, zones=%d",
+        boiler_mode,
+        boiler_switch or opentherm_entity,
         len(zones),
     )
     return True

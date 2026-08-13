@@ -17,8 +17,12 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import selector
 
 from .const import (
+    CONF_BOILER_MODE,
     CONF_BOILER_SWITCH,
     CONF_GEOFENCING_ENABLED,
+    CONF_OPENTHERM_ENTITY,
+    CONF_OPENTHERM_MAX_TEMP,
+    CONF_OPENTHERM_MIN_TEMP,
     CONF_PRESENCE_SENSOR,
     CONF_ZONE_NAME,
     CONF_ZONE_CLIMATES,
@@ -34,6 +38,8 @@ from .const import (
     CONF_GLOBAL_CALENDAR,
     DEFAULT_TRV_SYNC,
     DOMAIN,
+    MODE_OPENTHERM,
+    MODE_RELAY,
     make_zone_entity_id,
 )
 
@@ -118,7 +124,11 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     def __init__(self) -> None:
         """Initialize."""
+        self._boiler_mode: str = MODE_RELAY
         self._boiler_switch: str | None = None
+        self._opentherm_entity: str | None = None
+        self._opentherm_min_temp: float = 35.0
+        self._opentherm_max_temp: float = 75.0
         self._zones: list[dict] = []
         self._geofencing_enabled: bool = True
         self._presence_sensor: str | None = None
@@ -129,10 +139,38 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.FlowResult:
-        """Step 1: Select boiler switch."""
+        """Step 1: Select boiler mode."""
         await self.async_set_unique_id(DOMAIN)
         self._abort_if_unique_id_configured()
 
+        if user_input is not None:
+            self._boiler_mode = user_input[CONF_BOILER_MODE]
+            if self._boiler_mode == MODE_RELAY:
+                return await self.async_step_boiler_relay()
+            else:
+                return await self.async_step_boiler_opentherm()
+
+        schema = vol.Schema({
+            vol.Required(CONF_BOILER_MODE, default=MODE_RELAY): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=[
+                        selector.SelectOptionDict(value=MODE_RELAY, label="Relay (ON/OFF)"),
+                        selector.SelectOptionDict(value=MODE_OPENTHERM, label="OpenTherm (Modulating)"),
+                    ],
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                )
+            ),
+        })
+
+        return self.async_show_form(
+            step_id="user",
+            data_schema=schema,
+        )
+
+    async def async_step_boiler_relay(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.FlowResult:
+        """Step 1a: Select boiler relay."""
         errors: dict[str, str] = {}
         switches = _get_switch_entities(self.hass)
 
@@ -148,11 +186,41 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         })
 
         return self.async_show_form(
-            step_id="user",
+            step_id="boiler_relay",
             data_schema=schema,
             description_placeholders={
                 "switch_count": str(len(switches)),
             },
+        )
+
+    async def async_step_boiler_opentherm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.FlowResult:
+        """Step 1b: Select OpenTherm entity."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            self._opentherm_entity = user_input[CONF_OPENTHERM_ENTITY]
+            self._opentherm_min_temp = user_input[CONF_OPENTHERM_MIN_TEMP]
+            self._opentherm_max_temp = user_input[CONF_OPENTHERM_MAX_TEMP]
+            if self._opentherm_min_temp >= self._opentherm_max_temp:
+                errors["base"] = "invalid_temp_range"
+            else:
+                return await self.async_step_add_zone()
+
+        schema = vol.Schema({
+            vol.Required(CONF_OPENTHERM_ENTITY): selector.EntitySelector(selector.EntitySelectorConfig(domain=["climate", "water_heater", "number"])),
+            vol.Required(CONF_OPENTHERM_MIN_TEMP, default=35.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=20, max=90, step=1, mode=selector.NumberSelectorMode.BOX)
+            ),
+            vol.Required(CONF_OPENTHERM_MAX_TEMP, default=75.0): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=20, max=90, step=1, mode=selector.NumberSelectorMode.BOX)
+            ),
+        })
+
+        return self.async_show_form(
+            step_id="boiler_opentherm",
+            data_schema=schema,
+            errors=errors,
         )
 
     async def async_step_add_zone(
@@ -346,11 +414,22 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self.async_abort(reason="no_zones_configured")
 
         if user_input is not None:
-            data = {
-                CONF_BOILER_SWITCH: self._boiler_switch,
-                CONF_ZONES: self._zones,
-                CONF_GEOFENCING_ENABLED: self._geofencing_enabled,
-            }
+            if self._boiler_mode == MODE_RELAY:
+                data = {
+                    CONF_BOILER_MODE: self._boiler_mode,
+                    CONF_BOILER_SWITCH: self._boiler_switch,
+                    CONF_ZONES: self._zones,
+                    CONF_GEOFENCING_ENABLED: self._geofencing_enabled,
+                }
+            else:
+                data = {
+                    CONF_BOILER_MODE: self._boiler_mode,
+                    CONF_OPENTHERM_ENTITY: self._opentherm_entity,
+                    CONF_OPENTHERM_MIN_TEMP: self._opentherm_min_temp,
+                    CONF_OPENTHERM_MAX_TEMP: self._opentherm_max_temp,
+                    CONF_ZONES: self._zones,
+                    CONF_GEOFENCING_ENABLED: self._geofencing_enabled,
+                }
             if self._geofencing_enabled and self._presence_sensor:
                 data[CONF_PRESENCE_SENSOR] = self._presence_sensor
             if self._weather_sensor:
@@ -368,7 +447,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="confirm",
             data_schema=schema,
             description_placeholders={
-                "boiler_switch": self._boiler_switch,
+                "boiler_switch": self._boiler_switch or self._opentherm_entity or "N/A",
                 "zones_count": str(len(self._zones)),
                 "zones_list": "\n".join(
                     f"- {z[CONF_ZONE_NAME]}"
@@ -393,7 +472,11 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
         """Initialize."""
         self._config_entry = config_entry
         self._zones: list[dict[str, Any]] = list(config_entry.data.get(CONF_ZONES, []))
+        self._boiler_mode: str = config_entry.data.get(CONF_BOILER_MODE, MODE_RELAY)
         self._boiler_switch: str = config_entry.data.get(CONF_BOILER_SWITCH, "")
+        self._opentherm_entity: str | None = config_entry.data.get(CONF_OPENTHERM_ENTITY)
+        self._opentherm_min_temp: float = config_entry.data.get(CONF_OPENTHERM_MIN_TEMP, 35.0)
+        self._opentherm_max_temp: float = config_entry.data.get(CONF_OPENTHERM_MAX_TEMP, 75.0)
         self._geofencing_enabled: bool = config_entry.data.get(CONF_GEOFENCING_ENABLED, False)
         self._presence_sensor: str | None = config_entry.data.get(CONF_PRESENCE_SENSOR)
         self._weather_sensor: str | None = config_entry.data.get(CONF_WEATHER_SENSOR)
@@ -423,7 +506,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                 return await self.async_step_edit_calendar()
 
         menu_options = {
-            "change_boiler": "Change boiler switch",
+            "change_boiler": "Change boiler mode",
             "add_zone": "Add a zone",
             "edit_zone": "Edit a zone",
             "remove_zone": "Remove a zone",
@@ -440,7 +523,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             step_id="init",
             data_schema=schema,
             description_placeholders={
-                "boiler_switch": self._boiler_switch,
+                "boiler_switch": self._boiler_switch or self._opentherm_entity or "N/A",
                 "zones_count": str(len(self._zones)),
             },
         )
@@ -448,7 +531,32 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
     async def async_step_change_boiler(
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.FlowResult:
-        """Change the boiler switch."""
+        """Change boiler mode."""
+        if user_input is not None:
+            self._boiler_mode = user_input[CONF_BOILER_MODE]
+            if self._boiler_mode == MODE_RELAY:
+                return await self.async_step_boiler_relay()
+            else:
+                return await self.async_step_boiler_opentherm()
+
+        schema = vol.Schema({
+            vol.Required(CONF_BOILER_MODE, default=self._boiler_mode): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=[
+                        selector.SelectOptionDict(value=MODE_RELAY, label="Relay (ON/OFF)"),
+                        selector.SelectOptionDict(value=MODE_OPENTHERM, label="OpenTherm (Modulating)"),
+                    ],
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                )
+            ),
+        })
+
+        return self.async_show_form(step_id="change_boiler", data_schema=schema)
+
+    async def async_step_boiler_relay(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.FlowResult:
+        """Step 1a: Select boiler relay."""
         if user_input is not None:
             self._boiler_switch = user_input[CONF_BOILER_SWITCH]
             return self._save_options()
@@ -456,8 +564,33 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
         schema = vol.Schema({
             vol.Required(CONF_BOILER_SWITCH, default=self._boiler_switch): selector.EntitySelector(selector.EntitySelectorConfig(domain=SWITCH_DOMAIN)),
         })
+        return self.async_show_form(step_id="boiler_relay", data_schema=schema)
 
-        return self.async_show_form(step_id="change_boiler", data_schema=schema)
+    async def async_step_boiler_opentherm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.FlowResult:
+        """Step 1b: Select OpenTherm entity."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            self._opentherm_entity = user_input[CONF_OPENTHERM_ENTITY]
+            self._opentherm_min_temp = user_input[CONF_OPENTHERM_MIN_TEMP]
+            self._opentherm_max_temp = user_input[CONF_OPENTHERM_MAX_TEMP]
+            if self._opentherm_min_temp >= self._opentherm_max_temp:
+                errors["base"] = "invalid_temp_range"
+            else:
+                return self._save_options()
+
+        schema = vol.Schema({
+            vol.Required(CONF_OPENTHERM_ENTITY, default=self._opentherm_entity): selector.EntitySelector(selector.EntitySelectorConfig(domain=["climate", "water_heater", "number"])),
+            vol.Required(CONF_OPENTHERM_MIN_TEMP, default=self._opentherm_min_temp): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=20, max=90, step=1, mode=selector.NumberSelectorMode.BOX)
+            ),
+            vol.Required(CONF_OPENTHERM_MAX_TEMP, default=self._opentherm_max_temp): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=20, max=90, step=1, mode=selector.NumberSelectorMode.BOX)
+            ),
+        })
+
+        return self.async_show_form(step_id="boiler_opentherm", data_schema=schema, errors=errors)
 
     async def async_step_add_zone(
         self, user_input: dict[str, Any] | None = None
@@ -766,11 +899,22 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
 
     def _save_options(self) -> config_entries.FlowResult:
         """Save updated options into entry.data and reload entry."""
-        data = {
-            CONF_BOILER_SWITCH: self._boiler_switch,
-            CONF_ZONES: self._zones,
-            CONF_GEOFENCING_ENABLED: self._geofencing_enabled,
-        }
+        if self._boiler_mode == MODE_RELAY:
+            data = {
+                CONF_BOILER_MODE: self._boiler_mode,
+                CONF_BOILER_SWITCH: self._boiler_switch,
+                CONF_ZONES: self._zones,
+                CONF_GEOFENCING_ENABLED: self._geofencing_enabled,
+            }
+        else:
+            data = {
+                CONF_BOILER_MODE: self._boiler_mode,
+                CONF_OPENTHERM_ENTITY: self._opentherm_entity,
+                CONF_OPENTHERM_MIN_TEMP: self._opentherm_min_temp,
+                CONF_OPENTHERM_MAX_TEMP: self._opentherm_max_temp,
+                CONF_ZONES: self._zones,
+                CONF_GEOFENCING_ENABLED: self._geofencing_enabled,
+            }
         if self._geofencing_enabled and self._presence_sensor:
             data[CONF_PRESENCE_SENSOR] = self._presence_sensor
             

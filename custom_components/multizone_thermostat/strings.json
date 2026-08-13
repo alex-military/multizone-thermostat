@@ -2,10 +2,10 @@
   "config": {
     "step": {
       "user": {
-        "title": "Multizone Thermostat — Boiler Setup",
-        "description": "Select the switch entity that controls your boiler relay (circulator). This is the first required step.",
+        "title": "Multizone Thermostat — Boiler Mode",
+        "description": "Select how you want to control your central heating system (Relay ON/OFF or OpenTherm Modulating).",
         "data": {
-          "boiler_switch": "Boiler Switch"
+          "boiler_mode": "Boiler Control Mode"
         },
         "data_description": {
           "boiler_switch": "The switch/relay that controls the boiler circulator pump"
@@ -64,8 +64,27 @@
       },
       "confirm": {
         "title": "Confirm Configuration",
-        "description": "Ready to set up Multizone Thermostat with the following configuration:\n\n**Boiler Switch:** {boiler_switch}\n**Zones ({zones_count}):**\n{zones_list}\n\nClick Submit to create the integration.",
+        "description": "Ready to set up Multizone Thermostat.\n\n**Zones ({zones_count}):**\n{zones_list}\n\nClick Submit to create the integration.",
         "data": {}
+      },
+      "boiler_relay": {
+        "title": "Boiler Relay Setup",
+        "description": "Select the switch entity that controls your boiler relay (circulator).",
+        "data": {
+          "boiler_switch": "Boiler Switch"
+        },
+        "data_description": {
+          "boiler_switch": "The switch/relay that controls the boiler circulator pump"
+        }
+      },
+      "boiler_opentherm": {
+        "title": "OpenTherm Setup",
+        "description": "Select the OpenTherm entity that controls the Central Heating water temperature. Also define the minimum and maximum water temperatures.",
+        "data": {
+          "opentherm_entity": "OpenTherm Climate/Water Heater Entity",
+          "opentherm_min_temp": "Minimum Water Temperature (°C)",
+          "opentherm_max_temp": "Maximum Water Temperature (°C)"
+        }
       }
     },
     "abort": {
@@ -76,16 +95,23 @@
     },
     "error": {
       "zone_name_required": "Zone name cannot be empty.",
-      "presence_sensor_required": "You must select a presence sensor if Geofencing is enabled."
+      "presence_sensor_required": "You must select a presence sensor if Geofencing is enabled.",
+      "invalid_temp_range": "Minimum temperature must be lower than maximum temperature."
     }
   },
   "options": {
     "step": {
       "init": {
         "title": "Multizone Thermostat Options",
-        "description": "Choose an action",
+        "description": "Configured zones: **{zones_count}**\n\nWhat would you like to change?",
         "data": {
           "action": "Action"
+        }
+      },
+      "change_boiler": {
+        "title": "Change Boiler Mode",
+        "data": {
+          "boiler_mode": "Boiler Control Mode"
         }
       },
       "edit_calendar": {
@@ -93,12 +119,6 @@
         "description": "Select a local calendar entity to control the multizone system schedule.",
         "data": {
           "global_calendar": "Calendar Entity"
-        }
-      },
-      "change_boiler": {
-        "title": "Change Boiler Switch",
-        "data": {
-          "boiler_switch": "New Boiler Switch"
         }
       },
       "add_zone": {
@@ -158,6 +178,25 @@
         "data": {
           "weather_sensor": "Outdoor Temperature Sensor"
         }
+      },
+      "boiler_relay": {
+        "title": "Boiler Relay Setup",
+        "description": "Select the switch entity that controls your boiler relay (circulator).",
+        "data": {
+          "boiler_switch": "Boiler Switch"
+        },
+        "data_description": {
+          "boiler_switch": "The switch/relay that controls the boiler circulator pump"
+        }
+      },
+      "boiler_opentherm": {
+        "title": "OpenTherm Setup",
+        "description": "Select the OpenTherm entity that controls the Central Heating water temperature. Also define the minimum and maximum water temperatures.",
+        "data": {
+          "opentherm_entity": "OpenTherm Climate/Water Heater Entity",
+          "opentherm_min_temp": "Minimum Water Temperature (°C)",
+          "opentherm_max_temp": "Maximum Water Temperature (°C)"
+        }
       }
     },
     "abort": {
@@ -168,7 +207,8 @@
       "no_virtual_thermostats": "No virtual thermostats configured."
     },
     "error": {
-      "zone_name_required": "Zone name cannot be empty."
+      "zone_name_required": "Zone name cannot be empty.",
+      "invalid_temp_range": "Minimum temperature must be lower than maximum temperature."
     }
   },
   "entity": {

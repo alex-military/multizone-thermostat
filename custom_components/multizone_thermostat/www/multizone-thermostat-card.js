@@ -1,4 +1,4 @@
-﻿// window.customCards definition to register the cards in Lovelace UI card picker
+// window.customCards definition to register the cards in Lovelace UI card picker
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "multizone-thermostat-button-card",
@@ -1366,7 +1366,20 @@ class MultizoneThermostatStatusCard extends HTMLElement {
       }
     }
     const boilerState = boilerEntity ? this._hass.states[boilerEntity] : null;
-    const isBoilerOn = boilerState ? boilerState.state === "on" : false;
+    let isBoilerOn = boilerState ? boilerState.state === "on" : false;
+
+    // Fallback for OpenTherm or unreadable boiler state: check if any hybrid zone is actively heating
+    if (!isBoilerOn) {
+      const isAnyZoneHeating = Object.values(this._hass.states).some(s => 
+        s.entity_id.startsWith('climate.') && 
+        s.attributes && 
+        s.attributes.hybrid_zone === true && 
+        s.attributes.hvac_action === 'heating'
+      );
+      if (isAnyZoneHeating) {
+        isBoilerOn = true;
+      }
+    }
 
     let bgColor = "#37474f"; // grigio quando spento
     let stateText = getTranslation(this._hass, 'off');
