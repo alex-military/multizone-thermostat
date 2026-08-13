@@ -28,7 +28,28 @@ A custom integration for Home Assistant that provides **multi-zone heating manag
 - 🔄 **Global Presets & Dynamic Memory** — Manual, Eco, Comfort, Sleep, Away. The system remembers the specific temperature and bypass state of *each zone* per preset.
 - 📅 **Global Calendar Integration** — Control the entire system via Home Assistant's native Local Calendar. Schedule global presets or highly specific per-zone overrides.
 - 🤖 **Predictive Smart Start & Thermal Modeling** — The system learns the unique heating and cooling rates of your rooms and can automatically start heating *before* a scheduled calendar event so the room reaches the target temperature exactly on time.
+- 🔥 **OpenTherm Hybrid Support** — Dual-drive support for traditional ON/OFF Relays and OpenTherm modulating gateways, mapping house Heat Demand % directly to boiler water flow temperature.
 - 🎨 **4 Custom Lovelace Cards** — Master status card, circular dial card, compact button card, and global preset card — all auto-registered
+
+## 🔥 OpenTherm Hybrid Support
+
+Multizone Thermostat v4.2 introduces a **dual-drive architecture** allowing seamless operation with both traditional relay boilers and modern modulating OpenTherm gateways:
+
+- **Relay Mode (ON/OFF PWM)**: Uses Time-Proportional Integral (PWM) duty cycles to turn the boiler relay ON and OFF based on the calculated Heat Demand %, strictly respecting anti-short-cycle rules and minimum run/off times.
+- **OpenTherm Mode (Modulating)**: Bypasses relay switching and directly modulates the boiler flow water temperature according to real-time house demand.
+
+### Heat Demand Mapping (0-100% to Water Temperature)
+
+In OpenTherm mode, the coordinator translates the house's total calculated **Heat Demand %** ($0\%$ to $100\%$) into a precise target setpoint for boiler water flow temperature, mapped linearly between configured Minimum Water Temperature ($T_{\text{min}}$, e.g. 35°C) and Maximum Water Temperature ($T_{\text{max}}$, e.g. 75°C):
+
+$$\text{Water Temperature} = T_{\text{min}} + \left( \frac{\text{Demand \%}}{100} \times (T_{\text{max}} - T_{\text{min}}) \right)$$
+
+**Practical Example (35°C Min / 75°C Max):**
+- **0% Demand**: Central heating request deactivated or target water temperature set to minimum standby ($35^\circ\text{C}$).
+- **50% Demand**: Target water flow temperature set to $55^\circ\text{C}$.
+- **100% Demand**: Target water flow temperature set to maximum output ($75^\circ\text{C}$).
+
+The calculated water temperature is sent directly to your OpenTherm Gateway climate or number entity, allowing the boiler's internal modulation logic to adjust flame height efficiently.
 
 ## 🏗️ System Architecture
 
