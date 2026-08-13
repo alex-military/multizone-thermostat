@@ -1,4 +1,4 @@
-# Multizone Thermostat — Home Assistant Custom Integration (V3)
+# Multizone Thermostat — Home Assistant Custom Integration
 
 A custom integration for Home Assistant that provides **multi-zone heating management** with **centralized boiler control** and **advanced PID autotuning**. No YAML scripting or manual automations required — everything is configured through the Home Assistant UI.
 
