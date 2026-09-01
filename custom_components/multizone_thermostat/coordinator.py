@@ -574,7 +574,7 @@ class MultizoneCoordinator:
             if not trv_state:
                 continue
                 
-            supported_presets = trv_state.attributes.get("preset_modes", [])
+            supported_presets = trv_state.attributes.get("preset_modes") or []
             target_preset = None
             
             if new_state == HVAC_MODE_HEAT:
@@ -982,7 +982,7 @@ class MultizoneCoordinator:
         # Feed Peak Load to PWM Engine
         wanted_state = self._boiler_pwm.calculate(peak_demand)
         
-        boiler_state = self.hass.states.get(self.boiler_switch)
+        boiler_state = self.hass.states.get(self.boiler_switch) if self.boiler_switch else None
         current_boiler_on = boiler_state is not None and boiler_state.state == STATE_ON
             
         if wanted_state and not current_boiler_on:
@@ -1015,8 +1015,10 @@ class MultizoneCoordinator:
                                     if float(position) > 10.0:
                                         trvs_ready = True
                                         break
-                                except ValueError:
-                                    pass
+                                except (ValueError, TypeError):
+                                    if isinstance(position, str) and position.lower() in ("open", "heating", "on", "true"):
+                                        trvs_ready = True
+                                        break
                             else:
                                 # Assume ready if TRV doesn't expose position
                                 trvs_ready = True
@@ -1058,8 +1060,7 @@ class MultizoneCoordinator:
             return
             
         # Normalize demand from 0-100 to 0.0-1.0 and clamp
-        norm_demand = demand / 100.0 if demand > 1.0 else demand
-        norm_demand = max(0.0, min(1.0, norm_demand))
+        norm_demand = max(0.0, min(1.0, demand / 100.0))
             
         target_temp = self.opentherm_min_temp + (norm_demand * (self.opentherm_max_temp - self.opentherm_min_temp))
         target_temp = round(target_temp, 1)
@@ -1266,7 +1267,7 @@ class MultizoneCoordinator:
             if anti_seize_boiler:
                 _LOGGER.debug("Activating boiler for anti-seize...")
                 if self.boiler_mode == MODE_OPENTHERM:
-                    await self._async_update_opentherm_boiler(1.0)
+                    await self._async_update_opentherm_boiler(100.0)
                 elif self.boiler_switch:
                     await self.hass.services.async_call(
                         "switch",

@@ -502,6 +502,9 @@ class PIDAutotune:
                 self._induced_amplitude /= 6.0
 
                 # check convergence criterion for amplitude of induced oscillation
+                if self._induced_amplitude < 0.0001:
+                    self._induced_amplitude = 0.0001
+                
                 amplitude_dev = ((0.5 * (abs_max - abs_min) - self._induced_amplitude)
                                  / self._induced_amplitude)
 

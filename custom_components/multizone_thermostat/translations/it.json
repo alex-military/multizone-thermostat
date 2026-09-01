@@ -96,7 +96,9 @@
     "error": {
       "zone_name_required": "Il nome della zona non può essere vuoto.",
       "presence_sensor_required": "Devi selezionare un sensore se abiliti il Geofencing.",
-      "invalid_temp_range": "La temperatura minima deve essere inferiore alla temperatura massima."
+      "invalid_temp_range": "La temperatura minima deve essere inferiore alla temperatura massima.",
+      "no_actuators_selected": "Devi selezionare almeno un'entità climate o switch per la zona.",
+      "zone_name_exists": "Esiste già una zona con questo nome."
     }
   },
   "options": {
@@ -208,7 +210,9 @@
     },
     "error": {
       "zone_name_required": "Il nome della zona non può essere vuoto.",
-      "invalid_temp_range": "La temperatura minima deve essere inferiore alla temperatura massima."
+      "invalid_temp_range": "La temperatura minima deve essere inferiore alla temperatura massima.",
+      "no_actuators_selected": "Devi selezionare almeno un'entità climate o switch per la zona.",
+      "zone_name_exists": "Esiste già una zona con questo nome."
     }
   },
   "entity": {

@@ -1373,7 +1373,6 @@ class MultizoneThermostatStatusCard extends HTMLElement {
       const isAnyZoneHeating = Object.values(this._hass.states).some(s => 
         s.entity_id.startsWith('climate.') && 
         s.attributes && 
-        s.attributes.hybrid_zone === true && 
         s.attributes.hvac_action === 'heating'
       );
       if (isAnyZoneHeating) {
@@ -1668,6 +1667,18 @@ class MultizoneThermostatPresetCardEditor extends HTMLElement {
   }
 
   render() {
+    if (!this._config) return;
+    
+    // Only build DOM once, then just update values
+    if (this.shadowRoot.querySelector('.editor-container')) {
+        // Update existing input values
+        const titleInput = this.shadowRoot.querySelector('#title-input');
+        if (titleInput && titleInput.value !== (this._config.title || '')) {
+            titleInput.value = this._config.title || '';
+        }
+        return;
+    }
+
     if (!this._hass) return;
     const config = this._config || {};
     
@@ -1689,7 +1700,7 @@ class MultizoneThermostatPresetCardEditor extends HTMLElement {
     }
 
     const container = document.createElement('div');
-    container.className = 'card-config';
+    container.className = 'card-config editor-container';
 
     // Title Row
     const titleRow = document.createElement('div');
@@ -1699,6 +1710,7 @@ class MultizoneThermostatPresetCardEditor extends HTMLElement {
     titleLabel.style.display = 'block';
     titleLabel.style.marginBottom = '8px';
     const titleInput = document.createElement('input');
+    titleInput.id = 'title-input';
     titleInput.type = 'text';
     titleInput.value = config.title || '';
     titleInput.style.width = '100%';
@@ -1797,7 +1809,7 @@ class MultizoneThermostatDashboardStrategy extends HTMLElement {
     // Find all zones (by checking for climate_entity attribute)
     const zones = [];
     for (const entityId of Object.keys(hass.states)) {
-      if (entityId.startsWith("select.")) {
+      if (entityId.startsWith("select.") || entityId.startsWith("switch.")) {
         const stateObj = hass.states[entityId];
         const climateId = stateObj.attributes ? stateObj.attributes.climate_entity : null;
         if (climateId) {

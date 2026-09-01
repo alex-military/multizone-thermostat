@@ -174,13 +174,6 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             "boiler_entity_id": self._coordinator.boiler_switch,
         }
 
-    def async_write_ha_state(self) -> None:
-        """Override to debug rapid calls."""
-        import traceback
-        _LOGGER.debug("async_write_ha_state called for %s", self.entity_id)
-        _LOGGER.debug("Stack trace: %s", "".join(traceback.format_stack()))
-        super().async_write_ha_state()
-
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         """Set HVAC mode."""
         self._hvac_mode = hvac_mode
