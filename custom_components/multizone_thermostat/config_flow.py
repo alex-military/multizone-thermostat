@@ -561,9 +561,16 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             self._boiler_switch = user_input[CONF_BOILER_SWITCH]
             return self._save_options()
 
-        schema = vol.Schema({
-            vol.Required(CONF_BOILER_SWITCH, default=self._boiler_switch): selector.EntitySelector(selector.EntitySelectorConfig(domain=SWITCH_DOMAIN)),
-        })
+        schema_dict = {}
+        if self._boiler_switch:
+            schema_dict[vol.Required(CONF_BOILER_SWITCH, default=self._boiler_switch)] = selector.EntitySelector(
+                selector.EntitySelectorConfig(domain=SWITCH_DOMAIN)
+            )
+        else:
+            schema_dict[vol.Required(CONF_BOILER_SWITCH)] = selector.EntitySelector(
+                selector.EntitySelectorConfig(domain=SWITCH_DOMAIN)
+            )
+        schema = vol.Schema(schema_dict)
         return self.async_show_form(step_id="boiler_relay", data_schema=schema)
 
     async def async_step_boiler_opentherm(
@@ -580,15 +587,22 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             else:
                 return self._save_options()
 
-        schema = vol.Schema({
-            vol.Required(CONF_OPENTHERM_ENTITY, default=self._opentherm_entity): selector.EntitySelector(selector.EntitySelectorConfig(domain=["climate", "water_heater", "number"])),
-            vol.Required(CONF_OPENTHERM_MIN_TEMP, default=self._opentherm_min_temp): selector.NumberSelector(
-                selector.NumberSelectorConfig(min=20, max=90, step=1, mode=selector.NumberSelectorMode.BOX)
-            ),
-            vol.Required(CONF_OPENTHERM_MAX_TEMP, default=self._opentherm_max_temp): selector.NumberSelector(
-                selector.NumberSelectorConfig(min=20, max=90, step=1, mode=selector.NumberSelectorMode.BOX)
-            ),
-        })
+        schema_dict = {}
+        if self._opentherm_entity:
+            schema_dict[vol.Required(CONF_OPENTHERM_ENTITY, default=self._opentherm_entity)] = selector.EntitySelector(
+                selector.EntitySelectorConfig(domain=["climate", "water_heater", "number"])
+            )
+        else:
+            schema_dict[vol.Required(CONF_OPENTHERM_ENTITY)] = selector.EntitySelector(
+                selector.EntitySelectorConfig(domain=["climate", "water_heater", "number"])
+            )
+        schema_dict[vol.Required(CONF_OPENTHERM_MIN_TEMP, default=self._opentherm_min_temp)] = selector.NumberSelector(
+            selector.NumberSelectorConfig(min=20, max=90, step=1, mode=selector.NumberSelectorMode.BOX)
+        )
+        schema_dict[vol.Required(CONF_OPENTHERM_MAX_TEMP, default=self._opentherm_max_temp)] = selector.NumberSelector(
+            selector.NumberSelectorConfig(min=20, max=90, step=1, mode=selector.NumberSelectorMode.BOX)
+        )
+        schema = vol.Schema(schema_dict)
 
         return self.async_show_form(step_id="boiler_opentherm", data_schema=schema, errors=errors)
 
