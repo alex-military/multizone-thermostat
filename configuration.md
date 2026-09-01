@@ -19,8 +19,10 @@ If you want to use the **Global Calendar & Smart Start** feature, you must first
 1. Go to **Settings → Devices & Services → Add Integration**
 2. Search for **"Multizone Thermostat"**
 3. Follow the setup wizard:
-   - **Step 1 (Global Heating)**: Select your central boiler relay / circulator pump (`switch`).
-   - **Step 2 (Add Zone)**: Create your first thermal zone. Here you can assign all its hardware in a single page: Name, Temperature Sensor (optional), TRVs (`climate`), Heater Switches (`switch`), Window Sensor, and toggle Anti-seize/Preset Sync.
+   - **Step 1 (Boiler Mode)**: Choose between **Relay (ON/OFF)** and **OpenTherm (Modulating)**.
+   - **Step 1a (Relay Mode)**: Select your central boiler relay / circulator pump (`switch`).
+   - **Step 1b (OpenTherm Mode)**: Select your OpenTherm entity (`climate`, `water_heater`, or `number`) and set the Minimum ($T_{\text{min}}$, default 35°C) and Maximum ($T_{\text{max}}$, default 75°C) boiler water temperatures.
+   - **Step 2 (Add Zone)**: Create your first thermal zone. Assign all its hardware in a single page: Name, Temperature Sensor (optional), TRVs (`climate`), Heater Switches (`switch`), Window Sensor, and toggle Anti-seize/Preset Sync.
    - **Step 3 (TRV Calibration - Conditional)**: If in Step 2 you assigned *both* TRVs and a pure external Temperature Sensor, you will be asked if you want to assign a `Local Temperature Calibration` entity to each TRV (for the mathematical offset injection).
    - **Step 4 (More Zones)**: Choose whether to add another zone or proceed to global settings.
    - **Step 5 (Global Calendar)**: Select the Local Calendar entity you created in the prerequisite step. Leave blank if you don't want to use calendar scheduling.
@@ -91,7 +93,7 @@ Window Closed
 ## Options (Post-Installation)
 
 Go to **Settings → Devices & Services → Multizone Thermostat → Configure** to:
-- Change the boiler switch
+- Change boiler mode or entity (Relay vs OpenTherm settings)
 - Edit Global Calendar (change or remove the calendar entity)
 - Edit Weather Compensation (change or remove outdoor sensor)
 - Change the presence sensor for geofencing
