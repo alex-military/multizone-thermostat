@@ -39,7 +39,7 @@ The project is structured in phases to evolve from a simple aggregator to a full
 
 ### PHASE 6 — Advanced AI & Optimization
 - [x] **Adaptive Climate Curve**: Self-learning and continuous adaptation of the weather compensation curve based on history.
-- [ ] **Full OpenTherm Support**: Modulation of flame flow temperature, diagnostic reading, and DHW management, mapping the Demand % (0-100%).
+- [x] **Full OpenTherm Support (v4.2)**: Dual-drive architecture for ON/OFF Relays and OpenTherm modulating gateways, mapping house Heat Demand % (0-100%) to boiler water flow temperature.
 - [ ] **Advanced Diagnostics & Anomaly Analysis**: Detection of stuck valves, overshoots, PID cycles, and reporting for each room.
 
 
