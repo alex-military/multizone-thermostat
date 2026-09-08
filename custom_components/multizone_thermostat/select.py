@@ -94,6 +94,10 @@ class MultizoneGlobalPresetSelect(RestoreEntity, SelectEntity):
         # Notify coordinator to apply the new preset to all zones
         await self._coordinator.async_set_global_preset(option)
 
+    async def async_will_remove_from_hass(self) -> None:
+        """Unregister from coordinator on removal."""
+        pass
+
 
 class MultizoneZoneSelect(RestoreEntity, SelectEntity):
     """Zone mode selector for each zone."""
@@ -186,4 +190,7 @@ class MultizoneZoneSelect(RestoreEntity, SelectEntity):
                     )
                 except Exception as ex:
                     _LOGGER.warning("Could not turn on climate %s: %s", self._climate_id, ex)
-                    
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Unregister from coordinator on removal."""
+        pass

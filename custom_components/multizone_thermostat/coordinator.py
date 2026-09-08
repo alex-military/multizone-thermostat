@@ -133,7 +133,7 @@ class MultizoneCoordinator:
         self._valve_delay = 0.0
         self._climate_callbacks = {}
         self._last_boiler_change = 0.0
-        self._last_active_time = time.time() # Default to now until loaded
+        self._last_active_time = time.monotonic() # Default to now until loaded
         self._anti_seize_running = False
         
         self._calendar_active_event_id: str | None = None
@@ -145,6 +145,7 @@ class MultizoneCoordinator:
         self._preset_store = Store(hass, PRESET_STORAGE_VERSION, f"{DOMAIN}_{entry.entry_id}_presets")
         self._settings_store = Store(hass, SETTINGS_STORAGE_VERSION, f"{DOMAIN}_{entry.entry_id}_settings")
 
+        self._anti_seize_task: asyncio.Task | None = None
         self._pending_boiler_task: asyncio.Task | None = None
         self._boiler_pwm = PWMEngine(pwm_interval=900.0, min_on=self._min_cycle_on * 60, min_off=self._min_cycle_off * 60)
         
@@ -428,6 +429,13 @@ class MultizoneCoordinator:
     @callback
     def async_teardown_listeners(self) -> None:
         """Remove all state change listeners."""
+        if self._anti_seize_task and not self._anti_seize_task.done():
+            self._anti_seize_task.cancel()
+            self._anti_seize_task = None
+        if self._pending_boiler_task and not self._pending_boiler_task.done():
+            self._pending_boiler_task.cancel()
+            self._pending_boiler_task = None
+
         for unsub in self._unsub_listeners:
             unsub()
         self._unsub_listeners.clear()
@@ -973,7 +981,7 @@ class MultizoneCoordinator:
                 
         # Track activity for anti-seize (both modes)
         if peak_demand > 0:
-            self._last_active_time = time.time()
+            self._last_active_time = time.monotonic()
             
         if self.boiler_mode == MODE_OPENTHERM:
             await self._async_update_opentherm_boiler(peak_demand)
@@ -987,7 +995,7 @@ class MultizoneCoordinator:
             
         if wanted_state and not current_boiler_on:
             # Hard lock: prevent turning ON if min_cycle_off hasn't elapsed
-            time_since_change = time.time() - self._last_boiler_change
+            time_since_change = time.monotonic() - self._last_boiler_change
             min_off_sec = self._min_cycle_off * 60
             if time_since_change < min_off_sec:
                 _LOGGER.debug("PWM Tick: Boiler wants to turn ON, but min_cycle_off (%.0fs) hasn't elapsed. Waiting...", min_off_sec)
@@ -1039,7 +1047,7 @@ class MultizoneCoordinator:
         elif not wanted_state:
             # Hard lock: prevent turning OFF if min_cycle_on hasn't elapsed
             # (unless it's already off, then we just ensure pending tasks are cancelled)
-            time_since_change = time.time() - self._last_boiler_change
+            time_since_change = time.monotonic() - self._last_boiler_change
             min_on_sec = self._min_cycle_on * 60
             if current_boiler_on and time_since_change < min_on_sec:
                 _LOGGER.debug("PWM Tick: Boiler wants to turn OFF, but min_cycle_on (%.0fs) hasn't elapsed. Waiting...", min_on_sec)
@@ -1141,7 +1149,7 @@ class MultizoneCoordinator:
             {ATTR_ENTITY_ID: self.boiler_switch},
             blocking=False,
         )
-        self._last_boiler_change = time.time()
+        self._last_boiler_change = time.monotonic()
         _LOGGER.debug("Boiler forced ON")
 
     async def _force_boiler_off(self) -> None:
@@ -1159,7 +1167,7 @@ class MultizoneCoordinator:
             {ATTR_ENTITY_ID: self.boiler_switch},
             blocking=False,
         )
-        self._last_boiler_change = time.time()
+        self._last_boiler_change = time.monotonic()
         _LOGGER.debug("Boiler forced OFF")
 
     async def async_apply_master_on(self) -> None:
@@ -1214,13 +1222,13 @@ class MultizoneCoordinator:
         if self._anti_seize_running:
             return
             
-        idle_seconds = time.time() - self._last_active_time
+        idle_seconds = time.monotonic() - self._last_active_time
         idle_days = idle_seconds / 86400.0
         anti_seize_idle_days = self.get_persistent_data(KEY_ANTI_SEIZE_IDLE_DAYS, 15)
         
         if idle_days >= anti_seize_idle_days:
             _LOGGER.info("Anti-seize triggered. System idle for %.1f days (threshold: %d days).", idle_days, anti_seize_idle_days)
-            self.hass.async_create_task(self._async_execute_anti_seize())
+            self._anti_seize_task = self.hass.async_create_task(self._async_execute_anti_seize())
 
     async def _async_execute_anti_seize(self) -> None:
         """Execute the anti-seize routine."""
@@ -1247,7 +1255,7 @@ class MultizoneCoordinator:
             
             if not zones_to_open:
                 _LOGGER.info("No zones enabled for anti-seize. Skipping routine.")
-                self._last_active_time = time.time()
+                self._last_active_time = time.monotonic()
                 return
                 
             _LOGGER.debug("Opening zones: %s", zones_to_open)
@@ -1301,7 +1309,7 @@ class MultizoneCoordinator:
                 await self._async_set_hvac_mode(climate_id, old_state)
                     
             _LOGGER.info("Anti-seize routine completed successfully.")
-            self._last_active_time = time.time()
+            self._last_active_time = time.monotonic()
             
         except Exception as e:
             _LOGGER.error("Error during anti-seize routine: %s", e)

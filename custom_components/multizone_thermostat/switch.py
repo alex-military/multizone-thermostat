@@ -112,14 +112,12 @@ class MultizoneMasterSwitch(RestoreEntity, SwitchEntity):
         self._is_on = True
         self._coordinator.set_master_state(True)
         self.async_write_ha_state()
-        await self._coordinator.async_apply_master_on()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn master off."""
         self._is_on = False
         self._coordinator.set_master_state(False)
         self.async_write_ha_state()
-        await self._coordinator.async_apply_master_off()
 
     async def async_added_to_hass(self) -> None:
         """Restore state on HA restart."""

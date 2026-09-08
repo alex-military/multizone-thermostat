@@ -616,12 +616,12 @@ class MultizoneThermostatButtonCard extends HTMLElement {
     });
   }
 
-  changeHvacMode(mode) {
-    const climateEntity = this._config.entity;
-    this._hass.callService("climate", "set_hvac_mode", {
-      entity_id: climateEntity,
-      hvac_mode: mode
-    });
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    if (this._tempTimer) {
+        clearTimeout(this._tempTimer);
+        this._tempTimer = null;
+    }
   }
 
   renderError(msg) {
@@ -786,8 +786,6 @@ class MultizoneThermostatDialCard extends HTMLElement {
     // Update status text
     const badge = this.shadowRoot.querySelector('.status-badge');
     if (badge) {
-      const hvacMode = climateState.state;
-      const hvacAction = climateState.attributes.hvac_action;
       badge.className = 'status-badge';
       if (actualSwitchState === "bypass" || actualSwitchState === "off") {
         badge.innerHTML = "";
@@ -1020,6 +1018,14 @@ class MultizoneThermostatDialCard extends HTMLElement {
     }, 1000);
   }
 
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    if (this._tempTimer) {
+        clearTimeout(this._tempTimer);
+        this._tempTimer = null;
+    }
+  }
+
   renderError(msg) {
     this.shadowRoot.innerHTML = `
       <ha-card style="padding: 16px; color: red;">
@@ -1153,7 +1159,7 @@ class MultizoneThermostatCardEditor extends HTMLElement {
     switchLabel.id = 'switch-label';
     switchLabel.textContent = 'Switch di Zona (Abilita/Escludi)';
     const switchPicker = document.createElement('ha-entity-picker');
-    switchPicker.includeDomains = ['switch'];
+    switchPicker.includeDomains = ['switch', 'select'];
     switchPicker.value = this._config.switch || '';
     switchPicker.hass = this._hass;
     switchPicker.addEventListener('value-changed', (e) => this._updateConfig('switch', e.detail.value));

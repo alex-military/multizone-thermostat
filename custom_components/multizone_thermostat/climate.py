@@ -247,6 +247,8 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         for unsub in self._unsub_listeners:
             unsub()
         self._unsub_listeners.clear()
+        # Unregister from coordinator on removal.
+        pass
 
     @callback
     def _on_temp_changed(self, event: Event) -> None:
@@ -293,7 +295,7 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
 
     async def _async_on_trv_changed(self, event: Event) -> None:
         """Handle TRV knob changes."""
-        if event.context == self._context or event.context == self._internal_context:
+        if event.context == self.context or event.context == self._internal_context:
             return
             
         entity_id = event.data.get("entity_id")

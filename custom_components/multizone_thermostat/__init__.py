@@ -168,6 +168,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     if unload_ok:
         coordinator: MultizoneCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+        try:
+            await coordinator._async_save_storage()
+        except Exception as err:
+            _LOGGER.warning("Could not save storage on unload: %s", err)
         coordinator.async_teardown_listeners()
         hass.data[DOMAIN].pop(entry.entry_id)
         _LOGGER.info("Multizone Thermostat unloaded.")
