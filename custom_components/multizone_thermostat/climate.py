@@ -314,14 +314,14 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
                 self._update_current_temp()
                 self.async_write_ha_state()
                 
+        new_temp = new_state.attributes.get(ATTR_TEMPERATURE)
+        old_temp = self._last_known_trv_targets.get(entity_id)
+        
         # If TRV is OFF or transitioning to OFF, do not interpret target drops (e.g. frost protection 5°C) as a user knob change
         if new_state.state == HVACMode.OFF or old_state.state == HVACMode.OFF:
             if new_temp is not None:
                 self._last_known_trv_targets[entity_id] = float(new_temp)
             return
-            
-        new_temp = new_state.attributes.get(ATTR_TEMPERATURE)
-        old_temp = self._last_known_trv_targets.get(entity_id)
         
         if new_temp is not None and old_temp is not None:
             new_temp = float(new_temp)
