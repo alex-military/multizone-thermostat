@@ -314,6 +314,12 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
                 self._update_current_temp()
                 self.async_write_ha_state()
                 
+        # If TRV is OFF or transitioning to OFF, do not interpret target drops (e.g. frost protection 5°C) as a user knob change
+        if new_state.state == HVACMode.OFF or old_state.state == HVACMode.OFF:
+            if new_temp is not None:
+                self._last_known_trv_targets[entity_id] = float(new_temp)
+            return
+            
         new_temp = new_state.attributes.get(ATTR_TEMPERATURE)
         old_temp = self._last_known_trv_targets.get(entity_id)
         
@@ -352,12 +358,14 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
                     if not st:
                         continue
                         
+                    mode_changed = (st.state != target_hvac_mode)
                     # Sync HVAC Mode
-                    if st.state != target_hvac_mode:
+                    if mode_changed:
                         await self.hass.services.async_call(
                             "climate",
                             "set_hvac_mode",
                             {"entity_id": trv, "hvac_mode": target_hvac_mode},
+                            blocking=True,
                             context=self._internal_context,
                         )
                     
@@ -383,8 +391,9 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
                                     domain,
                                     "set_value",
                                     {"entity_id": calib_entity, "value": offset},
+                                    blocking=True,
                                     context=self._internal_context,
-                                )
+                                    )
                             # Scenario C: Ext Sensor + NO Calibration (Fake Target)
                             else:
                                 trv_target = self.target_temperature + (float(trv_current) - self._current_temperature)
@@ -395,12 +404,14 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
                         if step > 0:
                             trv_target = round(trv_target / step) * step
                         
-                        # Send target to TRV
-                        if st.attributes.get(ATTR_TEMPERATURE) != trv_target:
+                        # Send target to TRV (always send if mode changed, or if target differs)
+                        current_device_target = st.attributes.get(ATTR_TEMPERATURE)
+                        if mode_changed or current_device_target != trv_target:
                             await self.hass.services.async_call(
                                 "climate",
                                 "set_temperature",
                                 {"entity_id": trv, "temperature": trv_target},
+                                blocking=True,
                                 context=self._internal_context,
                             )
                         
