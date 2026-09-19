@@ -40,6 +40,7 @@ The project is structured in phases to evolve from a simple aggregator to a full
 ### PHASE 6 — Advanced AI & Optimization
 - [x] **Adaptive Climate Curve**: Self-learning and continuous adaptation of the weather compensation curve based on history.
 - [x] **Full OpenTherm Support (v4.2)**: Dual-drive architecture for ON/OFF Relays and OpenTherm modulating gateways, mapping house Heat Demand % (0-100%) to boiler water flow temperature.
+- [ ] **Anti-Frost Protection System (v4.3)**: Global safety override with dedicated switch (`switch.multizone_thermostat_anti_frost_protection`) and threshold control (`number.frost_protection_temp`). Forces emergency heating at 100% demand when room temperature drops below frost threshold, ignoring open window and master off blocks to prevent frozen pipes.
 - [ ] **Advanced Diagnostics & Anomaly Analysis**: Detection of stuck valves, overshoots, PID cycles, and reporting for each room.
 
 
