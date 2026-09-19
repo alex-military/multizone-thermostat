@@ -6,8 +6,6 @@ from datetime import timedelta
 import logging
 from typing import Any
 
-from homeassistant.helpers import device_registry as dr
-
 from homeassistant.components.climate import (
     ClimateEntity,
     ClimateEntityFeature,
@@ -128,7 +126,6 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             name="Heating Zones",
             manufacturer="Multizone Thermostat",
             model="Hybrid Zone Controller",
-            via_device=(DOMAIN, entry_id),
         )
 
         self.entity_id = vt_entity_id
@@ -196,18 +193,6 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
 
     async def async_added_to_hass(self) -> None:
         """Run when entity about to be added."""
-        # Fix via_device_id deprecation
-        device_registry = dr.async_get(self.hass)
-        main_device = device_registry.async_get_device({(DOMAIN, self._entry_id)})
-        if main_device:
-            self._attr_device_info = DeviceInfo(
-                identifiers=self._attr_device_info["identifiers"],
-                name=self._attr_device_info["name"],
-                manufacturer=self._attr_device_info["manufacturer"],
-                model=self._attr_device_info["model"],
-                via_device_id=main_device.id,
-            )
-
         await super().async_added_to_hass()
         
         self._coordinator.register_climate(self.entity_id, self.async_write_ha_state)
@@ -310,7 +295,8 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
 
     async def _async_on_trv_changed(self, event: Event) -> None:
         """Handle TRV knob changes."""
-        if event.context == self.context or event.context == self._internal_context:
+        entity_ctx = getattr(self, "_context", getattr(self, "context", None))
+        if event.context == entity_ctx or event.context == self._internal_context:
             return
             
         entity_id = event.data.get("entity_id")
