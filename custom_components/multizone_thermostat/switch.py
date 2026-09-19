@@ -60,7 +60,6 @@ def _make_device_info(entry_id: str, device_type: str = "main") -> DeviceInfo:
             name="Time & Geofencing",
             manufacturer="Custom Integration",
             model="Time & Geofencing Settings",
-            via_device=(DOMAIN, entry_id),
         )
     elif device_type == "zone_modes":
         return DeviceInfo(
@@ -68,7 +67,6 @@ def _make_device_info(entry_id: str, device_type: str = "main") -> DeviceInfo:
             name="Zone Modes",
             manufacturer="Custom Integration",
             model="Zone Modes",
-            via_device=(DOMAIN, entry_id),
         )
         
     return DeviceInfo(

@@ -44,7 +44,6 @@ class MultizoneNightTimeEntity(TimeEntity):
             "name": "Time & Geofencing",
             "manufacturer": "Custom Integration",
             "model": "Time & Geofencing Settings",
-            "via_device": (DOMAIN, entry_id),
         }
 
     @property
@@ -82,7 +81,6 @@ class MultizoneMorningTimeEntity(TimeEntity):
             "name": "Time & Geofencing",
             "manufacturer": "Custom Integration",
             "model": "Time & Geofencing Settings",
-            "via_device": (DOMAIN, entry_id),
         }
 
     @property

@@ -6,6 +6,8 @@ from datetime import timedelta
 import logging
 from typing import Any
 
+from homeassistant.helpers import device_registry as dr
+
 from homeassistant.components.climate import (
     ClimateEntity,
     ClimateEntityFeature,
@@ -114,6 +116,7 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         # Local PWM Engine for Switches (e.g. Relays, local valves)
         self._local_pwm = PWMEngine(pwm_interval=900.0, min_on=0.0, min_off=0.0)
         self._local_pwm_state = False
+        self._entry_id = entry_id
         
         # Entity setup
         vt_entity_id = make_zone_entity_id(self._name)
@@ -193,6 +196,18 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
 
     async def async_added_to_hass(self) -> None:
         """Run when entity about to be added."""
+        # Fix via_device_id deprecation
+        device_registry = dr.async_get(self.hass)
+        main_device = device_registry.async_get_device({(DOMAIN, self._entry_id)})
+        if main_device:
+            self._attr_device_info = DeviceInfo(
+                identifiers=self._attr_device_info["identifiers"],
+                name=self._attr_device_info["name"],
+                manufacturer=self._attr_device_info["manufacturer"],
+                model=self._attr_device_info["model"],
+                via_device_id=main_device.id,
+            )
+
         await super().async_added_to_hass()
         
         self._coordinator.register_climate(self.entity_id, self.async_write_ha_state)
