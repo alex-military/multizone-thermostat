@@ -87,6 +87,22 @@ KEY_ANTI_SEIZE_ENABLED = "anti_seize_enabled"
 KEY_ANTI_SEIZE_IDLE_DAYS = "anti_seize_idle_days"
 KEY_ANTI_SEIZE_DURATION = "anti_seize_duration"
 
+# Default values
+DEFAULT_TRV_SYNC = False
+DEFAULT_MIN_CYCLE_ON = 5
+DEFAULT_MIN_CYCLE_OFF = 5
+DEFAULT_VALVE_DELAY = 0
+
+# Virtual Thermostat keys
+CONF_VIRTUAL_THERMOSTATS = "virtual_thermostats"
+CONF_VT_TEMP_SENSOR = "temperature_sensor"
+CONF_VT_HEATER_SWITCH = "heater_switch"
+CONF_VT_NAME = "name"
+CONF_VT_TARGET_TEMP = "target_temperature"
+CONF_VT_TOLERANCE = "tolerance"
+DEFAULT_VT_TARGET_TEMP = 20.0
+DEFAULT_VT_TOLERANCE = 0.5
+
 # Persistent State Keys (Anti-Frost)
 KEY_ANTI_FROST_ENABLED = "anti_frost_enabled"
 KEY_FROST_PROTECTION_TEMP = "frost_protection_temp"
