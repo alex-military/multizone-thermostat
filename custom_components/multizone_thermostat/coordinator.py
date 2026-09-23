@@ -471,17 +471,8 @@ class MultizoneCoordinator:
                     # Limit to avoid lowering it too much if inertia is crazy high
                     effective_target = max(target_temp - 1.0, effective_target)
                 
-                # Update Autotuner
+                # BUG-07: Capture tuner state BEFORE updating, so we can detect the transition
                 tuner = self._autotuners[entity_id]
-                was_completed = (tuner.state == tuner.STATE_COMPLETED)
-                is_completed = (tuner.state == tuner.STATE_COMPLETED)
-                
-                # Check if learning just finished!
-                if is_completed and not was_completed:
-                    self._pids[entity_id].set_pid_param(kp=tuner.kp, ki=tuner.ki, kd=tuner.kd)
-                    _LOGGER.info("Autotuning just completed for %s! Smart PID activated.", entity_id)
-                    # Save states
-                    await self._async_save_autotuner_states()
                     
                 if tuner.state != tuner.STATE_COMPLETED:
                     # Hysteresis Fallback Mode (Learning phase)
@@ -531,10 +522,18 @@ class MultizoneCoordinator:
                 
             self.set_zone_demand(entity_id, demand)
             
-            # Feed Autotuner again if we just changed demand
+            # BUG-07: Update Autotuner AFTER demand is calculated; detect just-completed transition
             tuner = self._autotuners[entity_id]
             if tuner.state != tuner.STATE_COMPLETED:
                 tuner.update(current_temp, demand > 0)
+                # Check if this update just completed the learning phase
+                if tuner.state == tuner.STATE_COMPLETED:
+                    self._pids[entity_id].set_pid_param(kp=tuner.kp, ki=tuner.ki, kd=tuner.kd)
+                    _LOGGER.info(
+                        "Autotuning just completed for %s! Smart PID activated. Kp=%.1f, Ki=%.4f, Kd=%.1f",
+                        entity_id, tuner.kp, tuner.ki, tuner.kd,
+                    )
+                    await self._async_save_autotuner_states()
                 
             # Feed Thermal Observer
             self._thermal_models[entity_id].update(current_temp, demand > 0)
@@ -977,15 +976,32 @@ class MultizoneCoordinator:
         """Return True if anti-frost is enabled and zone temperature is below the safety threshold."""
         if not self.get_persistent_data(KEY_ANTI_FROST_ENABLED, DEFAULT_ANTI_FROST_ENABLED):
             return False
-            
+
+        # Try virtual thermostat temperature first
         st = self.hass.states.get(climate_id)
-        if not st:
-            return False
-            
-        current_temp = st.attributes.get("current_temperature")
+        current_temp = None
+        if st:
+            current_temp = st.attributes.get("current_temperature")
+
+        # WARN-02: Fallback — average TRV sensor readings if virtual thermostat has no temperature yet
+        # (e.g., right after boot before TRVs have reported back)
+        if current_temp is None:
+            zone = self._get_zone(climate_id)
+            if zone:
+                trv_temps = []
+                for trv in zone.get(CONF_ZONE_CLIMATES, []):
+                    trv_st = self.hass.states.get(trv)
+                    if trv_st:
+                        t = trv_st.attributes.get("current_temperature")
+                        if t is not None:
+                            trv_temps.append(float(t))
+                if trv_temps:
+                    current_temp = sum(trv_temps) / len(trv_temps)
+                    _LOGGER.debug("Frost check for %s: using avg TRV temp %.1f°C (virtual has no reading)", climate_id, current_temp)
+
         if current_temp is None:
             return False
-            
+
         frost_temp = float(self.get_persistent_data(KEY_FROST_PROTECTION_TEMP, DEFAULT_FROST_PROTECTION_TEMP))
         return float(current_temp) < frost_temp
 
@@ -1001,10 +1017,16 @@ class MultizoneCoordinator:
                 climate_id = make_zone_entity_id(zone[CONF_ZONE_NAME])
                 if self.is_zone_in_frost_emergency(climate_id):
                     frost_emergency = True
-                    _LOGGER.warning("Anti-Frost emergency triggered for zone %s! Forcing emergency heating.", climate_id)
-                    # Force zone demand to 100%
+                    _LOGGER.warning(
+                        "Anti-Frost emergency triggered for zone %s! Forcing emergency heating.",
+                        climate_id,
+                    )
+                    # Force zone demand to 100% so boiler PWM activates
                     self.set_zone_demand(climate_id, 100.0)
-                    break
+                    # BUG-02: Force zone into HEAT mode so TRVs physically open and heat reaches radiators
+                    self.hass.async_create_task(
+                        self._async_set_hvac_mode(climate_id, HVAC_MODE_HEAT)
+                    )
 
         if not self._master_state and not frost_emergency:
             return
@@ -1075,7 +1097,9 @@ class MultizoneCoordinator:
                 if trvs_ready:
                     break
                     
-            if not trvs_ready and any((zone.get(CONF_ZONE_CLIMATES) or []) for zone in self.zones):
+            if not trvs_ready and any((zone.get(CONF_ZONE_CLIMATES) or []) for zone in self.zones) and not frost_emergency:
+                # BUG-03: During frost_emergency, skip this check — TRVs are being forced HEAT above,
+                # they may not be physically open yet but anti-frost takes priority over boiler safety
                 _LOGGER.warning("PWM Tick: Boiler wants to turn ON, but no TRVs are open > 10%. Delaying boiler ignition.")
                 return
 
