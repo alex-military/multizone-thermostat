@@ -93,6 +93,7 @@ class MultizoneGlobalPresetSelect(RestoreEntity, SelectEntity):
 
         # Notify coordinator to apply the new preset to all zones
         await self._coordinator.async_set_global_preset(option)
+        self.async_write_ha_state()  # NEW-WARN-03: ensure UI updates immediately
 
     async def async_will_remove_from_hass(self) -> None:
         """Unregister from coordinator on removal."""

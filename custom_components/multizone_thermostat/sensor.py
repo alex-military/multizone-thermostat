@@ -113,7 +113,7 @@ class AutotuneSensor(SensorEntity):
     @property
     def native_value(self) -> str:
         """Return the current autotuner state."""
-        tuner = self._coordinator._autotuners.get(self._climate_entity_id)
+        tuner = self._coordinator.get_autotuner(self._climate_entity_id)
         if not tuner:
             return "unknown"
         if tuner.state == tuner.STATE_COMPLETED:
@@ -123,7 +123,7 @@ class AutotuneSensor(SensorEntity):
     @property
     def extra_state_attributes(self):
         """Return computed PID parameters."""
-        tuner = self._coordinator._autotuners.get(self._climate_entity_id)
+        tuner = self._coordinator.get_autotuner(self._climate_entity_id)
         if not tuner:
             return {}
         if tuner.state == tuner.STATE_COMPLETED:
@@ -198,7 +198,7 @@ class HeatingRateSensor(ThermalSensorBase):
         
     @property
     def native_value(self) -> float:
-        model = self._coordinator._thermal_models.get(self._climate_entity_id)
+        model = self._coordinator.get_thermal_model(self._climate_entity_id)
         return round(model.heating_rate, 2) if model else 0.0
 
     @property
@@ -219,7 +219,7 @@ class CoolingRateSensor(ThermalSensorBase):
         
     @property
     def native_value(self) -> float:
-        model = self._coordinator._thermal_models.get(self._climate_entity_id)
+        model = self._coordinator.get_thermal_model(self._climate_entity_id)
         return round(model.cooling_rate, 2) if model else 0.0
 
     @property
@@ -240,7 +240,7 @@ class ThermalInertiaSensor(ThermalSensorBase):
         
     @property
     def native_value(self) -> float:
-        model = self._coordinator._thermal_models.get(self._climate_entity_id)
+        model = self._coordinator.get_thermal_model(self._climate_entity_id)
         return round(model.thermal_inertia, 2) if model else 0.0
 
     @property

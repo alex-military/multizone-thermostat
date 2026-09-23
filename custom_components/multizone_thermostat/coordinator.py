@@ -250,6 +250,14 @@ class MultizoneCoordinator:
         """Register a select entity."""
         self._select_entities[key] = select_entity
 
+    def get_autotuner(self, climate_id: str):
+        """Get the autotuner instance for a given zone."""
+        return self._autotuners.get(climate_id)
+        
+    def get_thermal_model(self, climate_id: str):
+        """Get the thermal model instance for a given zone."""
+        return self._thermal_models.get(climate_id)
+
     def set_master_state(self, state: bool) -> None:
         """Set master state (called by master switch entity)."""
         self._master_state = state
@@ -446,9 +454,10 @@ class MultizoneCoordinator:
 
     async def _async_on_climate_state_changed(self, event: Event) -> None:
         """Handle state changes of any managed climate entity."""
-        entity_id = event.data.get("entity_id")
-        new_state = event.data.get("new_state")
-        old_state = event.data.get("old_state")
+        try:
+            entity_id = event.data.get("entity_id")
+            new_state = event.data.get("new_state")
+            old_state = event.data.get("old_state")
 
         if not new_state:
             return
@@ -572,6 +581,9 @@ class MultizoneCoordinator:
             self.hass.async_create_task(
                 self._async_sync_trv_preset(entity_id, new_state.state)
             )
+            
+        except Exception as err:
+            _LOGGER.error("Error handling climate state change for %s: %s", event.data.get("entity_id", "unknown"), err)
 
     async def _async_sync_trv_preset(self, zone_id: str, new_state: str) -> None:
         """Sync TRV activation/presets based on Zone state (heat/off)."""
@@ -799,9 +811,15 @@ class MultizoneCoordinator:
             
             for event in events:
                 try:
-                    # calendar.get_events returns ISO strings
+                    # NEW-BUG-07: calendar.get_events might return naive or aware datetimes
+                    # convert both to local aware to safely compare with `now`
                     start = dt_util.parse_datetime(event["start"])
+                    if start:
+                        start = dt_util.as_local(start)
+                    
                     end = dt_util.parse_datetime(event["end"])
+                    if end:
+                        end = dt_util.as_local(end)
                     
                     if start and end:
                         if start <= now < end:

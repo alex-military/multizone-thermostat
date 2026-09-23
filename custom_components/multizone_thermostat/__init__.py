@@ -108,14 +108,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Set up platforms (switch)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # Register static path for Lovelace custom card
-    await hass.http.async_register_static_paths([
-        StaticPathConfig(
-            url_path="/multizone_thermostat_card",
-            path=hass.config.path("custom_components/multizone_thermostat/www"),
-            cache_headers=False,
-        )
-    ])
+    # Register static path for Lovelace custom card (NEW-WARN-04: only if www dir exists)
+    import os
+    www_path = hass.config.path("custom_components/multizone_thermostat/www")
+    if os.path.isdir(www_path):
+        await hass.http.async_register_static_paths([
+            StaticPathConfig(
+                url_path="/multizone_thermostat_card",
+                path=www_path,
+                cache_headers=False,
+            )
+        ])
 
     # Register Lovelace custom card resource automatically
     try:
@@ -180,12 +183,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Handle options update (e.g., zones changed via Options Flow)."""
-    coordinator: MultizoneCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
-
-    new_boiler = entry.data.get(CONF_BOILER_SWITCH, coordinator.boiler_switch)
-    new_zones = entry.data.get(CONF_ZONES, coordinator.zones)
-
-    _LOGGER.debug(
-        "Options updated: boiler=%s, zones=%d", new_boiler, len(new_zones)
-    )
+    """Handle options update — config_flow already triggers reload via async_reload,
+    but this listener acts as a safety net to ensure any direct option changes are applied."""
+    # NEW-BUG-01: was a no-op. Trigger reload to apply any changes.
+    _LOGGER.info("Options updated for Multizone Thermostat, reloading integration...")
+    hass.async_create_task(hass.config_entries.async_reload(entry.entry_id))

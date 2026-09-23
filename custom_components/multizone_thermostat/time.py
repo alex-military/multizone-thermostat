@@ -39,12 +39,13 @@ class MultizoneNightTimeEntity(TimeEntity):
         self.coordinator = coordinator
         self._attr_unique_id = f"{DOMAIN}_{entry_id}_night_time"
         
-        self._attr_device_info = {
-            "identifiers": {(DOMAIN, f"{entry_id}_time_geofencing")},
-            "name": "Time & Geofencing",
-            "manufacturer": "Custom Integration",
-            "model": "Time & Geofencing Settings",
-        }
+        from homeassistant.helpers.entity import DeviceInfo
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"{entry_id}_time_geofencing")},
+            name="Time & Geofencing",
+            manufacturer="Custom Integration",
+            model="Time & Geofencing Settings",
+        )
 
     @property
     def native_value(self) -> datetime.time | None:
@@ -76,12 +77,13 @@ class MultizoneMorningTimeEntity(TimeEntity):
         self.coordinator = coordinator
         self._attr_unique_id = f"{DOMAIN}_{entry_id}_morning_time"
         
-        self._attr_device_info = {
-            "identifiers": {(DOMAIN, f"{entry_id}_time_geofencing")},
-            "name": "Time & Geofencing",
-            "manufacturer": "Custom Integration",
-            "model": "Time & Geofencing Settings",
-        }
+        from homeassistant.helpers.entity import DeviceInfo
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"{entry_id}_time_geofencing")},
+            name="Time & Geofencing",
+            manufacturer="Custom Integration",
+            model="Time & Geofencing Settings",
+        )
 
     @property
     def native_value(self) -> datetime.time | None:

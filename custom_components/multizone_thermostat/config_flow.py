@@ -710,13 +710,23 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             _remove_entity_from_registry(self.hass, vt_id)
             
             # Mode select Entity
+            # NEW-WARN-06: Fix select unique_id calculation to match what select.py creates
+            climate_id_for_unique = make_zone_entity_id(zone_to_remove)
+            select_unique_id = f"{DOMAIN}_{self._config_entry.entry_id}_zone_mode_{climate_id_for_unique.replace('.', '_')}"
+            select_entity_id = ent_reg.async_get_entity_id("select", DOMAIN, select_unique_id)
+            if select_entity_id:
+                ent_reg.async_remove(select_entity_id)
+                _LOGGER.debug("Removed orphaned select entity %s from registry", select_entity_id)
+                
+            # Physical Sync Switch
+            # NEW-BUG-03: Also remove the physical sync switch for the removed zone
             safe_name = zone_to_remove.lower().replace(" ", "_").replace("-", "_")
             safe_name = "".join(c for c in safe_name if c.isalnum() or c == "_")
-            unique_id = f"{DOMAIN}_{self._config_entry.entry_id}_zone_mode_{safe_name}"
-            entity_id = ent_reg.async_get_entity_id("select", DOMAIN, unique_id)
-            if entity_id:
-                ent_reg.async_remove(entity_id)
-                _LOGGER.debug("Removed orphaned select entity %s from registry", entity_id)
+            sync_unique_id = f"{DOMAIN}_{self._config_entry.entry_id}_physical_sync_{safe_name}"
+            sync_entity_id = ent_reg.async_get_entity_id("switch", DOMAIN, sync_unique_id)
+            if sync_entity_id:
+                ent_reg.async_remove(sync_entity_id)
+                _LOGGER.debug("Removed orphaned physical sync switch %s from registry", sync_entity_id)
             
             return self._save_options()
 
@@ -855,7 +865,6 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             errors=errors,
         )
 
-    @callback
     async def async_step_edit_weather_comp(
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.FlowResult:
@@ -883,7 +892,6 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             data_schema=schema,
         )
 
-    @callback
     async def async_step_edit_calendar(
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.FlowResult:
