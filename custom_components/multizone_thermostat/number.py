@@ -21,6 +21,8 @@ from .const import (
     KEY_ANTI_SEIZE_IDLE_DAYS,
     KEY_ANTI_SEIZE_DURATION,
     KEY_WEATHER_CURVE,
+    KEY_FROST_PROTECTION_TEMP,
+    DEFAULT_FROST_PROTECTION_TEMP,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -121,6 +123,19 @@ async def async_setup_entry(
             unit_of_measurement="",
             icon="mdi:chart-bell-curve-cumulative",
             default_val=0.0,
+            device_info=device_info,
+        ),
+        MultizonePersistentNumber(
+            coordinator=coordinator,
+            entry_id=config_entry.entry_id,
+            key=KEY_FROST_PROTECTION_TEMP,
+            name="Anti-Frost Temperature",
+            min_value=5.0,
+            max_value=16.0,
+            step=0.5,
+            unit_of_measurement="°C",
+            icon="mdi:snowflake-thermometer",
+            default_val=DEFAULT_FROST_PROTECTION_TEMP,
             device_info=device_info,
         ),
     ]

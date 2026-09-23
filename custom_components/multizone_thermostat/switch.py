@@ -18,6 +18,13 @@ from .const import (
     KEY_GEOFENCING_TOGGLE,
     KEY_AUTO_NIGHT_MODE,
     KEY_ANTI_SEIZE_ENABLED,
+    KEY_ANTI_FROST_ENABLED,
+    DEFAULT_ANTI_FROST_ENABLED,
+    KEY_PHYSICAL_SYNC_PREFIX,
+    CONF_ZONES,
+    CONF_ZONE_NAME,
+    CONF_ZONE_CLIMATES,
+    make_zone_entity_id,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -48,6 +55,16 @@ async def async_setup_entry(
 
     # Anti-seize Switch
     entities.append(MultizoneAntiSeizeSwitch(coordinator, config_entry.entry_id))
+
+    # Anti-Frost Protection Switch
+    entities.append(MultizoneAntiFrostSwitch(coordinator, config_entry.entry_id))
+
+    # Per-Zone Physical Control Synchronization Switches (for zones with climates)
+    zones = config_entry.data.get(CONF_ZONES, [])
+    for zone in zones:
+        if zone.get(CONF_ZONE_CLIMATES):
+            zone_name = zone[CONF_ZONE_NAME]
+            entities.append(MultizonePhysicalSyncSwitch(coordinator, config_entry.entry_id, zone_name))
 
     async_add_entities(entities, True)
 
@@ -214,5 +231,72 @@ class MultizoneAntiSeizeSwitch(SwitchEntity):
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Disable anti-seize."""
         await self._coordinator.async_set_persistent_data(KEY_ANTI_SEIZE_ENABLED, False)
+        self.async_write_ha_state()
+
+
+class MultizoneAntiFrostSwitch(SwitchEntity):
+    """Switch to globally enable/disable Anti-Frost protection."""
+
+    _attr_has_entity_name = True
+    _attr_name = "Anti-Frost Protection"
+    _attr_icon = "mdi:snowflake-alert"
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(self, coordinator: Any, entry_id: str) -> None:
+        """Initialize switch."""
+        self._coordinator = coordinator
+        self._attr_unique_id = f"{DOMAIN}_{entry_id}_anti_frost"
+        self._attr_device_info = _make_device_info(entry_id)
+
+    @property
+    def is_on(self) -> bool:
+        """Return true if anti-frost is enabled."""
+        return self._coordinator.get_persistent_data(KEY_ANTI_FROST_ENABLED, DEFAULT_ANTI_FROST_ENABLED)
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Enable anti-frost."""
+        await self._coordinator.async_set_persistent_data(KEY_ANTI_FROST_ENABLED, True)
+        self.async_write_ha_state()
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Disable anti-frost."""
+        await self._coordinator.async_set_persistent_data(KEY_ANTI_FROST_ENABLED, False)
+        self.async_write_ha_state()
+
+
+class MultizonePhysicalSyncSwitch(SwitchEntity):
+    """Switch to dynamically enable/disable physical thermostat/TRV control sync for a zone."""
+
+    _attr_has_entity_name = True
+    _attr_icon = "mdi:knob"
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(self, coordinator: Any, entry_id: str, zone_name: str) -> None:
+        """Initialize per-zone physical sync switch."""
+        self._coordinator = coordinator
+        self._zone_name = zone_name
+        safe_name = zone_name.lower().replace(" ", "_").replace("-", "_")
+        safe_name = "".join(c for c in safe_name if c.isalnum() or c == "_")
+        self._safe_name = safe_name
+        self._attr_unique_id = f"{DOMAIN}_{entry_id}_physical_sync_{safe_name}"
+        self._attr_name = f"Sync Controlli Fisici {zone_name}"
+        self._attr_device_info = _make_device_info(entry_id, "zone_modes")
+
+    @property
+    def is_on(self) -> bool:
+        """Return true if physical sync is enabled for this zone."""
+        key = f"{KEY_PHYSICAL_SYNC_PREFIX}{self._safe_name}"
+        return self._coordinator.get_persistent_data(key, True)
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Enable physical controls synchronization."""
+        key = f"{KEY_PHYSICAL_SYNC_PREFIX}{self._safe_name}"
+        await self._coordinator.async_set_persistent_data(key, True)
+        self.async_write_ha_state()
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Disable physical controls synchronization (lock virtual target/mode from physical overrides)."""
+        key = f"{KEY_PHYSICAL_SYNC_PREFIX}{self._safe_name}"
+        await self._coordinator.async_set_persistent_data(key, False)
         self.async_write_ha_state()
 

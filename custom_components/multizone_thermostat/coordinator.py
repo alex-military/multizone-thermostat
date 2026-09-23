@@ -78,6 +78,10 @@ from .const import (
     ZONE_MODE_SECONDARY,
     ZONE_MODE_BYPASS,
     CONF_GLOBAL_CALENDAR,
+    KEY_ANTI_FROST_ENABLED,
+    KEY_FROST_PROTECTION_TEMP,
+    DEFAULT_FROST_PROTECTION_TEMP,
+    DEFAULT_ANTI_FROST_ENABLED,
 )
 from .pwm_engine import PWMEngine
 from .thermal_model import ThermalObserver
@@ -633,6 +637,12 @@ class MultizoneCoordinator:
             
             if new_state.state == "on":
                 # Window OPENED
+                # Check Anti-Frost: if temperature is below frost threshold, prevent bypass to avoid freezing
+                anti_frost_active = self.is_zone_in_frost_emergency(climate_id)
+                if anti_frost_active:
+                    _LOGGER.warning("Window opened (%s) for %s, but Anti-Frost protection is active! Skipping bypass to prevent freezing.", sensor_id, climate_id)
+                    continue
+
                 _LOGGER.debug("Window opened (%s), bypassing zone %s", sensor_id, climate_id)
                 # Save current state if not already saved
                 if climate_id not in self._pre_window_state:
@@ -963,17 +973,48 @@ class MultizoneCoordinator:
         """Set the valve delay time (seconds)."""
         self._valve_delay = value
 
+    def is_zone_in_frost_emergency(self, climate_id: str) -> bool:
+        """Return True if anti-frost is enabled and zone temperature is below the safety threshold."""
+        if not self.get_persistent_data(KEY_ANTI_FROST_ENABLED, DEFAULT_ANTI_FROST_ENABLED):
+            return False
+            
+        st = self.hass.states.get(climate_id)
+        if not st:
+            return False
+            
+        current_temp = st.attributes.get("current_temperature")
+        if current_temp is None:
+            return False
+            
+        frost_temp = float(self.get_persistent_data(KEY_FROST_PROTECTION_TEMP, DEFAULT_FROST_PROTECTION_TEMP))
+        return float(current_temp) < frost_temp
+
     async def _async_pwm_tick(self, now: datetime) -> None:
-        """Periodic PWM tick for boiler (Peak Load)."""
-        if not self._master_state or self._anti_seize_running:
+        """Periodic PWM tick for boiler (Peak Load + Anti-Frost Safety)."""
+        if self._anti_seize_running:
+            return
+
+        # Check global Anti-Frost safety across all zones (even if Master is OFF)
+        frost_emergency = False
+        if self.get_persistent_data(KEY_ANTI_FROST_ENABLED, DEFAULT_ANTI_FROST_ENABLED):
+            for zone in self.zones:
+                climate_id = make_zone_entity_id(zone[CONF_ZONE_NAME])
+                if self.is_zone_in_frost_emergency(climate_id):
+                    frost_emergency = True
+                    _LOGGER.warning("Anti-Frost emergency triggered for zone %s! Forcing emergency heating.", climate_id)
+                    # Force zone demand to 100%
+                    self.set_zone_demand(climate_id, 100.0)
+                    break
+
+        if not self._master_state and not frost_emergency:
             return
             
         # Phase 4: Calculate Peak Demand
-        peak_demand = 0.0
+        peak_demand = 100.0 if frost_emergency else 0.0
         for zone in self.zones:
             climate_id = make_zone_entity_id(zone[CONF_ZONE_NAME])
             mode = self.get_zone_mode(climate_id)
-            if mode != ZONE_MODE_PRIMARY:
+            if mode != ZONE_MODE_PRIMARY and not frost_emergency:
                 continue
             demand = self.get_zone_demand(climate_id)
             if demand > peak_demand:

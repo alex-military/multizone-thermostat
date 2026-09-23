@@ -42,6 +42,7 @@ from .const import (
     CONF_ZONE_CALIBRATIONS,
     DOMAIN,
     make_zone_entity_id,
+    KEY_PHYSICAL_SYNC_PREFIX,
 )
 from .pwm_engine import PWMEngine
 
@@ -321,19 +322,48 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         new_temp = new_state.attributes.get(ATTR_TEMPERATURE)
         old_temp = self._last_known_trv_targets.get(entity_id)
         
-        # 1. If Master virtual zone is OFF, ignore any incoming physical target adjustment
+        # Check if physical controls synchronization is enabled for this zone
+        safe_name = self._name.lower().replace(" ", "_").replace("-", "_")
+        safe_name = "".join(c for c in safe_name if c.isalnum() or c == "_")
+        sync_switch_key = f"{KEY_PHYSICAL_SYNC_PREFIX}{safe_name}"
+        physical_sync_enabled = self._coordinator.get_persistent_data(sync_switch_key, True)
+
+        # Handle physical hardware Mode transitions (e.g. wall thermostat OFF or ON pressed)
+        if physical_sync_enabled:
+            # Physical device turned OFF (e.g. wall thermostat or primary TRV)
+            if new_state.state == HVACMode.OFF and old_state.state != HVACMode.OFF:
+                if self._hvac_mode != HVACMode.OFF:
+                    _LOGGER.info("Physical device %s turned OFF. Propagating OFF to Zone %s", entity_id, self._name)
+                    await self.async_set_hvac_mode(HVACMode.OFF)
+                if new_temp is not None:
+                    self._last_known_trv_targets[entity_id] = float(new_temp)
+                return
+
+            # Physical device turned HEAT from OFF
+            elif new_state.state == HVACMode.HEAT and old_state.state == HVACMode.OFF:
+                if self._hvac_mode != HVACMode.HEAT:
+                    _LOGGER.info("Physical device %s turned HEAT. Propagating HEAT to Zone %s", entity_id, self._name)
+                    await self.async_set_hvac_mode(HVACMode.HEAT)
+
+        # 1. If physical sync is disabled for this zone, ignore physical setpoint changes
+        if not physical_sync_enabled:
+            if new_temp is not None:
+                self._last_known_trv_targets[entity_id] = float(new_temp)
+            return
+
+        # 2. If Master virtual zone is OFF, ignore any incoming physical target adjustment
         if self._hvac_mode == HVACMode.OFF:
             if new_temp is not None:
                 self._last_known_trv_targets[entity_id] = float(new_temp)
             return
 
-        # 2. If TRV is OFF or transitioning to OFF, do not interpret target drops (e.g. frost protection 5°C) as a user knob change
+        # 3. If TRV is OFF or transitioning to OFF, do not interpret target drops (e.g. frost protection 5°C) as a user knob change
         if new_state.state == HVACMode.OFF or old_state.state == HVACMode.OFF:
             if new_temp is not None:
                 self._last_known_trv_targets[entity_id] = float(new_temp)
             return
 
-        # 3. Protect against transitional targets during activation (e.g. Sonoff 5°C -> 21°C -> desired target)
+        # 4. Protect against transitional targets during activation (e.g. Sonoff 5°C -> 21°C -> desired target)
         if entity_id in self._pending_trv_targets:
             pending = self._pending_trv_targets[entity_id]
             if new_temp is not None and abs(float(new_temp) - pending) < 0.01:
