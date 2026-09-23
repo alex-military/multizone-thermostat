@@ -1,6 +1,7 @@
 """Config flow for Multizone Thermostat integration."""
 from __future__ import annotations
 
+import copy
 import logging
 from typing import Any
 
@@ -471,7 +472,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         """Initialize."""
         self._config_entry = config_entry
-        self._zones: list[dict[str, Any]] = list(config_entry.data.get(CONF_ZONES, []))
+        self._zones: list[dict[str, Any]] = copy.deepcopy(config_entry.data.get(CONF_ZONES, []))
         self._boiler_mode: str = config_entry.data.get(CONF_BOILER_MODE, MODE_RELAY)
         self._boiler_switch: str = config_entry.data.get(CONF_BOILER_SWITCH, "")
         self._opentherm_entity: str | None = config_entry.data.get(CONF_OPENTHERM_ENTITY)

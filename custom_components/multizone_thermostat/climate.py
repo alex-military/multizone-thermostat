@@ -109,6 +109,7 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         self._sync_lock = asyncio.Lock()
         self._syncing_trvs = False
         self._last_known_trv_targets = {}
+        self._pending_trv_targets = {}
         self._internal_context = Context()
         
         # Local PWM Engine for Switches (e.g. Relays, local valves)
@@ -289,6 +290,17 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
     @callback
     def _on_trv_changed_wrapper(self, event: Event) -> None:
         """Wrapper for TRV changes."""
+        # Always update measured room temperature even if a target sync is in progress
+        if not self._temp_sensor:
+            new_state: State | None = event.data.get("new_state")
+            old_state: State | None = event.data.get("old_state")
+            if new_state:
+                new_current = new_state.attributes.get("current_temperature")
+                old_current = old_state.attributes.get("current_temperature") if old_state else None
+                if new_current is not None and new_current != old_current:
+                    self._update_current_temp()
+                    self.async_write_ha_state()
+
         if self._syncing_trvs:
             return
         self.hass.async_create_task(self._async_on_trv_changed(event))
@@ -306,22 +318,36 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         if not new_state or not old_state:
             return
             
-        # If there is no external temperature sensor, track TRV temperature changes
-        if not self._temp_sensor:
-            new_current = new_state.attributes.get("current_temperature")
-            old_current = old_state.attributes.get("current_temperature")
-            if new_current is not None and new_current != old_current:
-                self._update_current_temp()
-                self.async_write_ha_state()
-                
         new_temp = new_state.attributes.get(ATTR_TEMPERATURE)
         old_temp = self._last_known_trv_targets.get(entity_id)
         
-        # If TRV is OFF or transitioning to OFF, do not interpret target drops (e.g. frost protection 5°C) as a user knob change
+        # 1. If Master virtual zone is OFF, ignore any incoming physical target adjustment
+        if self._hvac_mode == HVACMode.OFF:
+            if new_temp is not None:
+                self._last_known_trv_targets[entity_id] = float(new_temp)
+            return
+
+        # 2. If TRV is OFF or transitioning to OFF, do not interpret target drops (e.g. frost protection 5°C) as a user knob change
         if new_state.state == HVACMode.OFF or old_state.state == HVACMode.OFF:
             if new_temp is not None:
                 self._last_known_trv_targets[entity_id] = float(new_temp)
             return
+
+        # 3. Protect against transitional targets during activation (e.g. Sonoff 5°C -> 21°C -> desired target)
+        if entity_id in self._pending_trv_targets:
+            pending = self._pending_trv_targets[entity_id]
+            if new_temp is not None and abs(float(new_temp) - pending) < 0.01:
+                # Reached expected target sent by us, clear pending
+                self._pending_trv_targets.pop(entity_id, None)
+                self._last_known_trv_targets[entity_id] = float(new_temp)
+                return
+            else:
+                # Still intermediate/transient state reported by device on activation, ignore delta
+                _LOGGER.debug(
+                    "Ignoring intermediate TRV target %s for %s while waiting for %s",
+                    new_temp, entity_id, pending
+                )
+                return
         
         if new_temp is not None and old_temp is not None:
             new_temp = float(new_temp)
@@ -401,12 +427,18 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
                         
                         # Round target to TRV's native step to prevent rounding-induced feedback loops
                         step = st.attributes.get("target_temp_step", 0.5)
-                        if step > 0:
-                            trv_target = round(trv_target / step) * step
-                        
+                        if step and float(step) > 0:
+                            trv_target = round(trv_target / float(step)) * float(step)
+
+                        # Clamp target to physical TRV min/max limits
+                        trv_min = st.attributes.get("min_temp", 5.0)
+                        trv_max = st.attributes.get("max_temp", 35.0)
+                        trv_target = max(float(trv_min), min(float(trv_max), trv_target))
+
                         # Send target to TRV (always send if mode changed, or if target differs)
                         current_device_target = st.attributes.get(ATTR_TEMPERATURE)
                         if mode_changed or current_device_target != trv_target:
+                            self._pending_trv_targets[trv] = trv_target
                             await self.hass.services.async_call(
                                 "climate",
                                 "set_temperature",
