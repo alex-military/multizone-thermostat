@@ -459,129 +459,129 @@ class MultizoneCoordinator:
             new_state = event.data.get("new_state")
             old_state = event.data.get("old_state")
 
-        if not new_state:
-            return
+            if not new_state:
+                return
 
-        # Phase 4: Calculate PID demand for this zone
-        current_temp = new_state.attributes.get("current_temperature")
-        target_temp = new_state.attributes.get("temperature")
-        
-        if current_temp is not None and target_temp is not None:
-            # Check mode (don't calculate if off/bypass)
-            hvac_mode = new_state.state
-            zone_mode = self.get_zone_mode(entity_id)
-            if hvac_mode == HVAC_MODE_HEAT and zone_mode != ZONE_MODE_BYPASS:
-                
-                # Smart Stop: Calculate Effective Target based on learned Inertia
-                thermal_model = self._thermal_models[entity_id]
-                effective_target = target_temp
-                if thermal_model.thermal_inertia > 0.05:
-                    effective_target = target_temp - thermal_model.thermal_inertia
-                    # Limit to avoid lowering it too much if inertia is crazy high
-                    effective_target = max(target_temp - 1.0, effective_target)
-                
-                # BUG-07: Capture tuner state BEFORE updating, so we can detect the transition
-                tuner = self._autotuners[entity_id]
+            # Phase 4: Calculate PID demand for this zone
+            current_temp = new_state.attributes.get("current_temperature")
+            target_temp = new_state.attributes.get("temperature")
+            
+            if current_temp is not None and target_temp is not None:
+                # Check mode (don't calculate if off/bypass)
+                hvac_mode = new_state.state
+                zone_mode = self.get_zone_mode(entity_id)
+                if hvac_mode == HVAC_MODE_HEAT and zone_mode != ZONE_MODE_BYPASS:
                     
-                if tuner.state != tuner.STATE_COMPLETED:
-                    # Hysteresis Fallback Mode (Learning phase)
-                    tolerance = 0.3
-                    current_demand = self.get_zone_demand(entity_id)
-                    if current_temp <= effective_target - tolerance:
-                        demand = 100.0
-                    elif current_temp >= effective_target + tolerance:
-                        demand = 0.0
+                    # Smart Stop: Calculate Effective Target based on learned Inertia
+                    thermal_model = self._thermal_models[entity_id]
+                    effective_target = target_temp
+                    if thermal_model.thermal_inertia > 0.05:
+                        effective_target = target_temp - thermal_model.thermal_inertia
+                        # Limit to avoid lowering it too much if inertia is crazy high
+                        effective_target = max(target_temp - 1.0, effective_target)
+                    
+                    # BUG-07: Capture tuner state BEFORE updating, so we can detect the transition
+                    tuner = self._autotuners[entity_id]
+                        
+                    if tuner.state != tuner.STATE_COMPLETED:
+                        # Hysteresis Fallback Mode (Learning phase)
+                        tolerance = 0.3
+                        current_demand = self.get_zone_demand(entity_id)
+                        if current_temp <= effective_target - tolerance:
+                            demand = 100.0
+                        elif current_temp >= effective_target + tolerance:
+                            demand = 0.0
+                        else:
+                            demand = current_demand # Keep previous demand inside the hysteresis band
                     else:
-                        demand = current_demand # Keep previous demand inside the hysteresis band
-                else:
-                    # Smart PID Mode
-                    demand = self._pids[entity_id].calc(current_temp, effective_target)
-                    
-                    # Apply Weather Compensation (Feed Forward)
-                    curve_val = self.get_persistent_data("weather_curve", 0.0)
-                    if self.weather_sensor_id:
-                        weather_state = self.hass.states.get(self.weather_sensor_id)
-                        if weather_state and weather_state.state not in ("unavailable", "unknown"):
-                            try:
-                                outdoor_temp = None
-                                if weather_state.domain == "weather":
-                                    temp_attr = weather_state.attributes.get("temperature")
-                                    if temp_attr is not None:
-                                        outdoor_temp = float(temp_attr)
-                                else:
-                                    outdoor_temp = float(weather_state.state)
-                                    
-                                    if outdoor_temp is not None:
-                                        # Adaptive Curve Calculation (SAT Math)
-                                        curve_val = thermal_model.get_weather_multiplier(manual_base_curve=curve_val)
+                        # Smart PID Mode
+                        demand = self._pids[entity_id].calc(current_temp, effective_target)
+                        
+                        # Apply Weather Compensation (Feed Forward)
+                        curve_val = self.get_persistent_data("weather_curve", 0.0)
+                        if self.weather_sensor_id:
+                            weather_state = self.hass.states.get(self.weather_sensor_id)
+                            if weather_state and weather_state.state not in ("unavailable", "unknown"):
+                                try:
+                                    outdoor_temp = None
+                                    if weather_state.domain == "weather":
+                                        temp_attr = weather_state.attributes.get("temperature")
+                                        if temp_attr is not None:
+                                            outdoor_temp = float(temp_attr)
+                                    else:
+                                        outdoor_temp = float(weather_state.state)
                                         
-                                        # (Target - OutdoorTemp) * Ke
-                                        delta_t = effective_target - outdoor_temp
-                                        if delta_t > 0.0 and curve_val > 0.0:
-                                            ff_demand = delta_t * curve_val
-                                            # Clamp the weather bonus to a max of +40% to avoid it dominating the PID
-                                            ff_demand = min(40.0, ff_demand)
-                                            demand = min(100.0, max(0.0, demand + ff_demand))
-                                            _LOGGER.debug("[%s] SAT Weather Comp: Target=%.1f, Outdoor=%.1f, Ke=%.2f, FF=+%.1f%%, Final=%.1f%%", 
-                                                          entity_id, effective_target, outdoor_temp, curve_val, ff_demand, demand)
-                            except ValueError:
-                                pass
+                                        if outdoor_temp is not None:
+                                            # Adaptive Curve Calculation (SAT Math)
+                                            curve_val = thermal_model.get_weather_multiplier(manual_base_curve=curve_val)
+                                            
+                                            # (Target - OutdoorTemp) * Ke
+                                            delta_t = effective_target - outdoor_temp
+                                            if delta_t > 0.0 and curve_val > 0.0:
+                                                ff_demand = delta_t * curve_val
+                                                # Clamp the weather bonus to a max of +40% to avoid it dominating the PID
+                                                ff_demand = min(40.0, ff_demand)
+                                                demand = min(100.0, max(0.0, demand + ff_demand))
+                                                _LOGGER.debug("[%s] SAT Weather Comp: Target=%.1f, Outdoor=%.1f, Ke=%.2f, FF=+%.1f%%, Final=%.1f%%", 
+                                                              entity_id, effective_target, outdoor_temp, curve_val, ff_demand, demand)
+                                except ValueError:
+                                    pass
+                else:
+                    demand = 0.0
+                    
+                self.set_zone_demand(entity_id, demand)
+                
+                # BUG-07: Update Autotuner AFTER demand is calculated; detect just-completed transition
+                tuner = self._autotuners[entity_id]
+                if tuner.state != tuner.STATE_COMPLETED:
+                    tuner.update(current_temp, demand > 0)
+                    # Check if this update just completed the learning phase
+                    if tuner.state == tuner.STATE_COMPLETED:
+                        self._pids[entity_id].set_pid_param(kp=tuner.kp, ki=tuner.ki, kd=tuner.kd)
+                        _LOGGER.info(
+                            "Autotuning just completed for %s! Smart PID activated. Kp=%.1f, Ki=%.4f, Kd=%.1f",
+                            entity_id, tuner.kp, tuner.ki, tuner.kd,
+                        )
+                        await self._async_save_autotuner_states()
+                    
+                # Feed Thermal Observer
+                self._thermal_models[entity_id].update(current_temp, demand > 0)
+                self.hass.async_create_task(self._async_save_thermal_states())
+                    
+                _LOGGER.debug("Zone '%s' Demand updated: %.1f%% (Temp: %s, Target: %s, Mode: %s)", 
+                              entity_id, demand, current_temp, target_temp, "PID" if tuner.state == tuner.STATE_COMPLETED else "Hysteresis")
+
             else:
                 demand = 0.0
+                self.set_zone_demand(entity_id, 0.0)
+
+            # Trigger boiler update if action changed (Legacy fallback check)
+            _LOGGER.debug("Climate state changed: %s → %s", entity_id, new_state.state)
+
+            # 0. Check for target temperature changes to save to preset memory
+            old_state = event.data.get("old_state")
+            if old_state is not None and self._current_global_preset:
+                new_temp = new_state.attributes.get("temperature")
+                old_temp = old_state.attributes.get("temperature")
+                if new_temp is not None and new_temp != old_temp:
+                    if self._current_global_preset not in self._presets:
+                        self._presets[self._current_global_preset] = {}
+                    if entity_id not in self._presets[self._current_global_preset]:
+                        self._presets[self._current_global_preset][entity_id] = {}
+                    
+                    self._presets[self._current_global_preset][entity_id]["target_temp"] = new_temp
+                    self.hass.async_create_task(self._async_save_presets_storage())
+                    _LOGGER.debug("Saved new target temp %s for %s in preset %s", new_temp, entity_id, self._current_global_preset)
+
+            # 1. Boiler demand is managed by the periodic PWM tick
+
+            # 2. TRV preset sync (if enabled for this zone)
+            zone = self._get_zone(entity_id)
+            if zone and zone.get(CONF_ZONE_TRV_SYNC, False):
+                self.hass.async_create_task(
+                    self._async_sync_trv_preset(entity_id, new_state.state)
+                )
                 
-            self.set_zone_demand(entity_id, demand)
-            
-            # BUG-07: Update Autotuner AFTER demand is calculated; detect just-completed transition
-            tuner = self._autotuners[entity_id]
-            if tuner.state != tuner.STATE_COMPLETED:
-                tuner.update(current_temp, demand > 0)
-                # Check if this update just completed the learning phase
-                if tuner.state == tuner.STATE_COMPLETED:
-                    self._pids[entity_id].set_pid_param(kp=tuner.kp, ki=tuner.ki, kd=tuner.kd)
-                    _LOGGER.info(
-                        "Autotuning just completed for %s! Smart PID activated. Kp=%.1f, Ki=%.4f, Kd=%.1f",
-                        entity_id, tuner.kp, tuner.ki, tuner.kd,
-                    )
-                    await self._async_save_autotuner_states()
-                
-            # Feed Thermal Observer
-            self._thermal_models[entity_id].update(current_temp, demand > 0)
-            self.hass.async_create_task(self._async_save_thermal_states())
-                
-            _LOGGER.debug("Zone '%s' Demand updated: %.1f%% (Temp: %s, Target: %s, Mode: %s)", 
-                          entity_id, demand, current_temp, target_temp, "PID" if tuner.state == tuner.STATE_COMPLETED else "Hysteresis")
-
-        else:
-            demand = 0.0
-            self.set_zone_demand(entity_id, 0.0)
-
-        # Trigger boiler update if action changed (Legacy fallback check)
-        _LOGGER.debug("Climate state changed: %s → %s", entity_id, new_state.state)
-
-        # 0. Check for target temperature changes to save to preset memory
-        old_state = event.data.get("old_state")
-        if old_state is not None and self._current_global_preset:
-            new_temp = new_state.attributes.get("temperature")
-            old_temp = old_state.attributes.get("temperature")
-            if new_temp is not None and new_temp != old_temp:
-                if self._current_global_preset not in self._presets:
-                    self._presets[self._current_global_preset] = {}
-                if entity_id not in self._presets[self._current_global_preset]:
-                    self._presets[self._current_global_preset][entity_id] = {}
-                
-                self._presets[self._current_global_preset][entity_id]["target_temp"] = new_temp
-                self.hass.async_create_task(self._async_save_presets_storage())
-                _LOGGER.debug("Saved new target temp %s for %s in preset %s", new_temp, entity_id, self._current_global_preset)
-
-        # 1. Boiler demand is managed by the periodic PWM tick
-
-        # 2. TRV preset sync (if enabled for this zone)
-        zone = self._get_zone(entity_id)
-        if zone and zone.get(CONF_ZONE_TRV_SYNC, False):
-            self.hass.async_create_task(
-                self._async_sync_trv_preset(entity_id, new_state.state)
-            )
-            
         except Exception as err:
             _LOGGER.error("Error handling climate state change for %s: %s", event.data.get("entity_id", "unknown"), err)
 
