@@ -1818,7 +1818,15 @@ class MultizoneThermostatPlantCard extends HTMLElement {
   }
 
   setConfig(config) {
-    this._config = config || {};
+    this._config = Object.assign({}, config || {});
+  }
+
+  getCardSize() {
+    return 3;
+  }
+
+  static getStubConfig() {
+    return {};
   }
 
   set hass(hass) {
@@ -2038,84 +2046,88 @@ class MultizoneThermostatPlantCard extends HTMLElement {
   updateCard() {
     if (!this._hass || !this._rendered) return;
 
-    let healthEntity = this._config.health_entity;
-    let cyclesEntity = this._config.cycles_entity;
-    let runtimeEntity = this._config.runtime_entity;
-    let anomalyEntity = this._config.anomaly_entity;
+    try {
+      let healthEntity = this._config.health_entity;
+      let cyclesEntity = this._config.cycles_entity;
+      let runtimeEntity = this._config.runtime_entity;
+      let anomalyEntity = this._config.anomaly_entity;
 
-    if (!healthEntity) {
-      healthEntity = Object.keys(this._hass.states).find(k => k.startsWith('sensor.') && k.includes('stato_salute_impianto'));
-    }
-    if (!cyclesEntity) {
-      cyclesEntity = Object.keys(this._hass.states).find(k => k.startsWith('sensor.') && k.includes('frequenza_accensioni_caldaia'));
-    }
-    if (!runtimeEntity) {
-      runtimeEntity = Object.keys(this._hass.states).find(k => k.startsWith('sensor.') && k.includes('ore_funzionamento_caldaia_24h'));
-    }
-    if (!anomalyEntity) {
-      anomalyEntity = Object.keys(this._hass.states).find(k => k.startsWith('binary_sensor.') && k.includes('plant_anomaly'));
-    }
-
-    const healthState = healthEntity ? this._hass.states[healthEntity] : null;
-    const cyclesState = cyclesEntity ? this._hass.states[cyclesEntity] : null;
-    const runtimeState = runtimeEntity ? this._hass.states[runtimeEntity] : null;
-    const anomalyState = anomalyEntity ? this._hass.states[anomalyEntity] : null;
-
-    const healthBadge = this.shadowRoot.getElementById('health-badge');
-    const healthText = this.shadowRoot.getElementById('health-text');
-    const cyclesVal = this.shadowRoot.getElementById('cycles-val');
-    const cyclesSub = this.shadowRoot.getElementById('cycles-sub');
-    const runtimeVal = this.shadowRoot.getElementById('runtime-val');
-    const alertBox = this.shadowRoot.getElementById('alert-box');
-    const alertDesc = this.shadowRoot.getElementById('alert-desc');
-
-    const statusVal = healthState ? healthState.state : "Ottimale";
-    if (healthBadge && healthText) {
-      healthText.innerText = statusVal.toUpperCase();
-      if (statusVal === "Critico") {
-        healthBadge.className = "status-badge status-critical";
-      } else if (statusVal === "Attenzione") {
-        healthBadge.className = "status-badge status-warning";
-      } else {
-        healthBadge.className = "status-badge status-optimal";
+      if (!healthEntity) {
+        healthEntity = Object.keys(this._hass.states).find(k => k.startsWith('sensor.') && k.includes('stato_salute_impianto'));
       }
-    }
+      if (!cyclesEntity) {
+        cyclesEntity = Object.keys(this._hass.states).find(k => k.startsWith('sensor.') && k.includes('frequenza_accensioni_caldaia'));
+      }
+      if (!runtimeEntity) {
+        runtimeEntity = Object.keys(this._hass.states).find(k => k.startsWith('sensor.') && k.includes('ore_funzionamento_caldaia_24h'));
+      }
+      if (!anomalyEntity) {
+        anomalyEntity = Object.keys(this._hass.states).find(k => k.startsWith('binary_sensor.') && k.includes('plant_anomaly'));
+      }
 
-    if (cyclesVal && cyclesState) {
-      const c = parseFloat(cyclesState.state) || 0;
-      cyclesVal.innerText = c.toFixed(1);
-      if (cyclesSub) {
-        if (c <= 3.5) {
-          cyclesSub.innerText = "Usura Bassa (< 3.5 c/h)";
-          cyclesSub.style.color = "#34d399";
-        } else if (c <= 5.0) {
-          cyclesSub.innerText = "Usura Moderata (3.5 - 5 c/h)";
-          cyclesSub.style.color = "#fbbf24";
+      const healthState = healthEntity ? this._hass.states[healthEntity] : null;
+      const cyclesState = cyclesEntity ? this._hass.states[cyclesEntity] : null;
+      const runtimeState = runtimeEntity ? this._hass.states[runtimeEntity] : null;
+      const anomalyState = anomalyEntity ? this._hass.states[anomalyEntity] : null;
+
+      const healthBadge = this.shadowRoot.getElementById('health-badge');
+      const healthText = this.shadowRoot.getElementById('health-text');
+      const cyclesVal = this.shadowRoot.getElementById('cycles-val');
+      const cyclesSub = this.shadowRoot.getElementById('cycles-sub');
+      const runtimeVal = this.shadowRoot.getElementById('runtime-val');
+      const alertBox = this.shadowRoot.getElementById('alert-box');
+      const alertDesc = this.shadowRoot.getElementById('alert-desc');
+
+      const statusVal = healthState ? healthState.state : "Ottimale";
+      if (healthBadge && healthText) {
+        healthText.innerText = statusVal.toUpperCase();
+        if (statusVal === "Critico") {
+          healthBadge.className = "status-badge status-critical";
+        } else if (statusVal === "Attenzione") {
+          healthBadge.className = "status-badge status-warning";
         } else {
-          cyclesSub.innerText = "⚠️ Short-Cycling Elevato (> 5 c/h)";
-          cyclesSub.style.color = "#f87171";
+          healthBadge.className = "status-badge status-optimal";
         }
       }
-    }
 
-    if (runtimeVal && runtimeState) {
-      const r = parseFloat(runtimeState.state) || 0;
-      runtimeVal.innerText = r.toFixed(1);
-    }
-
-    if (alertBox && alertDesc) {
-      const hasAnomaly = anomalyState ? anomalyState.state === "on" : (statusVal !== "Ottimale");
-      if (hasAnomaly && healthState && healthState.attributes && healthState.attributes.anomalies && healthState.attributes.anomalies.length > 0) {
-        alertBox.className = "alert-box alert-err";
-        const items = healthState.attributes.anomalies.map(a => `• <b>${a.zone}</b>: ${a.description}`).join('<br>');
-        alertDesc.innerHTML = items;
-      } else if (statusVal === "Attenzione") {
-        alertBox.className = "alert-box alert-err";
-        alertDesc.innerText = "Attenzione: frequenza di accensioni caldaia elevata o parametri da ottimizzare.";
-      } else {
-        alertBox.className = "alert-box alert-ok";
-        alertDesc.innerText = "Nessun blocco valvola, trafilamento o short-cycling rilevato.";
+      if (cyclesVal && cyclesState) {
+        const c = parseFloat(cyclesState.state) || 0;
+        cyclesVal.innerText = c.toFixed(1);
+        if (cyclesSub) {
+          if (c <= 3.5) {
+            cyclesSub.innerText = "Usura Bassa (< 3.5 c/h)";
+            cyclesSub.style.color = "#34d399";
+          } else if (c <= 5.0) {
+            cyclesSub.innerText = "Usura Moderata (3.5 - 5 c/h)";
+            cyclesSub.style.color = "#fbbf24";
+          } else {
+            cyclesSub.innerText = "⚠️ Short-Cycling Elevato (> 5 c/h)";
+            cyclesSub.style.color = "#f87171";
+          }
+        }
       }
+
+      if (runtimeVal && runtimeState) {
+        const r = parseFloat(runtimeState.state) || 0;
+        runtimeVal.innerText = r.toFixed(1);
+      }
+
+      if (alertBox && alertDesc) {
+        const hasAnomaly = anomalyState ? anomalyState.state === "on" : (statusVal !== "Ottimale");
+        if (hasAnomaly && healthState && healthState.attributes && healthState.attributes.anomalies && healthState.attributes.anomalies.length > 0) {
+          alertBox.className = "alert-box alert-err";
+          const items = healthState.attributes.anomalies.map(a => `• <b>${a.zone}</b>: ${a.description}`).join('<br>');
+          alertDesc.innerHTML = items;
+        } else if (statusVal === "Attenzione") {
+          alertBox.className = "alert-box alert-err";
+          alertDesc.innerText = "Attenzione: frequenza di accensioni caldaia elevata o parametri da ottimizzare.";
+        } else {
+          alertBox.className = "alert-box alert-ok";
+          alertDesc.innerText = "Nessun blocco valvola, trafilamento o short-cycling rilevato.";
+        }
+      }
+    } catch (err) {
+      console.error("Error updating MultizoneThermostatPlantCard:", err);
     }
   }
 }
@@ -2133,10 +2145,22 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
   }
 
   setConfig(config) {
-    if (!config.entity) {
+    if (!config || !config.entity) {
       throw new Error("Devi specificare un'entità climate");
     }
-    this._config = config;
+    this._config = Object.assign({}, config);
+  }
+
+  getCardSize() {
+    return 3;
+  }
+
+  static getStubConfig(hass, entities) {
+    const climate = entities ? entities.find(e => e.startsWith("climate.")) : "";
+    return {
+      entity: climate || "",
+      title: ""
+    };
   }
 
   set hass(hass) {
@@ -2156,7 +2180,7 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
         -webkit-backdrop-filter: blur(12px);
         border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.08));
         border-radius: var(--card-border-radius, 20px);
-        padding: 18px;
+        padding: 20px;
         box-shadow: var(--ha-card-box-shadow, 0 4px 20px rgba(0, 0, 0, 0.15));
         font-family: var(--paper-font-body1_-_font-family, inherit);
         color: var(--primary-text-color, #e2e8f0);
@@ -2169,39 +2193,47 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
         display: flex;
         align-items: flex-start;
         justify-content: space-between;
-        margin-bottom: 12px;
+        margin-bottom: 14px;
       }
       .zone-name {
-        font-size: 19px;
+        font-size: 20px;
         font-weight: 800;
         margin: 0;
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 10px;
       }
       .zone-mode-badge {
-        font-size: 10px;
+        font-size: 11px;
         font-weight: 800;
-        padding: 3px 8px;
+        padding: 4px 9px;
         border-radius: 6px;
         text-transform: uppercase;
         background: rgba(59, 130, 246, 0.2);
         color: #60a5fa;
+        cursor: pointer;
+        transition: opacity 0.2s ease, transform 0.1s ease;
+      }
+      .zone-mode-badge:hover {
+        opacity: 0.85;
+      }
+      .zone-mode-badge:active {
+        transform: scale(0.96);
       }
       .zone-sub {
-        font-size: 13px;
+        font-size: 14px;
         font-weight: 500;
         color: var(--secondary-text-color, #94a3b8);
-        margin-top: 3px;
+        margin-top: 4px;
       }
       .energy-badge {
-        padding: 6px 12px;
+        padding: 6px 14px;
         border-radius: 10px;
         font-weight: 900;
-        font-size: 17px;
+        font-size: 18px;
         text-align: center;
         box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-        min-width: 44px;
+        min-width: 48px;
         background: #10b981;
         color: white;
       }
@@ -2210,7 +2242,7 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
         height: 6px;
         border-radius: 3px;
         overflow: hidden;
-        margin-bottom: 14px;
+        margin-bottom: 16px;
         opacity: 0.85;
         gap: 2px;
       }
@@ -2246,36 +2278,36 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
         padding: 12px 14px;
       }
       .stat-label {
-        font-size: 12px;
+        font-size: 13px;
         font-weight: 600;
         color: var(--secondary-text-color, #94a3b8);
         display: block;
-        margin-bottom: 4px;
+        margin-bottom: 5px;
       }
       .stat-val {
-        font-size: 20px;
+        font-size: 22px;
         font-weight: 800;
         line-height: 1.2;
       }
       .stat-unit {
-        font-size: 12px;
+        font-size: 13px;
         color: var(--secondary-text-color, #94a3b8);
         font-weight: 600;
         margin-left: 2px;
       }
       .stat-eval {
-        font-size: 12px;
-        margin-top: 4px;
+        font-size: 13px;
+        margin-top: 5px;
         font-weight: 600;
         display: block;
       }
       .bottom-row {
-        padding-top: 12px;
+        padding-top: 14px;
         border-top: 1px solid rgba(255, 255, 255, 0.06);
         display: flex;
         align-items: center;
         justify-content: space-between;
-        font-size: 13px;
+        font-size: 14px;
       }
       .valve-status {
         display: flex;
@@ -2299,7 +2331,7 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
         <div>
           <div class="zone-name">
             <span id="zone-title">Stanza</span>
-            <span class="zone-mode-badge" id="zone-mode-badge">PRIMARIA</span>
+            <span class="zone-mode-badge" id="zone-mode-badge" title="Clicca per cambiare modalità zona">PRIMARIA</span>
           </div>
           <div class="zone-sub" id="temp-sub">-- °C</div>
         </div>
@@ -2351,178 +2383,214 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
   }
 
   updateCard() {
-    if (!this._hass || !this._rendered) return;
+    if (!this._hass || !this._rendered || !this._config || !this._config.entity) return;
 
-    const climateId = this._config.entity;
-    const climateState = this._hass.states[climateId];
-    if (!climateState) return;
+    try {
+      const climateId = this._config.entity;
+      const climateState = this._hass.states[climateId];
+      if (!climateState) return;
 
-    let title = this._config.title || climateState.attributes.friendly_name || climateId;
-    title = title.replace(/^Virtual Thermostats VT /i, '').replace(/^Heating Zones(?: Zone)? /i, '');
-    let slug = climateId.replace("climate.multizone_thermostat_", "").replace("climate.", "");
+      let title = this._config.title || climateState.attributes.friendly_name || climateId;
+      title = title.replace(/^Virtual Thermostats VT /i, '').replace(/^Heating Zones(?: Zone)? /i, '');
+      let slug = climateId.replace("climate.multizone_thermostat_", "").replace("climate.", "");
 
-    const energyEntity = Object.keys(this._hass.states).find(k => k.startsWith('sensor.') && k.includes('classe_energetica') && k.includes(slug));
-    const retentionEntity = Object.keys(this._hass.states).find(k => k.startsWith('sensor.') && k.includes('tempo_ritenzione_termica') && k.includes(slug));
-    const sizingEntity = Object.keys(this._hass.states).find(k => k.startsWith('sensor.') && k.includes('dimensionamento_radiatore') && k.includes(slug));
-    const anomalyEntity = Object.keys(this._hass.states).find(k => k.startsWith('binary_sensor.') && k.includes('anomaly') && k.includes(slug));
+      const energyEntity = Object.keys(this._hass.states).find(k => k.startsWith('sensor.') && k.includes('classe_energetica') && k.includes(slug));
+      const retentionEntity = Object.keys(this._hass.states).find(k => k.startsWith('sensor.') && k.includes('tempo_ritenzione_termica') && k.includes(slug));
+      const sizingEntity = Object.keys(this._hass.states).find(k => k.startsWith('sensor.') && k.includes('dimensionamento_radiatore') && k.includes(slug));
+      const anomalyEntity = Object.keys(this._hass.states).find(k => k.startsWith('binary_sensor.') && k.includes('anomaly') && k.includes(slug));
 
-    const titleEl = this.shadowRoot.getElementById('zone-title');
-    const tempSubEl = this.shadowRoot.getElementById('temp-sub');
-    const badgeEl = this.shadowRoot.getElementById('energy-badge');
-    const retentionVal = this.shadowRoot.getElementById('retention-val');
-    const retentionEval = this.shadowRoot.getElementById('retention-eval');
-    const sizingVal = this.shadowRoot.getElementById('sizing-val');
-    const sizingEval = this.shadowRoot.getElementById('sizing-eval');
-    const valveDot = this.shadowRoot.getElementById('valve-dot');
-    const valveText = this.shadowRoot.getElementById('valve-text');
-    // Determine zone mode (primary, secondary, bypass)
-    let zoneMode = "primary";
-    const selectObj = Object.values(this._hass.states).find(s => 
-      s.entity_id.startsWith('select.') && (
-        (s.attributes && s.attributes.climate_entity === climateId) ||
-        (s.entity_id.includes(slug) && (s.entity_id.includes('mode') || s.entity_id.includes('zone')))
-      )
-    );
-    if (selectObj && selectObj.state) {
-      zoneMode = selectObj.state;
-    } else if (climateState.attributes && climateState.attributes.zone_mode) {
-      zoneMode = climateState.attributes.zone_mode;
-    }
+      const titleEl = this.shadowRoot.getElementById('zone-title');
+      const tempSubEl = this.shadowRoot.getElementById('temp-sub');
+      const badgeEl = this.shadowRoot.getElementById('energy-badge');
+      const modeBadge = this.shadowRoot.getElementById('zone-mode-badge');
+      const retentionVal = this.shadowRoot.getElementById('retention-val');
+      const retentionEval = this.shadowRoot.getElementById('retention-eval');
+      const sizingVal = this.shadowRoot.getElementById('sizing-val');
+      const sizingEval = this.shadowRoot.getElementById('sizing-eval');
+      const valveDot = this.shadowRoot.getElementById('valve-dot');
+      const valveText = this.shadowRoot.getElementById('valve-text');
 
-    if (titleEl) titleEl.innerText = title;
-
-    if (tempSubEl) {
-      const cur = climateState.attributes.current_temperature;
-      const tgt = climateState.attributes.temperature;
-      if (zoneMode === "bypass") {
-        tempSubEl.innerText = `${cur !== undefined ? cur : '--'}°C / (Bypassata)`;
-      } else {
-        tempSubEl.innerText = `${cur !== undefined ? cur : '--'}°C / target ${tgt !== undefined ? tgt : '--'}°C`;
-      }
-    }
-
-    if (modeBadge) {
-      if (zoneMode === "bypass") {
-        modeBadge.innerText = "BYPASSATA";
-        modeBadge.style.background = "rgba(100, 116, 139, 0.25)";
-        modeBadge.style.color = "#94a3b8";
-        modeBadge.style.border = "1px solid rgba(148, 163, 184, 0.3)";
-      } else if (zoneMode === "secondary") {
-        modeBadge.innerText = "SECONDARIA";
-        modeBadge.style.background = "rgba(168, 85, 247, 0.2)";
-        modeBadge.style.color = "#c084fc";
-        modeBadge.style.border = "1px solid rgba(168, 85, 247, 0.3)";
-      } else {
-        modeBadge.innerText = "PRIMARIA";
-        modeBadge.style.background = "rgba(59, 130, 246, 0.2)";
-        modeBadge.style.color = "#60a5fa";
-        modeBadge.style.border = "1px solid rgba(59, 130, 246, 0.3)";
-      }
-    }
-
-    const eState = energyEntity ? this._hass.states[energyEntity] : null;
-    const energyClass = eState ? eState.state : "--";
-    const colors = {
-      'A4': '#00873d', 'A': '#139f37', 'B': '#55b726', 'C': '#96c818',
-      'D': '#e0d100', 'E': '#f39200', 'F': '#e64213', 'G': '#cb0019'
-    };
-
-    if (badgeEl) {
-      badgeEl.innerText = energyClass;
-      if (colors[energyClass]) {
-        badgeEl.style.backgroundColor = colors[energyClass];
-        badgeEl.style.color = (['C', 'D'].includes(energyClass)) ? '#111' : '#fff';
-      } else {
-        badgeEl.style.backgroundColor = '#64748b';
-        badgeEl.style.color = '#fff';
-      }
-    }
-
-    ['A4', 'A', 'B', 'C', 'D', 'E', 'F', 'G'].forEach(cls => {
-      const stepEl = this.shadowRoot.getElementById('step-' + cls);
-      if (stepEl) {
-        if (cls === energyClass) {
-          stepEl.classList.add('active');
+      // Robust determination of zone mode (primary, secondary, bypass)
+      let zoneMode = "primary";
+      const switchEntity = autoDiscoverSwitch(this._hass, climateId);
+      if (switchEntity && this._hass.states[switchEntity]) {
+        const sState = this._hass.states[switchEntity];
+        if (switchEntity.startsWith("switch.")) {
+          zoneMode = (sState.state === "off") ? "bypass" : "primary";
         } else {
-          stepEl.classList.remove('active');
+          zoneMode = sState.state || "primary";
+        }
+      } else if (climateState.attributes && climateState.attributes.zone_mode) {
+        zoneMode = climateState.attributes.zone_mode;
+      } else {
+        const selectObj = Object.values(this._hass.states).find(s => 
+          s.entity_id.startsWith('select.') && (
+            (s.attributes && s.attributes.climate_entity === climateId) ||
+            (s.entity_id.includes(slug) && (s.entity_id.includes('mode') || s.entity_id.includes('zone')))
+          )
+        );
+        if (selectObj && selectObj.state) {
+          zoneMode = selectObj.state;
         }
       }
-    });
 
-    const rState = retentionEntity ? this._hass.states[retentionEntity] : null;
-    if (retentionVal && rState) {
-      const r = parseFloat(rState.state);
-      retentionVal.innerText = isNaN(r) ? "--" : r.toFixed(1);
-      if (retentionEval) {
-        if (isNaN(r)) retentionEval.innerText = "In apprendimento...";
-        else if (r >= 6.0) retentionEval.innerText = "Ottimo isolamento";
-        else if (r >= 3.5) retentionEval.innerText = "Isolamento medio";
-        else retentionEval.innerText = "Dispersione rapida";
-      }
-    }
+      if (titleEl) titleEl.innerText = title;
 
-    const sState = sizingEntity ? this._hass.states[sizingEntity] : null;
-    if (sizingVal && sState) {
-      sizingVal.innerText = sState.state;
-      if (sizingEval) {
-        if (sState.state === "Ottimale") {
-          sizingEval.innerText = "Rapporto potenza/perdite OK";
-          sizingEval.style.color = "#34d399";
-        } else if (sState.state === "Sottodimensionato") {
-          sizingEval.innerText = "Richiede tempo per salire";
-          sizingEval.style.color = "#f87171";
-        } else if (sState.state === "Sovradimensionato") {
-          sizingEval.innerText = "Potenza elevata";
-          sizingEval.style.color = "#fbbf24";
+      if (tempSubEl) {
+        const cur = climateState.attributes.current_temperature;
+        const tgt = climateState.attributes.temperature;
+        if (zoneMode === "bypass") {
+          tempSubEl.innerText = `${cur !== undefined ? cur : '--'}°C / (Bypassata)`;
         } else {
-          sizingEval.innerText = "In attesa dati termici";
-          sizingEval.style.color = "#94a3b8";
+          tempSubEl.innerText = `${cur !== undefined ? cur : '--'}°C / target ${tgt !== undefined ? tgt : '--'}°C`;
         }
       }
-    }
 
-    const aState = anomalyEntity ? this._hass.states[anomalyEntity] : null;
-    const passiveHeatSwitch = Object.keys(this._hass.states).find(k => 
-      k.startsWith('switch.') && k.includes('passive_heat') && k.includes(slug)
-    );
-    const swState = passiveHeatSwitch ? this._hass.states[passiveHeatSwitch] : null;
-    const allowPassive = (swState && swState.state === 'on') || (climateState.attributes && climateState.attributes.allow_passive_heat);
+      if (modeBadge) {
+        if (!this._modeListenerAttached && switchEntity) {
+          this._modeListenerAttached = true;
+          modeBadge.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (switchEntity.startsWith('select.')) {
+              const modes = ['primary', 'secondary', 'bypass'];
+              const curIdx = modes.indexOf(zoneMode);
+              const nextMode = modes[(curIdx + 1) % modes.length];
+              this._hass.callService('select', 'select_option', {
+                entity_id: switchEntity,
+                option: nextMode
+              });
+            } else if (switchEntity.startsWith('switch.')) {
+              this._hass.callService('switch', 'toggle', {
+                entity_id: switchEntity
+              });
+            }
+          });
+        }
 
-    const valveStatusEl = this.shadowRoot.getElementById('valve-status');
-    if (valveStatusEl) {
-      if (!this._valveListenerAttached) {
-        this._valveListenerAttached = true;
-        valveStatusEl.style.cursor = 'pointer';
-        valveStatusEl.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const sw = Object.keys(this._hass.states).find(k => 
-            k.startsWith('switch.') && k.includes('passive_heat') && k.includes(slug)
-          );
-          if (sw) {
-            this._hass.callService('switch', 'toggle', { entity_id: sw });
+        if (zoneMode === "bypass") {
+          modeBadge.innerText = "BYPASSATA";
+          modeBadge.style.background = "rgba(100, 116, 139, 0.25)";
+          modeBadge.style.color = "#94a3b8";
+          modeBadge.style.border = "1px solid rgba(148, 163, 184, 0.3)";
+        } else if (zoneMode === "secondary") {
+          modeBadge.innerText = "SECONDARIA";
+          modeBadge.style.background = "rgba(168, 85, 247, 0.2)";
+          modeBadge.style.color = "#c084fc";
+          modeBadge.style.border = "1px solid rgba(168, 85, 247, 0.3)";
+        } else {
+          modeBadge.innerText = "PRIMARIA";
+          modeBadge.style.background = "rgba(59, 130, 246, 0.2)";
+          modeBadge.style.color = "#60a5fa";
+          modeBadge.style.border = "1px solid rgba(59, 130, 246, 0.3)";
+        }
+      }
+
+      const eState = energyEntity ? this._hass.states[energyEntity] : null;
+      const energyClass = eState ? eState.state : "--";
+      const colors = {
+        'A4': '#00873d', 'A': '#139f37', 'B': '#55b726', 'C': '#96c818',
+        'D': '#e0d100', 'E': '#f39200', 'F': '#e64213', 'G': '#cb0019'
+      };
+
+      if (badgeEl) {
+        badgeEl.innerText = energyClass;
+        if (colors[energyClass]) {
+          badgeEl.style.backgroundColor = colors[energyClass];
+          badgeEl.style.color = (['C', 'D'].includes(energyClass)) ? '#111' : '#fff';
+        } else {
+          badgeEl.style.backgroundColor = '#64748b';
+          badgeEl.style.color = '#fff';
+        }
+      }
+
+      ['A4', 'A', 'B', 'C', 'D', 'E', 'F', 'G'].forEach(cls => {
+        const stepEl = this.shadowRoot.getElementById('step-' + cls);
+        if (stepEl) {
+          if (cls === energyClass) {
+            stepEl.classList.add('active');
+          } else {
+            stepEl.classList.remove('active');
           }
-        });
-      }
-      valveStatusEl.title = allowPassive 
-        ? "Apporto Passivo ATTIVO (Clicca per disattivare)" 
-        : "Clicca per attivare Apporto Passivo (Fancoil senza valvola / Soppalco)";
-    }
+        }
+      });
 
-    if (valveDot && valveText) {
-      const hasAnomaly = aState && aState.state === "on";
-      if (hasAnomaly) {
-        valveDot.className = "pulse-dot pulse-red";
-        valveText.innerText = (aState.attributes && aState.attributes.details) || "Anomalia Rilevata";
-        valveText.style.color = "#f87171";
-      } else if (zoneMode === "bypass") {
-        valveDot.className = "pulse-dot pulse-green";
-        valveText.innerText = allowPassive ? "Valvola Chiusa (Apporto passivo attivo)" : "Valvola Chiusa (Bypass)";
-        valveText.style.color = "#94a3b8";
-      } else {
-        valveDot.className = "pulse-dot pulse-green";
-        valveText.innerText = allowPassive ? "Nessuna anomalia (Apporto passivo attivo)" : "Nessuna anomalia";
-        valveText.style.color = "#34d399";
+      const rState = retentionEntity ? this._hass.states[retentionEntity] : null;
+      if (retentionVal && rState) {
+        const r = parseFloat(rState.state);
+        retentionVal.innerText = isNaN(r) ? "--" : r.toFixed(1);
+        if (retentionEval) {
+          if (isNaN(r)) retentionEval.innerText = "In apprendimento...";
+          else if (r >= 6.0) retentionEval.innerText = "Ottimo isolamento";
+          else if (r >= 3.5) retentionEval.innerText = "Isolamento medio";
+          else retentionEval.innerText = "Dispersione rapida";
+        }
       }
+
+      const sState = sizingEntity ? this._hass.states[sizingEntity] : null;
+      if (sizingVal && sState) {
+        sizingVal.innerText = sState.state;
+        if (sizingEval) {
+          if (sState.state === "Ottimale") {
+            sizingEval.innerText = "Rapporto potenza/perdite OK";
+            sizingEval.style.color = "#34d399";
+          } else if (sState.state === "Sottodimensionato") {
+            sizingEval.innerText = "Richiede tempo per salire";
+            sizingEval.style.color = "#f87171";
+          } else if (sState.state === "Sovradimensionato") {
+            sizingEval.innerText = "Potenza elevata";
+            sizingEval.style.color = "#fbbf24";
+          } else {
+            sizingEval.innerText = "In attesa dati termici";
+            sizingEval.style.color = "#94a3b8";
+          }
+        }
+      }
+
+      const aState = anomalyEntity ? this._hass.states[anomalyEntity] : null;
+      const passiveHeatSwitch = Object.keys(this._hass.states).find(k => 
+        k.startsWith('switch.') && k.includes('passive_heat') && k.includes(slug)
+      );
+      const swState = passiveHeatSwitch ? this._hass.states[passiveHeatSwitch] : null;
+      const allowPassive = (swState && swState.state === 'on') || (climateState.attributes && climateState.attributes.allow_passive_heat);
+
+      const valveStatusEl = this.shadowRoot.getElementById('valve-status');
+      if (valveStatusEl) {
+        if (!this._valveListenerAttached) {
+          this._valveListenerAttached = true;
+          valveStatusEl.style.cursor = 'pointer';
+          valveStatusEl.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const sw = Object.keys(this._hass.states).find(k => 
+              k.startsWith('switch.') && k.includes('passive_heat') && k.includes(slug)
+            );
+            if (sw) {
+              this._hass.callService('switch', 'toggle', { entity_id: sw });
+            }
+          });
+        }
+        valveStatusEl.title = allowPassive 
+          ? "Apporto Passivo ATTIVO (Clicca per disattivare)" 
+          : "Clicca per attivare Apporto Passivo (Fancoil senza valvola / Soppalco)";
+      }
+
+      if (valveDot && valveText) {
+        const hasAnomaly = aState && aState.state === "on";
+        if (hasAnomaly) {
+          valveDot.className = "pulse-dot pulse-red";
+          valveText.innerText = (aState.attributes && aState.attributes.details) || "Anomalia Rilevata";
+          valveText.style.color = "#f87171";
+        } else if (zoneMode === "bypass") {
+          valveDot.className = "pulse-dot pulse-green";
+          valveText.innerText = allowPassive ? "Valvola Chiusa (Apporto passivo attivo)" : "Valvola Chiusa (Bypass)";
+          valveText.style.color = "#94a3b8";
+        } else {
+          valveDot.className = "pulse-dot pulse-green";
+          valveText.innerText = allowPassive ? "Nessuna anomalia (Apporto passivo attivo)" : "Nessuna anomalia";
+          valveText.style.color = "#34d399";
+        }
+      }
+    } catch (err) {
+      console.error("Error updating MultizoneThermostatZoneEnergyCard:", err);
     }
   }
 }
