@@ -41,7 +41,7 @@ The project is structured in phases to evolve from a simple aggregator to a full
 - [x] **Adaptive Climate Curve**: Self-learning and continuous adaptation of the weather compensation curve based on history.
 - [x] **Full OpenTherm Support (v4.2)**: Dual-drive architecture for ON/OFF Relays and OpenTherm modulating gateways, mapping house Heat Demand % (0-100%) to boiler water flow temperature.
 - [x] **Anti-Frost Protection System (v4.3)**: Global safety override with dedicated switch (`switch.multizone_thermostat_anti_frost_protection`) and threshold control (`number.frost_protection_temp`). Forces emergency heating at 100% demand when room temperature drops below frost threshold, ignoring open window and master off blocks to prevent frozen pipes.
-- [ ] **Advanced Diagnostics & Anomaly Analysis**: Detection of stuck valves, overshoots, PID cycles, and reporting for each room.
+- [x] **Advanced Diagnostics & Plant Supervision (v4.5)**: Automated detection of stuck valves, ghost heating leakage, boiler short-cycling frequency, 24h runtime telemetry, European building energy class (A4-G), thermal retention time, radiator sizing, and interactive mode switching.
 
 
 ### 🤝 Community Requests & Pull Requests
@@ -54,8 +54,8 @@ Features proposed or requested by the community that we plan to implement:
   - **Dual Seasonal Presets**: Independent sets of Global Presets (Comfort, Eco, etc.) for Winter (Heating targets) and Summer (Cooling targets).
 
 ### 📋 Additional Priorities
-  - **Intelligent Multi-Sensor Management:** Weighted average and priorities among multiple sensors in a room.
-  - **Advanced Dashboards & Statistics:** Graphical display of efficiency, PID, PWM, histories.
+  - [ ] **Intelligent Multi-Sensor Management:** Weighted average and priorities among multiple physical sensors in a room (currently multi-TRVs are simple-averaged; multi-sensor weighting with priority rules remains planned).
+  - [x] **Advanced Dashboards & Diagnostic Cards (v4.5)**: Graphical glassmorphic display of building energy efficiency, plant short-cycling, 24h telemetry, and automated diagnostic strategy view.
 
 ### 🔬 Future Research
 - [ ] **Hybrid Support (Heating / Cooling)**: Complete rewrite of the configuration engine to simultaneously manage and easily switch between Winter (Heating) and Summer (Cooling) modes, supporting reversible heat pumps.
