@@ -142,10 +142,11 @@ class PlantDiagnosticsEngine:
                 state["anomaly_details"] = ANOMALY_LABELS[ANOMALY_STALE_SENSOR]
                 return ANOMALY_STALE_SENSOR, state["anomaly_details"]
 
-            # 2. Overshoot Check: Room temperature > target by > 1.5°C
-            if target_temp is not None and current_temp > (float(target_temp) + 1.5):
+            # 2. Overshoot Check: Only when heating is active (boiler ON and demand > 0)
+            # If the boiler is OFF or demand is 0, warm room temperature is simply natural ambient/solar heat, NOT a heating overshoot!
+            if boiler_on and demand > 0.0 and target_temp is not None and current_temp > (float(target_temp) + 1.5):
                 state["active_anomaly"] = ANOMALY_OVERSHOOT
-                state["anomaly_details"] = f"Temperatura attuale ({current_temp}°C) supera il target ({target_temp}°C) di oltre 1.5°C"
+                state["anomaly_details"] = f"Temperatura attuale ({current_temp}°C) supera il target ({target_temp}°C) di oltre 1.5°C durante il riscaldamento"
                 return ANOMALY_OVERSHOOT, state["anomaly_details"]
 
             # 3. Stuck Closed Valve: Demand == 100% for > 75 min, but temperature did not rise >= 0.2°C
@@ -210,12 +211,13 @@ class PlantDiagnosticsEngine:
                     except (ValueError, TypeError):
                         pass
 
-            # Calculate normalized dispersion rate (normalized to standard 20°C inside / 0°C outside delta)
+            # If weather is mild (inside - outside < 7.0°C), thermal gradient is too small for reliable calculation
             if outdoor_temp is not None:
-                delta_t = max(3.0, current_temp - outdoor_temp)
+                delta_t = current_temp - outdoor_temp
+                if delta_t < 7.0:
+                    return "In apprendimento..."
                 normalized_dispersion = (thermal.cooling_rate / delta_t) * 20.0
             else:
-                # Relative fallback if no weather sensor
                 normalized_dispersion = thermal.cooling_rate
 
             # Scale mapping: European Energy Efficiency Class

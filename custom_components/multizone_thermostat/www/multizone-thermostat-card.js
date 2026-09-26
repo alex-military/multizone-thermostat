@@ -1844,9 +1844,9 @@ class MultizoneThermostatPlantCard extends HTMLElement {
         gap: 12px;
       }
       .icon-wrap {
-        width: 42px;
-        height: 42px;
-        border-radius: 12px;
+        width: 46px;
+        height: 46px;
+        border-radius: 14px;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -1854,29 +1854,29 @@ class MultizoneThermostatPlantCard extends HTMLElement {
         color: #38bdf8;
       }
       .icon-wrap ha-icon {
-        --mdc-icon-size: 24px;
+        --mdc-icon-size: 28px;
       }
       .title-text {
-        font-size: 17px;
-        font-weight: 700;
+        font-size: 20px;
+        font-weight: 800;
         margin: 0;
         line-height: 1.2;
       }
       .subtitle-text {
-        font-size: 11px;
+        font-size: 13px;
         color: var(--secondary-text-color, #94a3b8);
-        margin-top: 2px;
+        margin-top: 3px;
       }
       .status-badge {
-        padding: 5px 12px;
+        padding: 6px 14px;
         border-radius: 9999px;
-        font-size: 12px;
+        font-size: 13px;
         font-weight: 800;
         text-transform: uppercase;
         letter-spacing: 0.5px;
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 8px;
       }
       .status-optimal {
         background: rgba(16, 185, 129, 0.15);
@@ -1894,15 +1894,15 @@ class MultizoneThermostatPlantCard extends HTMLElement {
         border: 1px solid rgba(239, 68, 68, 0.3);
       }
       .status-dot {
-        width: 7px;
-        height: 7px;
+        width: 8px;
+        height: 8px;
         border-radius: 50%;
         background: currentColor;
       }
       .kpi-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 12px;
+        gap: 14px;
         margin-bottom: 14px;
       }
       @media (max-width: 480px) {
@@ -1911,14 +1911,15 @@ class MultizoneThermostatPlantCard extends HTMLElement {
       .kpi-card {
         background: rgba(255, 255, 255, 0.03);
         border: 1px solid rgba(255, 255, 255, 0.06);
-        border-radius: 14px;
-        padding: 14px;
+        border-radius: 16px;
+        padding: 16px;
       }
       .kpi-label {
-        font-size: 11px;
+        font-size: 13px;
+        font-weight: 600;
         color: var(--secondary-text-color, #94a3b8);
         display: block;
-        margin-bottom: 4px;
+        margin-bottom: 6px;
       }
       .kpi-value-row {
         display: flex;
@@ -1926,27 +1927,28 @@ class MultizoneThermostatPlantCard extends HTMLElement {
         gap: 6px;
       }
       .kpi-val {
-        font-size: 24px;
-        font-weight: 800;
+        font-size: 30px;
+        font-weight: 900;
         line-height: 1;
       }
       .kpi-unit {
-        font-size: 11px;
+        font-size: 13px;
+        font-weight: 600;
         color: var(--secondary-text-color, #94a3b8);
       }
       .kpi-sub {
-        font-size: 11px;
-        margin-top: 6px;
+        font-size: 12px;
+        margin-top: 8px;
         font-weight: 600;
       }
       .alert-box {
-        padding: 12px 14px;
-        border-radius: 12px;
-        font-size: 12px;
-        line-height: 1.4;
+        padding: 14px 16px;
+        border-radius: 14px;
+        font-size: 13px;
+        line-height: 1.5;
         display: flex;
         flex-direction: column;
-        gap: 4px;
+        gap: 6px;
         background: rgba(255, 255, 255, 0.02);
         border: 1px solid rgba(255, 255, 255, 0.06);
       }
@@ -1962,9 +1964,10 @@ class MultizoneThermostatPlantCard extends HTMLElement {
       }
       .alert-title {
         font-weight: 700;
+        font-size: 14px;
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 8px;
       }
     `;
 
@@ -2007,8 +2010,8 @@ class MultizoneThermostatPlantCard extends HTMLElement {
       </div>
 
       <div class="alert-box alert-ok" id="alert-box">
-        <div class="alert-title">
-          <ha-icon icon="mdi:check-circle-outline" style="--mdc-icon-size: 16px;"></ha-icon>
+        <div class="alert-title" id="alert-title-wrap">
+          <ha-icon icon="mdi:check-circle-outline" style="--mdc-icon-size: 18px; color: #34d399;"></ha-icon>
           <span>Tutti i circuiti operativi</span>
         </div>
         <div id="alert-desc">Nessun blocco valvola, trafilamento o short-cycling rilevato.</div>
@@ -2157,41 +2160,42 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
         margin-bottom: 12px;
       }
       .zone-name {
-        font-size: 16px;
-        font-weight: 700;
+        font-size: 19px;
+        font-weight: 800;
         margin: 0;
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 8px;
       }
       .zone-mode-badge {
-        font-size: 9px;
+        font-size: 10px;
         font-weight: 800;
-        padding: 2px 6px;
+        padding: 3px 8px;
         border-radius: 6px;
         text-transform: uppercase;
         background: rgba(59, 130, 246, 0.2);
         color: #60a5fa;
       }
       .zone-sub {
-        font-size: 11px;
+        font-size: 13px;
+        font-weight: 500;
         color: var(--secondary-text-color, #94a3b8);
-        margin-top: 2px;
+        margin-top: 3px;
       }
       .energy-badge {
-        padding: 4px 10px;
-        border-radius: 8px;
+        padding: 6px 12px;
+        border-radius: 10px;
         font-weight: 900;
-        font-size: 15px;
+        font-size: 17px;
         text-align: center;
         box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-        min-width: 38px;
+        min-width: 44px;
         background: #10b981;
         color: white;
       }
       .ribbon-scale {
         display: flex;
-        height: 5px;
+        height: 6px;
         border-radius: 3px;
         overflow: hidden;
         margin-bottom: 14px;
@@ -2220,55 +2224,56 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
       .stats-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 10px;
-        margin-bottom: 12px;
+        gap: 12px;
+        margin-bottom: 14px;
       }
       .stat-box {
         background: rgba(255, 255, 255, 0.03);
         border: 1px solid rgba(255, 255, 255, 0.05);
-        border-radius: 12px;
-        padding: 10px;
+        border-radius: 14px;
+        padding: 12px 14px;
       }
       .stat-label {
-        font-size: 10px;
+        font-size: 12px;
+        font-weight: 600;
         color: var(--secondary-text-color, #94a3b8);
         display: block;
-        margin-bottom: 2px;
+        margin-bottom: 4px;
       }
       .stat-val {
-        font-size: 16px;
+        font-size: 20px;
         font-weight: 800;
         line-height: 1.2;
       }
       .stat-unit {
-        font-size: 10px;
+        font-size: 12px;
         color: var(--secondary-text-color, #94a3b8);
-        font-weight: 500;
+        font-weight: 600;
         margin-left: 2px;
       }
       .stat-eval {
-        font-size: 10px;
-        margin-top: 3px;
+        font-size: 12px;
+        margin-top: 4px;
         font-weight: 600;
         display: block;
       }
       .bottom-row {
-        padding-top: 10px;
+        padding-top: 12px;
         border-top: 1px solid rgba(255, 255, 255, 0.06);
         display: flex;
         align-items: center;
         justify-content: space-between;
-        font-size: 11px;
+        font-size: 13px;
       }
       .valve-status {
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 8px;
         font-weight: 600;
       }
       .pulse-dot {
-        width: 7px;
-        height: 7px;
+        width: 8px;
+        height: 8px;
         border-radius: 50%;
       }
       .pulse-green { background: #10b981; }
@@ -2426,9 +2431,12 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
         } else if (sState.state === "Sottodimensionato") {
           sizingEval.innerText = "Richiede tempo per salire";
           sizingEval.style.color = "#f87171";
-        } else {
+        } else if (sState.state === "Sovradimensionato") {
           sizingEval.innerText = "Potenza elevata";
           sizingEval.style.color = "#fbbf24";
+        } else {
+          sizingEval.innerText = "In attesa dati termici";
+          sizingEval.style.color = "#94a3b8";
         }
       }
     }
