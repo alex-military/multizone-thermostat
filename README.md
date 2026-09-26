@@ -31,7 +31,17 @@ A custom integration for Home Assistant that provides **multi-zone heating manag
 - 🔥 **OpenTherm Hybrid Support** — Dual-drive support for traditional ON/OFF Relays and OpenTherm modulating gateways, mapping house Heat Demand % directly to boiler water flow temperature.
 - 🔍 **System Diagnostics & Anomaly Detection** — Automatic detection of mechanical/hydraulic anomalies (stuck valves, ghost heating leakage, air in radiator, stale sensor) with dedicated problem binary sensors.
 - ⚡ **Building Energy Efficiency Metrics** — Evaluates theoretical room energy efficiency class (A4 to G), thermal retention time (hours to lose 1°C), radiator sizing evaluation, and boiler cycle health.
-- 🎨 **4 Custom Lovelace Cards** — Master status card, circular dial card, compact button card, and global preset card — all auto-registered
+- 🎨 **6 Custom Lovelace Cards** — Master status card, circular dial card, compact button card, global preset card, central plant health card, and zone energy efficiency card — all auto-registered.
+
+## 📊 Plant Diagnostics & Building Efficiency (v4.5+)
+
+Multizone Thermostat continuously monitors the hydraulic and thermal health of your home:
+
+- **Central Plant Health**: Tracks hourly boiler cycling to prevent short-cycling wear, monitors 24h cumulative runtime, and displays real-time reasons for boiler states.
+- **Hydraulic Anomaly Engine**: Automatically detects mechanical faults like stuck closed valves, ghost heating leakage, and sensor lag, issuing native Home Assistant persistent notifications.
+- **Energy Classes & Thermal Retention**: Continuously estimates each room's theoretical European energy class (A4 through G) and cooling retention time (hours needed to drop 1°C).
+- **Interactive Smarthome UI**: Click directly on the zone badge (`PRIMARIA`, `SECONDARIA`, `BYPASSATA`) to cycle modes, or click the valve status footer to toggle **Apporto Passivo** (passive heat intake) for open lofts or fan coils without shutoff valves.
+- 🌐 **[Test the Live Interactive Diagnostics Demo](examples/diagnostics_demo.html)** directly in your browser.
 
 ## 🔥 OpenTherm Hybrid Support
 

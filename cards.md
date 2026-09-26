@@ -142,6 +142,8 @@ A card designed to display the building energy efficiency metrics for a specific
 - **Thermal Retention Time**: Displays hours needed for the room to lose $1.0^\circ\text{C}$.
 - **Radiator Sizing**: Evaluates whether the heating emitter is optimal, undersized, or oversized.
 - **Mechanical Valve Surveillance**: Alerts in real-time if a valve is stuck closed or leaking heat.
+- **Interactive Mode Switching**: Click directly on the `PRIMARIA`, `SECONDARIA`, or `BYPASSATA` badge to cycle the zone mode on the fly.
+- **Interactive Passive Heat Switch**: Click directly on the valve status footer to toggle **Apporto Passivo** (passive heat intake) for rooms like open lofts or fan coils without cutoff valves.
 
 ```yaml
 type: custom:multizone-thermostat-zone-energy-card
@@ -164,5 +166,17 @@ views:
       columns: 3 # (Optional: default 3)
 ```
 
+---
+
+## 🌟 Live Interactive Demo
+
+You can preview and test the complete modern glassmorphic diagnostic dashboard in your web browser:
+- Open [`examples/diagnostics_demo.html`](examples/diagnostics_demo.html) directly in any browser to interactively simulate:
+  - **Normal Operation**: optimal health, low short-cycling frequency, healthy valves.
+  - **High Short-Cycling Warning**: boiler cycle wear alerts and mitigation hints.
+  - **Stuck Valve Anomaly**: critical red alert when a room demands heat but radiator stays cold.
+  - **Passive Heat Intake (Soppalco / Fancoil)**: valve bypass and passive heat tracking.
+
 > **Note**: If you installed via HACS, the Lovelace card resource is registered automatically. If cards don't appear, add the resource manually:
 > Go to **Settings → Dashboards → Resources** → Add `/multizone_thermostat_card/multizone-thermostat-card.js` as **JavaScript Module**.
+

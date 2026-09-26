@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Home HVAC Diagnostics & Building Energy - Multizone Thermostat v4.5.7</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @keyframes pulse-glow {
+      0%, 100% { opacity: 0.4; transform: scale(1); }
+      50% { opacity: 0.9; transform: scale(1.06); }
+    }
+    @keyframes flame-wave {
+      0%, 100% { transform: translateY(0px) rotate(0deg); }
+      50% { transform: translateY(-2px) rotate(3deg); }
+    }
+    .glow-pulse { animation: pulse-glow 3s infinite ease-in-out; }
+    .flame-anim { animation: flame-wave 1.8s infinite ease-in-out; }
+    
+    .glass-panel {
+      background: var(--ha-card-background, rgba(30, 41, 59, 0.7));
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    }
+    .glass-card-subtle {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    /* European Energy Class Colors */
+    .c-A4 { background-color: #00873d; color: white; }
+    .c-A  { background-color: #139f37; color: white; }
+    .c-B  { background-color: #55b726; color: white; }
+    .c-C  { background-color: #96c818; color: #111; }
+    .c-D  { background-color: #e0d100; color: #111; }
+    .c-E  { background-color: #f39200; color: white; }
+    .c-F  { background-color: #e64213; color: white; }
+    .c-G  { background-color: #cb0019; color: white; }
+
+    .pulse-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+    }
+    .pulse-green { background: #10b981; }
+    .pulse-red { background: #ef4444; animation: blink 1s infinite; }
+    .pulse-amber { background: #f59e0b; animation: blink 1.5s infinite; }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 antialiased p-3 sm:p-6 font-sans min-h-screen">
+  <div class="max-w-6xl mx-auto space-y-6">
+
+    <!-- Top Navigation & Interactive Simulator Bar -->
+    <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-5 rounded-3xl glass-panel shadow-2xl">
+      <div class="flex items-center gap-3">
+        <div class="relative">
+          <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white shadow-lg shadow-cyan-500/25">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          </div>
+          <span class="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-slate-950"></span>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-xl font-extrabold tracking-tight">Multizone Thermostat</h1>
+            <span class="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 uppercase tracking-wider">v4.5.7 Live Demo</span>
+          </div>
+          <p class="text-xs text-slate-400">Diagnostica Impianto & Involucro Edilizio ad Alta Risoluzione</p>
+        </div>
+      </div>
+
+      <!-- State Simulator Pills -->
+      <div class="flex flex-wrap items-center gap-1.5 p-1 rounded-2xl bg-slate-900/90 border border-slate-800 text-xs self-start sm:self-auto">
+        <span class="px-2.5 text-slate-400 font-medium">Scenari:</span>
+        <button onclick="setScenario('normal')" id="btn-normal" class="px-3 py-1.5 rounded-xl font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-sm transition-all">Tutto Normale</button>
+        <button onclick="setScenario('high_cycle')" id="btn-cycle" class="px-3 py-1.5 rounded-xl font-medium text-slate-400 hover:text-slate-200 transition-all">Allerta Cicli</button>
+        <button onclick="setScenario('stuck_valve')" id="btn-stuck" class="px-3 py-1.5 rounded-xl font-medium text-slate-400 hover:text-slate-200 transition-all">Valvola Bloccata</button>
+        <button onclick="setScenario('passive_heat')" id="btn-passive" class="px-3 py-1.5 rounded-xl font-medium text-slate-400 hover:text-slate-200 transition-all">Soppalco / Fancoil</button>
+      </div>
+    </header>
+
+    <!-- Top Card: MultizoneThermostatPlantCard -->
+    <div id="plant-card" class="rounded-3xl glass-panel p-6 relative overflow-hidden flex flex-col justify-between shadow-2xl border border-emerald-500/20">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/5">
+        <div class="flex items-center gap-3">
+          <div class="w-12 h-12 rounded-2xl bg-sky-500/15 text-sky-400 flex items-center justify-center shrink-0">
+            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+          </div>
+          <div>
+            <h2 class="text-xl font-black text-slate-100 leading-tight">Salute Impianto & Caldaia</h2>
+            <p class="text-xs text-slate-400 mt-0.5">Supervisione idraulica, anti-trafilamento e usura relè</p>
+          </div>
+        </div>
+
+        <div id="health-badge" class="px-4 py-1.5 rounded-full text-xs font-black tracking-wider bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-2 self-start sm:self-auto">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span id="health-text">OTTIMALE</span>
+        </div>
+      </div>
+
+      <!-- KPI Grid -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 my-5">
+        <div class="glass-card-subtle p-4 rounded-2xl">
+          <span class="text-xs font-semibold text-slate-400 block mb-1">Frequenza Accensioni (Short-Cycle)</span>
+          <div class="flex items-baseline gap-2">
+            <span id="cycles-val" class="text-3xl font-black text-slate-100">1.8</span>
+            <span class="text-xs font-semibold text-slate-400">cicli/h</span>
+          </div>
+          <div id="cycles-sub" class="text-xs font-semibold text-emerald-400 mt-2">Usura Bassa (&lt; 3.5 c/h)</div>
+        </div>
+
+        <div class="glass-card-subtle p-4 rounded-2xl">
+          <span class="text-xs font-semibold text-slate-400 block mb-1">Funzionamento Ultime 24h</span>
+          <div class="flex items-baseline gap-2">
+            <span id="runtime-val" class="text-3xl font-black text-blue-400">4.2</span>
+            <span class="text-xs font-semibold text-slate-400">ore</span>
+          </div>
+          <div class="text-xs font-semibold text-slate-400 mt-2">Attività cumulativa relè / mandata</div>
+        </div>
+      </div>
+
+      <!-- Dynamic Alert Box -->
+      <div id="alert-box" class="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs flex flex-col gap-1">
+        <div class="font-bold flex items-center gap-2 text-sm text-emerald-400">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+          <span id="alert-title">Tutti i circuiti operativi</span>
+        </div>
+        <div id="alert-desc" class="text-slate-300">Nessun blocco valvola, trafilamento o short-cycling rilevato.</div>
+      </div>
+    </div>
+
+    <!-- Section Heading -->
+    <div class="flex items-center justify-between pt-2">
+      <div>
+        <h3 class="text-lg font-black text-slate-100 flex items-center gap-2">
+          <span>Stanze & Efficienza Involucro</span>
+          <span class="text-xs font-normal text-slate-400">(Clicca sul badge modalità per cambiare Primaria/Bypass, o su Stato Valvola per commutare l'Apporto Passivo)</span>
+        </h3>
+      </div>
+      <span class="text-xs text-slate-400 hidden sm:inline-block font-mono">Lovelace Auto-Layout</span>
+    </div>
+
+    <!-- 4 Zone Energy Cards Grid (v4.5.7 High Legibility Design) -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+
+      <!-- Card 1: Soggiorno -->
+      <div class="rounded-3xl glass-panel p-5 relative overflow-hidden flex flex-col justify-between space-y-4">
+        <div class="flex items-start justify-between">
+          <div>
+            <div class="flex items-center gap-2">
+              <h4 class="text-xl font-black text-slate-100">Soggiorno</h4>
+              <button onclick="cycleMode('soggiorno')" id="mode-soggiorno" class="zone-mode-badge text-[11px] font-extrabold px-2.5 py-1 rounded-md bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:opacity-80 transition-all uppercase" title="Clicca per cambiare modalità">PRIMARIA</button>
+            </div>
+            <div id="temp-soggiorno" class="text-sm font-medium text-slate-400 mt-1">20.4°C / target 20.5°C</div>
+          </div>
+          <div class="c-A px-3.5 py-1.5 rounded-xl shadow-lg text-center font-black text-lg min-w-[48px]">A</div>
+        </div>
+
+        <div class="flex items-center gap-0.5 h-1.5 rounded-full overflow-hidden opacity-85">
+          <div class="h-full flex-1 bg-[#00873d]"></div>
+          <div class="h-full flex-1 bg-[#139f37] ring-2 ring-white scale-y-150 shadow-sm"></div>
+          <div class="h-full flex-1 bg-[#55b726]"></div>
+          <div class="h-full flex-1 bg-[#96c818]"></div>
+          <div class="h-full flex-1 bg-[#e0d100]"></div>
+          <div class="h-full flex-1 bg-[#f39200]"></div>
+          <div class="h-full flex-1 bg-[#e64213]"></div>
+          <div class="h-full flex-1 bg-[#cb0019]"></div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 text-xs">
+          <div class="p-3 rounded-2xl glass-card-subtle">
+            <span class="text-xs font-semibold text-slate-400 block mb-1">Ritenzione (-1°C)</span>
+            <div class="text-2xl font-black text-sky-400 leading-tight">7.8 <span class="text-xs text-slate-400 font-semibold">ore</span></div>
+            <span class="text-xs font-semibold text-sky-300 mt-1 block">Ottimo isolamento</span>
+          </div>
+          <div class="p-3 rounded-2xl glass-card-subtle">
+            <span class="text-xs font-semibold text-slate-400 block mb-1">Resa Termoarredo</span>
+            <div class="text-2xl font-black text-emerald-400 leading-tight">Ottimale</div>
+            <span class="text-xs font-semibold text-emerald-400 mt-1 block">Rapporto OK</span>
+          </div>
+        </div>
+
+        <div class="pt-3 border-t border-white/5 flex items-center justify-between text-sm">
+          <span class="text-slate-400 text-xs">Stato Valvola:</span>
+          <div class="flex items-center gap-2 font-semibold text-emerald-400 text-xs cursor-pointer" onclick="togglePassive('soggiorno')" title="Clicca per invertire apporto passivo">
+            <span class="pulse-dot pulse-green"></span>
+            <span id="valve-soggiorno">Nessuna anomalia</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2: Cucina -->
+      <div class="rounded-3xl glass-panel p-5 relative overflow-hidden flex flex-col justify-between space-y-4">
+        <div class="flex items-start justify-between">
+          <div>
+            <div class="flex items-center gap-2">
+              <h4 class="text-xl font-black text-slate-100">Cucina</h4>
+              <button onclick="cycleMode('cucina')" id="mode-cucina" class="zone-mode-badge text-[11px] font-extrabold px-2.5 py-1 rounded-md bg-purple-500/20 text-purple-400 border border-purple-500/30 hover:opacity-80 transition-all uppercase" title="Clicca per cambiare modalità">SECONDARIA</button>
+            </div>
+            <div id="temp-cucina" class="text-sm font-medium text-slate-400 mt-1">19.8°C / target 20.0°C</div>
+          </div>
+          <div class="c-B px-3.5 py-1.5 rounded-xl shadow-lg text-center font-black text-lg min-w-[48px]">B</div>
+        </div>
+
+        <div class="flex items-center gap-0.5 h-1.5 rounded-full overflow-hidden opacity-85">
+          <div class="h-full flex-1 bg-[#00873d]"></div>
+          <div class="h-full flex-1 bg-[#139f37]"></div>
+          <div class="h-full flex-1 bg-[#55b726] ring-2 ring-white scale-y-150 shadow-sm"></div>
+          <div class="h-full flex-1 bg-[#96c818]"></div>
+          <div class="h-full flex-1 bg-[#e0d100]"></div>
+          <div class="h-full flex-1 bg-[#f39200]"></div>
+          <div class="h-full flex-1 bg-[#e64213]"></div>
+          <div class="h-full flex-1 bg-[#cb0019]"></div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 text-xs">
+          <div class="p-3 rounded-2xl glass-card-subtle">
+            <span class="text-xs font-semibold text-slate-400 block mb-1">Ritenzione (-1°C)</span>
+            <div class="text-2xl font-black text-sky-400 leading-tight">5.4 <span class="text-xs text-slate-400 font-semibold">ore</span></div>
+            <span class="text-xs font-semibold text-sky-300 mt-1 block">Isolamento medio</span>
+          </div>
+          <div class="p-3 rounded-2xl glass-card-subtle">
+            <span class="text-xs font-semibold text-slate-400 block mb-1">Resa Termoarredo</span>
+            <div class="text-2xl font-black text-emerald-400 leading-tight">Ottimale</div>
+            <span class="text-xs font-semibold text-emerald-400 mt-1 block">Rapporto OK</span>
+          </div>
+        </div>
+
+        <div class="pt-3 border-t border-white/5 flex items-center justify-between text-sm">
+          <span class="text-slate-400 text-xs">Stato Valvola:</span>
+          <div class="flex items-center gap-2 font-semibold text-emerald-400 text-xs cursor-pointer" onclick="togglePassive('cucina')" title="Clicca per invertire apporto passivo">
+            <span class="pulse-dot pulse-green"></span>
+            <span id="valve-cucina">Nessuna anomalia</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3: Camera Soppalco (Fancoil senza valvola) -->
+      <div id="card-soppalco1" class="rounded-3xl glass-panel p-5 relative overflow-hidden flex flex-col justify-between space-y-4">
+        <div class="flex items-start justify-between">
+          <div>
+            <div class="flex items-center gap-2">
+              <h4 class="text-xl font-black text-slate-100">Camera Soppalco</h4>
+              <button onclick="cycleMode('soppalco1')" id="mode-soppalco1" class="zone-mode-badge text-[11px] font-extrabold px-2.5 py-1 rounded-md bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:opacity-80 transition-all uppercase" title="Clicca per cambiare modalità">PRIMARIA</button>
+            </div>
+            <div id="temp-soppalco1" class="text-sm font-medium text-slate-400 mt-1">21.1°C / target 20.0°C</div>
+          </div>
+          <div class="c-C px-3.5 py-1.5 rounded-xl shadow-lg text-center font-black text-lg min-w-[48px]">C</div>
+        </div>
+
+        <div class="flex items-center gap-0.5 h-1.5 rounded-full overflow-hidden opacity-85">
+          <div class="h-full flex-1 bg-[#00873d]"></div>
+          <div class="h-full flex-1 bg-[#139f37]"></div>
+          <div class="h-full flex-1 bg-[#55b726]"></div>
+          <div class="h-full flex-1 bg-[#96c818] ring-2 ring-white scale-y-150 shadow-sm"></div>
+          <div class="h-full flex-1 bg-[#e0d100]"></div>
+          <div class="h-full flex-1 bg-[#f39200]"></div>
+          <div class="h-full flex-1 bg-[#e64213]"></div>
+          <div class="h-full flex-1 bg-[#cb0019]"></div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 text-xs">
+          <div class="p-3 rounded-2xl glass-card-subtle">
+            <span class="text-xs font-semibold text-slate-400 block mb-1">Ritenzione (-1°C)</span>
+            <div class="text-2xl font-black text-sky-400 leading-tight">3.8 <span class="text-xs text-slate-400 font-semibold">ore</span></div>
+            <span class="text-xs font-semibold text-sky-300 mt-1 block">Isolamento medio</span>
+          </div>
+          <div class="p-3 rounded-2xl glass-card-subtle">
+            <span class="text-xs font-semibold text-slate-400 block mb-1">Resa Termoarredo</span>
+            <div class="text-2xl font-black text-amber-400 leading-tight">Sovradimensionato</div>
+            <span class="text-xs font-semibold text-amber-300 mt-1 block">Potenza elevata</span>
+          </div>
+        </div>
+
+        <div class="pt-3 border-t border-white/5 flex items-center justify-between text-sm">
+          <span class="text-slate-400 text-xs">Stato Valvola:</span>
+          <div class="flex items-center gap-2 font-semibold text-emerald-400 text-xs cursor-pointer" onclick="togglePassive('soppalco1')" title="Clicca per attivare/disattivare Apporto Passivo">
+            <span class="pulse-dot pulse-green" id="dot-soppalco1"></span>
+            <span id="valve-soppalco1">Apporto passivo attivo</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 4: Camera Soppalco 2 (Bypassata) -->
+      <div id="card-soppalco2" class="rounded-3xl glass-panel p-5 relative overflow-hidden flex flex-col justify-between space-y-4">
+        <div class="flex items-start justify-between">
+          <div>
+            <div class="flex items-center gap-2">
+              <h4 class="text-xl font-black text-slate-100">Camera Soppalco 2</h4>
+              <button onclick="cycleMode('soppalco2')" id="mode-soppalco2" class="zone-mode-badge text-[11px] font-extrabold px-2.5 py-1 rounded-md bg-slate-500/20 text-slate-400 border border-slate-500/30 hover:opacity-80 transition-all uppercase" title="Clicca per cambiare modalità">BYPASSATA</button>
+            </div>
+            <div id="temp-soppalco2" class="text-sm font-medium text-slate-400 mt-1">21.4°C / (Bypassata)</div>
+          </div>
+          <div class="c-D px-3.5 py-1.5 rounded-xl shadow-lg text-center font-black text-lg min-w-[48px]">D</div>
+        </div>
+
+        <div class="flex items-center gap-0.5 h-1.5 rounded-full overflow-hidden opacity-85">
+          <div class="h-full flex-1 bg-[#00873d]"></div>
+          <div class="h-full flex-1 bg-[#139f37]"></div>
+          <div class="h-full flex-1 bg-[#55b726]"></div>
+          <div class="h-full flex-1 bg-[#96c818]"></div>
+          <div class="h-full flex-1 bg-[#e0d100] ring-2 ring-white scale-y-150 shadow-sm"></div>
+          <div class="h-full flex-1 bg-[#f39200]"></div>
+          <div class="h-full flex-1 bg-[#e64213]"></div>
+          <div class="h-full flex-1 bg-[#cb0019]"></div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 text-xs">
+          <div class="p-3 rounded-2xl glass-card-subtle">
+            <span class="text-xs font-semibold text-slate-400 block mb-1">Ritenzione (-1°C)</span>
+            <div class="text-2xl font-black text-amber-400 leading-tight">2.9 <span class="text-xs text-slate-400 font-semibold">ore</span></div>
+            <span class="text-xs font-semibold text-amber-300 mt-1 block">Dispersione rapida</span>
+          </div>
+          <div class="p-3 rounded-2xl glass-card-subtle">
+            <span class="text-xs font-semibold text-slate-400 block mb-1">Resa Termoarredo</span>
+            <div class="text-2xl font-black text-emerald-400 leading-tight">Ottimale</div>
+            <span class="text-xs font-semibold text-emerald-400 mt-1 block">Rapporto OK</span>
+          </div>
+        </div>
+
+        <div class="pt-3 border-t border-white/5 flex items-center justify-between text-sm">
+          <span class="text-slate-400 text-xs">Stato Valvola:</span>
+          <div class="flex items-center gap-2 font-semibold text-slate-400 text-xs cursor-pointer" onclick="togglePassive('soppalco2')" title="Clicca per invertire apporto passivo">
+            <span class="pulse-dot pulse-green" id="dot-soppalco2"></span>
+            <span id="valve-soppalco2">Valvola Chiusa (Bypass)</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    // State management for zones
+    const zoneStates = {
+      soggiorno: { mode: 'primary', passive: false, temp: 20.4, target: 20.5 },
+      cucina: { mode: 'secondary', passive: false, temp: 19.8, target: 20.0 },
+      soppalco1: { mode: 'primary', passive: true, temp: 21.1, target: 20.0 },
+      soppalco2: { mode: 'bypass', passive: false, temp: 21.4, target: 20.0 }
+    };
+
+    function updateZoneUI(zoneKey) {
+      const z = zoneStates[zoneKey];
+      const modeBtn = document.getElementById(`mode-${zoneKey}`);
+      const tempEl = document.getElementById(`temp-${zoneKey}`);
+      const valveEl = document.getElementById(`valve-${zoneKey}`);
+      const dotEl = document.getElementById(`dot-${zoneKey}`);
+
+      if (modeBtn) {
+        if (z.mode === 'primary') {
+          modeBtn.innerText = 'PRIMARIA';
+          modeBtn.className = 'zone-mode-badge text-[11px] font-extrabold px-2.5 py-1 rounded-md bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:opacity-80 transition-all uppercase';
+        } else if (z.mode === 'secondary') {
+          modeBtn.innerText = 'SECONDARIA';
+          modeBtn.className = 'zone-mode-badge text-[11px] font-extrabold px-2.5 py-1 rounded-md bg-purple-500/20 text-purple-400 border border-purple-500/30 hover:opacity-80 transition-all uppercase';
+        } else {
+          modeBtn.innerText = 'BYPASSATA';
+          modeBtn.className = 'zone-mode-badge text-[11px] font-extrabold px-2.5 py-1 rounded-md bg-slate-500/25 text-slate-400 border border-slate-500/30 hover:opacity-80 transition-all uppercase';
+        }
+      }
+
+      if (tempEl) {
+        if (z.mode === 'bypass') {
+          tempEl.innerText = `${z.temp}°C / (Bypassata)`;
+        } else {
+          tempEl.innerText = `${z.temp}°C / target ${z.target}°C`;
+        }
+      }
+
+      if (valveEl) {
+        if (z.mode === 'bypass') {
+          valveEl.innerText = z.passive ? 'Valvola Chiusa (Apporto passivo attivo)' : 'Valvola Chiusa (Bypass)';
+          valveEl.style.color = '#94a3b8';
+        } else {
+          valveEl.innerText = z.passive ? 'Nessuna anomalia (Apporto passivo attivo)' : 'Nessuna anomalia';
+          valveEl.style.color = '#34d399';
+        }
+      }
+    }
+
+    function cycleMode(zoneKey) {
+      const modes = ['primary', 'secondary', 'bypass'];
+      const cur = zoneStates[zoneKey].mode;
+      const nextIdx = (modes.indexOf(cur) + 1) % modes.length;
+      zoneStates[zoneKey].mode = modes[nextIdx];
+      updateZoneUI(zoneKey);
+    }
+
+    function togglePassive(zoneKey) {
+      zoneStates[zoneKey].passive = !zoneStates[zoneKey].passive;
+      updateZoneUI(zoneKey);
+    }
+
+    function setScenario(scen) {
+      const hero = document.getElementById('plant-card');
+      const badge = document.getElementById('health-badge');
+      const text = document.getElementById('health-text');
+      const cyclesVal = document.getElementById('cycles-val');
+      const cyclesSub = document.getElementById('cycles-sub');
+      const alertBox = document.getElementById('alert-box');
+      const alertTitle = document.getElementById('alert-title');
+      const alertDesc = document.getElementById('alert-desc');
+
+      // Reset buttons
+      ['btn-normal', 'btn-cycle', 'btn-stuck', 'btn-passive'].forEach(id => {
+        document.getElementById(id).className = "px-3 py-1.5 rounded-xl font-medium text-slate-400 hover:text-slate-200 transition-all";
+      });
+
+      if (scen === 'normal') {
+        document.getElementById('btn-normal').className = "px-3 py-1.5 rounded-xl font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-sm transition-all";
+        hero.className = "rounded-3xl glass-panel p-6 relative overflow-hidden flex flex-col justify-between shadow-2xl border border-emerald-500/20";
+        badge.className = "px-4 py-1.5 rounded-full text-xs font-black tracking-wider bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-2 self-start sm:self-auto";
+        text.innerText = "OTTIMALE";
+        cyclesVal.innerText = "1.8";
+        cyclesSub.innerText = "Usura Bassa (< 3.5 c/h)";
+        cyclesSub.className = "text-xs font-semibold text-emerald-400 mt-2";
+        alertBox.className = "p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs flex flex-col gap-1";
+        alertTitle.innerText = "Tutti i circuiti operativi";
+        alertDesc.innerText = "Nessun blocco valvola, trafilamento o short-cycling rilevato.";
+      }
+      else if (scen === 'high_cycle') {
+        document.getElementById('btn-cycle').className = "px-3 py-1.5 rounded-xl font-bold bg-amber-500/20 text-amber-400 border border-amber-500/40 shadow-sm transition-all";
+        hero.className = "rounded-3xl glass-panel p-6 relative overflow-hidden flex flex-col justify-between shadow-2xl border border-amber-500/30";
+        badge.className = "px-4 py-1.5 rounded-full text-xs font-black tracking-wider bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center gap-2 self-start sm:self-auto";
+        text.innerText = "ATTENZIONE";
+        cyclesVal.innerText = "5.8";
+        cyclesSub.innerText = "⚠️ Short-Cycling Elevato (> 5 c/h)";
+        cyclesSub.className = "text-xs font-semibold text-rose-400 mt-2";
+        alertBox.className = "p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex flex-col gap-1";
+        alertTitle.innerText = "Avviso Efficienza Caldaia";
+        alertDesc.innerText = "Attenzione: frequenza di accensioni caldaia elevata (5.8 cicli/h). Si consiglia di aumentare il parametro Anti-Cycle Min Off Time nei numeri di configurazione.";
+      }
+      else if (scen === 'stuck_valve') {
+        document.getElementById('btn-stuck').className = "px-3 py-1.5 rounded-xl font-bold bg-rose-500/20 text-rose-400 border border-rose-500/40 shadow-sm transition-all";
+        hero.className = "rounded-3xl glass-panel p-6 relative overflow-hidden flex flex-col justify-between shadow-2xl border border-rose-500/40";
+        badge.className = "px-4 py-1.5 rounded-full text-xs font-black tracking-wider bg-rose-500/20 text-rose-400 border border-rose-500/40 flex items-center gap-2 self-start sm:self-auto";
+        text.innerText = "CRITICO";
+        alertBox.className = "p-4 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-200 text-xs flex flex-col gap-1";
+        alertTitle.innerText = "Anomalia Meccanica / Idraulica Rilevata";
+        alertDesc.innerHTML = "• <b>Camera Soppalco</b>: Valvola probabilmente bloccata chiusa (richiesta 100% da &gt; 60m con caldaia ON, ma temperatura non sale).";
+      }
+      else if (scen === 'passive_heat') {
+        document.getElementById('btn-passive').className = "px-3 py-1.5 rounded-xl font-bold bg-sky-500/20 text-sky-400 border border-sky-500/40 shadow-sm transition-all";
+        zoneStates.soppalco1.passive = true;
+        zoneStates.soppalco2.mode = 'bypass';
+        zoneStates.soppalco2.passive = true;
+        updateZoneUI('soppalco1');
+        updateZoneUI('soppalco2');
+        alertBox.className = "p-4 rounded-2xl bg-sky-500/10 border border-sky-500/20 text-sky-300 text-xs flex flex-col gap-1";
+        alertTitle.innerText = "Gestione Soppalchi & Fancoil Attiva";
+        alertDesc.innerText = "L'apporto passivo di calore è attivo: il sistema non segnalerà falsi allarmi di trafilamento se la temperatura sale con valvola chiusa.";
+      }
+    }
+  </script>
+</body>
+</html>
