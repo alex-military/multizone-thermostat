@@ -83,6 +83,8 @@ from .const import (
     KEY_FROST_PROTECTION_TEMP,
     DEFAULT_FROST_PROTECTION_TEMP,
     DEFAULT_ANTI_FROST_ENABLED,
+    KEY_PASSIVE_HEAT_PREFIX,
+    CONF_ZONE_ALLOW_PASSIVE_HEAT,
 )
 from .pwm_engine import PWMEngine
 from .thermal_model import ThermalObserver
@@ -231,6 +233,17 @@ class MultizoneCoordinator:
         """Set a persistent setting."""
         self._settings[key] = value
         await self._settings_store.async_save(self._settings)
+
+    def is_passive_heat_allowed(self, climate_id: str) -> bool:
+        """Return True if passive heat is allowed dynamically or via zone config."""
+        for z in self.zones:
+            if make_zone_entity_id(z.get(CONF_ZONE_NAME, "")) == climate_id:
+                safe_name = z[CONF_ZONE_NAME].lower().replace(" ", "_").replace("-", "_")
+                safe_name = "".join(c for c in safe_name if c.isalnum() or c == "_")
+                key = f"{KEY_PASSIVE_HEAT_PREFIX}{safe_name}"
+                default_val = bool(z.get(CONF_ZONE_ALLOW_PASSIVE_HEAT, False))
+                return bool(self.get_persistent_data(key, default_val))
+        return False
 
     async def async_load_storage(self) -> None:
         """Load stored window states and presets."""

@@ -167,12 +167,8 @@ class PlantDiagnosticsEngine:
                 state["high_demand_start_time"] = None
                 state["high_demand_start_temp"] = None
 
-            # Lookup zone configuration to check if passive heat is expected
-            allow_passive_heat = False
-            for z in getattr(self.coordinator, "zones", []):
-                if make_zone_entity_id(z.get(CONF_ZONE_NAME, "")) == climate_id:
-                    allow_passive_heat = bool(z.get(CONF_ZONE_ALLOW_PASSIVE_HEAT, False))
-                    break
+            # Check if passive heat is allowed (via dynamic switch or zone config)
+            allow_passive_heat = self.coordinator.is_passive_heat_allowed(climate_id)
 
             # 4. Ghost Heating / Stuck Open: Zone is OFF or demand is 0, but room temp rose > 0.8°C while boiler running
             if demand <= 0.0 and boiler_on:

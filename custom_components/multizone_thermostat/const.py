@@ -113,6 +113,9 @@ DEFAULT_ANTI_FROST_ENABLED = True
 # Persistent State Keys (Physical Sync Switch per Zone)
 KEY_PHYSICAL_SYNC_PREFIX = "physical_sync_"
 
+# Persistent State Keys (Passive Heat Switch per Zone)
+KEY_PASSIVE_HEAT_PREFIX = "passive_heat_"
+
 
 def make_zone_entity_id(name: str) -> str:
     """Generate a predictable entity_id for a zone master thermostat."""

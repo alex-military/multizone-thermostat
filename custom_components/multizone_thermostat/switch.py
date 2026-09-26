@@ -21,6 +21,7 @@ from .const import (
     KEY_ANTI_FROST_ENABLED,
     DEFAULT_ANTI_FROST_ENABLED,
     KEY_PHYSICAL_SYNC_PREFIX,
+    KEY_PASSIVE_HEAT_PREFIX,
     CONF_ZONES,
     CONF_ZONE_NAME,
     CONF_ZONE_CLIMATES,
@@ -62,9 +63,11 @@ async def async_setup_entry(
     # Per-Zone Physical Control Synchronization Switches (for zones with climates)
     zones = config_entry.data.get(CONF_ZONES, [])
     for zone in zones:
+        zone_name = zone[CONF_ZONE_NAME]
         if zone.get(CONF_ZONE_CLIMATES):
-            zone_name = zone[CONF_ZONE_NAME]
             entities.append(MultizonePhysicalSyncSwitch(coordinator, config_entry.entry_id, zone_name))
+        # Per-Zone Passive Heat Switch (Dynamic Toggle for fancoils without valves / mezzanines)
+        entities.append(MultizonePassiveHeatSwitch(coordinator, config_entry.entry_id, zone_name))
 
     async_add_entities(entities, True)
 
@@ -301,4 +304,46 @@ class MultizonePhysicalSyncSwitch(SwitchEntity):
         key = f"{KEY_PHYSICAL_SYNC_PREFIX}{self._safe_name}"
         await self._coordinator.async_set_persistent_data(key, False)
         self.async_write_ha_state()
+
+
+class MultizonePassiveHeatSwitch(SwitchEntity):
+    """Switch to dynamically enable/disable passive heat allowance for a zone (e.g. fancoil without valve or open mezzanine)."""
+
+    _attr_has_entity_name = True
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(self, coordinator: Any, entry_id: str, zone_name: str) -> None:
+        """Initialize per-zone passive heat switch."""
+        self._coordinator = coordinator
+        self._zone_name = zone_name
+        safe_name = zone_name.lower().replace(" ", "_").replace("-", "_")
+        safe_name = "".join(c for c in safe_name if c.isalnum() or c == "_")
+        self._safe_name = safe_name
+        self._climate_id = make_zone_entity_id(zone_name)
+        self._attr_unique_id = f"{DOMAIN}_{entry_id}_passive_heat_{safe_name}"
+        self._attr_name = f"Apporto Passivo {zone_name}"
+        self._attr_device_info = _make_device_info(entry_id, "zone_modes")
+
+    @property
+    def is_on(self) -> bool:
+        """Return true if passive heat is allowed for this zone."""
+        return self._coordinator.is_passive_heat_allowed(self._climate_id)
+
+    @property
+    def icon(self) -> str:
+        """Return dynamic icon based on state."""
+        return "mdi:radiator-disabled" if self.is_on else "mdi:radiator"
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Enable passive heat allowance."""
+        key = f"{KEY_PASSIVE_HEAT_PREFIX}{self._safe_name}"
+        await self._coordinator.async_set_persistent_data(key, True)
+        self.async_write_ha_state()
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Disable passive heat allowance."""
+        key = f"{KEY_PASSIVE_HEAT_PREFIX}{self._safe_name}"
+        await self._coordinator.async_set_persistent_data(key, False)
+        self.async_write_ha_state()
+
 
