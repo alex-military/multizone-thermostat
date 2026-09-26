@@ -43,6 +43,7 @@ from .const import (
     CONF_ZONE_TEMP_SENSOR,
     CONF_ZONE_TARGET_TEMP,
     CONF_ZONE_CALIBRATIONS,
+    CONF_ZONE_ALLOW_PASSIVE_HEAT,
     DOMAIN,
     make_zone_entity_id,
     KEY_PHYSICAL_SYNC_PREFIX,
@@ -101,6 +102,7 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         self._climates = zone_data.get(CONF_ZONE_CLIMATES, [])
         self._switches = zone_data.get(CONF_ZONE_SWITCHES, [])
         self._calibrations = zone_data.get(CONF_ZONE_CALIBRATIONS, {})
+        self._allow_passive_heat = bool(zone_data.get(CONF_ZONE_ALLOW_PASSIVE_HEAT, False))
         
         # State
         self._hvac_mode = HVACMode.OFF
@@ -196,6 +198,7 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             "local_pwm_active": self._local_pwm_state,
             "boiler_entity_id": self._coordinator.boiler_switch,
             "zone_mode": self._coordinator.get_zone_mode(self.entity_id),
+            "allow_passive_heat": self._allow_passive_heat,
         }
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:

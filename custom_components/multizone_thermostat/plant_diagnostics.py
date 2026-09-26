@@ -6,6 +6,8 @@ import time
 from typing import Any
 from collections import deque
 
+from .const import CONF_ZONE_NAME, CONF_ZONE_ALLOW_PASSIVE_HEAT, make_zone_entity_id
+
 _LOGGER = logging.getLogger(__name__)
 
 # Anomaly Types
@@ -43,7 +45,7 @@ class PlantDiagnosticsEngine:
         # Zone tracking state for anomalies
         self._zone_anomaly_state: dict[str, dict[str, Any]] = {}
         for zone in coordinator.zones:
-            climate_id = f"climate.multizone_thermostat_{zone['name'].lower().replace(' ', '_').replace('-', '_')}"
+            climate_id = make_zone_entity_id(zone[CONF_ZONE_NAME])
             self._zone_anomaly_state[climate_id] = {
                 "active_anomaly": ANOMALY_NONE,
                 "anomaly_details": "Nessuna anomalia rilevata",
@@ -165,9 +167,19 @@ class PlantDiagnosticsEngine:
                 state["high_demand_start_time"] = None
                 state["high_demand_start_temp"] = None
 
+            # Lookup zone configuration to check if passive heat is expected
+            allow_passive_heat = False
+            for z in getattr(self.coordinator, "zones", []):
+                if make_zone_entity_id(z.get(CONF_ZONE_NAME, "")) == climate_id:
+                    allow_passive_heat = bool(z.get(CONF_ZONE_ALLOW_PASSIVE_HEAT, False))
+                    break
+
             # 4. Ghost Heating / Stuck Open: Zone is OFF or demand is 0, but room temp rose > 0.8°C while boiler running
             if demand <= 0.0 and boiler_on:
-                if state["ghost_heat_start_temp"] is None:
+                if allow_passive_heat:
+                    # Passive heat allowed (fan coil without shut-off valve, open mezzanine, etc.)
+                    state["ghost_heat_start_temp"] = None
+                elif state["ghost_heat_start_temp"] is None:
                     state["ghost_heat_start_temp"] = current_temp
                 elif (current_temp - state["ghost_heat_start_temp"]) > 0.8:
                     state["active_anomaly"] = ANOMALY_GHOST_HEATING
@@ -278,7 +290,7 @@ class PlantDiagnosticsEngine:
         """
         anomalies_found = []
         for zone in self.coordinator.zones:
-            climate_id = f"climate.multizone_thermostat_{zone['name'].lower().replace(' ', '_').replace('-', '_')}"
+            climate_id = make_zone_entity_id(zone[CONF_ZONE_NAME])
             anomaly_type, desc = self.evaluate_zone_anomalies(climate_id)
             if anomaly_type != ANOMALY_NONE:
                 anomalies_found.append({

@@ -21,6 +21,7 @@ CONF_ZONE_TRV_SYNC = "trv_preset_sync"
 CONF_ZONE_WINDOW_SENSOR = "window_sensor"
 CONF_ZONE_ANTI_SEIZE = "anti_seize_zone_enable"
 CONF_ZONE_CALIBRATIONS = "calibrations"
+CONF_ZONE_ALLOW_PASSIVE_HEAT = "allow_passive_heat"
 CONF_GLOBAL_CALENDAR = "global_calendar"
 
 # Geofencing keys

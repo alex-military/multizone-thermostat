@@ -33,12 +33,14 @@
           "name": "Zone Name",
           "trv_preset_sync": "Enable TRV Preset Sync",
           "anti_seize_zone_enable": "Enable Anti-seize (Summer Protection) for this zone",
+          "allow_passive_heat": "Allow Passive Heat (Fancoil without valve / Mezzanine)",
           "window_sensor": "Window Sensor (Optional)"
         },
         "data_description": {
           "climate_entities": "The climate entity for this room/zone",
           "name": "A friendly name for this zone (pre-filled from climate entity name)",
           "trv_preset_sync": "Automatically sync preset mode when HVAC mode changes (for physical TRV valves)",
+          "allow_passive_heat": "Disables ghost heating anomaly detection if this zone naturally absorbs heat while idle (e.g. open loft/mezzanine or fancoil without a zone valve).",
           "window_sensor": "Automatically bypass the zone when this sensor is open"
         }
       },
@@ -130,12 +132,14 @@
           "name": "Zone Name",
           "trv_preset_sync": "Enable TRV Preset Sync",
           "anti_seize_zone_enable": "Enable Anti-seize (Summer Protection) for this zone",
+          "allow_passive_heat": "Allow Passive Heat (Fancoil without valve / Mezzanine)",
           "window_sensor": "Window Sensor (Optional)"
         },
         "data_description": {
           "climate_entities": "The climate entity for this room/zone",
           "name": "A friendly name for this zone (pre-filled from climate entity name)",
           "trv_preset_sync": "Automatically sync preset mode when HVAC mode changes (for physical TRV valves)",
+          "allow_passive_heat": "Disables ghost heating anomaly detection if this zone naturally absorbs heat while idle (e.g. open loft/mezzanine or fancoil without a zone valve).",
           "window_sensor": "Automatically bypass the zone when this sensor is open"
         }
       },
@@ -153,6 +157,7 @@
           "zone_climate": "Zone",
           "trv_preset_sync": "Enable TRV Preset Sync",
           "anti_seize_zone_enable": "Enable Anti-seize (Summer Protection) for this zone",
+          "allow_passive_heat": "Allow Passive Heat (Fancoil without valve / Mezzanine)",
           "window_sensor": "Window Sensor (Optional)"
         }
       },

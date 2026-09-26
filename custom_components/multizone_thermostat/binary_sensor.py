@@ -62,6 +62,7 @@ class MultizonePlantAnomalyBinarySensor(BinarySensorEntity):
             manufacturer="Custom Integration",
             model="Master Control",
         )
+        self._notified_active: bool = False
 
     @property
     def is_on(self) -> bool:
@@ -88,12 +89,42 @@ class MultizonePlantAnomalyBinarySensor(BinarySensorEntity):
         }
 
     async def async_added_to_hass(self) -> None:
-        """Periodically refresh anomaly evaluations."""
+        """Periodically refresh anomaly evaluations and manage notifications."""
         await super().async_added_to_hass()
+
+        async def _async_tick(_):
+            self.async_write_ha_state()
+            engine = getattr(self._coordinator, "plant_diagnostics", None)
+            if not engine:
+                return
+            summary = engine.get_plant_health_summary()
+            anomalies = summary.get("anomalies", [])
+            if anomalies and not self._notified_active:
+                self._notified_active = True
+                bullet_lines = "\n".join([f"- **{a['zone']}**: {a['description']}" for a in anomalies])
+                await self.hass.services.async_call(
+                    "persistent_notification",
+                    "create",
+                    {
+                        "notification_id": "multizone_thermostat_plant_anomaly",
+                        "title": "Multizone Thermostat — Notifica Impianto",
+                        "message": f"Attenzione: rilevate anomalie nell'impianto termico:\n\n{bullet_lines}\n\nConsulta la dashboard Diagnostica per maggiori dettagli.",
+                    },
+                )
+            elif not anomalies and self._notified_active:
+                self._notified_active = False
+                await self.hass.services.async_call(
+                    "persistent_notification",
+                    "dismiss",
+                    {
+                        "notification_id": "multizone_thermostat_plant_anomaly",
+                    },
+                )
+
         self.async_on_remove(
             async_track_time_interval(
                 self.hass,
-                lambda _: self.async_write_ha_state(),
+                _async_tick,
                 timedelta(seconds=60),
             )
         )

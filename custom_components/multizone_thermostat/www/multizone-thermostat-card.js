@@ -2469,6 +2469,7 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
     }
 
     const aState = anomalyEntity ? this._hass.states[anomalyEntity] : null;
+    const allowPassive = cState && cState.attributes && cState.attributes.allow_passive_heat;
     if (valveDot && valveText) {
       const hasAnomaly = aState && aState.state === "on";
       if (hasAnomaly) {
@@ -2477,11 +2478,11 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
         valveText.style.color = "#f87171";
       } else if (zoneMode === "bypass") {
         valveDot.className = "pulse-dot pulse-green";
-        valveText.innerText = "Valvola Chiusa (Bypass)";
+        valveText.innerText = allowPassive ? "Valvola Chiusa (Apporto passivo consentito)" : "Valvola Chiusa (Bypass)";
         valveText.style.color = "#94a3b8";
       } else {
         valveDot.className = "pulse-dot pulse-green";
-        valveText.innerText = "Nessuna anomalia";
+        valveText.innerText = allowPassive ? "Nessuna anomalia (Apporto passivo consentito)" : "Nessuna anomalia";
         valveText.style.color = "#34d399";
       }
     }

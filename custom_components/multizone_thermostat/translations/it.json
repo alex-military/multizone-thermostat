@@ -33,12 +33,14 @@
           "name": "Nome Zona",
           "trv_preset_sync": "Abilita Sincronizzazione Preset TRV",
           "anti_seize_zone_enable": "Abilita Antigrippaggio (Protezione Estiva) per questa zona",
+          "allow_passive_heat": "Consenti Apporto Termico Passivo (Fancoil senza valvola / Soppalco aperto)",
           "window_sensor": "Sensore Finestra (Opzionale)"
         },
         "data_description": {
           "climate_entities": "L'entità climate per questa stanza/zona",
           "name": "Un nome per questa zona (precompilato dal nome dell'entità climate)",
           "trv_preset_sync": "Sincronizza automaticamente la modalità preset quando cambia la modalità HVAC (per valvole TRV fisiche)",
+          "allow_passive_heat": "Disattiva il rilevamento del riscaldamento fantasma se la stanza riceve calore passivo anche quando è a riposo (es. ventilconvettore senza valvola di zona o soppalco aperto con calore dal piano inferiore).",
           "window_sensor": "Bypassa automaticamente la zona quando questo sensore è aperto"
         }
       },
@@ -130,12 +132,14 @@
           "name": "Nome Zona",
           "trv_preset_sync": "Abilita Sincronizzazione Preset TRV",
           "anti_seize_zone_enable": "Abilita Antigrippaggio (Protezione Estiva) per questa zona",
+          "allow_passive_heat": "Consenti Apporto Termico Passivo (Fancoil senza valvola / Soppalco aperto)",
           "window_sensor": "Sensore Finestra (Opzionale)"
         },
         "data_description": {
           "climate_entities": "L'entità climate per questa stanza/zona",
           "name": "Un nome per questa zona (precompilato dal nome dell'entità climate)",
           "trv_preset_sync": "Sincronizza automaticamente la modalità preset quando cambia la modalità HVAC (per valvole TRV fisiche)",
+          "allow_passive_heat": "Disattiva il rilevamento del riscaldamento fantasma se la stanza riceve calore passivo anche quando è a riposo (es. ventilconvettore senza valvola di zona o soppalco aperto con calore dal piano inferiore).",
           "window_sensor": "Bypassa automaticamente la zona quando questo sensore è aperto"
         }
       },
@@ -153,6 +157,7 @@
           "zone_climate": "Seleziona la zona da modificare",
           "trv_preset_sync": "Sincronizza modalità Termostato (TRV) -> Centrale",
           "anti_seize_zone_enable": "Abilita Antigrippaggio (Protezione Estiva) per questa zona",
+          "allow_passive_heat": "Consenti Apporto Termico Passivo (Fancoil senza valvola / Soppalco aperto)",
           "window_sensor": "Sensore Finestra (opzionale)"
         }
       },
