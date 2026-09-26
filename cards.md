@@ -121,5 +121,48 @@ You can customize the number of columns to perfectly fit your device screen (e.g
 #### 4 Columns Layout (`columns: 4`)
 ![Dashboard 4 Columns](images/dashboard_4col.png)
 
+---
+
+## 6. Central Plant Health Card (`custom:multizone-thermostat-plant-card`)
+A zero-configuration, glassmorphic card that displays physical boiler telemetry, short-cycling frequency, and overall plant health.
+- **Auto-Discovery**: Automatically finds and binds to the central health and boiler runtime sensors.
+- **Short-Cycling Alert**: Monitors hourly ignition frequency and alerts if wear is high (> 5 cycles/h).
+- **Active Anomalies List**: Expands dynamically to display exact room details whenever an anomaly (stuck valve, ghost heating) is active.
+
+```yaml
+type: custom:multizone-thermostat-plant-card
+```
+
+---
+
+## 7. Zone Energy & Building Efficiency Card (`custom:multizone-thermostat-zone-energy-card`)
+A card designed to display the building energy efficiency metrics for a specific heating zone:
+- **European Energy Class (A4 → G)**: Theoretical energy grade calculated from thermal dispersion and outdoor weather $\Delta T$.
+- **Mini Ribbon Scale**: Visual colored scale highlighting the active energy tier.
+- **Thermal Retention Time**: Displays hours needed for the room to lose $1.0^\circ\text{C}$.
+- **Radiator Sizing**: Evaluates whether the heating emitter is optimal, undersized, or oversized.
+- **Mechanical Valve Surveillance**: Alerts in real-time if a valve is stuck closed or leaking heat.
+
+```yaml
+type: custom:multizone-thermostat-zone-energy-card
+entity: climate.multizone_thermostat_soggiorno
+```
+
+---
+
+## 8. Auto-Generated Diagnostic View Strategy (`custom:multizone-thermostat-diagnostics`)
+If you want an entire, self-updating diagnostic view that automatically lists the central plant health and creates cards for **every zone** in your house without writing any YAML:
+
+```yaml
+views:
+  - title: Diagnostica
+    path: diagnostica
+    icon: mdi:chart-box-outline
+    panel: true
+    strategy:
+      type: custom:multizone-thermostat-diagnostics
+      columns: 3 # (Optional: default 3)
+```
+
 > **Note**: If you installed via HACS, the Lovelace card resource is registered automatically. If cards don't appear, add the resource manually:
 > Go to **Settings → Dashboards → Resources** → Add `/multizone_thermostat_card/multizone-thermostat-card.js` as **JavaScript Module**.

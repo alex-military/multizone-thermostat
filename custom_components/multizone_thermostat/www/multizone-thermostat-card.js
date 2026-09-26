@@ -24,6 +24,18 @@ window.customCards.push({
   description: "A quick selection card for Global Presets (Comfort, Eco, Sleep, Away).",
   preview: true,
 });
+window.customCards.push({
+  type: "multizone-thermostat-plant-card",
+  name: "Multizone Thermostat Plant Health Card",
+  description: "A modern card displaying boiler telemetry, short-cycling frequency and physical plant health.",
+  preview: true,
+});
+window.customCards.push({
+  type: "multizone-thermostat-zone-energy-card",
+  name: "Multizone Thermostat Zone Energy Card",
+  description: "A modern card displaying room energy efficiency class (A4-G), thermal retention time and radiator sizing.",
+  preview: true,
+});
 
 const TRANSLATIONS = {
   it: {
@@ -1785,18 +1797,751 @@ if (!customElements.get("multizone-thermostat-spacer")) {
   customElements.define("multizone-thermostat-spacer", MultizoneThermostatSpacer);
 }
 
+/* ==================== PLANT DIAGNOSTIC CARD ==================== */
+class MultizoneThermostatPlantCard extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: 'open' });
+    this._rendered = false;
+  }
+
+  setConfig(config) {
+    this._config = config || {};
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    if (!this._rendered) {
+      this.render();
+    }
+    this.updateCard();
+  }
+
+  render() {
+    const style = document.createElement('style');
+    style.textContent = `
+      ha-card {
+        background: var(--ha-card-background, var(--card-background-color, rgba(30, 41, 59, 0.7)));
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.08));
+        border-radius: var(--card-border-radius, 20px);
+        padding: 20px;
+        box-shadow: var(--ha-card-box-shadow, 0 4px 20px rgba(0, 0, 0, 0.15));
+        font-family: var(--paper-font-body1_-_font-family, inherit);
+        color: var(--primary-text-color, #e2e8f0);
+        box-sizing: border-box;
+      }
+      .header-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 16px;
+      }
+      .title-group {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .icon-wrap {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(14, 165, 233, 0.15);
+        color: #38bdf8;
+      }
+      .icon-wrap ha-icon {
+        --mdc-icon-size: 24px;
+      }
+      .title-text {
+        font-size: 17px;
+        font-weight: 700;
+        margin: 0;
+        line-height: 1.2;
+      }
+      .subtitle-text {
+        font-size: 11px;
+        color: var(--secondary-text-color, #94a3b8);
+        margin-top: 2px;
+      }
+      .status-badge {
+        padding: 5px 12px;
+        border-radius: 9999px;
+        font-size: 12px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .status-optimal {
+        background: rgba(16, 185, 129, 0.15);
+        color: #34d399;
+        border: 1px solid rgba(16, 185, 129, 0.3);
+      }
+      .status-warning {
+        background: rgba(245, 158, 11, 0.15);
+        color: #fbbf24;
+        border: 1px solid rgba(245, 158, 11, 0.3);
+      }
+      .status-critical {
+        background: rgba(239, 68, 68, 0.15);
+        color: #f87171;
+        border: 1px solid rgba(239, 68, 68, 0.3);
+      }
+      .status-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: currentColor;
+      }
+      .kpi-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+      @media (max-width: 480px) {
+        .kpi-grid { grid-template-columns: 1fr; }
+      }
+      .kpi-card {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 14px;
+        padding: 14px;
+      }
+      .kpi-label {
+        font-size: 11px;
+        color: var(--secondary-text-color, #94a3b8);
+        display: block;
+        margin-bottom: 4px;
+      }
+      .kpi-value-row {
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+      }
+      .kpi-val {
+        font-size: 24px;
+        font-weight: 800;
+        line-height: 1;
+      }
+      .kpi-unit {
+        font-size: 11px;
+        color: var(--secondary-text-color, #94a3b8);
+      }
+      .kpi-sub {
+        font-size: 11px;
+        margin-top: 6px;
+        font-weight: 600;
+      }
+      .alert-box {
+        padding: 12px 14px;
+        border-radius: 12px;
+        font-size: 12px;
+        line-height: 1.4;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+      }
+      .alert-box.alert-ok {
+        background: rgba(16, 185, 129, 0.08);
+        border-color: rgba(16, 185, 129, 0.2);
+        color: #a7f3d0;
+      }
+      .alert-box.alert-err {
+        background: rgba(239, 68, 68, 0.12);
+        border-color: rgba(239, 68, 68, 0.35);
+        color: #fca5a5;
+      }
+      .alert-title {
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+    `;
+
+    const card = document.createElement('ha-card');
+    card.innerHTML = `
+      <div class="header-row">
+        <div class="title-group">
+          <div class="icon-wrap">
+            <ha-icon icon="mdi:shield-check"></ha-icon>
+          </div>
+          <div>
+            <div class="title-text">Salute Impianto & Caldaia</div>
+            <div class="subtitle-text">Supervisione idraulica e usura relè</div>
+          </div>
+        </div>
+        <div class="status-badge status-optimal" id="health-badge">
+          <span class="status-dot"></span>
+          <span id="health-text">OTTIMALE</span>
+        </div>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <span class="kpi-label">Frequenza Accensioni (Short-Cycle)</span>
+          <div class="kpi-value-row">
+            <span class="kpi-val" id="cycles-val">--</span>
+            <span class="kpi-unit">cicli/h</span>
+          </div>
+          <div class="kpi-sub" id="cycles-sub" style="color: #34d399;">Usura Bassa</div>
+        </div>
+
+        <div class="kpi-card">
+          <span class="kpi-label">Funzionamento Ultime 24h</span>
+          <div class="kpi-value-row">
+            <span class="kpi-val" id="runtime-val" style="color: #60a5fa;">--</span>
+            <span class="kpi-unit">ore</span>
+          </div>
+          <div class="kpi-sub" style="color: #94a3b8;">Attività cumulativa relè/mandata</div>
+        </div>
+      </div>
+
+      <div class="alert-box alert-ok" id="alert-box">
+        <div class="alert-title">
+          <ha-icon icon="mdi:check-circle-outline" style="--mdc-icon-size: 16px;"></ha-icon>
+          <span>Tutti i circuiti operativi</span>
+        </div>
+        <div id="alert-desc">Nessun blocco valvola, trafilamento o short-cycling rilevato.</div>
+      </div>
+    `;
+
+    this.shadowRoot.appendChild(style);
+    this.shadowRoot.appendChild(card);
+    this._rendered = true;
+  }
+
+  updateCard() {
+    if (!this._hass || !this._rendered) return;
+
+    let healthEntity = this._config.health_entity;
+    let cyclesEntity = this._config.cycles_entity;
+    let runtimeEntity = this._config.runtime_entity;
+    let anomalyEntity = this._config.anomaly_entity;
+
+    if (!healthEntity) {
+      healthEntity = Object.keys(this._hass.states).find(k => k.startsWith('sensor.') && k.includes('stato_salute_impianto'));
+    }
+    if (!cyclesEntity) {
+      cyclesEntity = Object.keys(this._hass.states).find(k => k.startsWith('sensor.') && k.includes('frequenza_accensioni_caldaia'));
+    }
+    if (!runtimeEntity) {
+      runtimeEntity = Object.keys(this._hass.states).find(k => k.startsWith('sensor.') && k.includes('ore_funzionamento_caldaia_24h'));
+    }
+    if (!anomalyEntity) {
+      anomalyEntity = Object.keys(this._hass.states).find(k => k.startsWith('binary_sensor.') && k.includes('plant_anomaly'));
+    }
+
+    const healthState = healthEntity ? this._hass.states[healthEntity] : null;
+    const cyclesState = cyclesEntity ? this._hass.states[cyclesEntity] : null;
+    const runtimeState = runtimeEntity ? this._hass.states[runtimeEntity] : null;
+    const anomalyState = anomalyEntity ? this._hass.states[anomalyEntity] : null;
+
+    const healthBadge = this.shadowRoot.getElementById('health-badge');
+    const healthText = this.shadowRoot.getElementById('health-text');
+    const cyclesVal = this.shadowRoot.getElementById('cycles-val');
+    const cyclesSub = this.shadowRoot.getElementById('cycles-sub');
+    const runtimeVal = this.shadowRoot.getElementById('runtime-val');
+    const alertBox = this.shadowRoot.getElementById('alert-box');
+    const alertDesc = this.shadowRoot.getElementById('alert-desc');
+
+    const statusVal = healthState ? healthState.state : "Ottimale";
+    if (healthBadge && healthText) {
+      healthText.innerText = statusVal.toUpperCase();
+      if (statusVal === "Critico") {
+        healthBadge.className = "status-badge status-critical";
+      } else if (statusVal === "Attenzione") {
+        healthBadge.className = "status-badge status-warning";
+      } else {
+        healthBadge.className = "status-badge status-optimal";
+      }
+    }
+
+    if (cyclesVal && cyclesState) {
+      const c = parseFloat(cyclesState.state) || 0;
+      cyclesVal.innerText = c.toFixed(1);
+      if (cyclesSub) {
+        if (c <= 3.5) {
+          cyclesSub.innerText = "Usura Bassa (< 3.5 c/h)";
+          cyclesSub.style.color = "#34d399";
+        } else if (c <= 5.0) {
+          cyclesSub.innerText = "Usura Moderata (3.5 - 5 c/h)";
+          cyclesSub.style.color = "#fbbf24";
+        } else {
+          cyclesSub.innerText = "⚠️ Short-Cycling Elevato (> 5 c/h)";
+          cyclesSub.style.color = "#f87171";
+        }
+      }
+    }
+
+    if (runtimeVal && runtimeState) {
+      const r = parseFloat(runtimeState.state) || 0;
+      runtimeVal.innerText = r.toFixed(1);
+    }
+
+    if (alertBox && alertDesc) {
+      const hasAnomaly = anomalyState ? anomalyState.state === "on" : (statusVal !== "Ottimale");
+      if (hasAnomaly && healthState && healthState.attributes && healthState.attributes.anomalies && healthState.attributes.anomalies.length > 0) {
+        alertBox.className = "alert-box alert-err";
+        const items = healthState.attributes.anomalies.map(a => `• <b>${a.zone}</b>: ${a.description}`).join('<br>');
+        alertDesc.innerHTML = items;
+      } else if (statusVal === "Attenzione") {
+        alertBox.className = "alert-box alert-err";
+        alertDesc.innerText = "Attenzione: frequenza di accensioni caldaia elevata o parametri da ottimizzare.";
+      } else {
+        alertBox.className = "alert-box alert-ok";
+        alertDesc.innerText = "Nessun blocco valvola, trafilamento o short-cycling rilevato.";
+      }
+    }
+  }
+}
+
+if (!customElements.get("multizone-thermostat-plant-card")) {
+  customElements.define("multizone-thermostat-plant-card", MultizoneThermostatPlantCard);
+}
+
+/* ==================== ZONE ENERGY CARD ==================== */
+class MultizoneThermostatZoneEnergyCard extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: 'open' });
+    this._rendered = false;
+  }
+
+  setConfig(config) {
+    if (!config.entity) {
+      throw new Error("Devi specificare un'entità climate");
+    }
+    this._config = config;
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    if (!this._rendered) {
+      this.render();
+    }
+    this.updateCard();
+  }
+
+  render() {
+    const style = document.createElement('style');
+    style.textContent = `
+      ha-card {
+        background: var(--ha-card-background, var(--card-background-color, rgba(30, 41, 59, 0.7)));
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.08));
+        border-radius: var(--card-border-radius, 20px);
+        padding: 18px;
+        box-shadow: var(--ha-card-box-shadow, 0 4px 20px rgba(0, 0, 0, 0.15));
+        font-family: var(--paper-font-body1_-_font-family, inherit);
+        color: var(--primary-text-color, #e2e8f0);
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+      .top-row {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        margin-bottom: 12px;
+      }
+      .zone-name {
+        font-size: 16px;
+        font-weight: 700;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .zone-mode-badge {
+        font-size: 9px;
+        font-weight: 800;
+        padding: 2px 6px;
+        border-radius: 6px;
+        text-transform: uppercase;
+        background: rgba(59, 130, 246, 0.2);
+        color: #60a5fa;
+      }
+      .zone-sub {
+        font-size: 11px;
+        color: var(--secondary-text-color, #94a3b8);
+        margin-top: 2px;
+      }
+      .energy-badge {
+        padding: 4px 10px;
+        border-radius: 8px;
+        font-weight: 900;
+        font-size: 15px;
+        text-align: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        min-width: 38px;
+        background: #10b981;
+        color: white;
+      }
+      .ribbon-scale {
+        display: flex;
+        height: 5px;
+        border-radius: 3px;
+        overflow: hidden;
+        margin-bottom: 14px;
+        opacity: 0.85;
+        gap: 2px;
+      }
+      .ribbon-step {
+        flex: 1;
+        height: 100%;
+        transition: transform 0.2s ease;
+      }
+      .ribbon-step.active {
+        transform: scaleY(1.8);
+        box-shadow: 0 0 6px white;
+        z-index: 2;
+      }
+      .step-A4 { background-color: #00873d; }
+      .step-A  { background-color: #139f37; }
+      .step-B  { background-color: #55b726; }
+      .step-C  { background-color: #96c818; }
+      .step-D  { background-color: #e0d100; }
+      .step-E  { background-color: #f39200; }
+      .step-F  { background-color: #e64213; }
+      .step-G  { background-color: #cb0019; }
+
+      .stats-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+      .stat-box {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 12px;
+        padding: 10px;
+      }
+      .stat-label {
+        font-size: 10px;
+        color: var(--secondary-text-color, #94a3b8);
+        display: block;
+        margin-bottom: 2px;
+      }
+      .stat-val {
+        font-size: 16px;
+        font-weight: 800;
+        line-height: 1.2;
+      }
+      .stat-unit {
+        font-size: 10px;
+        color: var(--secondary-text-color, #94a3b8);
+        font-weight: 500;
+        margin-left: 2px;
+      }
+      .stat-eval {
+        font-size: 10px;
+        margin-top: 3px;
+        font-weight: 600;
+        display: block;
+      }
+      .bottom-row {
+        padding-top: 10px;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 11px;
+      }
+      .valve-status {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-weight: 600;
+      }
+      .pulse-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+      }
+      .pulse-green { background: #10b981; }
+      .pulse-red { background: #ef4444; animation: blink 1s infinite; }
+      @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+    `;
+
+    const card = document.createElement('ha-card');
+    card.innerHTML = `
+      <div class="top-row">
+        <div>
+          <div class="zone-name">
+            <span id="zone-title">Stanza</span>
+            <span class="zone-mode-badge" id="zone-mode-badge">PRIMARIA</span>
+          </div>
+          <div class="zone-sub" id="temp-sub">-- °C</div>
+        </div>
+        <div class="energy-badge" id="energy-badge">--</div>
+      </div>
+
+      <div class="ribbon-scale" id="ribbon-scale">
+        <div class="ribbon-step step-A4" id="step-A4"></div>
+        <div class="ribbon-step step-A" id="step-A"></div>
+        <div class="ribbon-step step-B" id="step-B"></div>
+        <div class="ribbon-step step-C" id="step-C"></div>
+        <div class="ribbon-step step-D" id="step-D"></div>
+        <div class="ribbon-step step-E" id="step-E"></div>
+        <div class="ribbon-step step-F" id="step-F"></div>
+        <div class="ribbon-step step-G" id="step-G"></div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-box">
+          <span class="stat-label">Ritenzione (-1°C)</span>
+          <div>
+            <span class="stat-val" id="retention-val">--</span>
+            <span class="stat-unit">ore</span>
+          </div>
+          <span class="stat-eval" id="retention-eval" style="color: #38bdf8;">--</span>
+        </div>
+
+        <div class="stat-box">
+          <span class="stat-label">Resa Termoarredo</span>
+          <div>
+            <span class="stat-val" id="sizing-val">--</span>
+          </div>
+          <span class="stat-eval" id="sizing-eval" style="color: #34d399;">--</span>
+        </div>
+      </div>
+
+      <div class="bottom-row">
+        <span style="color: var(--secondary-text-color, #94a3b8);">Stato Valvola:</span>
+        <div class="valve-status" id="valve-status">
+          <span class="pulse-dot pulse-green" id="valve-dot"></span>
+          <span id="valve-text">Nessuna anomalia</span>
+        </div>
+      </div>
+    `;
+
+    this.shadowRoot.appendChild(style);
+    this.shadowRoot.appendChild(card);
+    this._rendered = true;
+  }
+
+  updateCard() {
+    if (!this._hass || !this._rendered) return;
+
+    const climateId = this._config.entity;
+    const climateState = this._hass.states[climateId];
+    if (!climateState) return;
+
+    let title = this._config.title || climateState.attributes.friendly_name || climateId;
+    title = title.replace(/^Virtual Thermostats VT /i, '').replace(/^Heating Zones(?: Zone)? /i, '');
+    let slug = climateId.replace("climate.multizone_thermostat_", "").replace("climate.", "");
+
+    const energyEntity = Object.keys(this._hass.states).find(k => k.startsWith('sensor.') && k.includes('classe_energetica') && k.includes(slug));
+    const retentionEntity = Object.keys(this._hass.states).find(k => k.startsWith('sensor.') && k.includes('tempo_ritenzione_termica') && k.includes(slug));
+    const sizingEntity = Object.keys(this._hass.states).find(k => k.startsWith('sensor.') && k.includes('dimensionamento_radiatore') && k.includes(slug));
+    const anomalyEntity = Object.keys(this._hass.states).find(k => k.startsWith('binary_sensor.') && k.includes('anomaly') && k.includes(slug));
+
+    const titleEl = this.shadowRoot.getElementById('zone-title');
+    const tempSubEl = this.shadowRoot.getElementById('temp-sub');
+    const badgeEl = this.shadowRoot.getElementById('energy-badge');
+    const retentionVal = this.shadowRoot.getElementById('retention-val');
+    const retentionEval = this.shadowRoot.getElementById('retention-eval');
+    const sizingVal = this.shadowRoot.getElementById('sizing-val');
+    const sizingEval = this.shadowRoot.getElementById('sizing-eval');
+    const valveDot = this.shadowRoot.getElementById('valve-dot');
+    const valveText = this.shadowRoot.getElementById('valve-text');
+    const modeBadge = this.shadowRoot.getElementById('zone-mode-badge');
+
+    if (titleEl) titleEl.innerText = title;
+
+    if (tempSubEl) {
+      const cur = climateState.attributes.current_temperature;
+      const tgt = climateState.attributes.temperature;
+      tempSubEl.innerText = `${cur !== undefined ? cur : '--'}°C / target ${tgt !== undefined ? tgt : '--'}°C`;
+    }
+
+    if (modeBadge) {
+      const isSec = climateState.attributes.secondary_zone || false;
+      modeBadge.innerText = isSec ? "SECONDARIA" : "PRIMARIA";
+      modeBadge.style.background = isSec ? "rgba(168, 85, 247, 0.2)" : "rgba(59, 130, 246, 0.2)";
+      modeBadge.style.color = isSec ? "#c084fc" : "#60a5fa";
+    }
+
+    const eState = energyEntity ? this._hass.states[energyEntity] : null;
+    const energyClass = eState ? eState.state : "--";
+    const colors = {
+      'A4': '#00873d', 'A': '#139f37', 'B': '#55b726', 'C': '#96c818',
+      'D': '#e0d100', 'E': '#f39200', 'F': '#e64213', 'G': '#cb0019'
+    };
+
+    if (badgeEl) {
+      badgeEl.innerText = energyClass;
+      if (colors[energyClass]) {
+        badgeEl.style.backgroundColor = colors[energyClass];
+        badgeEl.style.color = (['C', 'D'].includes(energyClass)) ? '#111' : '#fff';
+      } else {
+        badgeEl.style.backgroundColor = '#64748b';
+        badgeEl.style.color = '#fff';
+      }
+    }
+
+    ['A4', 'A', 'B', 'C', 'D', 'E', 'F', 'G'].forEach(cls => {
+      const stepEl = this.shadowRoot.getElementById('step-' + cls);
+      if (stepEl) {
+        if (cls === energyClass) {
+          stepEl.classList.add('active');
+        } else {
+          stepEl.classList.remove('active');
+        }
+      }
+    });
+
+    const rState = retentionEntity ? this._hass.states[retentionEntity] : null;
+    if (retentionVal && rState) {
+      const r = parseFloat(rState.state);
+      retentionVal.innerText = isNaN(r) ? "--" : r.toFixed(1);
+      if (retentionEval) {
+        if (isNaN(r)) retentionEval.innerText = "In apprendimento...";
+        else if (r >= 6.0) retentionEval.innerText = "Ottimo isolamento";
+        else if (r >= 3.5) retentionEval.innerText = "Isolamento medio";
+        else retentionEval.innerText = "Dispersione rapida";
+      }
+    }
+
+    const sState = sizingEntity ? this._hass.states[sizingEntity] : null;
+    if (sizingVal && sState) {
+      sizingVal.innerText = sState.state;
+      if (sizingEval) {
+        if (sState.state === "Ottimale") {
+          sizingEval.innerText = "Rapporto potenza/perdite OK";
+          sizingEval.style.color = "#34d399";
+        } else if (sState.state === "Sottodimensionato") {
+          sizingEval.innerText = "Richiede tempo per salire";
+          sizingEval.style.color = "#f87171";
+        } else {
+          sizingEval.innerText = "Potenza elevata";
+          sizingEval.style.color = "#fbbf24";
+        }
+      }
+    }
+
+    const aState = anomalyEntity ? this._hass.states[anomalyEntity] : null;
+    if (valveDot && valveText) {
+      const hasAnomaly = aState && aState.state === "on";
+      if (hasAnomaly) {
+        valveDot.className = "pulse-dot pulse-red";
+        valveText.innerText = (aState.attributes && aState.attributes.details) || "Anomalia Rilevata";
+        valveText.style.color = "#f87171";
+      } else {
+        valveDot.className = "pulse-dot pulse-green";
+        valveText.innerText = "Nessuna anomalia";
+        valveText.style.color = "#34d399";
+      }
+    }
+  }
+}
+
+if (!customElements.get("multizone-thermostat-zone-energy-card")) {
+  customElements.define("multizone-thermostat-zone-energy-card", MultizoneThermostatZoneEnergyCard);
+}
+
 /* ==================== DASHBOARD STRATEGY ==================== */
 class MultizoneThermostatDashboardStrategy extends HTMLElement {
   static async generateDashboard(info) {
     const view = await this.generateView(info);
+    const diagView = await this.generateDiagnosticView(info);
     return {
       title: "Multizone Thermostat",
       views: [
         {
-          title: "Home",
+          title: "Termostati",
           path: "home",
+          icon: "mdi:radiator",
           panel: true,
           cards: view.cards,
+        },
+        {
+          title: "Diagnostica & Efficienza",
+          path: "diagnostica",
+          icon: "mdi:chart-box-outline",
+          panel: true,
+          cards: diagView.cards,
+        }
+      ]
+    };
+  }
+
+  static async generateDiagnosticView(info) {
+    const hass = info.hass;
+    const strategyConfig = info.config?.strategy || info.strategy || info.config || {};
+    
+    // Find all zones
+    const zones = [];
+    for (const entityId of Object.keys(hass.states)) {
+      if (entityId.startsWith("select.") || entityId.startsWith("switch.")) {
+        const stateObj = hass.states[entityId];
+        const climateId = stateObj.attributes ? stateObj.attributes.climate_entity : null;
+        if (climateId) {
+          const climateState = hass.states[climateId];
+          if (climateState && !zones.some(z => z.climate === climateId)) {
+            let title = climateState.attributes.friendly_name || climateId;
+            title = title.replace(/^Virtual Thermostats VT /i, '').replace(/^Heating Zones(?: Zone)? /i, '');
+            zones.push({
+              climate: climateId,
+              title: title,
+            });
+          }
+        }
+      }
+    }
+    zones.sort((a, b) => a.title.localeCompare(b.title));
+
+    let columns = parseInt(strategyConfig.columns, 10);
+    if (isNaN(columns) || columns < 1) {
+      columns = 3;
+    }
+
+    const stackCards = [
+      {
+        type: "custom:multizone-thermostat-plant-card",
+        border_radius: "20px",
+      }
+    ];
+
+    for (let i = 0; i < zones.length; i += columns) {
+      const chunk = zones.slice(i, i + columns);
+      const rowCards = chunk.map(zone => ({
+        type: "custom:multizone-thermostat-zone-energy-card",
+        entity: zone.climate,
+        title: zone.title,
+        border_radius: "20px",
+      }));
+      
+      while (rowCards.length < columns && columns <= 3) {
+        rowCards.push({
+          type: "custom:multizone-thermostat-spacer"
+        });
+      }
+
+      stackCards.push({
+        type: "horizontal-stack",
+        cards: rowCards
+      });
+    }
+
+    return {
+      cards: [
+        {
+          type: "vertical-stack",
+          cards: stackCards
         }
       ]
     };
@@ -1909,13 +2654,26 @@ window.customStrategies.push({
   name: "Multizone Thermostat Dashboard",
   description: "Auto-generated dashboard for your heating system."
 });
+window.customStrategies.push({
+  type: "multizone-thermostat-diagnostics",
+  name: "Multizone Thermostat Diagnostics",
+  description: "Auto-generated diagnostic and energy efficiency view for your heating zones."
+});
 
 class MultizoneThermostatViewStrategy extends MultizoneThermostatDashboardStrategy {}
+class MultizoneThermostatDiagnosticViewStrategy extends HTMLElement {
+  static async generateView(info) {
+    return MultizoneThermostatDashboardStrategy.generateDiagnosticView(info);
+  }
+}
 
 if (!customElements.get("ll-strategy-dashboard-multizone-thermostat-dashboard")) {
   customElements.define("ll-strategy-dashboard-multizone-thermostat-dashboard", MultizoneThermostatDashboardStrategy);
 }
 if (!customElements.get("ll-strategy-view-multizone-thermostat-dashboard")) {
   customElements.define("ll-strategy-view-multizone-thermostat-dashboard", MultizoneThermostatViewStrategy);
+}
+if (!customElements.get("ll-strategy-view-multizone-thermostat-diagnostics")) {
+  customElements.define("ll-strategy-view-multizone-thermostat-diagnostics", MultizoneThermostatDiagnosticViewStrategy);
 }
 
