@@ -134,6 +134,13 @@ class PlantDiagnosticsEngine:
 
             current_temp = float(current_temp)
 
+            # If the zone is Bypassed, it is intentionally excluded from heating
+            zone_mode = self.coordinator.get_zone_mode(climate_id)
+            if zone_mode == "bypass":
+                state["active_anomaly"] = ANOMALY_NONE
+                state["anomaly_details"] = "Zona bypassata (Esclusa dal riscaldamento)"
+                return ANOMALY_NONE, state["anomaly_details"]
+
             # 1. Staleness Check: Has the temperature sensor not updated in > 2 hours?
             if state["last_temp_seen"] is None or state["last_temp_seen"] != current_temp:
                 state["last_temp_seen"] = current_temp

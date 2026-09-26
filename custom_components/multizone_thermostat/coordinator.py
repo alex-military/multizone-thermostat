@@ -262,6 +262,13 @@ class MultizoneCoordinator:
             self._settings = settings_stored
             _LOGGER.debug("Loaded settings from storage: %s", self._settings)
             
+            # Load stored zone modes
+            saved_zone_modes = self._settings.get("zone_modes", {})
+            for cid, mode in saved_zone_modes.items():
+                self._zone_modes[cid] = mode
+                if cid in self._climate_callbacks:
+                    self._climate_callbacks[cid]()
+            
             # Load autotuner states
             autotune_data = self._settings.get("autotuners", {})
             for climate_id, tuner in self._autotuners.items():
@@ -339,6 +346,16 @@ class MultizoneCoordinator:
     def set_zone_mode(self, climate_entity: str, mode: str) -> None:
         """Set zone mode (called by zone select entity)."""
         self._zone_modes[climate_entity] = mode
+
+        # Persist zone mode directly in settings
+        if "zone_modes" not in self._settings:
+            self._settings["zone_modes"] = {}
+        self._settings["zone_modes"][climate_entity] = mode
+        self.hass.async_create_task(self._settings_store.async_save(self._settings))
+
+        # Notify climate entity callback so extra_state_attributes update immediately
+        if climate_entity in self._climate_callbacks:
+            self._climate_callbacks[climate_entity]()
 
         # If a preset is active, save the mode state
         if self._current_global_preset:

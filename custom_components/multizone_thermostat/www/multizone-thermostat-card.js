@@ -127,12 +127,13 @@ function autoDiscoverSwitch(hass, climateId) {
   }
   
   // Fallback: check if the entityId contains the climate device name AND is a zone_mode entity
-  const climateName = climateId.split('.')[1];
-  if (climateName) {
-    for (const entityId of Object.keys(hass.states)) {
-      if (entityId.startsWith("select.") && entityId.includes("zone_mode") && entityId.includes(climateName)) {
-        return entityId;
-      }
+  const rawName = climateId.split('.')[1] || "";
+  const slug = rawName.replace(/^multizone_thermostat_/, "");
+  for (const entityId of Object.keys(hass.states)) {
+    if (entityId.startsWith("select.") && 
+        (entityId.includes(slug) || (rawName && entityId.includes(rawName))) &&
+        (entityId.includes("mode") || entityId.includes("zone"))) {
+      return entityId;
     }
   }
   
@@ -767,9 +768,14 @@ class MultizoneThermostatDialCard extends HTMLElement {
     }
 
     // Use temporary switch state if toggled locally to avoid flickering
-    const actualSwitchState = this._tempSwitchState !== undefined 
-      ? this._tempSwitchState 
-      : (switchState ? switchState.state : "primary");
+    let actualSwitchState = "primary";
+    if (this._tempSwitchState !== undefined) {
+      actualSwitchState = this._tempSwitchState;
+    } else if (switchState && switchState.state) {
+      actualSwitchState = switchState.state;
+    } else if (climateState && climateState.attributes && climateState.attributes.zone_mode) {
+      actualSwitchState = climateState.attributes.zone_mode;
+    }
 
     // Update segmented buttons state and tooltips
     const segPrimary = this.shadowRoot.querySelector('#seg-primary');
@@ -1003,7 +1009,13 @@ class MultizoneThermostatDialCard extends HTMLElement {
   }
 
   setZoneMode(mode) {
-    const switchEntity = this._config.switch;
+    let switchEntity = this._config.switch;
+    if (!switchEntity || !this._hass.states[switchEntity]) {
+      switchEntity = autoDiscoverSwitch(this._hass, this._config.entity);
+      if (switchEntity) {
+        this._config = {...this._config, switch: switchEntity};
+      }
+    }
     if (!switchEntity) return;
 
     this._tempSwitchState = mode;
@@ -2365,15 +2377,16 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
     const valveText = this.shadowRoot.getElementById('valve-text');
     // Determine zone mode (primary, secondary, bypass)
     let zoneMode = "primary";
-    if (climateState.attributes && climateState.attributes.zone_mode) {
+    const selectObj = Object.values(this._hass.states).find(s => 
+      s.entity_id.startsWith('select.') && (
+        (s.attributes && s.attributes.climate_entity === climateId) ||
+        (s.entity_id.includes(slug) && (s.entity_id.includes('mode') || s.entity_id.includes('zone')))
+      )
+    );
+    if (selectObj && selectObj.state) {
+      zoneMode = selectObj.state;
+    } else if (climateState.attributes && climateState.attributes.zone_mode) {
       zoneMode = climateState.attributes.zone_mode;
-    } else {
-      const selectObj = Object.values(this._hass.states).find(s => 
-        s.entity_id.startsWith('select.') && s.attributes && s.attributes.climate_entity === climateId
-      );
-      if (selectObj) {
-        zoneMode = selectObj.state;
-      }
     }
 
     if (titleEl) titleEl.innerText = title;
