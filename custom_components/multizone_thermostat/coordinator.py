@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections import deque
 from datetime import datetime, timedelta, time as dt_time
 import logging
 import time
@@ -179,9 +180,44 @@ class MultizoneCoordinator:
         self._last_night_trigger_date: datetime.date | None = None
         self._last_morning_trigger_date: datetime.date | None = None
 
-    def register_climate(self, entity_id: str, callback) -> None:
-        """Register a climate entity for state updates."""
+        # Software Diagnostics: Ring Buffer and State Reason
+        self._diagnostics_history: deque[dict[str, Any]] = deque(maxlen=100)
+        self._climate_entities: dict[str, Any] = {}
+        self._boiler_status_reason: str = "OFF - Initializing"
+
+    def register_climate(self, entity_id: str, callback, entity_instance: Any = None) -> None:
+        """Register a climate entity for state updates and diagnostics."""
         self._climate_callbacks[entity_id] = callback
+        if entity_instance is not None:
+            self._climate_entities[entity_id] = entity_instance
+
+    def unregister_climate(self, entity_id: str) -> None:
+        """Unregister a climate entity on removal."""
+        self._climate_callbacks.pop(entity_id, None)
+        self._climate_entities.pop(entity_id, None)
+
+    @property
+    def boiler_status_reason(self) -> str:
+        """Return human-readable explanation of why the boiler is currently in its state."""
+        return self._boiler_status_reason
+
+    @property
+    def diagnostics_history(self) -> list[dict[str, Any]]:
+        """Return recent diagnostic trace history."""
+        return list(self._diagnostics_history)
+
+    def record_diagnostic_event(self, event_type: str, details: dict[str, Any] | None = None) -> None:
+        """Record a diagnostic event in the circular trace buffer (fail-safe)."""
+        try:
+            entry: dict[str, Any] = {
+                "timestamp": dt_util.now().isoformat(),
+                "type": event_type,
+            }
+            if details:
+                entry.update(details)
+            self._diagnostics_history.append(entry)
+        except Exception:
+            pass
 
     def get_persistent_data(self, key: str, default: Any = None) -> Any:
         """Get a persistent setting."""
@@ -663,6 +699,7 @@ class MultizoneCoordinator:
                 
                 # Change mode to Bypass
                 if zone_select and self.get_zone_mode(climate_id) != ZONE_MODE_BYPASS:
+                    self.record_diagnostic_event("WINDOW_OPENED_BYPASS", {"sensor": sensor_id, "zone": climate_id})
                     self.hass.async_create_task(zone_select.async_select_option(ZONE_MODE_BYPASS))
                     
             elif new_state.state == "off":
@@ -674,6 +711,7 @@ class MultizoneCoordinator:
                     
                     # Restore the mode
                     if zone_select and self.get_zone_mode(climate_id) != was_mode:
+                        self.record_diagnostic_event("WINDOW_CLOSED_RESTORE", {"sensor": sensor_id, "zone": climate_id, "mode": was_mode})
                         self.hass.async_create_task(zone_select.async_select_option(was_mode))
 
     @callback
@@ -1047,10 +1085,12 @@ class MultizoneCoordinator:
                     )
 
         if not self._master_state and not frost_emergency:
+            self._boiler_status_reason = "OFF - Master switch is OFF"
             return
             
         # Phase 4: Calculate Peak Demand
         peak_demand = 100.0 if frost_emergency else 0.0
+        peak_zone = "Frost Emergency" if frost_emergency else None
         for zone in self.zones:
             climate_id = make_zone_entity_id(zone[CONF_ZONE_NAME])
             mode = self.get_zone_mode(climate_id)
@@ -1059,6 +1099,7 @@ class MultizoneCoordinator:
             demand = self.get_zone_demand(climate_id)
             if demand > peak_demand:
                 peak_demand = demand
+                peak_zone = zone[CONF_ZONE_NAME]
                 
         # Track activity for anti-seize (both modes)
         if peak_demand > 0:
@@ -1066,6 +1107,9 @@ class MultizoneCoordinator:
             
         if self.boiler_mode == MODE_OPENTHERM:
             await self._async_update_opentherm_boiler(peak_demand)
+            norm = max(0.0, min(1.0, peak_demand / 100.0))
+            water_target = round(self.opentherm_min_temp + (norm * (self.opentherm_max_temp - self.opentherm_min_temp)), 1)
+            self._boiler_status_reason = f"MODULATING - Target water: {water_target}°C (Demand: {round(peak_demand, 1)}% from {peak_zone or 'None'})"
             return
 
         # Feed Peak Load to PWM Engine
@@ -1079,6 +1123,7 @@ class MultizoneCoordinator:
             time_since_change = time.monotonic() - self._last_boiler_change
             min_off_sec = self._min_cycle_off * 60
             if time_since_change < min_off_sec:
+                self._boiler_status_reason = f"HOLD_OFF - min_cycle_off active ({round(min_off_sec - time_since_change)}s remaining)"
                 _LOGGER.debug("PWM Tick: Boiler wants to turn ON, but min_cycle_off (%.0fs) hasn't elapsed. Waiting...", min_off_sec)
                 return
                 
@@ -1118,14 +1163,17 @@ class MultizoneCoordinator:
             if not trvs_ready and any((zone.get(CONF_ZONE_CLIMATES) or []) for zone in self.zones) and not frost_emergency:
                 # BUG-03: During frost_emergency, skip this check — TRVs are being forced HEAT above,
                 # they may not be physically open yet but anti-frost takes priority over boiler safety
+                self._boiler_status_reason = "HOLD_TRV_CLOSED - TRVs not physically open > 10%"
                 _LOGGER.warning("PWM Tick: Boiler wants to turn ON, but no TRVs are open > 10%. Delaying boiler ignition.")
                 return
 
             if self._valve_delay > 0:
                 if not self._pending_boiler_task:
+                    self._boiler_status_reason = f"WAITING_VALVES - Valve delay active ({self._valve_delay}s)"
                     _LOGGER.debug("Waiting %s seconds for valves to open...", self._valve_delay)
                     self._schedule_boiler_check(self._valve_delay, True)
             else:
+                self._boiler_status_reason = f"ON - Demand {round(peak_demand, 1)}% from {peak_zone or 'Zone'}"
                 await self._force_boiler_on()
         elif not wanted_state:
             # Hard lock: prevent turning OFF if min_cycle_on hasn't elapsed
@@ -1133,6 +1181,7 @@ class MultizoneCoordinator:
             time_since_change = time.monotonic() - self._last_boiler_change
             min_on_sec = self._min_cycle_on * 60
             if current_boiler_on and time_since_change < min_on_sec:
+                self._boiler_status_reason = f"HOLD_ON - min_cycle_on active ({round(min_on_sec - time_since_change)}s remaining)"
                 _LOGGER.debug("PWM Tick: Boiler wants to turn OFF, but min_cycle_on (%.0fs) hasn't elapsed. Waiting...", min_on_sec)
                 return
                 
@@ -1142,8 +1191,14 @@ class MultizoneCoordinator:
                 self._pending_boiler_task.cancel()
                 self._pending_boiler_task = None
             if current_boiler_on:
+                self._boiler_status_reason = f"OFF - Cycle ended (Peak Demand: {round(peak_demand, 1)}%)"
                 _LOGGER.debug("PWM Tick: Boiler → OFF (Peak Demand: %.1f%%)", peak_demand)
                 await self._force_boiler_off()
+            else:
+                self._boiler_status_reason = f"OFF - Idle (Peak Demand: {round(peak_demand, 1)}%)"
+        else:
+            # wanted_state and current_boiler_on (steady heating)
+            self._boiler_status_reason = f"ON - Heating (Peak Demand: {round(peak_demand, 1)}% from {peak_zone or 'Zone'})"
 
     async def _async_update_opentherm_boiler(self, demand: float) -> None:
         """Map demand to OpenTherm target temperature."""
@@ -1233,6 +1288,7 @@ class MultizoneCoordinator:
             blocking=False,
         )
         self._last_boiler_change = time.monotonic()
+        self.record_diagnostic_event("BOILER_SWITCH_ON", {"switch": self.boiler_switch, "reason": self._boiler_status_reason})
         _LOGGER.debug("Boiler forced ON")
 
     async def _force_boiler_off(self) -> None:
@@ -1251,6 +1307,7 @@ class MultizoneCoordinator:
             blocking=False,
         )
         self._last_boiler_change = time.monotonic()
+        self.record_diagnostic_event("BOILER_SWITCH_OFF", {"switch": self.boiler_switch, "reason": self._boiler_status_reason})
         _LOGGER.debug("Boiler forced OFF")
 
     async def async_apply_master_on(self) -> None:

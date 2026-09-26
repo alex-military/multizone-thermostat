@@ -4,7 +4,10 @@ from __future__ import annotations
 import asyncio
 from datetime import timedelta
 import logging
+import time
 from typing import Any
+
+import homeassistant.util.dt as dt_util
 
 from homeassistant.components.climate import (
     ClimateEntity,
@@ -134,6 +137,22 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
 
         self.entity_id = vt_entity_id
         self._unsub_listeners: list = []
+        
+        # Diagnostics: TRV Health, Latency & Communication Status
+        self._trv_health: dict[str, dict[str, Any]] = {
+            trv: {
+                "sync_status": "INITIALIZED",
+                "last_command_target": None,
+                "last_command_mode": None,
+                "last_command_time": None,
+                "last_ack_time": None,
+                "last_reported_temp": None,
+                "latency_s": None,
+                "consecutive_timeouts": 0,
+                "last_error": None,
+            }
+            for trv in self._climates
+        }
 
     @property
     def name(self) -> str:
@@ -199,7 +218,7 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         """Run when entity about to be added."""
         await super().async_added_to_hass()
         
-        self._coordinator.register_climate(self.entity_id, self.async_write_ha_state)
+        self._coordinator.register_climate(self.entity_id, self.async_write_ha_state, self)
 
         last_state = await self.async_get_last_state()
         if last_state is not None:
@@ -251,8 +270,16 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         for unsub in self._unsub_listeners:
             unsub()
         self._unsub_listeners.clear()
-        # Unregister from coordinator on removal.
-        pass
+        self._coordinator.unregister_climate(self.entity_id)
+
+    def get_trv_health(self) -> dict[str, Any]:
+        """Return sanitized TRV health, communication status and latency statistics."""
+        sanitized = {}
+        for trv, health in self._trv_health.items():
+            entry = dict(health)
+            entry.pop("last_command_time_monotonic", None)
+            sanitized[trv] = entry
+        return sanitized
 
     @callback
     def _on_temp_changed(self, event: Event) -> None:
@@ -372,6 +399,20 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
                     # Reached expected target sent by us, clear pending
                     self._pending_trv_targets.pop(entity_id, None)
                     self._last_known_trv_targets[entity_id] = float(new_temp)
+                    health = self._trv_health.setdefault(entity_id, {})
+                    sent_mono = health.get("last_command_time_monotonic")
+                    latency = round(time.monotonic() - sent_mono, 2) if sent_mono else None
+                    health["sync_status"] = "IN_SYNC"
+                    health["latency_s"] = latency
+                    health["last_ack_time"] = dt_util.now().isoformat()
+                    health["last_reported_temp"] = float(new_temp)
+                    health["consecutive_timeouts"] = 0
+                    self._coordinator.record_diagnostic_event("TRV_CONFIRMED", {
+                        "zone": self._name,
+                        "trv": entity_id,
+                        "target": float(new_temp),
+                        "latency_s": latency,
+                    })
                     return
                 else:
                     # Still intermediate/transient state reported by device on activation, ignore delta
@@ -387,6 +428,13 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
                 if abs(new_temp - old_temp) > 0.01:
                     delta = new_temp - old_temp
                     _LOGGER.info("TRV %s changed target by %.1f°. Applying delta to Zone %s", entity_id, delta, self._name)
+                    self._coordinator.record_diagnostic_event("TRV_KNOB_DELTA", {
+                        "zone": self._name,
+                        "trv": entity_id,
+                        "delta": round(delta, 1),
+                        "old_temp": old_temp,
+                        "new_temp": new_temp,
+                    })
 
                     # Apply delta to Master target
                     if self._target_temperature is not None:
@@ -479,6 +527,13 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
                         # Send target to TRV (always send if mode changed, or if target differs)
                         current_device_target = st.attributes.get(ATTR_TEMPERATURE)
                         if mode_changed or current_device_target != trv_target:
+                            health = self._trv_health.setdefault(trv, {})
+                            health["last_command_target"] = trv_target
+                            health["last_command_mode"] = str(target_hvac_mode)
+                            health["last_command_time"] = dt_util.now().isoformat()
+                            health["last_command_time_monotonic"] = time.monotonic()
+                            health["sync_status"] = "PENDING_CONFIRMATION"
+
                             # BUG-01: register pending ONLY on successful send; clean up on failure
                             try:
                                 await self.hass.services.async_call(
@@ -489,8 +544,22 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
                                     context=self._internal_context,
                                 )
                                 self._pending_trv_targets[trv] = trv_target
+                                self._coordinator.record_diagnostic_event("TRV_COMMAND_SENT", {
+                                    "zone": self._name,
+                                    "trv": trv,
+                                    "target": trv_target,
+                                    "mode": str(target_hvac_mode),
+                                })
                             except Exception as err:
                                 _LOGGER.error("Failed to send temperature to TRV %s: %s", trv, err)
+                                health["sync_status"] = "FAILED"
+                                health["consecutive_timeouts"] = health.get("consecutive_timeouts", 0) + 1
+                                health["last_error"] = str(err)
+                                self._coordinator.record_diagnostic_event("TRV_COMMAND_FAILED", {
+                                    "zone": self._name,
+                                    "trv": trv,
+                                    "error": str(err),
+                                })
                                 # Remove any stale pending to avoid permanently ignoring this TRV
                                 self._pending_trv_targets.pop(trv, None)
 

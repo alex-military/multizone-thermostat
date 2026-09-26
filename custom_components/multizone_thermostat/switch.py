@@ -120,6 +120,8 @@ class MultizoneMasterSwitch(RestoreEntity, SwitchEntity):
         return {
             "multizone_type": "master",
             "boiler_switch": self._coordinator.boiler_switch,
+            "boiler_status_reason": self._coordinator.boiler_status_reason,
+            "boiler_mode": self._coordinator.boiler_mode,
         }
 
     async def async_turn_on(self, **kwargs: Any) -> None:
