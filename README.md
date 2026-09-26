@@ -146,7 +146,7 @@ Explore how the central plant supervision and zone energy evaluation react to re
 
 | Metric | Room Details | Automated Diagnosis |
 | :--- | :--- | :--- |
-| **Zone** | **Studio / Office** (Primary) | Heat demanded for > 45 minutes, but room temperature continues dropping. |
+| **Zone** | **Master Bedroom** (Primary) | Heat demanded for > 45 minutes, but room temperature continues dropping. |
 | **Energy Class** | **Class F** (Severe Dispersion) | Room losing heat faster than emitter output. |
 | **Thermal Retention** | **2.1 hours** (-1°C) • *Rapid dispersion* | Cold wall transmission or open damper. |
 | **Valve Surveillance** | **❌ CRITICAL: Valve Stuck Closed** | **Hardware Fault:** Actuator pin stuck closed or air trapped in radiator. Persistent notification dispatched to Home Assistant notifications center. |
@@ -154,14 +154,14 @@ Explore how the central plant supervision and zone energy evaluation react to re
 </details>
 
 <details>
-<summary><b>4. 🟣 Loft & Fan Coil: Passive Heat Intake (Apporto Passivo)</b></summary>
+<summary><b>4. 🟣 Mezzanine & Fan Coil: Passive Heat Intake (Apporto Passivo)</b></summary>
 <br>
 
-| Metric | Camera Soppalco 2 (Bypassed Zone) | Thermal Behavior |
+| Metric | Guest Bedroom / Mezzanine (Bypassed Zone) | Thermal Behavior |
 | :--- | :--- | :--- |
 | **Zone Mode** | **BYPASSED / SECONDARY** | Zone excluded from triggering central boiler ignition. |
 | **Passive Intake** | **Active (Apporto Passivo)** | Designed for open mezzanines or fan coils without cutoff valves where hot water circulates freely. |
-| **Valve Surveillance** | **Valvola Chiusa (Apporto passivo attivo)** | Suppresses false "ghost heating" alarms when convective heat rises from the floor below. |
+| **Valve Surveillance** | **Valve Closed (Passive heat active)** | Suppresses false "ghost heating" alarms when convective heat rises from the floor below. |
 
 </details>
 

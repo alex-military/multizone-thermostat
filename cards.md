@@ -182,7 +182,7 @@ You can also test the full diagnostic dashboard interactively in your web browse
   - **Normal Operation**: optimal health, low short-cycling frequency, healthy valves.
   - **High Short-Cycling Warning**: boiler cycle wear alerts and mitigation hints.
   - **Stuck Valve Anomaly**: critical red alert when a room demands heat but radiator stays cold.
-  - **Passive Heat Intake (Soppalco / Fancoil)**: valve bypass and passive heat tracking.
+  - **Passive Heat Intake (Mezzanine / Fan coil)**: valve bypass and passive heat tracking.
   - **Instant Multilingual Switch**: Toggle between 🇬🇧 English, 🇮🇹 Italian, and 🇷🇺 Russian with a single click.
 
 > **Note**: If you installed via HACS, the Lovelace card resource is registered automatically. If cards don't appear, add the resource manually:

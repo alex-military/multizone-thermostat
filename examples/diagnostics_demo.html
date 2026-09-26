@@ -242,12 +242,12 @@
         </div>
       </div>
 
-      <!-- Card 3: Loft Bedroom (Fan coil / Passive Heat) -->
+      <!-- Card 3: Master Bedroom -->
       <div id="card-loft1" class="rounded-3xl glass-panel p-5 relative overflow-hidden flex flex-col justify-between space-y-4">
         <div class="flex items-start justify-between">
           <div>
             <div class="flex items-center gap-2">
-              <h4 class="text-xl font-black text-slate-100" id="title-loft1">Loft Bedroom</h4>
+              <h4 class="text-xl font-black text-slate-100" id="title-loft1">Master Bedroom</h4>
               <button onclick="cycleMode('loft1')" id="mode-loft1" class="text-[11px] font-extrabold px-2.5 py-1 rounded-md bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:opacity-80 transition-all uppercase" title="Click to cycle mode">PRIMARY</button>
             </div>
             <div id="temp-loft1" class="text-sm font-medium text-slate-400 mt-1">21.1°C / target 20.0°C</div>
@@ -288,12 +288,12 @@
         </div>
       </div>
 
-      <!-- Card 4: Upper Loft 2 (Bypassed) -->
+      <!-- Card 4: Guest Bedroom (Bypassed) -->
       <div id="card-loft2" class="rounded-3xl glass-panel p-5 relative overflow-hidden flex flex-col justify-between space-y-4">
         <div class="flex items-start justify-between">
           <div>
             <div class="flex items-center gap-2">
-              <h4 class="text-xl font-black text-slate-100" id="title-loft2">Upper Loft 2</h4>
+              <h4 class="text-xl font-black text-slate-100" id="title-loft2">Guest Bedroom</h4>
               <button onclick="cycleMode('loft2')" id="mode-loft2" class="text-[11px] font-extrabold px-2.5 py-1 rounded-md bg-slate-500/20 text-slate-400 border border-slate-500/30 hover:opacity-80 transition-all uppercase" title="Click to cycle mode">BYPASSED</button>
             </div>
             <div id="temp-loft2" class="text-sm font-medium text-slate-400 mt-1">21.4°C / (BYPASSED)</div>
@@ -389,8 +389,8 @@
         passiveActive: "Passive heat active",
         titleLiving: "Living Room",
         titleKitchen: "Kitchen",
-        titleLoft1: "Loft Bedroom",
-        titleLoft2: "Upper Loft 2"
+        titleLoft1: "Master Bedroom",
+        titleLoft2: "Guest Bedroom"
       },
       it: {
         headerDesc: "Diagnostica Impianto Termico & Involucro Edilizio ad Alta Precisione",
@@ -439,8 +439,8 @@
         passiveActive: "Apporto passivo attivo",
         titleLiving: "Soggiorno",
         titleKitchen: "Cucina",
-        titleLoft1: "Camera Soppalco",
-        titleLoft2: "Camera Soppalco 2"
+        titleLoft1: "Camera da Letto",
+        titleLoft2: "Camera Ospiti"
       },
       ru: {
         headerDesc: "Диагностика отопления и энергоэффективности помещений",
@@ -489,8 +489,8 @@
         passiveActive: "Пассивное тепло активно",
         titleLiving: "Гостиная",
         titleKitchen: "Кухня",
-        titleLoft1: "Мансарда 1",
-        titleLoft2: "Мансарда 2"
+        titleLoft1: "Спальня",
+        titleLoft2: "Гостевая"
       }
     };
 
@@ -655,10 +655,10 @@
         alertBox.className = "p-4 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-200 text-xs flex flex-col gap-1";
         alertTitle.innerText = d.critical;
         alertDesc.innerHTML = currentLang === 'it' 
-          ? "• <b>Camera Soppalco</b>: Valvola probabilmente bloccata chiusa (richiesta 100% da &gt; 60m con caldaia ON, ma temperatura non sale)."
+          ? "• <b>Camera da Letto</b>: Valvola probabilmente bloccata chiusa (richiesta 100% da &gt; 60m con caldaia ON, ma temperatura non sale)."
           : (currentLang === 'ru'
-            ? "• <b>Мансарда 1</b>: Клапан заблокирован (запрос 100% более 60 мин при включенном котле, но температура не растет)."
-            : "• <b>Loft Bedroom</b>: Valve likely stuck closed (100% demand for &gt; 60m with boiler ON, but temperature does not rise).");
+            ? "• <b>Спальня</b>: Клапан заблокирован (запрос 100% более 60 мин при включенном котле, но температура не растет)."
+            : "• <b>Master Bedroom</b>: Valve likely stuck closed (100% demand for &gt; 60m with boiler ON, but temperature does not rise).");
       }
       else if (scen === 'passive_heat') {
         document.getElementById('btn-passive').className = "px-3 py-1.5 rounded-xl font-bold bg-sky-500/20 text-sky-400 border border-sky-500/40 shadow-sm transition-all";
@@ -670,10 +670,10 @@
         alertBox.className = "p-4 rounded-2xl bg-sky-500/10 border border-sky-500/20 text-sky-300 text-xs flex flex-col gap-1";
         alertTitle.innerText = d.passiveActive;
         alertDesc.innerText = currentLang === 'it'
-          ? "Gestione soppalchi e fancoil attiva: nessun falso allarme di trafilamento se la temperatura sale a valvola esclusa."
+          ? "Gestione apporto passivo attiva: nessun falso allarme di trafilamento se la temperatura sale a valvola esclusa (es. fancoil o calore convettivo)."
           : (currentLang === 'ru'
-            ? "Пассивное тепло активно: ложные тревоги утечки отключены для мансард и фанкойлов."
-            : "Passive heat intake active: ghost heating leakage warnings are safely muted when valves are closed.");
+            ? "Пассивное тепло активно: ложные тревоги утечки отключены при закрытом клапане (фанкойлы или конвекционное тепло)."
+            : "Passive heat intake active: ghost heating leakage warnings are safely muted when valves are closed (e.g. fan coils or convective heat).");
       }
     }
   </script>
