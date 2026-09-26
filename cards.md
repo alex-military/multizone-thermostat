@@ -168,15 +168,24 @@ views:
 
 ---
 
-## 🌟 Live Interactive Demo
+## 🌟 Live Interactive Demo & Multilingual Support
 
-You can preview and test the complete modern glassmorphic diagnostic dashboard in your web browser:
-- Open [`examples/diagnostics_demo.html`](examples/diagnostics_demo.html) directly in any browser to interactively simulate:
+The Lovelace cards automatically adapt to your Home Assistant language setting (**English**, **Italian**, and **Russian** supported natively).
+
+You can also test the full diagnostic dashboard interactively in your web browser with our standalone web simulator:
+
+[![Launch Live Simulator](https://img.shields.io/badge/Launch%20Live%20Simulator-GitHub%20Pages-0ea5e9?style=for-the-badge&logo=googlechrome&logoColor=white)](https://alex-military.github.io/multizone-thermostat/)
+
+- **Live Web App**: [https://alex-military.github.io/multizone-thermostat/](https://alex-military.github.io/multizone-thermostat/)
+- **Offline / Local**: Open [`examples/diagnostics_demo.html`](examples/diagnostics_demo.html) directly in any browser.
+- **Interactive Scenarios**:
   - **Normal Operation**: optimal health, low short-cycling frequency, healthy valves.
   - **High Short-Cycling Warning**: boiler cycle wear alerts and mitigation hints.
   - **Stuck Valve Anomaly**: critical red alert when a room demands heat but radiator stays cold.
   - **Passive Heat Intake (Soppalco / Fancoil)**: valve bypass and passive heat tracking.
+  - **Instant Multilingual Switch**: Toggle between 🇬🇧 English, 🇮🇹 Italian, and 🇷🇺 Russian with a single click.
 
 > **Note**: If you installed via HACS, the Lovelace card resource is registered automatically. If cards don't appear, add the resource manually:
 > Go to **Settings → Dashboards → Resources** → Add `/multizone_thermostat_card/multizone-thermostat-card.js` as **JavaScript Module**.
+
 

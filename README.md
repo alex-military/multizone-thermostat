@@ -96,6 +96,77 @@ graph TD
 1. Copy the `custom_components/multizone_thermostat` folder to your HA `custom_components` directory
 2. Restart Home Assistant
 
+## 🎮 Interactive Live Simulator & Diagnostics Showcase
+
+Experience the diagnostic supervision and energy calculation features directly inside your browser. Multizone Thermostat provides a standalone web simulator running the exact same frontend algorithms as the Home Assistant Lovelace cards:
+
+[![Launch Live Simulator](https://img.shields.io/badge/Launch%20Live%20Simulator-GitHub%20Pages-0ea5e9?style=for-the-badge&logo=googlechrome&logoColor=white)](https://alex-military.github.io/multizone-thermostat/)
+
+> [!TIP]
+> The live simulator is hosted directly on this repository via **GitHub Pages** (`docs/index.html`) with instant multilingual toggles (**🇬🇧 EN**, **🇮🇹 IT**, **🇷🇺 RU**).
+> 
+> *To enable GitHub Pages on your fork*: Navigate to **Settings** → **Pages** → under **Build and deployment**, set Source to **Deploy from a branch**, Branch to `master` and folder to `/docs`.
+
+### 🔍 Interactive Scenario Showcase
+
+Explore how the central plant supervision and zone energy evaluation react to real-world thermal situations:
+
+<details open>
+<summary><b>1. 🟢 Normal Operation (Optimal Plant Health)</b></summary>
+<br>
+
+| Metric | Central Plant | Living Room (Primary) | Master Bedroom (Primary) |
+| :--- | :--- | :--- | :--- |
+| **System State** | **OPTIMAL** (Burner Standby) | Target: 20.0°C / Current: 20.4°C | Target: 19.0°C / Current: 19.1°C |
+| **Boiler Cycles** | **1.8 cycles/h** (Low Wear) | — | — |
+| **Runtime 24h** | **4.2 hours** | — | — |
+| **Energy Class** | — | **Class A (3.2 kW/m²)** | **Class B (4.8 kW/m²)** |
+| **Thermal Retention** | — | **7.5 hours** (-1°C) • *Excellent Insulation* | **6.1 hours** (-1°C) • *Excellent Insulation* |
+| **Radiator Sizing** | — | **Optimal** (Power/loss ratio OK) | **Optimal** (Power/loss ratio OK) |
+| **Valve Status** | Circuits operational | ✅ Valve Closed (Target met) | ✅ Valve Closed (Target met) |
+
+</details>
+
+<details>
+<summary><b>2. 🟡 High Short-Cycling Alert (Boiler Stress)</b></summary>
+<br>
+
+| Metric | Central Plant | Root Cause & Mitigation |
+| :--- | :--- | :--- |
+| **System State** | **ATTENTION** (High Ignition Frequency) | Burner cycling frequently due to low heat capacity or undersized minimum off-time. |
+| **Boiler Cycles** | **⚠️ 6.8 cycles/h (> 5.0 c/h)** | *Exceeds safe mechanical limit.* |
+| **Runtime 24h** | **5.4 hours** | Fragmented bursts reduce condensation efficiency and strain relay contacts. |
+| **System Guidance** | Increase minimum off-time in options | Increase `anti_cycle_delay` parameter in integration settings to bundle heating demands into fewer, longer cycles. |
+
+</details>
+
+<details>
+<summary><b>3. 🔴 Critical Anomaly: Stuck Mechanical Valve</b></summary>
+<br>
+
+| Metric | Room Details | Automated Diagnosis |
+| :--- | :--- | :--- |
+| **Zone** | **Studio / Office** (Primary) | Heat demanded for > 45 minutes, but room temperature continues dropping. |
+| **Energy Class** | **Class F** (Severe Dispersion) | Room losing heat faster than emitter output. |
+| **Thermal Retention** | **2.1 hours** (-1°C) • *Rapid dispersion* | Cold wall transmission or open damper. |
+| **Valve Surveillance** | **❌ CRITICAL: Valve Stuck Closed** | **Hardware Fault:** Actuator pin stuck closed or air trapped in radiator. Persistent notification dispatched to Home Assistant notifications center. |
+
+</details>
+
+<details>
+<summary><b>4. 🟣 Loft & Fan Coil: Passive Heat Intake (Apporto Passivo)</b></summary>
+<br>
+
+| Metric | Camera Soppalco 2 (Bypassed Zone) | Thermal Behavior |
+| :--- | :--- | :--- |
+| **Zone Mode** | **BYPASSED / SECONDARY** | Zone excluded from triggering central boiler ignition. |
+| **Passive Intake** | **Active (Apporto Passivo)** | Designed for open mezzanines or fan coils without cutoff valves where hot water circulates freely. |
+| **Valve Surveillance** | **Valvola Chiusa (Apporto passivo attivo)** | Suppresses false "ghost heating" alarms when convective heat rises from the floor below. |
+
+</details>
+
+---
+
 ## Documentation Hub
 
 Everything about the Multizone Thermostat is documented in the following dedicated pages:
@@ -111,3 +182,4 @@ A special thanks to the creators of [SmartThermostat](https://github.com/ScratMa
 ## License
 
 This project is licensed under the MIT License.
+

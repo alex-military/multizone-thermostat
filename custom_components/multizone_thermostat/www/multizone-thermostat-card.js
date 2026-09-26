@@ -70,7 +70,42 @@ const TRANSLATIONS = {
     preset_sleep: "Notte",
     preset_away: "Fuori Casa",
     preset_card_title: "Preset Globale",
-    edit_preset: "EntitÃ  Preset (Opzionale)"
+    edit_preset: "Entità Preset (Opzionale)",
+    // Diagnostic translations
+    plant_health_title: "Salute Impianto & Caldaia",
+    plant_health_sub: "Supervisione idraulica e usura relè",
+    cycles_label: "Frequenza Accensioni (Short-Cycle)",
+    cycles_unit: "cicli/h",
+    wear_low: "Usura Bassa (< 3.5 c/h)",
+    wear_moderate: "Usura Moderata (3.5 - 5 c/h)",
+    wear_high: "⚠️ Short-Cycling Elevato (> 5 c/h)",
+    runtime_24h: "Funzionamento Ultime 24h",
+    runtime_sub: "Attività cumulativa relè / mandata",
+    all_circuits_ok: "Tutti i circuiti operativi",
+    no_anomalies: "Nessun blocco valvola, trafilamento o short-cycling rilevato.",
+    attention_cycles: "Attenzione: frequenza di accensioni caldaia elevata o parametri da ottimizzare.",
+    retention_label: "Ritenzione (-1°C)",
+    hours: "ore",
+    learning: "In apprendimento...",
+    opt_insulation: "Ottimo isolamento",
+    med_insulation: "Isolamento medio",
+    fast_dispersion: "Dispersione rapida",
+    sizing_label: "Resa Termoarredo",
+    sizing_opt: "Rapporto potenza/perdite OK",
+    sizing_under: "Richiede tempo per salire",
+    sizing_over: "Potenza elevata",
+    sizing_waiting: "In attesa dati termici",
+    valve_status: "Stato Valvola:",
+    valve_ok: "Nessuna anomalia",
+    valve_closed_bypass: "Valvola Chiusa (Bypass)",
+    passive_heat_active: "Apporto passivo attivo",
+    bypassed_tag: "BYPASSATA",
+    primary_tag: "PRIMARIA",
+    secondary_tag: "SECONDARIA",
+    target: "target",
+    optimal: "OTTIMALE",
+    warning: "ATTENZIONE",
+    critical: "CRITICO"
   },
   en: {
     enabled: "Enabled",
@@ -104,7 +139,111 @@ const TRANSLATIONS = {
     preset_sleep: "Sleep",
     preset_away: "Away",
     preset_card_title: "Global Preset",
-    edit_preset: "Preset Entity (Optional)"
+    edit_preset: "Preset Entity (Optional)",
+    // Diagnostic translations
+    plant_health_title: "Plant Health & Boiler",
+    plant_health_sub: "Hydraulic supervision and relay wear",
+    cycles_label: "Ignition Frequency (Short-Cycle)",
+    cycles_unit: "cycles/h",
+    wear_low: "Low Wear (< 3.5 c/h)",
+    wear_moderate: "Moderate Wear (3.5 - 5 c/h)",
+    wear_high: "⚠️ High Short-Cycling (> 5 c/h)",
+    runtime_24h: "Runtime Past 24h",
+    runtime_sub: "Cumulative relay / burner activity",
+    all_circuits_ok: "All circuits operational",
+    no_anomalies: "No valve lock, leakage or short-cycling detected.",
+    attention_cycles: "Warning: high boiler cycling frequency or parameters need tuning.",
+    retention_label: "Retention (-1°C)",
+    hours: "hours",
+    learning: "Learning...",
+    opt_insulation: "Great insulation",
+    med_insulation: "Average insulation",
+    fast_dispersion: "Fast heat loss",
+    sizing_label: "Radiator Sizing",
+    sizing_opt: "Heat output ratio OK",
+    sizing_under: "Slow warm-up (undersized)",
+    sizing_over: "High power (oversized)",
+    sizing_waiting: "Waiting for thermal data",
+    valve_status: "Valve Status:",
+    valve_ok: "No anomalies",
+    valve_closed_bypass: "Valve Closed (Bypass)",
+    passive_heat_active: "Passive heat active",
+    bypassed_tag: "BYPASSED",
+    primary_tag: "PRIMARY",
+    secondary_tag: "SECONDARY",
+    target: "target",
+    optimal: "OPTIMAL",
+    warning: "WARNING",
+    critical: "CRITICAL"
+  },
+  ru: {
+    enabled: "Включено",
+    heating: "Отопление",
+    heating_active: "Активный нагрев",
+    idle: "Ожидание (Idle)",
+    off: "Выкл",
+    excluded: "Зона исключена",
+    bypass_msg: "Зона исключена / Байпас",
+    caldaia_circ: "Котел/Насос",
+    system_active: "Система активна",
+    system_off: "Система выключена",
+    searching: "Поиск...",
+    master_not_found: "Мастер не найден",
+    temp_detected: "Текущая",
+    custom_error: "Ошибка карточки Multizone Thermostat",
+    heat_mode: "Нагрев",
+    primary: "Основная",
+    secondary: "Вторичная",
+    primary_tooltip: "Основная (запускает котел)",
+    secondary_tooltip: "Вторичная (пассивная)",
+    bypass_tooltip: "Байпас (исключена)",
+    master_title: "Центральное отопление",
+    thermostat: "Термостат",
+    edit_title: "Пользовательское имя (опционально)",
+    edit_climate: "Термостат (Climate Entity)",
+    edit_switch: "Переключатель зоны",
+    preset_manual: "Ручной",
+    preset_eco: "Эко",
+    preset_comfort: "Комфорт",
+    preset_sleep: "Сон",
+    preset_away: "Вне дома",
+    preset_card_title: "Глобальный пресет",
+    edit_preset: "Сущность пресета",
+    // Diagnostic translations
+    plant_health_title: "Здоровье системы и котла",
+    plant_health_sub: "Гидравлический контроль и износ реле",
+    cycles_label: "Частота розжига (Short-Cycle)",
+    cycles_unit: "циклов/ч",
+    wear_low: "Низкий износ (< 3.5 ц/ч)",
+    wear_moderate: "Умеренный износ (3.5 - 5 ц/ч)",
+    wear_high: "⚠️ Частые циклы (> 5 ц/ч)",
+    runtime_24h: "Время работы за 24ч",
+    runtime_sub: "Суммарная активность реле",
+    all_circuits_ok: "Все контуры в норме",
+    no_anomalies: "Заеданий, утечек и частых циклов не обнаружено.",
+    attention_cycles: "Внимание: частый розжиг котла, требуется настройка параметров.",
+    retention_label: "Удержание (-1°C)",
+    hours: "ч",
+    learning: "Обучение...",
+    opt_insulation: "Отличная изоляция",
+    med_insulation: "Средняя изоляция",
+    fast_dispersion: "Быстрая потеря тепла",
+    sizing_label: "Размер радиатора",
+    sizing_opt: "Баланс мощности в норме",
+    sizing_under: "Медленный прогрев",
+    sizing_over: "Высокая мощность",
+    sizing_waiting: "Ожидание данных",
+    valve_status: "Статус клапана:",
+    valve_ok: "Без аномалий",
+    valve_closed_bypass: "Клапан закрыт (Байпас)",
+    passive_heat_active: "Пассивное тепло активно",
+    bypassed_tag: "БАЙПАС",
+    primary_tag: "ОСНОВНАЯ",
+    secondary_tag: "ВТОРИЧНАЯ",
+    target: "цель",
+    optimal: "ОПТИМАЛЬНО",
+    warning: "ВНИМАНИЕ",
+    critical: "КРИТИЧНО"
   }
 };
 
@@ -1991,6 +2130,7 @@ class MultizoneThermostatPlantCard extends HTMLElement {
       }
     `;
 
+    const t = (k) => getTranslation(this._hass, k);
     const card = document.createElement('ha-card');
     card.innerHTML = `
       <div class="header-row">
@@ -1999,42 +2139,42 @@ class MultizoneThermostatPlantCard extends HTMLElement {
             <ha-icon icon="mdi:shield-check"></ha-icon>
           </div>
           <div>
-            <div class="title-text">Salute Impianto & Caldaia</div>
-            <div class="subtitle-text">Supervisione idraulica e usura relè</div>
+            <div class="title-text" id="plant-title">${t('plant_health_title')}</div>
+            <div class="subtitle-text" id="plant-sub">${t('plant_health_sub')}</div>
           </div>
         </div>
         <div class="status-badge status-optimal" id="health-badge">
           <span class="status-dot"></span>
-          <span id="health-text">OTTIMALE</span>
+          <span id="health-text">${t('optimal')}</span>
         </div>
       </div>
 
       <div class="kpi-grid">
         <div class="kpi-card">
-          <span class="kpi-label">Frequenza Accensioni (Short-Cycle)</span>
+          <span class="kpi-label" id="cycles-label">${t('cycles_label')}</span>
           <div class="kpi-value-row">
             <span class="kpi-val" id="cycles-val">--</span>
-            <span class="kpi-unit">cicli/h</span>
+            <span class="kpi-unit" id="cycles-unit">${t('cycles_unit')}</span>
           </div>
-          <div class="kpi-sub" id="cycles-sub" style="color: #34d399;">Usura Bassa</div>
+          <div class="kpi-sub" id="cycles-sub" style="color: #34d399;">${t('wear_low')}</div>
         </div>
 
         <div class="kpi-card">
-          <span class="kpi-label">Funzionamento Ultime 24h</span>
+          <span class="kpi-label" id="runtime-label">${t('runtime_24h')}</span>
           <div class="kpi-value-row">
             <span class="kpi-val" id="runtime-val" style="color: #60a5fa;">--</span>
-            <span class="kpi-unit">ore</span>
+            <span class="kpi-unit" id="runtime-unit">${t('hours')}</span>
           </div>
-          <div class="kpi-sub" style="color: #94a3b8;">Attività cumulativa relè/mandata</div>
+          <div class="kpi-sub" id="runtime-sub" style="color: #94a3b8;">${t('runtime_sub')}</div>
         </div>
       </div>
 
       <div class="alert-box alert-ok" id="alert-box">
         <div class="alert-title" id="alert-title-wrap">
           <ha-icon icon="mdi:check-circle-outline" style="--mdc-icon-size: 18px; color: #34d399;"></ha-icon>
-          <span>Tutti i circuiti operativi</span>
+          <span id="alert-title-text">${t('all_circuits_ok')}</span>
         </div>
-        <div id="alert-desc">Nessun blocco valvola, trafilamento o short-cycling rilevato.</div>
+        <div id="alert-desc">${t('no_anomalies')}</div>
       </div>
     `;
 
@@ -2047,6 +2187,7 @@ class MultizoneThermostatPlantCard extends HTMLElement {
     if (!this._hass || !this._rendered) return;
 
     try {
+      const t = (k) => getTranslation(this._hass, k);
       let healthEntity = this._config.health_entity;
       let cyclesEntity = this._config.cycles_entity;
       let runtimeEntity = this._config.runtime_entity;
@@ -2080,12 +2221,14 @@ class MultizoneThermostatPlantCard extends HTMLElement {
 
       const statusVal = healthState ? healthState.state : "Ottimale";
       if (healthBadge && healthText) {
-        healthText.innerText = statusVal.toUpperCase();
         if (statusVal === "Critico") {
+          healthText.innerText = t('critical');
           healthBadge.className = "status-badge status-critical";
         } else if (statusVal === "Attenzione") {
+          healthText.innerText = t('warning');
           healthBadge.className = "status-badge status-warning";
         } else {
+          healthText.innerText = t('optimal');
           healthBadge.className = "status-badge status-optimal";
         }
       }
@@ -2095,13 +2238,13 @@ class MultizoneThermostatPlantCard extends HTMLElement {
         cyclesVal.innerText = c.toFixed(1);
         if (cyclesSub) {
           if (c <= 3.5) {
-            cyclesSub.innerText = "Usura Bassa (< 3.5 c/h)";
+            cyclesSub.innerText = t('wear_low');
             cyclesSub.style.color = "#34d399";
           } else if (c <= 5.0) {
-            cyclesSub.innerText = "Usura Moderata (3.5 - 5 c/h)";
+            cyclesSub.innerText = t('wear_moderate');
             cyclesSub.style.color = "#fbbf24";
           } else {
-            cyclesSub.innerText = "⚠️ Short-Cycling Elevato (> 5 c/h)";
+            cyclesSub.innerText = t('wear_high');
             cyclesSub.style.color = "#f87171";
           }
         }
@@ -2120,10 +2263,10 @@ class MultizoneThermostatPlantCard extends HTMLElement {
           alertDesc.innerHTML = items;
         } else if (statusVal === "Attenzione") {
           alertBox.className = "alert-box alert-err";
-          alertDesc.innerText = "Attenzione: frequenza di accensioni caldaia elevata o parametri da ottimizzare.";
+          alertDesc.innerText = t('attention_cycles');
         } else {
           alertBox.className = "alert-box alert-ok";
-          alertDesc.innerText = "Nessun blocco valvola, trafilamento o short-cycling rilevato.";
+          alertDesc.innerText = t('no_anomalies');
         }
       }
     } catch (err) {
@@ -2325,13 +2468,14 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
       @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
     `;
 
+    const t = (k) => getTranslation(this._hass, k);
     const card = document.createElement('ha-card');
     card.innerHTML = `
       <div class="top-row">
         <div>
           <div class="zone-name">
             <span id="zone-title">Stanza</span>
-            <span class="zone-mode-badge" id="zone-mode-badge" title="Clicca per cambiare modalità zona">PRIMARIA</span>
+            <span class="zone-mode-badge" id="zone-mode-badge" title="Click to cycle zone mode">${t('primary_tag')}</span>
           </div>
           <div class="zone-sub" id="temp-sub">-- °C</div>
         </div>
@@ -2351,16 +2495,16 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
 
       <div class="stats-grid">
         <div class="stat-box">
-          <span class="stat-label">Ritenzione (-1°C)</span>
+          <span class="stat-label" id="retention-label">${t('retention_label')}</span>
           <div>
             <span class="stat-val" id="retention-val">--</span>
-            <span class="stat-unit">ore</span>
+            <span class="stat-unit" id="retention-unit">${t('hours')}</span>
           </div>
           <span class="stat-eval" id="retention-eval" style="color: #38bdf8;">--</span>
         </div>
 
         <div class="stat-box">
-          <span class="stat-label">Resa Termoarredo</span>
+          <span class="stat-label" id="sizing-label">${t('sizing_label')}</span>
           <div>
             <span class="stat-val" id="sizing-val">--</span>
           </div>
@@ -2369,10 +2513,10 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
       </div>
 
       <div class="bottom-row">
-        <span style="color: var(--secondary-text-color, #94a3b8);">Stato Valvola:</span>
+        <span style="color: var(--secondary-text-color, #94a3b8);" id="valve-status-label">${t('valve_status')}</span>
         <div class="valve-status" id="valve-status">
           <span class="pulse-dot pulse-green" id="valve-dot"></span>
-          <span id="valve-text">Nessuna anomalia</span>
+          <span id="valve-text">${t('valve_ok')}</span>
         </div>
       </div>
     `;
@@ -2386,6 +2530,7 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
     if (!this._hass || !this._rendered || !this._config || !this._config.entity) return;
 
     try {
+      const t = (k) => getTranslation(this._hass, k);
       const climateId = this._config.entity;
       const climateState = this._hass.states[climateId];
       if (!climateState) return;
@@ -2440,9 +2585,9 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
         const cur = climateState.attributes.current_temperature;
         const tgt = climateState.attributes.temperature;
         if (zoneMode === "bypass") {
-          tempSubEl.innerText = `${cur !== undefined ? cur : '--'}°C / (Bypassata)`;
+          tempSubEl.innerText = `${cur !== undefined ? cur : '--'}°C / (${t('bypassed_tag')})`;
         } else {
-          tempSubEl.innerText = `${cur !== undefined ? cur : '--'}°C / target ${tgt !== undefined ? tgt : '--'}°C`;
+          tempSubEl.innerText = `${cur !== undefined ? cur : '--'}°C / ${t('target')} ${tgt !== undefined ? tgt : '--'}°C`;
         }
       }
 
@@ -2468,17 +2613,17 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
         }
 
         if (zoneMode === "bypass") {
-          modeBadge.innerText = "BYPASSATA";
+          modeBadge.innerText = t('bypassed_tag');
           modeBadge.style.background = "rgba(100, 116, 139, 0.25)";
           modeBadge.style.color = "#94a3b8";
           modeBadge.style.border = "1px solid rgba(148, 163, 184, 0.3)";
         } else if (zoneMode === "secondary") {
-          modeBadge.innerText = "SECONDARIA";
+          modeBadge.innerText = t('secondary_tag');
           modeBadge.style.background = "rgba(168, 85, 247, 0.2)";
           modeBadge.style.color = "#c084fc";
           modeBadge.style.border = "1px solid rgba(168, 85, 247, 0.3)";
         } else {
-          modeBadge.innerText = "PRIMARIA";
+          modeBadge.innerText = t('primary_tag');
           modeBadge.style.background = "rgba(59, 130, 246, 0.2)";
           modeBadge.style.color = "#60a5fa";
           modeBadge.style.border = "1px solid rgba(59, 130, 246, 0.3)";
@@ -2519,10 +2664,10 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
         const r = parseFloat(rState.state);
         retentionVal.innerText = isNaN(r) ? "--" : r.toFixed(1);
         if (retentionEval) {
-          if (isNaN(r)) retentionEval.innerText = "In apprendimento...";
-          else if (r >= 6.0) retentionEval.innerText = "Ottimo isolamento";
-          else if (r >= 3.5) retentionEval.innerText = "Isolamento medio";
-          else retentionEval.innerText = "Dispersione rapida";
+          if (isNaN(r)) retentionEval.innerText = t('learning');
+          else if (r >= 6.0) retentionEval.innerText = t('opt_insulation');
+          else if (r >= 3.5) retentionEval.innerText = t('med_insulation');
+          else retentionEval.innerText = t('fast_dispersion');
         }
       }
 
@@ -2531,16 +2676,16 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
         sizingVal.innerText = sState.state;
         if (sizingEval) {
           if (sState.state === "Ottimale") {
-            sizingEval.innerText = "Rapporto potenza/perdite OK";
+            sizingEval.innerText = t('sizing_opt');
             sizingEval.style.color = "#34d399";
           } else if (sState.state === "Sottodimensionato") {
-            sizingEval.innerText = "Richiede tempo per salire";
+            sizingEval.innerText = t('sizing_under');
             sizingEval.style.color = "#f87171";
           } else if (sState.state === "Sovradimensionato") {
-            sizingEval.innerText = "Potenza elevata";
+            sizingEval.innerText = t('sizing_over');
             sizingEval.style.color = "#fbbf24";
           } else {
-            sizingEval.innerText = "In attesa dati termici";
+            sizingEval.innerText = t('sizing_waiting');
             sizingEval.style.color = "#94a3b8";
           }
         }
@@ -2581,11 +2726,11 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
           valveText.style.color = "#f87171";
         } else if (zoneMode === "bypass") {
           valveDot.className = "pulse-dot pulse-green";
-          valveText.innerText = allowPassive ? "Valvola Chiusa (Apporto passivo attivo)" : "Valvola Chiusa (Bypass)";
+          valveText.innerText = allowPassive ? `${t('valve_closed_bypass')} (${t('passive_heat_active')})` : t('valve_closed_bypass');
           valveText.style.color = "#94a3b8";
         } else {
           valveDot.className = "pulse-dot pulse-green";
-          valveText.innerText = allowPassive ? "Nessuna anomalia (Apporto passivo attivo)" : "Nessuna anomalia";
+          valveText.innerText = allowPassive ? `${t('valve_ok')} (${t('passive_heat_active')})` : t('valve_ok');
           valveText.style.color = "#34d399";
         }
       }
