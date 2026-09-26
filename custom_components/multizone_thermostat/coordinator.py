@@ -185,6 +185,10 @@ class MultizoneCoordinator:
         self._climate_entities: dict[str, Any] = {}
         self._boiler_status_reason: str = "OFF - Initializing"
 
+        # Plant Diagnostics & Anomaly Detection Engine
+        from .plant_diagnostics import PlantDiagnosticsEngine
+        self.plant_diagnostics = PlantDiagnosticsEngine(self)
+
     def register_climate(self, entity_id: str, callback, entity_instance: Any = None) -> None:
         """Register a climate entity for state updates and diagnostics."""
         self._climate_callbacks[entity_id] = callback
@@ -1214,6 +1218,7 @@ class MultizoneCoordinator:
         domain = self.opentherm_entity.split(".")[0]
         
         _LOGGER.debug("OpenTherm: Demand %.1f%% -> Target Water Temp: %.1f°C", norm_demand * 100, target_temp)
+        self.plant_diagnostics.record_boiler_state(norm_demand > 0.0)
         
         try:
             if domain in ["climate", "water_heater"]:
@@ -1289,6 +1294,7 @@ class MultizoneCoordinator:
         )
         self._last_boiler_change = time.monotonic()
         self.record_diagnostic_event("BOILER_SWITCH_ON", {"switch": self.boiler_switch, "reason": self._boiler_status_reason})
+        self.plant_diagnostics.record_boiler_state(True)
         _LOGGER.debug("Boiler forced ON")
 
     async def _force_boiler_off(self) -> None:
@@ -1308,6 +1314,7 @@ class MultizoneCoordinator:
         )
         self._last_boiler_change = time.monotonic()
         self.record_diagnostic_event("BOILER_SWITCH_OFF", {"switch": self.boiler_switch, "reason": self._boiler_status_reason})
+        self.plant_diagnostics.record_boiler_state(False)
         _LOGGER.debug("Boiler forced OFF")
 
     async def async_apply_master_on(self) -> None:

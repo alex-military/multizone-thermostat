@@ -110,10 +110,16 @@ async def async_get_config_entry_diagnostics(
     # 4. Ring Buffer / Trace Timeline (Last 100 events)
     trace_events = getattr(coordinator, "diagnostics_history", [])
 
+    # 5. Physical Plant Diagnostics & Building Energy Metrics
+    plant_health = {}
+    if hasattr(coordinator, "plant_diagnostics"):
+        plant_health = coordinator.plant_diagnostics.get_plant_health_summary()
+
     return {
         "timestamp": dt_util.now().isoformat(),
         "config_entry": entry_dict,
         "coordinator": coordinator_info,
+        "plant_health": plant_health,
         "zones": zones_diag,
         "trace_events": trace_events,
     }

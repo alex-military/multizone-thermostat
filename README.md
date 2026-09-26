@@ -29,6 +29,8 @@ A custom integration for Home Assistant that provides **multi-zone heating manag
 - 📅 **Global Calendar Integration** — Control the entire system via Home Assistant's native Local Calendar. Schedule global presets or highly specific per-zone overrides.
 - 🤖 **Predictive Smart Start & Thermal Modeling** — The system learns the unique heating and cooling rates of your rooms and can automatically start heating *before* a scheduled calendar event so the room reaches the target temperature exactly on time.
 - 🔥 **OpenTherm Hybrid Support** — Dual-drive support for traditional ON/OFF Relays and OpenTherm modulating gateways, mapping house Heat Demand % directly to boiler water flow temperature.
+- 🔍 **System Diagnostics & Anomaly Detection** — Automatic detection of mechanical/hydraulic anomalies (stuck valves, ghost heating leakage, air in radiator, stale sensor) with dedicated problem binary sensors.
+- ⚡ **Building Energy Efficiency Metrics** — Evaluates theoretical room energy efficiency class (A4 to G), thermal retention time (hours to lose 1°C), radiator sizing evaluation, and boiler cycle health.
 - 🎨 **4 Custom Lovelace Cards** — Master status card, circular dial card, compact button card, and global preset card — all auto-registered
 
 ## 🔥 OpenTherm Hybrid Support
