@@ -195,6 +195,7 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             "hybrid_zone": True,
             "local_pwm_active": self._local_pwm_state,
             "boiler_entity_id": self._coordinator.boiler_switch,
+            "zone_mode": self._coordinator.get_zone_mode(self.entity_id),
         }
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:

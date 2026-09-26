@@ -2363,21 +2363,48 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
     const sizingEval = this.shadowRoot.getElementById('sizing-eval');
     const valveDot = this.shadowRoot.getElementById('valve-dot');
     const valveText = this.shadowRoot.getElementById('valve-text');
-    const modeBadge = this.shadowRoot.getElementById('zone-mode-badge');
+    // Determine zone mode (primary, secondary, bypass)
+    let zoneMode = "primary";
+    if (climateState.attributes && climateState.attributes.zone_mode) {
+      zoneMode = climateState.attributes.zone_mode;
+    } else {
+      const selectObj = Object.values(this._hass.states).find(s => 
+        s.entity_id.startsWith('select.') && s.attributes && s.attributes.climate_entity === climateId
+      );
+      if (selectObj) {
+        zoneMode = selectObj.state;
+      }
+    }
 
     if (titleEl) titleEl.innerText = title;
 
     if (tempSubEl) {
       const cur = climateState.attributes.current_temperature;
       const tgt = climateState.attributes.temperature;
-      tempSubEl.innerText = `${cur !== undefined ? cur : '--'}°C / target ${tgt !== undefined ? tgt : '--'}°C`;
+      if (zoneMode === "bypass") {
+        tempSubEl.innerText = `${cur !== undefined ? cur : '--'}°C / (Bypassata)`;
+      } else {
+        tempSubEl.innerText = `${cur !== undefined ? cur : '--'}°C / target ${tgt !== undefined ? tgt : '--'}°C`;
+      }
     }
 
     if (modeBadge) {
-      const isSec = climateState.attributes.secondary_zone || false;
-      modeBadge.innerText = isSec ? "SECONDARIA" : "PRIMARIA";
-      modeBadge.style.background = isSec ? "rgba(168, 85, 247, 0.2)" : "rgba(59, 130, 246, 0.2)";
-      modeBadge.style.color = isSec ? "#c084fc" : "#60a5fa";
+      if (zoneMode === "bypass") {
+        modeBadge.innerText = "BYPASSATA";
+        modeBadge.style.background = "rgba(100, 116, 139, 0.25)";
+        modeBadge.style.color = "#94a3b8";
+        modeBadge.style.border = "1px solid rgba(148, 163, 184, 0.3)";
+      } else if (zoneMode === "secondary") {
+        modeBadge.innerText = "SECONDARIA";
+        modeBadge.style.background = "rgba(168, 85, 247, 0.2)";
+        modeBadge.style.color = "#c084fc";
+        modeBadge.style.border = "1px solid rgba(168, 85, 247, 0.3)";
+      } else {
+        modeBadge.innerText = "PRIMARIA";
+        modeBadge.style.background = "rgba(59, 130, 246, 0.2)";
+        modeBadge.style.color = "#60a5fa";
+        modeBadge.style.border = "1px solid rgba(59, 130, 246, 0.3)";
+      }
     }
 
     const eState = energyEntity ? this._hass.states[energyEntity] : null;
@@ -2448,6 +2475,10 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
         valveDot.className = "pulse-dot pulse-red";
         valveText.innerText = (aState.attributes && aState.attributes.details) || "Anomalia Rilevata";
         valveText.style.color = "#f87171";
+      } else if (zoneMode === "bypass") {
+        valveDot.className = "pulse-dot pulse-green";
+        valveText.innerText = "Valvola Chiusa (Bypass)";
+        valveText.style.color = "#94a3b8";
       } else {
         valveDot.className = "pulse-dot pulse-green";
         valveText.innerText = "Nessuna anomalia";
