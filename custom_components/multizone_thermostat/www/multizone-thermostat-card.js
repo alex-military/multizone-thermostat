@@ -2051,7 +2051,9 @@ class MultizoneThermostatHealthSummaryCard extends HTMLElement {
     
     let healthEntity = null;
     for (const eid of Object.keys(this._hass.states)) {
-      if (eid.startsWith("sensor.") && eid.endsWith("_plant_health")) {
+      if (eid.startsWith("sensor.") && 
+          this._hass.states[eid].attributes && 
+          this._hass.states[eid].attributes.hasOwnProperty("anomalies_count")) {
         healthEntity = eid;
         break;
       }
