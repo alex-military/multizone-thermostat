@@ -1975,6 +1975,117 @@ if (!customElements.get("multizone-thermostat-spacer")) {
   customElements.define("multizone-thermostat-spacer", MultizoneThermostatSpacer);
 }
 
+/* ==================== HEALTH SUMMARY CARD ==================== */
+class MultizoneThermostatHealthSummaryCard extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: 'open' });
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    this.updateCard();
+  }
+
+  setConfig(config) {
+    this._config = config || {};
+    if (!this._rendered) this.renderStructure();
+  }
+
+  renderStructure() {
+    this.shadowRoot.innerHTML = `
+      <style>
+        ha-card {
+          padding: 16px;
+          border-radius: var(--ha-card-border-radius, 20px);
+          background-color: var(--card-background-color, #1c1c1c);
+          color: white;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          height: 100%;
+          min-height: 80px;
+          cursor: pointer;
+          transition: background-color 0.2s;
+          box-sizing: border-box;
+        }
+        ha-card:hover {
+          background-color: var(--secondary-background-color, #2c2c2c);
+        }
+        .container {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 4px;
+        }
+        ha-icon {
+          --mdc-icon-size: 32px;
+        }
+        .healthy { color: #4CAF50; }
+        .warning { color: #FF9800; }
+        .title { font-weight: bold; font-size: 1.1em; }
+        .subtitle { font-size: 0.9em; opacity: 0.8; }
+      </style>
+      <ha-card id="health-card">
+        <div class="container">
+          <ha-icon id="health-icon" icon="mdi:shield-check" class="healthy"></ha-icon>
+          <div class="title" id="health-title">Diagnostica</div>
+          <div class="subtitle" id="health-subtitle">Sistema Ok</div>
+        </div>
+      </ha-card>
+    `;
+
+    this.shadowRoot.querySelector('#health-card').addEventListener('click', () => {
+      const event = new Event('hass-action', { bubbles: true, composed: true });
+      event.detail = {
+          config: { tap_action: { action: 'navigate', navigation_path: 'diagnostica' } },
+          action: 'tap'
+      };
+      this.dispatchEvent(event);
+    });
+    this._rendered = true;
+  }
+
+  updateCard() {
+    if (!this._hass || !this._rendered) return;
+    
+    let healthEntity = null;
+    for (const eid of Object.keys(this._hass.states)) {
+      if (eid.startsWith("sensor.") && eid.endsWith("_plant_health")) {
+        healthEntity = eid;
+        break;
+      }
+    }
+
+    const iconEl = this.shadowRoot.querySelector('#health-icon');
+    const subtitleEl = this.shadowRoot.querySelector('#health-subtitle');
+
+    if (!healthEntity) {
+      subtitleEl.textContent = "Non trovato";
+      iconEl.icon = "mdi:shield-off";
+      iconEl.className = "";
+      return;
+    }
+
+    const stateObj = this._hass.states[healthEntity];
+    const anomalies = stateObj.attributes.anomalies || [];
+    
+    if (anomalies.length === 0) {
+      subtitleEl.textContent = "Sistema Ok";
+      iconEl.icon = "mdi:shield-check";
+      iconEl.className = "healthy";
+    } else {
+      subtitleEl.textContent = anomalies.length + (anomalies.length === 1 ? " Anomalia" : " Anomalie");
+      iconEl.icon = "mdi:alert";
+      iconEl.className = "warning";
+    }
+  }
+}
+
+if (!customElements.get("multizone-thermostat-health-summary-card")) {
+  customElements.define("multizone-thermostat-health-summary-card", MultizoneThermostatHealthSummaryCard);
+}
+
 /* ==================== PLANT DIAGNOSTIC CARD ==================== */
 class MultizoneThermostatPlantCard extends HTMLElement {
   constructor() {
@@ -2920,6 +3031,13 @@ class MultizoneThermostatDashboardStrategy extends HTMLElement {
       type: "custom:multizone-thermostat-status-card",
       border_radius: "20px",
     });
+
+    // Add health summary card in the remaining space
+    if (topRowCards.length < 3) {
+      topRowCards.push({
+        type: "custom:multizone-thermostat-health-summary-card"
+      });
+    }
 
     // Fill the rest of the top row with spacers so it's always exactly 3 blocks wide
     while (topRowCards.length < 3) {
