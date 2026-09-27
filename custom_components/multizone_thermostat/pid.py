@@ -169,6 +169,9 @@ class PID:
         Returns:
             A value between `out_min` and `out_max`.
         """
+        if math.isnan(input_val) or math.isnan(set_point):
+            return self._last_output, False
+
         if self._sampling_period != 0 and self._last_input_time is not None and \
                 time() - self._input_time < self._sampling_period:
             return self._output, False  # If last sample is too young, keep last output value
@@ -211,7 +214,7 @@ class PID:
             self._dt = self._input_time - self._last_input_time
         else:
             self._dt = 0
-        if ext_temp is not None:
+        if ext_temp is not None and not math.isnan(ext_temp):
             self._dext = set_point - ext_temp
         else:
             self._dext = 0
@@ -221,7 +224,7 @@ class PID:
 
         # Anti-windup: always integrate, but clamp to prevent windup
         # Reset integral on setpoint change to allow faster convergence
-        if ext_temp is not None and self._last_set_point != self._set_point:
+        if self._last_set_point != self._set_point:
             self._integral = 0  # Reset integral if set point has changed
         else:
             self._integral += self._Ki * self._error * self._dt

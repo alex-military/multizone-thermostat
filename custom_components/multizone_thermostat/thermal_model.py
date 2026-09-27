@@ -49,10 +49,16 @@ class ThermalObserver:
             if now - self._shutdown_time <= 3600:
                 if current_temp > self._max_temp_after_shutdown:
                     self._max_temp_after_shutdown = current_temp
-                    inertia = self._max_temp_after_shutdown - self._temp_at_shutdown
+                elif current_temp <= self._max_temp_after_shutdown - 0.1:
+                    # Peak reached (temperature started dropping)
+                    inertia = max(0.0, self._max_temp_after_shutdown - self._temp_at_shutdown)
                     self._update_ema('thermal_inertia', inertia, alpha=0.1)
-                    _LOGGER.debug("[%s] Inertia peak updated: +%.2f°C", self.zone_id, inertia)
+                    _LOGGER.debug("[%s] Inertia peak reached: +%.2f°C", self.zone_id, inertia)
+                    self._shutdown_time = None
             else:
+                inertia = max(0.0, self._max_temp_after_shutdown - self._temp_at_shutdown)
+                self._update_ema('thermal_inertia', inertia, alpha=0.1)
+                _LOGGER.debug("[%s] Inertia window closed: +%.2f°C", self.zone_id, inertia)
                 self._shutdown_time = None  # Stop tracking inertia after 1 hour
 
         # Calculate Rates (dT/dt) if temperature changed enough

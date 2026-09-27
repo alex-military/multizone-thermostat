@@ -58,6 +58,10 @@ const TRANSLATIONS = {
     secondary: "Secondaria",
     primary_tooltip: "Primaria (Accende Caldaia)",
     secondary_tooltip: "Secondaria (Passiva)",
+    passive_heat_active_tooltip: "Apporto Passivo ATTIVO (Clicca per disattivare)",
+    passive_heat_inactive_tooltip: "Apporto Passivo non attivo (Clicca per attivare)",
+    anomaly_detected: "Anomalia Rilevata",
+    card_error_title: "Errore scheda Multizone Thermostat",
     bypass_tooltip: "Bypass (Esclusa)",
     master_title: "Riscaldamento Centrale",
     thermostat: "Termostato",
@@ -174,7 +178,11 @@ const TRANSLATIONS = {
     target: "target",
     optimal: "OPTIMAL",
     warning: "WARNING",
-    critical: "CRITICAL"
+    critical: "CRITICAL",
+    passive_heat_active_tooltip: "Passive Heat ACTIVE (Click to disable)",
+    passive_heat_inactive_tooltip: "Passive Heat inactive (Click to enable)",
+    anomaly_detected: "Anomaly Detected",
+    card_error_title: "Multizone Thermostat Card Error"
   },
   ru: {
     enabled: "Включено",
@@ -243,7 +251,11 @@ const TRANSLATIONS = {
     target: "цель",
     optimal: "ОПТИМАЛЬНО",
     warning: "ВНИМАНИЕ",
-    critical: "КРИТИЧНО"
+    critical: "КРИТИЧНО",
+    passive_heat_active_tooltip: "Пассивный нагрев АКТИВЕН (Нажмите для отключения)",
+    passive_heat_inactive_tooltip: "Пассивный нагрев неактивен (Нажмите для включения)",
+    anomaly_detected: "Обнаружена аномалия",
+    card_error_title: "Ошибка карточки Multizone Thermostat"
   }
 };
 
@@ -383,6 +395,10 @@ class MultizoneThermostatButtonCard extends HTMLElement {
     if (!climateState) {
       this.renderError(getTranslation(this._hass, 'custom_error') + `: ${climateEntity} not found.`);
       return;
+    }
+
+    if (!this._rendered) {
+      this.renderStructure();
     }
 
     const currentTemp = climateState.attributes.current_temperature;
@@ -769,7 +785,7 @@ class MultizoneThermostatButtonCard extends HTMLElement {
   }
 
   disconnectedCallback() {
-    super.disconnectedCallback();
+    // HTMLElement has no disconnectedCallback, so do NOT call super
     if (this._tempTimer) {
         clearTimeout(this._tempTimer);
         this._tempTimer = null;
@@ -779,7 +795,7 @@ class MultizoneThermostatButtonCard extends HTMLElement {
   renderError(msg) {
     this.shadowRoot.innerHTML = `
       <ha-card style="padding: 16px; color: red;">
-        <h3>Errore scheda Multizone Thermostat</h3>
+        <h3>${this._hass ? getTranslation(this._hass, 'card_error_title') : 'Multizone Thermostat Card Error'}</h3>
         <p>${msg}</p>
       </ha-card>
     `;
@@ -894,6 +910,10 @@ class MultizoneThermostatDialCard extends HTMLElement {
     if (!climateState) {
       this.renderError(getTranslation(this._hass, 'custom_error') + `: ${climateEntity} not found.`);
       return;
+    }
+
+    if (!this._rendered) {
+      this.renderStructure();
     }
 
     let displayTitle = this._config.title || climateState.attributes.friendly_name || climateEntity;
@@ -1182,7 +1202,7 @@ class MultizoneThermostatDialCard extends HTMLElement {
   }
 
   disconnectedCallback() {
-    super.disconnectedCallback();
+    // HTMLElement has no disconnectedCallback, so do NOT call super
     if (this._tempTimer) {
         clearTimeout(this._tempTimer);
         this._tempTimer = null;
@@ -1192,7 +1212,7 @@ class MultizoneThermostatDialCard extends HTMLElement {
   renderError(msg) {
     this.shadowRoot.innerHTML = `
       <ha-card style="padding: 16px; color: red;">
-        <h3>Errore scheda Multizone Thermostat</h3>
+        <h3>${this._hass ? getTranslation(this._hass, 'card_error_title') : 'Multizone Thermostat Card Error'}</h3>
         <p>${msg}</p>
       </ha-card>
     `;
@@ -1231,12 +1251,19 @@ class MultizoneThermostatCardEditor extends HTMLElement {
   }
 
   render() {
-    if (this._rendered) {
-      this.shadowRoot.querySelector('#title').value = this._config.title || '';
-      this._climatePicker.value = this._config.entity || '';
-      this._switchPicker.value = this._config.switch || '';
-      this.translateLabels();
-      return;
+    if (!this._config) return;
+    
+    // Only build DOM once — prevent focus loss on every keystroke
+    if (this.shadowRoot && this.shadowRoot.querySelector('.card-editor-container')) {
+        // Just update values if already built
+        const titleInput = this.shadowRoot.querySelector('#card-title-input');
+        if (titleInput && document.activeElement !== titleInput && this.shadowRoot.activeElement !== titleInput) {
+            titleInput.value = this._config.title || '';
+        }
+        if (this._climatePicker) this._climatePicker.value = this._config.entity || '';
+        if (this._switchPicker) this._switchPicker.value = this._config.switch || '';
+        this.translateLabels();
+        return;
     }
 
     const style = document.createElement('style');
@@ -1262,7 +1289,7 @@ class MultizoneThermostatCardEditor extends HTMLElement {
     `;
 
     const container = document.createElement('div');
-    container.className = 'editor-container';
+    container.className = 'card-editor-container';
 
     // Title Row
     const titleRow = document.createElement('div');
@@ -1272,9 +1299,9 @@ class MultizoneThermostatCardEditor extends HTMLElement {
     titleLabel.textContent = 'Titolo Personalizzato (Opzionale)';
     const titleInput = document.createElement('input');
     titleInput.type = 'text';
-    titleInput.id = 'title';
+    titleInput.id = 'card-title-input';
     titleInput.value = this._config.title || '';
-    titleInput.addEventListener('change', (e) => this._updateConfig('title', e.target.value));
+    titleInput.addEventListener('input', (e) => this._updateConfig('title', e.target.value));
     titleRow.appendChild(titleLabel);
     titleRow.appendChild(titleInput);
     container.appendChild(titleRow);
@@ -1618,7 +1645,7 @@ class MultizoneThermostatStatusCard extends HTMLElement {
   renderError(msg) {
     this.shadowRoot.innerHTML = `
       <ha-card style="padding: 16px; color: red; background-color: rgba(255,0,0,0.15);">
-        <h3>Errore scheda Multizone Thermostat</h3>
+        <h3>${this._hass ? getTranslation(this._hass, 'card_error_title') : 'Multizone Thermostat Card Error'}</h3>
         <p>${msg}</p>
       </ha-card>
     `;
@@ -2714,15 +2741,15 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
           });
         }
         valveStatusEl.title = allowPassive 
-          ? "Apporto Passivo ATTIVO (Clicca per disattivare)" 
-          : "Clicca per attivare Apporto Passivo (Fancoil senza valvola / Soppalco)";
+          ? getTranslation(this._hass, 'passive_heat_active_tooltip') 
+          : getTranslation(this._hass, 'passive_heat_inactive_tooltip');
       }
 
       if (valveDot && valveText) {
         const hasAnomaly = aState && aState.state === "on";
         if (hasAnomaly) {
           valveDot.className = "pulse-dot pulse-red";
-          valveText.innerText = (aState.attributes && aState.attributes.details) || "Anomalia Rilevata";
+          valveText.innerText = (aState.attributes && aState.attributes.details) || getTranslation(this._hass, 'anomaly_detected');
           valveText.style.color = "#f87171";
         } else if (zoneMode === "bypass") {
           valveDot.className = "pulse-dot pulse-green";

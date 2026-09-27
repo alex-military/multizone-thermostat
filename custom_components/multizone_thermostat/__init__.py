@@ -27,10 +27,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Multizone Thermostat from a config entry."""
     hass.data.setdefault(DOMAIN, {})
 
-    boiler_mode = entry.data.get(CONF_BOILER_MODE, MODE_RELAY)
-    boiler_switch = entry.data.get(CONF_BOILER_SWITCH)
-    opentherm_entity = entry.data.get(CONF_OPENTHERM_ENTITY)
-    zones = [dict(z) for z in list(entry.data.get(CONF_ZONES, []))]
+    config = {**entry.data, **entry.options}
+    boiler_mode = config.get(CONF_BOILER_MODE, MODE_RELAY)
+    boiler_switch = config.get(CONF_BOILER_SWITCH)
+    opentherm_entity = config.get(CONF_OPENTHERM_ENTITY)
+    zones = [dict(z) for z in list(config.get(CONF_ZONES, []))]
 
     # Validate primary entity exists
     if boiler_mode == MODE_RELAY and boiler_switch:
@@ -111,7 +112,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Register static path for Lovelace custom card (NEW-WARN-04: only if www dir exists)
     import os
     www_path = hass.config.path("custom_components/multizone_thermostat/www")
-    if os.path.isdir(www_path):
+    if await hass.async_add_executor_job(os.path.isdir, www_path):
         await hass.http.async_register_static_paths([
             StaticPathConfig(
                 url_path="/multizone_thermostat_card",
@@ -172,7 +173,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if unload_ok:
         coordinator: MultizoneCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
         try:
-            await coordinator._async_save_storage()
+            await coordinator.async_save_storage()
         except Exception as err:
             _LOGGER.warning("Could not save storage on unload: %s", err)
         coordinator.async_teardown_listeners()
@@ -187,4 +188,4 @@ async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> Non
     but this listener acts as a safety net to ensure any direct option changes are applied."""
     # NEW-BUG-01: was a no-op. Trigger reload to apply any changes.
     _LOGGER.info("Options updated for Multizone Thermostat, reloading integration...")
-    hass.async_create_task(hass.config_entries.async_reload(entry.entry_id))
+    await hass.config_entries.async_reload(entry.entry_id)

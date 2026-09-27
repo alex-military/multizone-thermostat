@@ -30,6 +30,13 @@ class PWMEngine:
         
     def calculate(self, demand: float) -> bool:
         """Calculate the current ON/OFF state based on demand (0-100)."""
+        # Clamp near-100% demand to avoid float precision edge case
+        if demand >= 99.0:
+            self.time_on = self.pwm_interval
+            self.time_off = 0.0
+            self.current_state = True
+            return self.current_state
+            
         now = time.time()
         time_passed = now - self.cycle_start_time
         
@@ -59,9 +66,12 @@ class PWMEngine:
             # Safety cap: never let dilatation stretch beyond 4x the base cycle
             max_cycle = self.pwm_interval * 4
             if self.time_on + self.time_off > max_cycle:
-                # Demand is too low to be meaningful with min_on/min_off constraints
-                self.time_on = 0.0
-                self.time_off = self.pwm_interval
+                if demand >= 50.0:
+                    self.time_on = self.pwm_interval
+                    self.time_off = 0.0
+                else:
+                    self.time_on = 0.0
+                    self.time_off = self.pwm_interval
 
         total_cycle = self.time_on + self.time_off
         

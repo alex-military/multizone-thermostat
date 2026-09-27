@@ -12,7 +12,6 @@ from homeassistant.components.climate import DOMAIN as CLIMATE_DOMAIN
 from homeassistant.components.switch import DOMAIN as SWITCH_DOMAIN
 from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN
 from homeassistant.components.binary_sensor import DOMAIN as BINARY_SENSOR_DOMAIN
-from homeassistant.components.number import DOMAIN as NUMBER_DOMAIN
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import selector
@@ -791,6 +790,9 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                 
         if self._current_zone_name is not None:
             zone_data = next((z for z in self._zones if z[CONF_ZONE_NAME] == self._current_zone_name), None)
+            if zone_data is None: zone_data = {}
+            if errors and user_input is not None:
+                zone_data = {**zone_data, **user_input}
             
             temp_sensor_val = zone_data.get(CONF_ZONE_TEMP_SENSOR)
             temp_desc = {"description": {"suggested_value": temp_sensor_val}} if temp_sensor_val and temp_sensor_val != "none" else {}

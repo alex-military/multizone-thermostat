@@ -39,7 +39,7 @@ class PlantDiagnosticsEngine:
 
         # Boiler tracking
         self._boiler_on_events: deque[float] = deque(maxlen=200) # Timestamps when boiler turned ON
-        self._boiler_run_intervals: deque[tuple[float, float]] = deque(maxlen=300) # (start, end)
+        self._boiler_run_intervals: deque[tuple[float, float]] = deque(maxlen=1000) # (start, end)
         self._current_boiler_start: float | None = None
 
         # Zone tracking state for anomalies
@@ -127,7 +127,7 @@ class PlantDiagnosticsEngine:
             current_temp = st.attributes.get("current_temperature")
             target_temp = st.attributes.get("temperature")
             demand = self.coordinator.get_zone_demand(climate_id)
-            boiler_on = self.coordinator.get_master_state() and (self.get_boiler_cycles_per_hour() > 0 or self._current_boiler_start is not None)
+            boiler_on = self.coordinator.get_master_state() and self._current_boiler_start is not None
 
             if current_temp is None:
                 return ANOMALY_NONE, "In attesa lettura temperatura"

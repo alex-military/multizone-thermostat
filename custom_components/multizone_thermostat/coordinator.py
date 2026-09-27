@@ -14,10 +14,12 @@ from homeassistant.components.climate import (
     ClimateEntityFeature,
     SERVICE_SET_HVAC_MODE,
     SERVICE_SET_PRESET_MODE,
+    SERVICE_SET_TEMPERATURE,
     DOMAIN as CLIMATE_DOMAIN,
 )
 from homeassistant.const import (
     ATTR_ENTITY_ID,
+    ATTR_TEMPERATURE,
     SERVICE_TURN_OFF,
     SERVICE_TURN_ON,
     STATE_ON,
@@ -85,6 +87,8 @@ from .const import (
     DEFAULT_ANTI_FROST_ENABLED,
     KEY_PASSIVE_HEAT_PREFIX,
     CONF_ZONE_ALLOW_PASSIVE_HEAT,
+    CONF_WEATHER_SENSOR,
+    KEY_WEATHER_CURVE,
 )
 from .pwm_engine import PWMEngine
 from .thermal_model import ThermalObserver
@@ -122,7 +126,7 @@ class MultizoneCoordinator:
         self.opentherm_max_temp = entry.data.get(CONF_OPENTHERM_MAX_TEMP, 75.0)
         self.zones = entry.data.get(CONF_ZONES, [])
         self.presence_sensor = entry.data.get(CONF_PRESENCE_SENSOR)
-        self.weather_sensor_id = entry.data.get("weather_sensor")
+        self.weather_sensor_id = entry.data.get(CONF_WEATHER_SENSOR)
         self.global_calendar_id = entry.data.get(CONF_GLOBAL_CALENDAR)
         
         # Internal state tracking
@@ -135,13 +139,14 @@ class MultizoneCoordinator:
         }
         self._pre_window_state: dict[str, str] = {}
         self._pre_anti_seize_state: dict[str, str] = {}
-        self._min_cycle_on = 0.0
-        self._min_cycle_off = 0.0
-        self._valve_delay = 0.0
+        self._min_cycle_on = float(entry.data.get(CONF_MIN_CYCLE_ON, DEFAULT_MIN_CYCLE_ON))
+        self._min_cycle_off = float(entry.data.get(CONF_MIN_CYCLE_OFF, DEFAULT_MIN_CYCLE_OFF))
+        self._valve_delay = float(entry.data.get(CONF_VALVE_DELAY, DEFAULT_VALVE_DELAY))
         self._climate_callbacks = {}
         self._last_boiler_change = 0.0
         self._last_active_time = time.monotonic() # Default to now until loaded
         self._anti_seize_running = False
+        self._storage_save_pending: bool = False
         
         self._calendar_active_event_id: str | None = None
         self._calendar_temp_overrides: dict[str, float] = {}
@@ -237,8 +242,9 @@ class MultizoneCoordinator:
     def is_passive_heat_allowed(self, climate_id: str) -> bool:
         """Return True if passive heat is allowed dynamically or via zone config."""
         for z in self.zones:
-            if make_zone_entity_id(z.get(CONF_ZONE_NAME, "")) == climate_id:
-                safe_name = z[CONF_ZONE_NAME].lower().replace(" ", "_").replace("-", "_")
+            zone_name = z.get(CONF_ZONE_NAME, "")
+            if make_zone_entity_id(zone_name) == climate_id:
+                safe_name = zone_name.lower().replace(" ", "_").replace("-", "_")
                 safe_name = "".join(c for c in safe_name if c.isalnum() or c == "_")
                 key = f"{KEY_PASSIVE_HEAT_PREFIX}{safe_name}"
                 default_val = bool(z.get(CONF_ZONE_ALLOW_PASSIVE_HEAT, False))
@@ -288,7 +294,7 @@ class MultizoneCoordinator:
                     _LOGGER.info("Restored Thermal Model for %s: Heating=%.2f, Cooling=%.2f, Inertia=%.2f", 
                                  climate_id, model.heating_rate, model.cooling_rate, model.thermal_inertia)
 
-    async def _async_save_storage(self) -> None:
+    async def async_save_storage(self) -> None:
         """Save window states to storage."""
         await self._store.async_save(self._pre_window_state)
 
@@ -433,7 +439,7 @@ class MultizoneCoordinator:
                 async_track_state_change_event(
                     self.hass,
                     climate_entities,
-                    self._async_on_climate_state_changed,
+                    self._on_climate_state_changed,
                 )
             )
             _LOGGER.debug(
@@ -517,10 +523,18 @@ class MultizoneCoordinator:
         if self._pending_boiler_task and not self._pending_boiler_task.done():
             self._pending_boiler_task.cancel()
             self._pending_boiler_task = None
+        if getattr(self, "_debounce_save_task", None) and not self._debounce_save_task.done():
+            self._debounce_save_task.cancel()
+            self._debounce_save_task = None
 
         for unsub in self._unsub_listeners:
             unsub()
         self._unsub_listeners.clear()
+
+    @callback
+    def _on_climate_state_changed(self, event: Event) -> None:
+        """Sync wrapper for climate state changes (required by async_track_state_change_event)."""
+        self.hass.async_create_task(self._async_on_climate_state_changed(event))
 
     async def _async_on_climate_state_changed(self, event: Event) -> None:
         """Handle state changes of any managed climate entity."""
@@ -568,7 +582,7 @@ class MultizoneCoordinator:
                         demand = self._pids[entity_id].calc(current_temp, effective_target)
                         
                         # Apply Weather Compensation (Feed Forward)
-                        curve_val = self.get_persistent_data("weather_curve", 0.0)
+                        curve_val = self.get_persistent_data(KEY_WEATHER_CURVE, 0.0)
                         if self.weather_sensor_id:
                             weather_state = self.hass.states.get(self.weather_sensor_id)
                             if weather_state and weather_state.state not in ("unavailable", "unknown"):
@@ -616,7 +630,18 @@ class MultizoneCoordinator:
                     
                 # Feed Thermal Observer
                 self._thermal_models[entity_id].update(current_temp, demand > 0)
-                self.hass.async_create_task(self._async_save_thermal_states())
+                # Debounced save: avoid writing to disk on every state change (SD card wear)
+                if not getattr(self, "_storage_save_pending", False):
+                    self._storage_save_pending = True
+                    async def _debounced_thermal_save():
+                        try:
+                            await asyncio.sleep(120)  # Wait 2 minutes before writing
+                            self._storage_save_pending = False
+                            await self._async_save_thermal_states()
+                        except asyncio.CancelledError:
+                            self._storage_save_pending = False
+                            raise
+                    self._debounce_save_task = self.hass.async_create_task(_debounced_thermal_save())
                     
                 _LOGGER.debug("Zone '%s' Demand updated: %.1f%% (Temp: %s, Target: %s, Mode: %s)", 
                               entity_id, demand, current_temp, target_temp, "PID" if tuner.state == tuner.STATE_COMPLETED else "Hysteresis")
@@ -729,7 +754,7 @@ class MultizoneCoordinator:
                 if climate_id not in self._pre_window_state:
                     current_mode = self.get_zone_mode(climate_id)
                     self._pre_window_state[climate_id] = current_mode
-                    self.hass.async_create_task(self._async_save_storage())
+                    self.hass.async_create_task(self.async_save_storage())
                 
                 # Change mode to Bypass
                 if zone_select and self.get_zone_mode(climate_id) != ZONE_MODE_BYPASS:
@@ -741,7 +766,7 @@ class MultizoneCoordinator:
                 _LOGGER.debug("Window closed (%s), restoring zone %s", sensor_id, climate_id)
                 if climate_id in self._pre_window_state:
                     was_mode = self._pre_window_state.pop(climate_id)
-                    self.hass.async_create_task(self._async_save_storage())
+                    self.hass.async_create_task(self.async_save_storage())
                     
                     # Restore the mode
                     if zone_select and self.get_zone_mode(climate_id) != was_mode:
@@ -914,10 +939,10 @@ class MultizoneCoordinator:
         # 1. Process Current Event
         if current_event:
             # We use a unique ID based on start time and title to avoid re-applying SET constantly
-            event_uid = f"{current_event['start']}_{current_event['summary']}"
+            event_uid = f"{current_event.get('start', '')}_{current_event.get('summary', 'Untitled')}"
             
             if self._calendar_active_event_id != event_uid:
-                _LOGGER.info("Calendar Event Started: %s", current_event["summary"])
+                _LOGGER.info("Calendar Event Started: %s", current_event.get("summary", "Untitled"))
                 self._calendar_active_event_id = event_uid
                 
                 if self._pre_calendar_preset is None:
@@ -928,7 +953,7 @@ class MultizoneCoordinator:
                 self._calendar_mode_overrides.clear()
                 
                 # Parse
-                parsed = parse_calendar_event(current_event["summary"])
+                parsed = parse_calendar_event(current_event.get("summary", ""))
                 
                 # Apply Global Settings
                 if parsed["global_preset"]:
@@ -998,7 +1023,7 @@ class MultizoneCoordinator:
         if next_event:
             start_time = dt_util.parse_datetime(next_event["start"])
             if start_time:
-                parsed_next = parse_calendar_event(next_event["summary"])
+                parsed_next = parse_calendar_event(next_event.get("summary", ""))
                 # We only preheat if there is a target temperature shift
                 # For each zone, calculate if we need to start
                 for zone in self.zones:
@@ -1116,6 +1141,16 @@ class MultizoneCoordinator:
                     # BUG-02: Force zone into HEAT mode so TRVs physically open and heat reaches radiators
                     self.hass.async_create_task(
                         self._async_set_hvac_mode(climate_id, HVAC_MODE_HEAT)
+                    )
+                    # H2-FIX: Also set target temperature above frost threshold so TRV internal PID opens valve
+                    frost_target = float(self.get_persistent_data(KEY_FROST_PROTECTION_TEMP, DEFAULT_FROST_PROTECTION_TEMP)) + 3.0
+                    self.hass.async_create_task(
+                        self.hass.services.async_call(
+                            CLIMATE_DOMAIN,
+                            SERVICE_SET_TEMPERATURE,
+                            {ATTR_ENTITY_ID: climate_id, ATTR_TEMPERATURE: frost_target},
+                            blocking=False,
+                        )
                     )
 
         if not self._master_state and not frost_emergency:
@@ -1488,6 +1523,17 @@ class MultizoneCoordinator:
             _LOGGER.info("Anti-seize routine completed successfully.")
             self._last_active_time = time.monotonic()
             
+        except asyncio.CancelledError:
+            _LOGGER.warning("Anti-seize routine was cancelled! Initiating emergency shutdown of boiler and valves.")
+            async def _emergency_cleanup():
+                if self.boiler_mode == MODE_OPENTHERM:
+                    await self._async_update_opentherm_boiler(0.0)
+                elif self.boiler_switch:
+                    await self.hass.services.async_call("switch", SERVICE_TURN_OFF, {ATTR_ENTITY_ID: self.boiler_switch}, blocking=False)
+                for climate_id, old_state in self._pre_anti_seize_state.items():
+                    await self._async_set_hvac_mode(climate_id, old_state)
+            self.hass.async_create_task(_emergency_cleanup())
+            raise
         except Exception as e:
             _LOGGER.error("Error during anti-seize routine: %s", e)
         finally:
