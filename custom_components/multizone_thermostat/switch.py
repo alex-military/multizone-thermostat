@@ -72,7 +72,7 @@ async def async_setup_entry(
     async_add_entities(entities, True)
 
 
-def _make_device_info(entry_id: str, device_type: str = "main") -> DeviceInfo:
+def _make_device_info(entry_id: str, master_device_id: str | None = None, device_type: str = "main") -> DeviceInfo:
     """Create a shared device info for all entities of this integration instance."""
     if device_type == "time_geofencing":
         return DeviceInfo(
@@ -80,6 +80,7 @@ def _make_device_info(entry_id: str, device_type: str = "main") -> DeviceInfo:
             name="Time & Geofencing",
             manufacturer="Custom Integration",
             model="Time & Geofencing Settings",
+            via_device_id=master_device_id,
         )
     elif device_type == "zone_modes":
         return DeviceInfo(
@@ -87,6 +88,7 @@ def _make_device_info(entry_id: str, device_type: str = "main") -> DeviceInfo:
             name="Zone Modes",
             manufacturer="Custom Integration",
             model="Zone Modes",
+            via_device_id=master_device_id,
         )
         
     return DeviceInfo(
@@ -109,7 +111,7 @@ class MultizoneMasterSwitch(RestoreEntity, SwitchEntity):
         self._coordinator = coordinator
         self._entry_id = entry_id
         self._attr_unique_id = f"{DOMAIN}_{entry_id}_master"
-        self._attr_device_info = _make_device_info(entry_id)
+        self._attr_device_info = _make_device_info(entry_id, getattr(coordinator, "master_device_id", None))
         self._is_on: bool = False
 
     @property
@@ -162,7 +164,7 @@ class MultizoneAutoNightModeSwitch(SwitchEntity):
         """Initialize switch."""
         self._coordinator = coordinator
         self._attr_unique_id = f"{DOMAIN}_{entry_id}_auto_night"
-        self._attr_device_info = _make_device_info(entry_id, "time_geofencing")
+        self._attr_device_info = _make_device_info(entry_id, getattr(coordinator, "master_device_id", None), "time_geofencing")
 
     @property
     def is_on(self) -> bool:
@@ -192,7 +194,7 @@ class MultizoneGeofencingSwitch(SwitchEntity):
         """Initialize switch."""
         self._coordinator = coordinator
         self._attr_unique_id = f"{DOMAIN}_{entry_id}_geofencing"
-        self._attr_device_info = _make_device_info(entry_id, "time_geofencing")
+        self._attr_device_info = _make_device_info(entry_id, getattr(coordinator, "master_device_id", None), "time_geofencing")
 
     @property
     def is_on(self) -> bool:
@@ -221,7 +223,7 @@ class MultizoneAntiSeizeSwitch(SwitchEntity):
         """Initialize switch."""
         self._coordinator = coordinator
         self._attr_unique_id = f"{DOMAIN}_{entry_id}_anti_seize"
-        self._attr_device_info = _make_device_info(entry_id)
+        self._attr_device_info = _make_device_info(entry_id, getattr(coordinator, "master_device_id", None))
 
     @property
     def is_on(self) -> bool:
@@ -251,7 +253,7 @@ class MultizoneAntiFrostSwitch(SwitchEntity):
         """Initialize switch."""
         self._coordinator = coordinator
         self._attr_unique_id = f"{DOMAIN}_{entry_id}_anti_frost"
-        self._attr_device_info = _make_device_info(entry_id)
+        self._attr_device_info = _make_device_info(entry_id, getattr(coordinator, "master_device_id", None))
 
     @property
     def is_on(self) -> bool:

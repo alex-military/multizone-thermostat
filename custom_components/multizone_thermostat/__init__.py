@@ -90,11 +90,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         new_data["zones"] = zones
         hass.config_entries.async_update_entry(entry, data=new_data)
 
+
+    from homeassistant.helpers import device_registry as dr
+    device_registry = dr.async_get(hass)
+    master_device = device_registry.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, entry.entry_id)},
+        name="Master Control",
+        manufacturer="Custom Integration",
+        model="Master Control",
+    )
+
     # Create coordinator
     coordinator = MultizoneCoordinator(
         hass=hass,
         entry=entry,
     )
+    coordinator.master_device_id = master_device.id
 
     # Load persistent data
     await coordinator.async_load_storage()

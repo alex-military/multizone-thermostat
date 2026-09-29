@@ -150,6 +150,7 @@ class MultizoneZoneAnomalyBinarySensor(BinarySensorEntity):
             name="Heating Zones",
             manufacturer="Multizone Thermostat",
             model="Hybrid Zone Controller",
+            via_device_id=getattr(coordinator, "master_device_id", None),
         )
 
     @property

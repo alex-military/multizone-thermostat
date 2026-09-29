@@ -128,6 +128,7 @@ class MultizoneZoneSelect(RestoreEntity, SelectEntity):
             name="Zone Modes",
             manufacturer="Custom Integration",
             model="Zone Modes",
+            via_device_id=getattr(self._coordinator, "master_device_id", None),
         )
 
     @property
