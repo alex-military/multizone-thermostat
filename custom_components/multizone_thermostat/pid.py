@@ -364,8 +364,8 @@ class PIDAutotune:
         """
         divisors = self._tuning_rules[tuning_rule]
         kp = self._Ku / divisors[0]
-        ki = kp / (self._Pu / divisors[1])
-        kd = kp * (self._Pu / divisors[2])
+        ki = kp / (max(self._Pu, 0.001) / divisors[1])
+        kd = kp * (max(self._Pu, 0.001) / divisors[2])
         return PIDAutotune.PIDParams(kp, ki, kd)
 
     def run(self, input_val, set_point, now=None):
@@ -456,6 +456,10 @@ class PIDAutotune:
         self._state = PIDAutotune.STATE_RELAY_STEP_UP
 
     def analysis(self):
+        self._peak_count = 0
+        self._peak_type = 0
+        self._peaks.clear()
+        self._peak_timestamps.clear()
         for index in range(self._inputs.maxlen):
             input_val = self._inputs[index]
             now = self._inputs_timestamps[index]

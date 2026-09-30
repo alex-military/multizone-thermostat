@@ -30,18 +30,18 @@
         "description": "Configure a heating zone. {zones_added} zone(s) already added.",
         "data": {
           "climate_entities": "Climate Entity",
-          "name": "Zone Name",
-          "trv_preset_sync": "Enable TRV Preset Sync",
           "anti_seize_zone_enable": "Enable Anti-seize (Summer Protection) for this zone",
           "allow_passive_heat": "Allow Passive Heat (Fancoil without valve / Mezzanine)",
-          "window_sensor": "Window Sensor (Optional)"
+          "window_sensor": "Window Sensor (Optional)",
+          "zone_name": "Zone Name",
+          "zone_trv_sync": "Enable TRV Preset Sync"
         },
         "data_description": {
           "climate_entities": "The climate entity for this room/zone",
-          "name": "A friendly name for this zone (pre-filled from climate entity name)",
-          "trv_preset_sync": "Automatically sync preset mode when HVAC mode changes (for physical TRV valves)",
           "allow_passive_heat": "Disables ghost heating anomaly detection if this zone naturally absorbs heat while idle (e.g. open loft/mezzanine or fancoil without a zone valve).",
-          "window_sensor": "Automatically bypass the zone when this sensor is open"
+          "window_sensor": "Automatically bypass the zone when this sensor is open",
+          "zone_name": "A friendly name for this zone (pre-filled from climate entity name)",
+          "zone_trv_sync": "Automatically sync preset mode when HVAC mode changes (for physical TRV valves)"
         }
       },
       "trv_calibration": {
@@ -129,25 +129,25 @@
         "title": "Add New Zone",
         "data": {
           "climate_entities": "Climate Entity",
-          "name": "Zone Name",
-          "trv_preset_sync": "Enable TRV Preset Sync",
           "anti_seize_zone_enable": "Enable Anti-seize (Summer Protection) for this zone",
           "allow_passive_heat": "Allow Passive Heat (Fancoil without valve / Mezzanine)",
-          "window_sensor": "Window Sensor (Optional)"
+          "window_sensor": "Window Sensor (Optional)",
+          "zone_name": "Zone Name",
+          "zone_trv_sync": "Enable TRV Preset Sync"
         },
         "data_description": {
           "climate_entities": "The climate entity for this room/zone",
-          "name": "A friendly name for this zone (pre-filled from climate entity name)",
-          "trv_preset_sync": "Automatically sync preset mode when HVAC mode changes (for physical TRV valves)",
           "allow_passive_heat": "Disables ghost heating anomaly detection if this zone naturally absorbs heat while idle (e.g. open loft/mezzanine or fancoil without a zone valve).",
-          "window_sensor": "Automatically bypass the zone when this sensor is open"
+          "window_sensor": "Automatically bypass the zone when this sensor is open",
+          "zone_name": "A friendly name for this zone (pre-filled from climate entity name)",
+          "zone_trv_sync": "Automatically sync preset mode when HVAC mode changes (for physical TRV valves)"
         }
       },
       "remove_zone": {
         "title": "Remove a Zone",
         "description": "Select the zone to remove. The switch entity for this zone will also be removed.",
         "data": {
-          "zone_climate": "Zone to Remove"
+          "zone_name": "Zone to Remove"
         }
       },
       "edit_zone": {
@@ -155,10 +155,10 @@
         "description": "Edit settings for a zone.",
         "data": {
           "zone_climate": "Zone",
-          "trv_preset_sync": "Enable TRV Preset Sync",
           "anti_seize_zone_enable": "Enable Anti-seize (Summer Protection) for this zone",
           "allow_passive_heat": "Allow Passive Heat (Fancoil without valve / Mezzanine)",
-          "window_sensor": "Window Sensor (Optional)"
+          "window_sensor": "Window Sensor (Optional)",
+          "zone_trv_sync": "Enable TRV Preset Sync"
         }
       },
       "edit_geofencing": {

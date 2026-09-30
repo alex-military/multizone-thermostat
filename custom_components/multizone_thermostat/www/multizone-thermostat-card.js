@@ -335,6 +335,8 @@ function findPresetEntity(hass) {
 
 /* ==================== BUTTON CARD CLASS ==================== */
 class MultizoneThermostatButtonCard extends HTMLElement {
+  disconnectedCallback() { if (this._tempTimer) clearTimeout(this._tempTimer); }
+
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
@@ -370,6 +372,7 @@ class MultizoneThermostatButtonCard extends HTMLElement {
   }
 
   updateCard() {
+    if (!this._hass || !this._hass.states) return;
     if (!this._hass || !this._config) return;
 
     const climateEntity = this._config.entity;
@@ -806,6 +809,8 @@ class MultizoneThermostatButtonCard extends HTMLElement {
 
 /* ==================== DIAL (NATIVE WRAPPER) CARD CLASS ==================== */
 class MultizoneThermostatDialCard extends HTMLElement {
+  disconnectedCallback() { if (this._tempTimer) clearTimeout(this._tempTimer); }
+
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
@@ -876,6 +881,7 @@ class MultizoneThermostatDialCard extends HTMLElement {
   }
 
   updateCard() {
+    if (!this._hass || !this._hass.states) return;
     if (!this._hass || !this._config) return;
 
     const card = this.shadowRoot.querySelector('ha-card');
@@ -1527,6 +1533,7 @@ class MultizoneThermostatStatusCard extends HTMLElement {
   }
 
   updateCard() {
+    if (!this._hass || !this._hass.states) return;
     if (!this._hass || !this._rendered) return;
 
     // We no longer rely on a master switch, we use the global preset to determine if system is ON
@@ -1553,7 +1560,7 @@ class MultizoneThermostatStatusCard extends HTMLElement {
         boilerEntity = zoneClimate.attributes.boiler_entity_id;
       } else {
         // Fallback to name heuristic
-        const boilerFound = Object.keys(this._hass.states).find(key => {
+        const boilerFound = this._hass && this._hass.states && Object.keys(this._hass.states).find(key => {
           return key.startsWith('switch.') && (key.includes('boiler') || key.includes('caldaia'));
         });
         if (boilerFound) {
@@ -1793,6 +1800,7 @@ class MultizoneThermostatPresetCard extends HTMLElement {
   }
 
   updateCard() {
+    if (!this._hass || !this._hass.states) return;
     if (!this._hass) return;
 
     // Apply custom styling from config
@@ -2047,6 +2055,7 @@ class MultizoneThermostatHealthSummaryCard extends HTMLElement {
   }
 
   updateCard() {
+    if (!this._hass || !this._hass.states) return;
     if (!this._hass || !this._rendered) return;
     
     let healthEntity = null;
@@ -2324,6 +2333,7 @@ class MultizoneThermostatPlantCard extends HTMLElement {
   }
 
   updateCard() {
+    if (!this._hass || !this._hass.states) return;
     if (!this._hass || !this._rendered) return;
 
     try {
@@ -2334,16 +2344,16 @@ class MultizoneThermostatPlantCard extends HTMLElement {
       let anomalyEntity = this._config.anomaly_entity;
 
       if (!healthEntity) {
-        healthEntity = Object.keys(this._hass.states).find(k => k.startsWith('sensor.') && k.includes('stato_salute_impianto'));
+        healthEntity = this._hass && this._hass.states && Object.keys(this._hass.states).find(k => k.startsWith('sensor.') && k.includes('stato_salute_impianto'));
       }
       if (!cyclesEntity) {
-        cyclesEntity = Object.keys(this._hass.states).find(k => k.startsWith('sensor.') && k.includes('frequenza_accensioni_caldaia'));
+        cyclesEntity = this._hass && this._hass.states && Object.keys(this._hass.states).find(k => k.startsWith('sensor.') && k.includes('frequenza_accensioni_caldaia'));
       }
       if (!runtimeEntity) {
-        runtimeEntity = Object.keys(this._hass.states).find(k => k.startsWith('sensor.') && k.includes('ore_funzionamento_caldaia_24h'));
+        runtimeEntity = this._hass && this._hass.states && Object.keys(this._hass.states).find(k => k.startsWith('sensor.') && k.includes('ore_funzionamento_caldaia_24h'));
       }
       if (!anomalyEntity) {
-        anomalyEntity = Object.keys(this._hass.states).find(k => k.startsWith('binary_sensor.') && k.includes('plant_anomaly'));
+        anomalyEntity = this._hass && this._hass.states && Object.keys(this._hass.states).find(k => k.startsWith('binary_sensor.') && k.includes('plant_anomaly'));
       }
 
       const healthState = healthEntity ? this._hass.states[healthEntity] : null;
@@ -2667,6 +2677,7 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
   }
 
   updateCard() {
+    if (!this._hass || !this._hass.states) return;
     if (!this._hass || !this._rendered || !this._config || !this._config.entity) return;
 
     try {
@@ -2679,10 +2690,10 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
       title = title.replace(/^Virtual Thermostats VT /i, '').replace(/^Heating Zones(?: Zone)? /i, '');
       let slug = climateId.replace("climate.multizone_thermostat_", "").replace("climate.", "");
 
-      const energyEntity = Object.keys(this._hass.states).find(k => k.startsWith('sensor.') && k.includes('classe_energetica') && k.includes(slug));
-      const retentionEntity = Object.keys(this._hass.states).find(k => k.startsWith('sensor.') && k.includes('tempo_ritenzione_termica') && k.includes(slug));
-      const sizingEntity = Object.keys(this._hass.states).find(k => k.startsWith('sensor.') && k.includes('dimensionamento_radiatore') && k.includes(slug));
-      const anomalyEntity = Object.keys(this._hass.states).find(k => k.startsWith('binary_sensor.') && k.includes('anomaly') && k.includes(slug));
+      const energyEntity = this._hass && this._hass.states && Object.keys(this._hass.states).find(k => k.startsWith('sensor.') && k.includes('classe_energetica') && k.includes(slug));
+      const retentionEntity = this._hass && this._hass.states && Object.keys(this._hass.states).find(k => k.startsWith('sensor.') && k.includes('tempo_ritenzione_termica') && k.includes(slug));
+      const sizingEntity = this._hass && this._hass.states && Object.keys(this._hass.states).find(k => k.startsWith('sensor.') && k.includes('dimensionamento_radiatore') && k.includes(slug));
+      const anomalyEntity = this._hass && this._hass.states && Object.keys(this._hass.states).find(k => k.startsWith('binary_sensor.') && k.includes('anomaly') && k.includes(slug));
 
       const titleEl = this.shadowRoot.getElementById('zone-title');
       const tempSubEl = this.shadowRoot.getElementById('temp-sub');
@@ -2832,7 +2843,7 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
       }
 
       const aState = anomalyEntity ? this._hass.states[anomalyEntity] : null;
-      const passiveHeatSwitch = Object.keys(this._hass.states).find(k => 
+      const passiveHeatSwitch = this._hass && this._hass.states && Object.keys(this._hass.states).find(k => 
         k.startsWith('switch.') && k.includes('passive_heat') && k.includes(slug)
       );
       const swState = passiveHeatSwitch ? this._hass.states[passiveHeatSwitch] : null;
@@ -2845,7 +2856,7 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
           valveStatusEl.style.cursor = 'pointer';
           valveStatusEl.addEventListener('click', (e) => {
             e.stopPropagation();
-            const sw = Object.keys(this._hass.states).find(k => 
+            const sw = this._hass && this._hass.states && Object.keys(this._hass.states).find(k => 
               k.startsWith('switch.') && k.includes('passive_heat') && k.includes(slug)
             );
             if (sw) {
