@@ -174,13 +174,17 @@ class MultizoneZoneAnomalyBinarySensor(BinarySensorEntity):
             "details": details,
         }
 
+    @callback
+    def _update_state(self, _) -> None:
+        self.async_write_ha_state()
+
     async def async_added_to_hass(self) -> None:
         """Periodically refresh anomaly evaluations."""
         await super().async_added_to_hass()
         self.async_on_remove(
             async_track_time_interval(
                 self.hass,
-                lambda _: self.async_write_ha_state(),
+                self._update_state,
                 timedelta(seconds=60),
             )
         )

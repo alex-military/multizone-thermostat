@@ -311,11 +311,15 @@ class MultizonePlantHealthSensor(SensorEntity):
             return {}
         return engine.get_plant_health_summary()
 
+    @callback
+    def _update_state(self, _) -> None:
+        self.async_write_ha_state()
+
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
         self.async_on_remove(
             async_track_time_interval(
-                self.hass, lambda _: self.async_write_ha_state(), timedelta(seconds=60)
+                self.hass, self._update_state, timedelta(seconds=60)
             )
         )
 
@@ -345,11 +349,15 @@ class MultizoneBoilerCyclesSensor(SensorEntity):
         engine = getattr(self._coordinator, "plant_diagnostics", None)
         return engine.get_boiler_cycles_per_hour() if engine else 0
 
+    @callback
+    def _update_state(self, _) -> None:
+        self.async_write_ha_state()
+
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
         self.async_on_remove(
             async_track_time_interval(
-                self.hass, lambda _: self.async_write_ha_state(), timedelta(seconds=60)
+                self.hass, self._update_state, timedelta(seconds=60)
             )
         )
 
@@ -379,11 +387,15 @@ class MultizoneBoilerDailyRuntimeSensor(SensorEntity):
         engine = getattr(self._coordinator, "plant_diagnostics", None)
         return engine.get_boiler_daily_runtime_hours() if engine else 0.0
 
+    @callback
+    def _update_state(self, _) -> None:
+        self.async_write_ha_state()
+
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
         self.async_on_remove(
             async_track_time_interval(
-                self.hass, lambda _: self.async_write_ha_state(), timedelta(seconds=60)
+                self.hass, self._update_state, timedelta(seconds=60)
             )
         )
 
