@@ -1187,6 +1187,8 @@ class MultizoneCoordinator:
         
         boiler_state = self.hass.states.get(self.boiler_switch) if self.boiler_switch else None
         current_boiler_on = boiler_state is not None and boiler_state.state == STATE_ON
+        if current_boiler_on and self.plant_diagnostics._current_boiler_start is None:
+            self.plant_diagnostics.record_boiler_state(True)
             
         if wanted_state and not current_boiler_on:
             # Hard lock: prevent turning ON if min_cycle_off hasn't elapsed

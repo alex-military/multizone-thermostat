@@ -24,6 +24,7 @@ class MultizonePID:
         """
         self._pid = PID(kp, ki, kd, out_min=out_min, out_max=out_max, sampling_period=0)
         self.sensor_timeout = sensor_timeout
+        self.update_sensor_timestamp()
         self.last_sensor_update = time.time()
         self._last_demand = 0.0
         

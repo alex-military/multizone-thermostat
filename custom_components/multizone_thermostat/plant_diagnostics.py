@@ -142,10 +142,15 @@ class PlantDiagnosticsEngine:
                 return ANOMALY_NONE, state["anomaly_details"]
 
             # 1. Staleness Check: Has the temperature sensor not updated in > 2 hours?
+            last_reported = st.last_reported if hasattr(st, "last_reported") else st.last_updated
+            if last_reported:
+                time_since_update = now - last_reported.timestamp()
+            else:
+                time_since_update = 0
             if state["last_temp_seen"] is None or state["last_temp_seen"] != current_temp:
                 state["last_temp_seen"] = current_temp
                 state["last_temp_time"] = now
-            elif state["last_temp_time"] is not None and (now - state["last_temp_time"]) > 7200:
+            if time_since_update > 7200:
                 # Same exact float value for > 2 hours
                 state["active_anomaly"] = ANOMALY_STALE_SENSOR
                 state["anomaly_details"] = ANOMALY_LABELS[ANOMALY_STALE_SENSOR]

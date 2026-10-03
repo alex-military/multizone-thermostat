@@ -75,8 +75,8 @@ async def async_get_config_entry_diagnostics(
             "mode": coordinator.get_zone_mode(climate_id),
             "demand_percent": coordinator.get_zone_demand(climate_id),
             "is_frost_emergency": coordinator.is_zone_in_frost_emergency(climate_id),
-            "climates_configured": zone.get("climates", []),
-            "switches_configured": zone.get("switches", []),
+            "climates_configured": zone.get("climate_entities", []),
+            "switches_configured": zone.get("switch_entities", []),
             "autotuner": {
                 "state": tuner.state if tuner else "N/A",
                 "completed_cycles": len(tuner.completed_cycles) if tuner else 0,

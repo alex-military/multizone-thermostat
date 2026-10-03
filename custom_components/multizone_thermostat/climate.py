@@ -583,6 +583,7 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         if new_pwm_state != self._local_pwm_state:
             self._local_pwm_state = new_pwm_state
             await self._async_sync_switches()
+            self.async_write_ha_state()
 
     async def _async_sync_switches(self) -> None:
         """Turn local switches ON or OFF based on PWM state."""
