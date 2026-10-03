@@ -128,6 +128,7 @@ class MultizoneCoordinator:
         self.presence_sensor = entry.data.get(CONF_PRESENCE_SENSOR)
         self.weather_sensor_id = entry.data.get(CONF_WEATHER_SENSOR)
         self.global_calendar_id = entry.data.get(CONF_GLOBAL_CALENDAR)
+        self.master_device_id: str | None = None
         
         # Internal state tracking
         self._master_state: bool = False
