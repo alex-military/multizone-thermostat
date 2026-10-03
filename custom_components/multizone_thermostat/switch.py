@@ -139,6 +139,7 @@ class MultizoneMasterSwitch(RestoreEntity, SwitchEntity):
         """Turn master off."""
         self._is_on = False
         self._coordinator.set_master_state(False)
+        await self._coordinator.async_apply_master_off()
         self.async_write_ha_state()
 
     async def async_added_to_hass(self) -> None:
@@ -287,7 +288,7 @@ class MultizonePhysicalSyncSwitch(SwitchEntity):
         self._safe_name = safe_name
         self._attr_unique_id = f"{DOMAIN}_{entry_id}_physical_sync_{safe_name}"
         self._attr_name = f"Sync Controlli Fisici {zone_name}"
-        self._attr_device_info = _make_device_info(entry_id, "zone_modes")
+        self._attr_device_info = _make_device_info(entry_id, getattr(coordinator, "master_device_id", None), "zone_modes")
 
     @property
     def is_on(self) -> bool:
@@ -324,7 +325,7 @@ class MultizonePassiveHeatSwitch(SwitchEntity):
         self._climate_id = make_zone_entity_id(zone_name)
         self._attr_unique_id = f"{DOMAIN}_{entry_id}_passive_heat_{safe_name}"
         self._attr_name = f"Apporto Passivo {zone_name}"
-        self._attr_device_info = _make_device_info(entry_id, "zone_modes")
+        self._attr_device_info = _make_device_info(entry_id, getattr(coordinator, "master_device_id", None), "zone_modes")
 
     @property
     def is_on(self) -> bool:

@@ -793,8 +793,8 @@ class MultizoneCoordinator:
         _LOGGER.info("Presence changed: %s -> %s", old_val, new_val)
         
         # Consider 0, 'not_home', or 'off' as Away
-        is_away = new_val in ("0", "not_home", "off")
-        was_away = old_val in ("0", "not_home", "off")
+        is_away = new_val != "home"
+        was_away = old_val != "home"
         
         if is_away and not was_away:
             # Everyone left! Save current preset and set to Away
@@ -1022,7 +1022,7 @@ class MultizoneCoordinator:
         # 2. Process Smart Start (Next Event)
         # Check if next event requires pre-heating
         if next_event:
-            start_time = dt_util.parse_datetime(next_event["start"])
+            start_time = dt_util.as_local(dt_util.parse_datetime(next_event["start"]))
             if start_time:
                 parsed_next = parse_calendar_event(next_event.get("summary", ""))
                 # We only preheat if there is a target temperature shift
@@ -1349,8 +1349,8 @@ class MultizoneCoordinator:
             return
 
         if self._pending_boiler_task:
-            self._pending_boiler_task.cancel()
-            self._pending_boiler_task = None
+            # We don't cancel inside force_boiler_on/off because they might be called from the task itself.
+            pass
 
         await self.hass.services.async_call(
             "switch",
@@ -1369,8 +1369,8 @@ class MultizoneCoordinator:
             return
 
         if self._pending_boiler_task:
-            self._pending_boiler_task.cancel()
-            self._pending_boiler_task = None
+            # We don't cancel inside force_boiler_on/off because they might be called from the task itself.
+            pass
 
         await self.hass.services.async_call(
             "switch",
