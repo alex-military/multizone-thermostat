@@ -229,7 +229,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     ) -> config_entries.FlowResult:
         """Step 2: Add a zone (Virtual Zone)."""
         errors: dict[str, str] = {}
-        already_added = [z[CONF_ZONE_NAME] for z in self._zones]
+        already_added = [z.get(CONF_ZONE_NAME, 'Unnamed Zone') for z in self._zones]
 
         if user_input is not None:
             zone_name = user_input[CONF_ZONE_NAME].strip()
@@ -304,7 +304,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return await self.async_step_another_zone()
             
         schema_dict = {}
-        climates = self._current_zone_data[CONF_ZONE_CLIMATES]
+        climates = self._current_zone_data.get(CONF_ZONE_CLIMATES, []) if self._current_zone_data else []
         for climate_id in climates:
             schema_dict[vol.Optional(climate_id)] = selector.EntitySelector(selector.EntitySelectorConfig(domain=["number", "input_number"]))
             
@@ -334,7 +334,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=schema,
             description_placeholders={
                 "zones_added": str(len(self._zones)),
-                "zones_list": ", ".join(z[CONF_ZONE_NAME] for z in self._zones),
+                "zones_list": ", ".join(z.get(CONF_ZONE_NAME, 'Unnamed Zone') for z in self._zones),
             },
         )
 
@@ -453,7 +453,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "boiler_switch": self._boiler_switch or self._opentherm_entity or "N/A",
                 "zones_count": str(len(self._zones)),
                 "zones_list": "\n".join(
-                    f"- {z[CONF_ZONE_NAME]}"
+                    f"- {z.get(CONF_ZONE_NAME, 'Unnamed Zone')}"
                     for z in self._zones
                 ),
             },
@@ -463,27 +463,27 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @callback
     def async_get_options_flow(
         config_entry: config_entries.ConfigEntry,
-    ) -> MultizoneOptionsFlow:
+    ) -> config_entries.OptionsFlow:
         """Get options flow."""
-        return MultizoneOptionsFlow(config_entry)
+        return MultizoneOptionsFlow()
 
 
 class MultizoneOptionsFlow(config_entries.OptionsFlow):
     """Handle options flow for Multizone Thermostat."""
 
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
+    def __init__(self) -> None:
         """Initialize."""
-        self._config_entry = config_entry
-        self._zones: list[dict[str, Any]] = copy.deepcopy(config_entry.data.get(CONF_ZONES, []))
-        self._boiler_mode: str = config_entry.data.get(CONF_BOILER_MODE, MODE_RELAY)
-        self._boiler_switch: str = config_entry.data.get(CONF_BOILER_SWITCH, "")
-        self._opentherm_entity: str | None = config_entry.data.get(CONF_OPENTHERM_ENTITY)
-        self._opentherm_min_temp: float = config_entry.data.get(CONF_OPENTHERM_MIN_TEMP, 35.0)
-        self._opentherm_max_temp: float = config_entry.data.get(CONF_OPENTHERM_MAX_TEMP, 75.0)
-        self._geofencing_enabled: bool = config_entry.data.get(CONF_GEOFENCING_ENABLED, False)
-        self._presence_sensor: str | None = config_entry.data.get(CONF_PRESENCE_SENSOR)
-        self._weather_sensor: str | None = config_entry.data.get(CONF_WEATHER_SENSOR)
-        self._global_calendar: str | None = config_entry.data.get(CONF_GLOBAL_CALENDAR)
+        # self.config_entry is automatically set by Home Assistant 2024.12+
+        self._zones: list[dict[str, Any]] = copy.deepcopy(self.config_entry.data.get(CONF_ZONES, []))
+        self._boiler_mode: str = self.config_entry.data.get(CONF_BOILER_MODE, MODE_RELAY)
+        self._boiler_switch: str = self.config_entry.data.get(CONF_BOILER_SWITCH, "")
+        self._opentherm_entity: str | None = self.config_entry.data.get(CONF_OPENTHERM_ENTITY)
+        self._opentherm_min_temp: float = self.config_entry.data.get(CONF_OPENTHERM_MIN_TEMP, 35.0)
+        self._opentherm_max_temp: float = self.config_entry.data.get(CONF_OPENTHERM_MAX_TEMP, 75.0)
+        self._geofencing_enabled: bool = self.config_entry.data.get(CONF_GEOFENCING_ENABLED, False)
+        self._presence_sensor: str | None = self.config_entry.data.get(CONF_PRESENCE_SENSOR)
+        self._weather_sensor: str | None = self.config_entry.data.get(CONF_WEATHER_SENSOR)
+        self._global_calendar: str | None = self.config_entry.data.get(CONF_GLOBAL_CALENDAR)
         self._current_zone_name: str | None = None
         self._current_zone_data: dict[str, Any] | None = None
 
@@ -614,7 +614,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
     ) -> config_entries.FlowResult:
         """Add a new zone."""
         errors: dict[str, str] = {}
-        already_added = [z[CONF_ZONE_NAME] for z in self._zones]
+        already_added = [z.get(CONF_ZONE_NAME, 'Unnamed Zone') for z in self._zones]
 
         if user_input is not None:
             name = user_input[CONF_ZONE_NAME].strip()
@@ -682,7 +682,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             return self._save_options()
             
         schema_dict = {}
-        climates = self._current_zone_data[CONF_ZONE_CLIMATES]
+        climates = self._current_zone_data.get(CONF_ZONE_CLIMATES, []) if self._current_zone_data else []
         for climate_id in climates:
             schema_dict[vol.Optional(climate_id)] = selector.EntitySelector(selector.EntitySelectorConfig(domain=["number", "input_number"]))
             
@@ -700,11 +700,11 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
         if not self._zones:
             return self.async_abort(reason="no_zones_configured")
 
-        zone_options = {z[CONF_ZONE_NAME]: z[CONF_ZONE_NAME] for z in self._zones}
+        zone_options = {z.get(CONF_ZONE_NAME, 'Unnamed Zone'): z.get(CONF_ZONE_NAME, 'Unnamed Zone') for z in self._zones}
 
         if user_input is not None:
             zone_to_remove = user_input["zone_name"]
-            self._zones = [z for z in self._zones if z[CONF_ZONE_NAME] != zone_to_remove]
+            self._zones = [z for z in self._zones if z.get(CONF_ZONE_NAME, 'Unnamed Zone') != zone_to_remove]
             
             # Remove entities from registry associated with this zone
             ent_reg = er.async_get(self.hass)
@@ -716,7 +716,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             # Mode select Entity
             # NEW-WARN-06: Fix select unique_id calculation to match what select.py creates
             climate_id_for_unique = make_zone_entity_id(zone_to_remove)
-            select_unique_id = f"{DOMAIN}_{self._config_entry.entry_id}_zone_mode_{climate_id_for_unique.replace('.', '_')}"
+            select_unique_id = f"{DOMAIN}_{self.config_entry.entry_id}_zone_mode_{climate_id_for_unique.replace('.', '_')}"
             select_entity_id = ent_reg.async_get_entity_id("select", DOMAIN, select_unique_id)
             if select_entity_id:
                 ent_reg.async_remove(select_entity_id)
@@ -726,7 +726,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             # NEW-BUG-03: Also remove the physical sync switch for the removed zone
             safe_name = zone_to_remove.lower().replace(" ", "_").replace("-", "_")
             safe_name = "".join(c for c in safe_name if c.isalnum() or c == "_")
-            sync_unique_id = f"{DOMAIN}_{self._config_entry.entry_id}_physical_sync_{safe_name}"
+            sync_unique_id = f"{DOMAIN}_{self.config_entry.entry_id}_physical_sync_{safe_name}"
             sync_entity_id = ent_reg.async_get_entity_id("switch", DOMAIN, sync_unique_id)
             if sync_entity_id:
                 ent_reg.async_remove(sync_entity_id)
@@ -757,7 +757,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                     errors["base"] = "no_actuators_selected"
                 else:
                     for i, z in enumerate(self._zones):
-                        if z[CONF_ZONE_NAME] == self._current_zone_name:
+                        if z.get(CONF_ZONE_NAME, 'Unnamed Zone') == self._current_zone_name:
                             self._zones[i][CONF_ZONE_CLIMATES] = climates
                             self._zones[i][CONF_ZONE_SWITCHES] = switches
                             self._zones[i][CONF_ZONE_TRV_SYNC] = user_input.get(CONF_ZONE_TRV_SYNC, DEFAULT_TRV_SYNC)
@@ -778,7 +778,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                             self._current_zone_data = self._zones[i]
                             break
                             
-                    if CONF_ZONE_TEMP_SENSOR in self._current_zone_data and climates:
+                    if self._current_zone_data and CONF_ZONE_TEMP_SENSOR in self._current_zone_data and climates:
                         return await self.async_step_trv_calibration_edit()
                     
                     self._current_zone_name = None
@@ -789,7 +789,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                 self._current_zone_name = user_input["zone_name"]
                 
         if self._current_zone_name is not None:
-            zone_data = next((z for z in self._zones if z[CONF_ZONE_NAME] == self._current_zone_name), None)
+            zone_data = next((z for z in self._zones if z.get(CONF_ZONE_NAME, 'Unnamed Zone') == self._current_zone_name), None)
             if zone_data is None: zone_data = {}
             if errors and user_input is not None:
                 zone_data = {**zone_data, **user_input}
@@ -812,7 +812,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             })
             return self.async_show_form(step_id="edit_zone", data_schema=schema, errors=errors)
 
-        zone_options = {z[CONF_ZONE_NAME]: z[CONF_ZONE_NAME] for z in self._zones}
+        zone_options = {z.get(CONF_ZONE_NAME, 'Unnamed Zone'): z.get(CONF_ZONE_NAME, 'Unnamed Zone') for z in self._zones}
         schema = vol.Schema({
             vol.Required("zone_name"): vol.In(zone_options),
         })
@@ -829,7 +829,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             return self._save_options()
             
         schema_dict = {}
-        climates = self._current_zone_data[CONF_ZONE_CLIMATES]
+        climates = self._current_zone_data.get(CONF_ZONE_CLIMATES, []) if self._current_zone_data else []
         current_calibrations = self._current_zone_data.get(CONF_ZONE_CALIBRATIONS, {})
         for climate_id in climates:
             default_val = current_calibrations.get(climate_id)
@@ -957,11 +957,11 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             data[CONF_GLOBAL_CALENDAR] = self._global_calendar
 
         self.hass.config_entries.async_update_entry(
-            self._config_entry, data=data
+            self.config_entry, data=data
         )
         
         self.hass.async_create_task(
-            self.hass.config_entries.async_reload(self._config_entry.entry_id)
+            self.hass.config_entries.async_reload(self.config_entry.entry_id)
         )
         
         return self.async_create_entry(title="", data={})

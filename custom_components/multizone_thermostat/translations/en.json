@@ -33,8 +33,11 @@
           "anti_seize_zone_enable": "Enable Anti-seize (Summer Protection) for this zone",
           "allow_passive_heat": "Allow Passive Heat (Fancoil without valve / Mezzanine)",
           "window_sensor": "Window Sensor (Optional)",
-          "zone_name": "Zone Name",
-          "zone_trv_sync": "Enable TRV Preset Sync"
+          "name": "Zone Name",
+          "trv_preset_sync": "Enable TRV Preset Sync",
+          "switch_entities": "Zone Switches / Relays",
+          "temp_sensor": "Zone Temperature Sensor",
+          "target_temperature": "Base Target Temperature"
         },
         "data_description": {
           "climate_entities": "The climate entity for this room/zone",
@@ -132,8 +135,11 @@
           "anti_seize_zone_enable": "Enable Anti-seize (Summer Protection) for this zone",
           "allow_passive_heat": "Allow Passive Heat (Fancoil without valve / Mezzanine)",
           "window_sensor": "Window Sensor (Optional)",
-          "zone_name": "Zone Name",
-          "zone_trv_sync": "Enable TRV Preset Sync"
+          "name": "Zone Name",
+          "trv_preset_sync": "Enable TRV Preset Sync",
+          "switch_entities": "Zone Switches / Relays",
+          "temp_sensor": "Zone Temperature Sensor",
+          "target_temperature": "Base Target Temperature"
         },
         "data_description": {
           "climate_entities": "The climate entity for this room/zone",
@@ -154,11 +160,15 @@
         "title": "Edit Zone Settings",
         "description": "Edit settings for a zone.",
         "data": {
-          "zone_climate": "Zone",
           "anti_seize_zone_enable": "Enable Anti-seize (Summer Protection) for this zone",
           "allow_passive_heat": "Allow Passive Heat (Fancoil without valve / Mezzanine)",
           "window_sensor": "Window Sensor (Optional)",
-          "zone_trv_sync": "Enable TRV Preset Sync"
+          "trv_preset_sync": "Enable TRV Preset Sync",
+          "zone_name": "Zone",
+          "switch_entities": "Zone Switches / Relays",
+          "climate_entities": "Zone TRVs / Climates",
+          "temp_sensor": "Zone Temperature Sensor",
+          "target_temperature": "Base Target Temperature"
         }
       },
       "edit_geofencing": {

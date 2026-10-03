@@ -33,8 +33,11 @@
           "anti_seize_zone_enable": "Abilita Antigrippaggio (Protezione Estiva) per questa zona",
           "allow_passive_heat": "Consenti Apporto Termico Passivo (Fancoil senza valvola / Soppalco aperto)",
           "window_sensor": "Sensore Finestra (Opzionale)",
-          "zone_name": "Nome Zona",
-          "zone_trv_sync": "Abilita Sincronizzazione Preset TRV"
+          "name": "Nome Zona",
+          "trv_preset_sync": "Abilita Sincronizzazione Preset TRV",
+          "switch_entities": "Zone Switches / Relays",
+          "temp_sensor": "Zone Temperature Sensor",
+          "target_temperature": "Base Target Temperature"
         },
         "data_description": {
           "climate_entities": "L'entità climate per questa stanza/zona",
@@ -132,8 +135,11 @@
           "anti_seize_zone_enable": "Abilita Antigrippaggio (Protezione Estiva) per questa zona",
           "allow_passive_heat": "Consenti Apporto Termico Passivo (Fancoil senza valvola / Soppalco aperto)",
           "window_sensor": "Sensore Finestra (Opzionale)",
-          "zone_name": "Nome Zona",
-          "zone_trv_sync": "Abilita Sincronizzazione Preset TRV"
+          "name": "Nome Zona",
+          "trv_preset_sync": "Abilita Sincronizzazione Preset TRV",
+          "switch_entities": "Zone Switches / Relays",
+          "temp_sensor": "Zone Temperature Sensor",
+          "target_temperature": "Base Target Temperature"
         },
         "data_description": {
           "climate_entities": "L'entità climate per questa stanza/zona",
@@ -154,11 +160,15 @@
         "title": "Modifica Zona",
         "description": "Modifica le impostazioni per questa zona.\nSe è abilitata la protezione estiva, puoi disabilitarla per questa singola zona deselezionando l'apposita casella.",
         "data": {
-          "zone_climate": "Seleziona la zona da modificare",
           "anti_seize_zone_enable": "Abilita Antigrippaggio (Protezione Estiva) per questa zona",
           "allow_passive_heat": "Consenti Apporto Termico Passivo (Fancoil senza valvola / Soppalco aperto)",
           "window_sensor": "Sensore Finestra (opzionale)",
-          "zone_trv_sync": "Sincronizza modalità Termostato (TRV) -> Centrale"
+          "trv_preset_sync": "Sincronizza modalità Termostato (TRV) -> Centrale",
+          "zone_name": "Seleziona la zona da modificare",
+          "switch_entities": "Zone Switches / Relays",
+          "climate_entities": "Zone TRVs / Climates",
+          "temp_sensor": "Zone Temperature Sensor",
+          "target_temperature": "Base Target Temperature"
         }
       },
       "edit_geofencing": {

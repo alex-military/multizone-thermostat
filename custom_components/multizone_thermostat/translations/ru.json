@@ -33,7 +33,11 @@
           "name": "Имя зоны",
           "trv_preset_sync": "Включить синхронизацию пресетов TRV",
           "anti_seize_zone_enable": "Включить защиту от заклинивания (летняя защита) для этой зоны",
-          "window_sensor": "Датчик окна (опционально)"
+          "window_sensor": "Датчик окна (опционально)",
+          "allow_passive_heat": "Разрешить пассивный нагрев",
+          "switch_entities": "Zone Switches / Relays",
+          "temp_sensor": "Zone Temperature Sensor",
+          "target_temperature": "Base Target Temperature"
         },
         "data_description": {
           "climate_entities": "Объект климата для этой комнаты/зоны",
@@ -130,7 +134,11 @@
           "name": "Имя зоны",
           "trv_preset_sync": "Включить синхронизацию пресетов TRV",
           "anti_seize_zone_enable": "Включить защиту от заклинивания (летняя защита) для этой зоны",
-          "window_sensor": "Датчик окна (опционально)"
+          "window_sensor": "Датчик окна (опционально)",
+          "allow_passive_heat": "Разрешить пассивный нагрев",
+          "switch_entities": "Zone Switches / Relays",
+          "temp_sensor": "Zone Temperature Sensor",
+          "target_temperature": "Base Target Temperature"
         },
         "data_description": {
           "climate_entities": "Объект климата для этой комнаты/зоны",
@@ -143,17 +151,22 @@
         "title": "Удалить зону",
         "description": "Выберите зону для удаления. Переключатель для этой зоны также будет удален.",
         "data": {
-          "zone_climate": "Зона для удаления"
+          "zone_name": "Зона для удаления"
         }
       },
       "edit_zone": {
         "title": "Редактировать настройки зоны",
         "description": "Изменить настройки зоны.",
         "data": {
-          "zone_climate": "Зона",
           "trv_preset_sync": "Включить синхронизацию пресетов TRV",
           "anti_seize_zone_enable": "Включить защиту от заклинивания (летняя защита) для этой зоны",
-          "window_sensor": "Датчик окна (опционально)"
+          "window_sensor": "Датчик окна (опционально)",
+          "allow_passive_heat": "Разрешить пассивный нагрев",
+          "zone_name": "Зона",
+          "switch_entities": "Zone Switches / Relays",
+          "climate_entities": "Zone TRVs / Climates",
+          "temp_sensor": "Zone Temperature Sensor",
+          "target_temperature": "Base Target Temperature"
         }
       },
       "edit_geofencing": {

@@ -267,7 +267,7 @@ function getTranslation(hass, key) {
 
 // Helper function to auto-discover the bypass switch for a climate entity
 function autoDiscoverSwitch(hass, climateId) {
-  if (!hass || !climateId) return "";
+  if (!hass || !hass.states || !climateId) return "";
   for (const entityId of Object.keys(hass.states)) {
     // Check both legacy switches and new select entities for the climate_entity attribute
     if ((entityId.startsWith("select.") || entityId.startsWith("switch.")) && 
@@ -335,8 +335,6 @@ function findPresetEntity(hass) {
 
 /* ==================== BUTTON CARD CLASS ==================== */
 class MultizoneThermostatButtonCard extends HTMLElement {
-  disconnectedCallback() { if (this._tempTimer) clearTimeout(this._tempTimer); }
-
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
@@ -349,7 +347,7 @@ class MultizoneThermostatButtonCard extends HTMLElement {
   }
 
   setConfig(config) {
-    if (!config.entity) {
+    if (!config || !config.entity) {
       throw new Error("Specificare un termostato (climate entity)");
     }
     this._config = config;
@@ -809,8 +807,6 @@ class MultizoneThermostatButtonCard extends HTMLElement {
 
 /* ==================== DIAL (NATIVE WRAPPER) CARD CLASS ==================== */
 class MultizoneThermostatDialCard extends HTMLElement {
-  disconnectedCallback() { if (this._tempTimer) clearTimeout(this._tempTimer); }
-
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
@@ -826,7 +822,7 @@ class MultizoneThermostatDialCard extends HTMLElement {
   }
 
   setConfig(config) {
-    if (!config.entity) {
+    if (!config || !config.entity) {
       throw new Error("Specificare un termostato (climate entity)");
     }
     this._config = config;
@@ -1985,6 +1981,7 @@ if (!customElements.get("multizone-thermostat-spacer")) {
 
 /* ==================== HEALTH SUMMARY CARD ==================== */
 class MultizoneThermostatHealthSummaryCard extends HTMLElement {
+  getCardSize() { return 3; }
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
@@ -2923,6 +2920,7 @@ class MultizoneThermostatDashboardStrategy extends HTMLElement {
 
   static async generateDiagnosticView(info) {
     const hass = info.hass;
+    if (!hass || !hass.states) return { cards: [] };
     const strategyConfig = info.config?.strategy || info.strategy || info.config || {};
     
     // Find all zones
@@ -2991,6 +2989,7 @@ class MultizoneThermostatDashboardStrategy extends HTMLElement {
 
   static async generateView(info) {
     const hass = info.hass;
+    if (!hass || !hass.states) return { cards: [] };
     // In view strategies, config is usually in info.config.strategy or info.strategy
     const strategyConfig = info.config?.strategy || info.strategy || info.config || {};
     
