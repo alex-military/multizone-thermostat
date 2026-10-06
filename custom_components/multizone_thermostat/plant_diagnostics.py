@@ -19,6 +19,7 @@ ANOMALY_STALE_SENSOR = "stale_sensor"
 ANOMALY_OVERSHOOT = "overshoot"
 ANOMALY_LOW_BATTERY = "low_battery"
 ANOMALY_SENSOR_FAULT = "sensor_fault"
+ANOMALY_SENSOR_TIMEOUT = "sensor_timeout"
 
 # Human-readable anomaly labels (Italian)
 ANOMALY_LABELS = {
@@ -30,6 +31,7 @@ ANOMALY_LABELS = {
     ANOMALY_OVERSHOOT: "Superamento anomalo temperatura impostata (>1.5°C)",
     ANOMALY_LOW_BATTERY: "Batteria sensore in esaurimento (<= 10%)",
     ANOMALY_SENSOR_FAULT: "Guasto sensore o temperatura non plausibile",
+    ANOMALY_SENSOR_TIMEOUT: "Watchdog: Sonda offline / mancata ricezione dati",
 }
 
 
@@ -204,6 +206,20 @@ class PlantDiagnosticsEngine:
                 state["anomaly_details"] = f"Lettura temperatura non plausibile o sbalzo anomalo ({current_temp}°C)"
                 return ANOMALY_SENSOR_FAULT, state["anomaly_details"]
 
+            # 0.c Watchdog Sensor Timeout Check
+            timeout_min = zone.get("sensor_timeout_min", 60) if zone else 60
+            sensor_entity = zone.get("temp_sensor") if zone else None
+            if sensor_entity:
+                s_state = self.hass.states.get(sensor_entity)
+                if s_state:
+                    s_reported = s_state.last_reported if hasattr(s_state, "last_reported") else s_state.last_updated
+                    if s_reported:
+                        elapsed_sec = now - s_reported.timestamp()
+                        if elapsed_sec > (timeout_min * 60):
+                            state["active_anomaly"] = ANOMALY_SENSOR_TIMEOUT
+                            state["anomaly_details"] = f"Sonda {sensor_entity} non aggiornata da oltre {int(elapsed_sec / 60)} min (limite: {timeout_min} min)"
+                            return ANOMALY_SENSOR_TIMEOUT, state["anomaly_details"]
+
             # If the zone is Bypassed, it is intentionally excluded from heating
             zone_mode = self.coordinator.get_zone_mode(climate_id)
             if zone_mode == "bypass":
@@ -363,11 +379,11 @@ class PlantDiagnosticsEngine:
             return "In apprendimento..."
 
     def has_critical_sensor_fault(self, climate_id: str) -> bool:
-        """Return True if the zone sensor has a low battery or implausible reading."""
+        """Return True if the zone sensor has a low battery, implausible reading, or watchdog timeout."""
         state = self._zone_anomaly_state.get(climate_id)
         if not state:
             return False
-        return state.get("active_anomaly") in (ANOMALY_LOW_BATTERY, ANOMALY_SENSOR_FAULT)
+        return state.get("active_anomaly") in (ANOMALY_LOW_BATTERY, ANOMALY_SENSOR_FAULT, ANOMALY_SENSOR_TIMEOUT)
 
     def get_plant_health_summary(self) -> dict[str, Any]:
         """

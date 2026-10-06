@@ -34,6 +34,8 @@ from .const import (
     CONF_ZONE_ANTI_SEIZE,
     CONF_ZONE_CALIBRATIONS,
     CONF_ZONE_ALLOW_PASSIVE_HEAT,
+    CONF_ZONE_SENSOR_TIMEOUT,
+    DEFAULT_SENSOR_TIMEOUT_MIN,
     CONF_ZONES,
     CONF_WEATHER_SENSOR,
     CONF_GLOBAL_CALENDAR,
@@ -250,6 +252,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_ZONE_TRV_SYNC: user_input.get(CONF_ZONE_TRV_SYNC, DEFAULT_TRV_SYNC),
                     CONF_ZONE_ANTI_SEIZE: user_input.get(CONF_ZONE_ANTI_SEIZE, True),
                     CONF_ZONE_ALLOW_PASSIVE_HEAT: user_input.get(CONF_ZONE_ALLOW_PASSIVE_HEAT, False),
+                    CONF_ZONE_SENSOR_TIMEOUT: user_input.get(CONF_ZONE_SENSOR_TIMEOUT, DEFAULT_SENSOR_TIMEOUT_MIN),
                     CONF_ZONE_TARGET_TEMP: user_input.get(CONF_ZONE_TARGET_TEMP, 20.0),
                     CONF_ZONE_CALIBRATIONS: {},
                 }
@@ -276,6 +279,9 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             vol.Optional(CONF_ZONE_SWITCHES, default=[]): selector.EntitySelector(selector.EntitySelectorConfig(domain=SWITCH_DOMAIN, multiple=True)),
             vol.Optional(CONF_ZONE_TEMP_SENSOR): selector.EntitySelector(selector.EntitySelectorConfig(domain=SENSOR_DOMAIN, device_class="temperature")),
             vol.Optional(CONF_ZONE_TARGET_TEMP, default=20.0): vol.Coerce(float),
+            vol.Optional(CONF_ZONE_SENSOR_TIMEOUT, default=DEFAULT_SENSOR_TIMEOUT_MIN): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=10, max=180, step=5, mode=selector.NumberSelectorMode.BOX)
+            ),
             vol.Optional(CONF_ZONE_TRV_SYNC, default=DEFAULT_TRV_SYNC): bool,
             vol.Optional(CONF_ZONE_ANTI_SEIZE, default=True): bool,
             vol.Optional(CONF_ZONE_ALLOW_PASSIVE_HEAT, default=False): bool,
@@ -635,6 +641,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                     CONF_ZONE_TRV_SYNC: user_input.get(CONF_ZONE_TRV_SYNC, DEFAULT_TRV_SYNC),
                     CONF_ZONE_ANTI_SEIZE: user_input.get(CONF_ZONE_ANTI_SEIZE, True),
                     CONF_ZONE_ALLOW_PASSIVE_HEAT: user_input.get(CONF_ZONE_ALLOW_PASSIVE_HEAT, False),
+                    CONF_ZONE_SENSOR_TIMEOUT: user_input.get(CONF_ZONE_SENSOR_TIMEOUT, DEFAULT_SENSOR_TIMEOUT_MIN),
                     CONF_ZONE_TARGET_TEMP: user_input.get(CONF_ZONE_TARGET_TEMP, 20.0),
                     CONF_ZONE_CALIBRATIONS: {},
                 }
@@ -659,6 +666,9 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             vol.Optional(CONF_ZONE_SWITCHES, default=[]): selector.EntitySelector(selector.EntitySelectorConfig(domain=SWITCH_DOMAIN, multiple=True)),
             vol.Optional(CONF_ZONE_TEMP_SENSOR): selector.EntitySelector(selector.EntitySelectorConfig(domain=SENSOR_DOMAIN, device_class="temperature")),
             vol.Optional(CONF_ZONE_TARGET_TEMP, default=20.0): vol.Coerce(float),
+            vol.Optional(CONF_ZONE_SENSOR_TIMEOUT, default=DEFAULT_SENSOR_TIMEOUT_MIN): selector.NumberSelector(
+                selector.NumberSelectorConfig(min=10, max=180, step=5, mode=selector.NumberSelectorMode.BOX)
+            ),
             vol.Optional(CONF_ZONE_TRV_SYNC, default=DEFAULT_TRV_SYNC): bool,
             vol.Optional(CONF_ZONE_ANTI_SEIZE, default=True): bool,
             vol.Optional(CONF_ZONE_ALLOW_PASSIVE_HEAT, default=False): bool,
@@ -763,6 +773,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                             self._zones[i][CONF_ZONE_TRV_SYNC] = user_input.get(CONF_ZONE_TRV_SYNC, DEFAULT_TRV_SYNC)
                             self._zones[i][CONF_ZONE_ANTI_SEIZE] = user_input.get(CONF_ZONE_ANTI_SEIZE, True)
                             self._zones[i][CONF_ZONE_ALLOW_PASSIVE_HEAT] = user_input.get(CONF_ZONE_ALLOW_PASSIVE_HEAT, False)
+                            self._zones[i][CONF_ZONE_SENSOR_TIMEOUT] = user_input.get(CONF_ZONE_SENSOR_TIMEOUT, DEFAULT_SENSOR_TIMEOUT_MIN)
                             self._zones[i][CONF_ZONE_TARGET_TEMP] = user_input.get(CONF_ZONE_TARGET_TEMP, 20.0)
                             
                             if user_input.get(CONF_ZONE_TEMP_SENSOR) and user_input[CONF_ZONE_TEMP_SENSOR] != "none":
@@ -805,6 +816,9 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                 vol.Optional(CONF_ZONE_SWITCHES, default=zone_data.get(CONF_ZONE_SWITCHES, [])): selector.EntitySelector(selector.EntitySelectorConfig(domain=SWITCH_DOMAIN, multiple=True)),
                 vol.Optional(CONF_ZONE_TEMP_SENSOR, **temp_desc): selector.EntitySelector(selector.EntitySelectorConfig(domain=SENSOR_DOMAIN, device_class="temperature")),
                 vol.Optional(CONF_ZONE_TARGET_TEMP, default=zone_data.get(CONF_ZONE_TARGET_TEMP, 20.0)): vol.Coerce(float),
+                vol.Optional(CONF_ZONE_SENSOR_TIMEOUT, default=zone_data.get(CONF_ZONE_SENSOR_TIMEOUT, DEFAULT_SENSOR_TIMEOUT_MIN)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=10, max=180, step=5, mode=selector.NumberSelectorMode.BOX)
+                ),
                 vol.Optional(CONF_ZONE_TRV_SYNC, default=zone_data.get(CONF_ZONE_TRV_SYNC, DEFAULT_TRV_SYNC)): bool,
                 vol.Optional(CONF_ZONE_ANTI_SEIZE, default=zone_data.get(CONF_ZONE_ANTI_SEIZE, True)): bool,
                 vol.Optional(CONF_ZONE_ALLOW_PASSIVE_HEAT, default=zone_data.get(CONF_ZONE_ALLOW_PASSIVE_HEAT, False)): bool,

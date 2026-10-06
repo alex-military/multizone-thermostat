@@ -37,14 +37,16 @@
           "trv_preset_sync": "Abilita Sincronizzazione Preset TRV",
           "switch_entities": "Zone Switches / Relays",
           "temp_sensor": "Zone Temperature Sensor",
-          "target_temperature": "Base Target Temperature"
+          "target_temperature": "Base Target Temperature",
+          "sensor_timeout_min": "Timeout Watchdog Sensore (minuti)"
         },
         "data_description": {
           "climate_entities": "L'entità climate per questa stanza/zona",
           "allow_passive_heat": "Disattiva il rilevamento del riscaldamento fantasma se la stanza riceve calore passivo anche quando è a riposo (es. ventilconvettore senza valvola di zona o soppalco aperto con calore dal piano inferiore).",
           "window_sensor": "Bypassa automaticamente la zona quando questo sensore è aperto",
           "zone_name": "Un nome per questa zona (precompilato dal nome dell'entità climate)",
-          "zone_trv_sync": "Sincronizza automaticamente la modalità preset quando cambia la modalità HVAC (per valvole TRV fisiche)"
+          "zone_trv_sync": "Sincronizza automaticamente la modalità preset quando cambia la modalità HVAC (per valvole TRV fisiche)",
+          "sensor_timeout_min": "Tempo massimo senza ricezione dati prima di passare in modalità di sicurezza/fallback su TRV"
         }
       },
       "trv_calibration": {
@@ -139,14 +141,16 @@
           "trv_preset_sync": "Abilita Sincronizzazione Preset TRV",
           "switch_entities": "Zone Switches / Relays",
           "temp_sensor": "Zone Temperature Sensor",
-          "target_temperature": "Base Target Temperature"
+          "target_temperature": "Base Target Temperature",
+          "sensor_timeout_min": "Timeout Watchdog Sensore (minuti)"
         },
         "data_description": {
           "climate_entities": "L'entità climate per questa stanza/zona",
           "allow_passive_heat": "Disattiva il rilevamento del riscaldamento fantasma se la stanza riceve calore passivo anche quando è a riposo (es. ventilconvettore senza valvola di zona o soppalco aperto con calore dal piano inferiore).",
           "window_sensor": "Bypassa automaticamente la zona quando questo sensore è aperto",
           "zone_name": "Un nome per questa zona (precompilato dal nome dell'entità climate)",
-          "zone_trv_sync": "Sincronizza automaticamente la modalità preset quando cambia la modalità HVAC (per valvole TRV fisiche)"
+          "zone_trv_sync": "Sincronizza automaticamente la modalità preset quando cambia la modalità HVAC (per valvole TRV fisiche)",
+          "sensor_timeout_min": "Tempo massimo senza ricezione dati prima di passare in modalità di sicurezza/fallback su TRV"
         }
       },
       "remove_zone": {
@@ -168,7 +172,8 @@
           "switch_entities": "Zone Switches / Relays",
           "climate_entities": "Zone TRVs / Climates",
           "temp_sensor": "Zone Temperature Sensor",
-          "target_temperature": "Base Target Temperature"
+          "target_temperature": "Base Target Temperature",
+          "sensor_timeout_min": "Timeout Watchdog Sensore (minuti)"
         }
       },
       "edit_geofencing": {

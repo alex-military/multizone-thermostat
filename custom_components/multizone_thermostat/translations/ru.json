@@ -37,13 +37,15 @@
           "allow_passive_heat": "Разрешить пассивный нагрев",
           "switch_entities": "Zone Switches / Relays",
           "temp_sensor": "Zone Temperature Sensor",
-          "target_temperature": "Base Target Temperature"
+          "target_temperature": "Base Target Temperature",
+          "sensor_timeout_min": "Тайм-аут сторожевого таймера датчика (минуты)"
         },
         "data_description": {
           "climate_entities": "Объект климата для этой комнаты/зоны",
           "name": "Понятное имя для этой зоны (заполняется автоматически из имени объекта климата)",
           "trv_preset_sync": "Автоматически синхронизировать режим пресета при изменении режима HVAC (для физических клапанов TRV)",
-          "window_sensor": "Автоматически пропускать зону, когда этот датчик открыт"
+          "window_sensor": "Автоматически пропускать зону, когда этот датчик открыт",
+          "sensor_timeout_min": "Максимальное время без обновлений перед переходом в безопасный режим"
         }
       },
       "trv_calibration": {
@@ -138,13 +140,15 @@
           "allow_passive_heat": "Разрешить пассивный нагрев",
           "switch_entities": "Zone Switches / Relays",
           "temp_sensor": "Zone Temperature Sensor",
-          "target_temperature": "Base Target Temperature"
+          "target_temperature": "Base Target Temperature",
+          "sensor_timeout_min": "Тайм-аут сторожевого таймера датчика (минуты)"
         },
         "data_description": {
           "climate_entities": "Объект климата для этой комнаты/зоны",
           "name": "Понятное имя для этой зоны (заполняется автоматически из имени объекта климата)",
           "trv_preset_sync": "Автоматически синхронизировать режим пресета при изменении режима HVAC (для физических клапанов TRV)",
-          "window_sensor": "Автоматически пропускать зону, когда этот датчик открыт"
+          "window_sensor": "Автоматически пропускать зону, когда этот датчик открыт",
+          "sensor_timeout_min": "Максимальное время без обновлений перед переходом в безопасный режим"
         }
       },
       "remove_zone": {
@@ -166,7 +170,8 @@
           "switch_entities": "Zone Switches / Relays",
           "climate_entities": "Zone TRVs / Climates",
           "temp_sensor": "Zone Temperature Sensor",
-          "target_temperature": "Base Target Temperature"
+          "target_temperature": "Base Target Temperature",
+          "sensor_timeout_min": "Тайм-аут сторожевого таймера датчика (минуты)"
         }
       },
       "edit_geofencing": {

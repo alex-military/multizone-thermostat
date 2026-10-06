@@ -22,6 +22,8 @@ CONF_ZONE_WINDOW_SENSOR = "window_sensor"
 CONF_ZONE_ANTI_SEIZE = "anti_seize_zone_enable"
 CONF_ZONE_CALIBRATIONS = "calibrations"
 CONF_ZONE_ALLOW_PASSIVE_HEAT = "allow_passive_heat"
+CONF_ZONE_SENSOR_TIMEOUT = "sensor_timeout_min"
+DEFAULT_SENSOR_TIMEOUT_MIN = 60
 CONF_GLOBAL_CALENDAR = "global_calendar"
 
 # Geofencing keys

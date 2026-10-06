@@ -37,14 +37,16 @@
           "window_sensor": "Window Sensor (Optional)",
           "switch_entities": "Zone Switches / Relays",
           "temp_sensor": "Zone Temperature Sensor",
-          "target_temperature": "Base Target Temperature"
+          "target_temperature": "Base Target Temperature",
+          "sensor_timeout_min": "Timeout Watchdog Sensore (minuti)"
         },
         "data_description": {
           "climate_entities": "The climate entity for this room/zone",
           "name": "A friendly name for this zone (pre-filled from climate entity name)",
           "trv_preset_sync": "Automatically sync preset mode when HVAC mode changes (for physical TRV valves)",
           "allow_passive_heat": "Disables ghost heating anomaly detection if this zone naturally absorbs heat while idle (e.g. open loft/mezzanine or fancoil without a zone valve).",
-          "window_sensor": "Automatically bypass the zone when this sensor is open"
+          "window_sensor": "Automatically bypass the zone when this sensor is open",
+          "sensor_timeout_min": "Tempo massimo senza ricezione dati prima di passare in modalità di sicurezza/fallback su TRV"
         }
       },
       "trv_calibration": {
@@ -139,14 +141,16 @@
           "window_sensor": "Window Sensor (Optional)",
           "switch_entities": "Zone Switches / Relays",
           "temp_sensor": "Zone Temperature Sensor",
-          "target_temperature": "Base Target Temperature"
+          "target_temperature": "Base Target Temperature",
+          "sensor_timeout_min": "Timeout Watchdog Sensore (minuti)"
         },
         "data_description": {
           "climate_entities": "The climate entity for this room/zone",
           "name": "A friendly name for this zone (pre-filled from climate entity name)",
           "trv_preset_sync": "Automatically sync preset mode when HVAC mode changes (for physical TRV valves)",
           "allow_passive_heat": "Disables ghost heating anomaly detection if this zone naturally absorbs heat while idle (e.g. open loft/mezzanine or fancoil without a zone valve).",
-          "window_sensor": "Automatically bypass the zone when this sensor is open"
+          "window_sensor": "Automatically bypass the zone when this sensor is open",
+          "sensor_timeout_min": "Tempo massimo senza ricezione dati prima di passare in modalità di sicurezza/fallback su TRV"
         }
       },
       "remove_zone": {
@@ -168,7 +172,8 @@
           "switch_entities": "Zone Switches / Relays",
           "climate_entities": "Zone TRVs / Climates",
           "temp_sensor": "Zone Temperature Sensor",
-          "target_temperature": "Base Target Temperature"
+          "target_temperature": "Base Target Temperature",
+          "sensor_timeout_min": "Timeout Watchdog Sensore (minuti)"
         }
       },
       "edit_geofencing": {
