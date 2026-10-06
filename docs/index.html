@@ -42,6 +42,7 @@
     .pulse-green { background: #10b981; }
     .pulse-red { background: #ef4444; animation: blink 1s infinite; }
     .pulse-amber { background: #f59e0b; animation: blink 1.5s infinite; }
+    .pulse-blue { background: #0ea5e9; animation: blink 1.2s infinite; }
     @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
   </style>
 </head>
@@ -60,9 +61,9 @@
         <div>
           <div class="flex items-center gap-2">
             <h1 class="text-xl font-extrabold tracking-tight">Multizone Thermostat</h1>
-            <span class="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 uppercase tracking-wider">v4.5.8 Live Simulator</span>
+            <span class="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 uppercase tracking-wider">v4.7.0 Live Simulator</span>
           </div>
-          <p class="text-xs text-slate-400" id="header-desc">High-Precision Heating Plant Diagnostics & Building Efficiency</p>
+          <p class="text-xs text-slate-400" id="header-desc">High-Precision Heating Plant Diagnostics, OpenTherm Supervision & Building Efficiency</p>
         </div>
       </div>
 
@@ -82,11 +83,13 @@
           <button onclick="setScenario('high_cycle')" id="btn-cycle" class="px-3 py-1.5 rounded-xl font-medium text-slate-400 hover:text-slate-200 transition-all">Short-Cycling</button>
           <button onclick="setScenario('stuck_valve')" id="btn-stuck" class="px-3 py-1.5 rounded-xl font-medium text-slate-400 hover:text-slate-200 transition-all">Stuck Valve</button>
           <button onclick="setScenario('passive_heat')" id="btn-passive" class="px-3 py-1.5 rounded-xl font-medium text-slate-400 hover:text-slate-200 transition-all">Passive Heat</button>
+          <button onclick="setScenario('ot_dhw')" id="btn-dhw" class="px-3 py-1.5 rounded-xl font-medium text-slate-400 hover:text-slate-200 transition-all">🚿 DHW Priority</button>
+          <button onclick="setScenario('ot_fault')" id="btn-otfault" class="px-3 py-1.5 rounded-xl font-medium text-slate-400 hover:text-slate-200 transition-all">⚠️ OpenTherm Alert</button>
         </div>
       </div>
     </header>
 
-    <!-- Top Card: MultizoneThermostatPlantCard -->
+    <!-- Top Card: MultizoneThermostatPlantCard with OpenTherm Telemetry -->
     <div id="plant-card" class="rounded-3xl glass-panel p-6 relative overflow-hidden flex flex-col justify-between shadow-2xl border border-emerald-500/20">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/5">
         <div class="flex items-center gap-3">
@@ -95,17 +98,17 @@
           </div>
           <div>
             <h2 class="text-xl font-black text-slate-100 leading-tight" id="plant-title">Plant Health & Boiler Supervision</h2>
-            <p class="text-xs text-slate-400 mt-0.5" id="plant-sub">Hydraulic surveillance, anti-leakage & burner relay wear</p>
+            <p class="text-xs text-slate-400 mt-0.5" id="plant-sub">Hydraulic surveillance, OpenTherm bus telemetry & burner modulation</p>
           </div>
         </div>
 
         <div id="health-badge" class="px-4 py-1.5 rounded-full text-xs font-black tracking-wider bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-2 self-start sm:self-auto">
-          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" id="health-dot"></span>
           <span id="health-text">OPTIMAL</span>
         </div>
       </div>
 
-      <!-- KPI Grid -->
+      <!-- Core KPI Grid -->
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 my-5">
         <div class="glass-card-subtle p-4 rounded-2xl">
           <span class="text-xs font-semibold text-slate-400 block mb-1" id="cycles-label">Ignition Frequency (Short-Cycle)</span>
@@ -126,13 +129,70 @@
         </div>
       </div>
 
+      <!-- OpenTherm Bus Telemetry Sub-Panel (v4.7.0 Feature) -->
+      <div id="ot-panel" class="p-4 rounded-2xl bg-cyan-950/20 border border-cyan-500/20 mb-5">
+        <div class="flex items-center justify-between pb-3 mb-3 border-b border-cyan-500/15">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></span>
+            <h3 class="text-xs font-black tracking-wider uppercase text-cyan-300" id="ot-heading">OpenTherm Bus Telemetry</h3>
+            <span class="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30" id="ot-bus-status">CONNECTED</span>
+          </div>
+          <div id="dhw-indicator" class="flex items-center gap-1.5 text-xs font-bold text-slate-400">
+            <span class="w-2 h-2 rounded-full bg-slate-500" id="dhw-dot"></span>
+            <span id="dhw-text">DHW Standby</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+          <!-- Water Pressure -->
+          <div class="p-3 rounded-xl glass-card-subtle">
+            <span class="text-slate-400 block mb-1 font-semibold" id="ot-press-label">Water Pressure</span>
+            <div class="flex items-baseline gap-1">
+              <span id="ot-press-val" class="text-2xl font-black text-cyan-400">1.4</span>
+              <span class="text-[10px] text-slate-400 font-bold">Bar</span>
+            </div>
+            <span id="ot-press-sub" class="text-[11px] font-semibold text-emerald-400 block mt-1">Nominal (1.0 - 2.0 Bar)</span>
+          </div>
+
+          <!-- Modulation & Flame -->
+          <div class="p-3 rounded-xl glass-card-subtle">
+            <span class="text-slate-400 block mb-1 font-semibold" id="ot-mod-label">Modulation / Flame</span>
+            <div class="flex items-baseline gap-1.5">
+              <span id="ot-mod-val" class="text-2xl font-black text-amber-400">45%</span>
+              <span id="ot-flame-icon" class="text-base">🔥</span>
+            </div>
+            <span id="ot-flame-sub" class="text-[11px] font-semibold text-amber-400 block mt-1">Flame Active</span>
+          </div>
+
+          <!-- Flow / Return Temp -->
+          <div class="p-3 rounded-xl glass-card-subtle">
+            <span class="text-slate-400 block mb-1 font-semibold" id="ot-temps-label">Flow / Return</span>
+            <div class="flex items-baseline gap-1">
+              <span id="ot-flow-val" class="text-2xl font-black text-sky-400">52°</span>
+              <span class="text-slate-400 font-bold">/</span>
+              <span id="ot-return-val" class="text-lg font-bold text-slate-300">41°C</span>
+            </div>
+            <span id="ot-delta-sub" class="text-[11px] font-semibold text-sky-300 block mt-1">ΔT = 11°C</span>
+          </div>
+
+          <!-- Fault Code -->
+          <div class="p-3 rounded-xl glass-card-subtle">
+            <span class="text-slate-400 block mb-1 font-semibold" id="ot-fault-label">Boiler Fault Code</span>
+            <div class="flex items-baseline gap-1">
+              <span id="ot-fault-val" class="text-2xl font-black text-emerald-400">E00</span>
+            </div>
+            <span id="ot-fault-sub" class="text-[11px] font-semibold text-emerald-400 block mt-1">No Faults</span>
+          </div>
+        </div>
+      </div>
+
       <!-- Dynamic Alert Box -->
       <div id="alert-box" class="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs flex flex-col gap-1">
         <div class="font-bold flex items-center gap-2 text-sm text-emerald-400">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
           <span id="alert-title">All circuits operational</span>
         </div>
-        <div id="alert-desc" class="text-slate-300">No valve lock, ghost leakage or short-cycling detected.</div>
+        <div id="alert-desc" class="text-slate-300">No valve lock, ghost leakage or short-cycling detected. OpenTherm bus telemetry nominal.</div>
       </div>
     </div>
 
@@ -140,14 +200,14 @@
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2">
       <div>
         <h3 class="text-lg font-black text-slate-100 flex items-center gap-2">
-          <span id="zones-title">Rooms & Building Thermal Efficiency</span>
+          <span id="zones-title">Rooms, Battery Surveillance & Building Thermal Efficiency</span>
         </h3>
         <p class="text-xs text-slate-400" id="zones-hint">Click on mode badge (PRIMARY/BYPASSED) to cycle mode, or click on Valve Status to toggle Passive Heat</p>
       </div>
       <span class="text-xs text-slate-400 font-mono">Lovelace Auto-Layout</span>
     </div>
 
-    <!-- 4 Zone Energy Cards Grid (v4.5.8 Multilingual High-Legibility) -->
+    <!-- 4 Zone Energy Cards Grid (v4.7.0 with Live Battery Levels) -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
 
       <!-- Card 1: Living Room -->
@@ -187,11 +247,16 @@
           </div>
         </div>
 
-        <div class="pt-3 border-t border-white/5 flex items-center justify-between text-sm">
-          <span class="text-slate-400 text-xs label-valvestat">Valve Status:</span>
-          <div class="flex items-center gap-2 font-semibold text-emerald-400 text-xs cursor-pointer" onclick="togglePassive('living')" title="Click to toggle passive heat">
+        <!-- Footer: Valve Status + Battery Level -->
+        <div class="pt-3 border-t border-white/5 flex items-center justify-between text-xs">
+          <div class="flex items-center gap-1.5 cursor-pointer font-semibold" onclick="togglePassive('living')" title="Click to toggle passive heat">
+            <span class="text-slate-400 label-valvestat">Valve:</span>
             <span class="pulse-dot pulse-green"></span>
-            <span id="valve-living">No anomalies</span>
+            <span id="valve-living" class="text-emerald-400 text-xs">No anomalies</span>
+          </div>
+          <div class="flex items-center gap-1 font-bold text-xs" title="Battery level (Zigbee/TRV)">
+            <span class="text-emerald-400">🔋</span>
+            <span id="bat-living" class="text-emerald-400">92%</span>
           </div>
         </div>
       </div>
@@ -233,11 +298,16 @@
           </div>
         </div>
 
-        <div class="pt-3 border-t border-white/5 flex items-center justify-between text-sm">
-          <span class="text-slate-400 text-xs label-valvestat">Valve Status:</span>
-          <div class="flex items-center gap-2 font-semibold text-emerald-400 text-xs cursor-pointer" onclick="togglePassive('kitchen')" title="Click to toggle passive heat">
+        <!-- Footer: Valve Status + Battery Level -->
+        <div class="pt-3 border-t border-white/5 flex items-center justify-between text-xs">
+          <div class="flex items-center gap-1.5 cursor-pointer font-semibold" onclick="togglePassive('kitchen')" title="Click to toggle passive heat">
+            <span class="text-slate-400 label-valvestat">Valve:</span>
             <span class="pulse-dot pulse-green"></span>
-            <span id="valve-kitchen">No anomalies</span>
+            <span id="valve-kitchen" class="text-emerald-400 text-xs">No anomalies</span>
+          </div>
+          <div class="flex items-center gap-1 font-bold text-xs" title="Battery level (Zigbee/TRV)">
+            <span class="text-emerald-400">🔋</span>
+            <span id="bat-kitchen" class="text-emerald-400">85%</span>
           </div>
         </div>
       </div>
@@ -279,11 +349,16 @@
           </div>
         </div>
 
-        <div class="pt-3 border-t border-white/5 flex items-center justify-between text-sm">
-          <span class="text-slate-400 text-xs label-valvestat">Valve Status:</span>
-          <div class="flex items-center gap-2 font-semibold text-emerald-400 text-xs cursor-pointer" onclick="togglePassive('loft1')" title="Click to toggle passive heat">
+        <!-- Footer: Valve Status + Battery Level -->
+        <div class="pt-3 border-t border-white/5 flex items-center justify-between text-xs">
+          <div class="flex items-center gap-1.5 cursor-pointer font-semibold" onclick="togglePassive('loft1')" title="Click to toggle passive heat">
+            <span class="text-slate-400 label-valvestat">Valve:</span>
             <span class="pulse-dot pulse-green"></span>
-            <span id="valve-loft1">Passive heat active</span>
+            <span id="valve-loft1" class="text-emerald-400 text-xs">Passive heat active</span>
+          </div>
+          <div class="flex items-center gap-1 font-bold text-xs" title="Battery level (Zigbee/TRV)">
+            <span class="text-amber-400">🪫</span>
+            <span id="bat-loft1" class="text-amber-400">48%</span>
           </div>
         </div>
       </div>
@@ -325,11 +400,16 @@
           </div>
         </div>
 
-        <div class="pt-3 border-t border-white/5 flex items-center justify-between text-sm">
-          <span class="text-slate-400 text-xs label-valvestat">Valve Status:</span>
-          <div class="flex items-center gap-2 font-semibold text-slate-400 text-xs cursor-pointer" onclick="togglePassive('loft2')" title="Click to toggle passive heat">
+        <!-- Footer: Valve Status + Battery Level -->
+        <div class="pt-3 border-t border-white/5 flex items-center justify-between text-xs">
+          <div class="flex items-center gap-1.5 cursor-pointer font-semibold" onclick="togglePassive('loft2')" title="Click to toggle passive heat">
+            <span class="text-slate-400 label-valvestat">Valve:</span>
             <span class="pulse-dot pulse-green"></span>
-            <span id="valve-loft2">Valve Closed (Bypass)</span>
+            <span id="valve-loft2" class="text-slate-400 text-xs">Valve Closed (Bypass)</span>
+          </div>
+          <div class="flex items-center gap-1 font-bold text-xs" title="Battery level (Zigbee/TRV)">
+            <span class="text-amber-500">🪫</span>
+            <span id="bat-loft2" class="text-amber-500">22%</span>
           </div>
         </div>
       </div>
@@ -343,14 +423,16 @@
 
     const DICT = {
       en: {
-        headerDesc: "High-Precision Heating Plant Diagnostics & Building Efficiency",
+        headerDesc: "High-Precision Heating Plant Diagnostics, OpenTherm Supervision & Building Efficiency",
         scenarios: "Scenarios:",
         btnNormal: "Normal",
         btnCycle: "Short-Cycling",
         btnStuck: "Stuck Valve",
         btnPassive: "Passive Heat",
+        btnDhw: "🚿 DHW Priority",
+        btnOtfault: "⚠️ OpenTherm Alert",
         plantTitle: "Plant Health & Boiler Supervision",
-        plantSub: "Hydraulic surveillance, anti-leakage & burner relay wear",
+        plantSub: "Hydraulic surveillance, OpenTherm bus telemetry & burner modulation",
         optimal: "OPTIMAL",
         warning: "WARNING",
         critical: "CRITICAL",
@@ -363,14 +445,14 @@
         runtimeUnit: "hours",
         runtimeSub: "Cumulative burner / relay activity",
         allCircuitsOk: "All circuits operational",
-        noAnomalies: "No valve lock, ghost leakage or short-cycling detected.",
+        noAnomalies: "No valve lock, ghost leakage or short-cycling detected. OpenTherm bus telemetry nominal.",
         attentionCycles: "Warning: high boiler cycling frequency or parameters need tuning.",
-        zonesTitle: "Rooms & Building Thermal Efficiency",
+        zonesTitle: "Rooms, Battery Surveillance & Building Thermal Efficiency",
         zonesHint: "Click on mode badge (PRIMARY/BYPASSED) to cycle mode, or click on Valve Status to toggle Passive Heat",
         retentionLabel: "Retention (-1°C)",
         hours: "hours",
         sizingLabel: "Radiator Sizing",
-        valveStat: "Valve Status:",
+        valveStat: "Valve:",
         tagPrimary: "PRIMARY",
         tagSecondary: "SECONDARY",
         tagBypassed: "BYPASSED",
@@ -390,17 +472,33 @@
         titleLiving: "Living Room",
         titleKitchen: "Kitchen",
         titleLoft1: "Master Bedroom",
-        titleLoft2: "Guest Bedroom"
+        titleLoft2: "Guest Bedroom",
+        otHeading: "OpenTherm Bus Telemetry",
+        otBusConnected: "CONNECTED",
+        dhwStandby: "DHW Standby",
+        dhwActive: "🚿 DHW Active (PID Frozen)",
+        otPressLabel: "Water Pressure",
+        otPressNominal: "Nominal (1.0 - 2.0 Bar)",
+        otPressLow: "⚠️ Low Pressure (< 0.8 Bar)",
+        otModLabel: "Modulation / Flame",
+        flameActive: "Flame Active",
+        flameOff: "Standby (Off)",
+        otTempsLabel: "Flow / Return",
+        otFaultLabel: "Boiler Fault Code",
+        faultNone: "No Faults",
+        faultUnderpress: "⚠️ Low Pressure (E04)"
       },
       it: {
-        headerDesc: "Diagnostica Impianto Termico & Involucro Edilizio ad Alta Precisione",
+        headerDesc: "Diagnostica Impianto Termico, Supervisione OpenTherm & Involucro Edilizio",
         scenarios: "Scenari:",
         btnNormal: "Normale",
         btnCycle: "Allerta Cicli",
         btnStuck: "Valvola Bloccata",
         btnPassive: "Apporto Passivo",
+        btnDhw: "🚿 Priorità ACS",
+        btnOtfault: "⚠️ Allerta OpenTherm",
         plantTitle: "Salute Impianto & Caldaia",
-        plantSub: "Supervisione idraulica, anti-trafilamento e usura relè",
+        plantSub: "Supervisione idraulica, telemetria bus OpenTherm e modulazione",
         optimal: "OTTIMALE",
         warning: "ATTENZIONE",
         critical: "CRITICO",
@@ -413,14 +511,14 @@
         runtimeUnit: "ore",
         runtimeSub: "Attività cumulativa relè / mandata",
         allCircuitsOk: "Tutti i circuiti operativi",
-        noAnomalies: "Nessun blocco valvola, trafilamento o short-cycling rilevato.",
+        noAnomalies: "Nessun blocco valvola, trafilamento o short-cycling rilevato. Telemetria OpenTherm nominale.",
         attentionCycles: "Attenzione: frequenza di accensioni caldaia elevata o parametri da ottimizzare.",
-        zonesTitle: "Stanze & Efficienza Involucro",
+        zonesTitle: "Stanze, Stato Batterie & Efficienza Involucro",
         zonesHint: "Clicca sul badge modalità (PRIMARIA/BYPASSATA) per cambiare, o su Stato Valvola per invertire l'Apporto Passivo",
         retentionLabel: "Ritenzione (-1°C)",
         hours: "ore",
         sizingLabel: "Resa Termoarredo",
-        valveStat: "Stato Valvola:",
+        valveStat: "Valvola:",
         tagPrimary: "PRIMARIA",
         tagSecondary: "SECONDARIA",
         tagBypassed: "BYPASSATA",
@@ -440,17 +538,33 @@
         titleLiving: "Soggiorno",
         titleKitchen: "Cucina",
         titleLoft1: "Camera da Letto",
-        titleLoft2: "Camera Ospiti"
+        titleLoft2: "Camera Ospiti",
+        otHeading: "Telemetria Bus OpenTherm",
+        otBusConnected: "CONNESSO",
+        dhwStandby: "ACS Standby",
+        dhwActive: "🚿 ACS Attiva (PID Congelato)",
+        otPressLabel: "Pressione Circuito",
+        otPressNominal: "Nominale (1.0 - 2.0 Bar)",
+        otPressLow: "⚠️ Pressione Bassa (< 0.8 Bar)",
+        otModLabel: "Modulazione / Fiamma",
+        flameActive: "Fiamma Attiva",
+        flameOff: "Standby (Spento)",
+        otTempsLabel: "Mandata / Ritorno",
+        otFaultLabel: "Codice Errore Caldaia",
+        faultNone: "Nessun Guasto",
+        faultUnderpress: "⚠️ Bassa Pressione (E04)"
       },
       ru: {
-        headerDesc: "Диагностика отопления и энергоэффективности помещений",
+        headerDesc: "Диагностика отопления, контроль OpenTherm и энергоэффективность помещений",
         scenarios: "Сценарии:",
         btnNormal: "Нормально",
         btnCycle: "Частые циклы",
         btnStuck: "Заедание клапана",
         btnPassive: "Пассивное тепло",
+        btnDhw: "🚿 Приоритет ГВС",
+        btnOtfault: "⚠️ Тревога OpenTherm",
         plantTitle: "Здоровье системы и котла",
-        plantSub: "Гидравлический контроль, утечки и износ реле",
+        plantSub: "Гидравлический контроль, телеметрия OpenTherm и модуляция",
         optimal: "ОПТИМАЛЬНО",
         warning: "ВНИМАНИЕ",
         critical: "КРИТИЧНО",
@@ -463,14 +577,14 @@
         runtimeUnit: "ч",
         runtimeSub: "Суммарная активность реле",
         allCircuitsOk: "Все контуры в норме",
-        noAnomalies: "Заеданий, утечек и частых циклов не обнаружено.",
+        noAnomalies: "Заеданий, утечек и частых циклов не обнаружено. Телеметрия OpenTherm в норме.",
         attentionCycles: "Внимание: частый розжиг котла, требуется настройка параметров.",
-        zonesTitle: "Помещения и теплоизоляция",
+        zonesTitle: "Помещения, батареи и теплоизоляция",
         zonesHint: "Нажмите на режим (ОСНОВНАЯ/БАЙПАС) для переключения или на статус клапана для пассивного тепла",
         retentionLabel: "Удержание (-1°C)",
         hours: "ч",
         sizingLabel: "Размер радиатора",
-        valveStat: "Статус клапана:",
+        valveStat: "Клапан:",
         tagPrimary: "ОСНОВНАЯ",
         tagSecondary: "ВТОРИЧНАЯ",
         tagBypassed: "БАЙПАС",
@@ -490,7 +604,21 @@
         titleLiving: "Гостиная",
         titleKitchen: "Кухня",
         titleLoft1: "Спальня",
-        titleLoft2: "Гостевая"
+        titleLoft2: "Гостевая",
+        otHeading: "Телеметрия шины OpenTherm",
+        otBusConnected: "ПОДКЛЮЧЕНО",
+        dhwStandby: "ГВС Ожидание",
+        dhwActive: "🚿 ГВС Активно (ПИД заморожен)",
+        otPressLabel: "Давление в контуре",
+        otPressNominal: "Норма (1.0 - 2.0 Бар)",
+        otPressLow: "⚠️ Низкое давление (< 0.8 Бар)",
+        otModLabel: "Модуляция / Пламя",
+        flameActive: "Пламя активно",
+        flameOff: "Ожидание (выкл)",
+        otTempsLabel: "Подача / Обратка",
+        otFaultLabel: "Код ошибки котла",
+        faultNone: "Нет ошибок",
+        faultUnderpress: "⚠️ Низкое давление (E04)"
       }
     };
 
@@ -501,6 +629,8 @@
       loft1: { mode: 'primary', passive: true, temp: 21.1, target: 20.0 },
       loft2: { mode: 'bypass', passive: false, temp: 21.4, target: 20.0 }
     };
+
+    let activeScenario = 'normal';
 
     function setLanguage(lang) {
       currentLang = lang;
@@ -517,6 +647,8 @@
       document.getElementById('btn-cycle').innerText = d.btnCycle;
       document.getElementById('btn-stuck').innerText = d.btnStuck;
       document.getElementById('btn-passive').innerText = d.btnPassive;
+      document.getElementById('btn-dhw').innerText = d.btnDhw;
+      document.getElementById('btn-otfault').innerText = d.btnOtfault;
 
       document.getElementById('plant-title').innerText = d.plantTitle;
       document.getElementById('plant-sub').innerText = d.plantSub;
@@ -525,6 +657,12 @@
       document.getElementById('runtime-label').innerText = d.runtimeLabel;
       document.getElementById('runtime-unit').innerText = d.runtimeUnit;
       document.getElementById('runtime-sub').innerText = d.runtimeSub;
+
+      document.getElementById('ot-heading').innerText = d.otHeading;
+      document.getElementById('ot-press-label').innerText = d.otPressLabel;
+      document.getElementById('ot-mod-label').innerText = d.otModLabel;
+      document.getElementById('ot-temps-label').innerText = d.otTempsLabel;
+      document.getElementById('ot-fault-label').innerText = d.otFaultLabel;
 
       document.getElementById('zones-title').innerText = d.zonesTitle;
       document.getElementById('zones-hint').innerText = d.zonesHint;
@@ -553,6 +691,8 @@
       document.getElementById('size-loft2').innerText = d.sizeOpt;
       document.getElementById('size-eval-loft2').innerText = d.sizeOptSub;
 
+      // Refresh active scenario text in new language
+      setScenario(activeScenario);
       Object.keys(zoneStates).forEach(k => updateZoneUI(k));
     }
 
@@ -609,6 +749,7 @@
     }
 
     function setScenario(scen) {
+      activeScenario = scen;
       const d = DICT[currentLang];
       const hero = document.getElementById('plant-card');
       const badge = document.getElementById('health-badge');
@@ -619,7 +760,21 @@
       const alertTitle = document.getElementById('alert-title');
       const alertDesc = document.getElementById('alert-desc');
 
-      ['btn-normal', 'btn-cycle', 'btn-stuck', 'btn-passive'].forEach(id => {
+      // OpenTherm elements
+      const otPressVal = document.getElementById('ot-press-val');
+      const otPressSub = document.getElementById('ot-press-sub');
+      const otModVal = document.getElementById('ot-mod-val');
+      const otFlameIcon = document.getElementById('ot-flame-icon');
+      const otFlameSub = document.getElementById('ot-flame-sub');
+      const otFlowVal = document.getElementById('ot-flow-val');
+      const otReturnVal = document.getElementById('ot-return-val');
+      const otDeltaSub = document.getElementById('ot-delta-sub');
+      const otFaultVal = document.getElementById('ot-fault-val');
+      const otFaultSub = document.getElementById('ot-fault-sub');
+      const dhwDot = document.getElementById('dhw-dot');
+      const dhwText = document.getElementById('dhw-text');
+
+      ['btn-normal', 'btn-cycle', 'btn-stuck', 'btn-passive', 'btn-dhw', 'btn-otfault'].forEach(id => {
         document.getElementById(id).className = "px-3 py-1.5 rounded-xl font-medium text-slate-400 hover:text-slate-200 transition-all";
       });
 
@@ -634,6 +789,26 @@
         alertBox.className = "p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs flex flex-col gap-1";
         alertTitle.innerText = d.allCircuitsOk;
         alertDesc.innerText = d.noAnomalies;
+
+        // OT Normal
+        otPressVal.innerText = "1.4";
+        otPressVal.className = "text-2xl font-black text-cyan-400";
+        otPressSub.innerText = d.otPressNominal;
+        otPressSub.className = "text-[11px] font-semibold text-emerald-400 block mt-1";
+        otModVal.innerText = "45%";
+        otModVal.className = "text-2xl font-black text-amber-400";
+        otFlameIcon.innerText = "🔥";
+        otFlameSub.innerText = d.flameActive;
+        otFlowVal.innerText = "52°";
+        otReturnVal.innerText = "41°C";
+        otDeltaSub.innerText = "ΔT = 11°C";
+        otFaultVal.innerText = "E00";
+        otFaultVal.className = "text-2xl font-black text-emerald-400";
+        otFaultSub.innerText = d.faultNone;
+        otFaultSub.className = "text-[11px] font-semibold text-emerald-400 block mt-1";
+        dhwDot.className = "w-2 h-2 rounded-full bg-slate-500";
+        dhwText.innerText = d.dhwStandby;
+        dhwText.className = "text-slate-400";
       }
       else if (scen === 'high_cycle') {
         document.getElementById('btn-cycle').className = "px-3 py-1.5 rounded-xl font-bold bg-amber-500/20 text-amber-400 border border-amber-500/40 shadow-sm transition-all";
@@ -646,6 +821,20 @@
         alertBox.className = "p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex flex-col gap-1";
         alertTitle.innerText = d.warning;
         alertDesc.innerText = d.attentionCycles;
+
+        otPressVal.innerText = "1.3";
+        otPressVal.className = "text-2xl font-black text-cyan-400";
+        otPressSub.innerText = d.otPressNominal;
+        otModVal.innerText = "20%";
+        otFlameIcon.innerText = "🔥";
+        otFlameSub.innerText = d.flameActive;
+        otFlowVal.innerText = "45°";
+        otReturnVal.innerText = "38°C";
+        otDeltaSub.innerText = "ΔT = 7°C";
+        otFaultVal.innerText = "E00";
+        otFaultSub.innerText = d.faultNone;
+        dhwDot.className = "w-2 h-2 rounded-full bg-slate-500";
+        dhwText.innerText = d.dhwStandby;
       }
       else if (scen === 'stuck_valve') {
         document.getElementById('btn-stuck').className = "px-3 py-1.5 rounded-xl font-bold bg-rose-500/20 text-rose-400 border border-rose-500/40 shadow-sm transition-all";
@@ -659,6 +848,17 @@
           : (currentLang === 'ru'
             ? "• <b>Спальня</b>: Клапан заблокирован (запрос 100% более 60 мин при включенном котле, но температура не растет)."
             : "• <b>Master Bedroom</b>: Valve likely stuck closed (100% demand for &gt; 60m with boiler ON, but temperature does not rise).");
+
+        otPressVal.innerText = "1.5";
+        otPressSub.innerText = d.otPressNominal;
+        otModVal.innerText = "75%";
+        otFlameIcon.innerText = "🔥";
+        otFlameSub.innerText = d.flameActive;
+        otFlowVal.innerText = "60°";
+        otReturnVal.innerText = "46°C";
+        otDeltaSub.innerText = "ΔT = 14°C";
+        otFaultVal.innerText = "E00";
+        otFaultSub.innerText = d.faultNone;
       }
       else if (scen === 'passive_heat') {
         document.getElementById('btn-passive').className = "px-3 py-1.5 rounded-xl font-bold bg-sky-500/20 text-sky-400 border border-sky-500/40 shadow-sm transition-all";
@@ -674,6 +874,68 @@
           : (currentLang === 'ru'
             ? "Пассивное тепло активно: ложные тревоги утечки отключены при закрытом клапане (фанкойлы или конвекционное тепло)."
             : "Passive heat intake active: ghost heating leakage warnings are safely muted when valves are closed (e.g. fan coils or convective heat).");
+      }
+      else if (scen === 'ot_dhw') {
+        // OpenTherm DHW Active scenario
+        document.getElementById('btn-dhw').className = "px-3 py-1.5 rounded-xl font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm transition-all";
+        hero.className = "rounded-3xl glass-panel p-6 relative overflow-hidden flex flex-col justify-between shadow-2xl border border-cyan-500/30";
+        badge.className = "px-4 py-1.5 rounded-full text-xs font-black tracking-wider bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 flex items-center gap-2 self-start sm:self-auto";
+        text.innerText = "HOLD_DHW";
+        cyclesVal.innerText = "2.1";
+        cyclesSub.innerText = d.wearLow;
+        cyclesSub.className = "text-xs font-semibold text-emerald-400 mt-2";
+        alertBox.className = "p-4 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-200 text-xs flex flex-col gap-1";
+        alertTitle.innerText = currentLang === 'it' ? "🚿 Produzione Acqua Calda Sanitaria in corso" : (currentLang === 'ru' ? "🚿 Работает контур ГВС (Горячая вода)" : "🚿 Domestic Hot Water Draw-Off Active");
+        alertDesc.innerText = currentLang === 'it'
+          ? "Priorità ACS attiva: i loop PID delle zone sono temporaneamente congelati per prevenire overshooting ed accumulo integrale indebito. La caldaia sta erogando acqua a 65°C per la doccia/rubinetti."
+          : (currentLang === 'ru'
+            ? "Приоритет ГВС активен: ПИД-регуляторы зон временно заморожены для предотвращения перерегулирования. Котел работает на нагрев санитарной воды 65°C."
+            : "DHW priority active: zone PID loops are safely frozen to prevent integral windup. The boiler is modulating at 85% to produce sanitary hot water at 65°C.");
+
+        otPressVal.innerText = "1.4";
+        otPressSub.innerText = d.otPressNominal;
+        otModVal.innerText = "85%";
+        otFlameIcon.innerText = "🔥";
+        otFlameSub.innerText = d.flameActive;
+        otFlowVal.innerText = "65°";
+        otReturnVal.innerText = "50°C";
+        otDeltaSub.innerText = "ΔT = 15°C (DHW)";
+        otFaultVal.innerText = "E00";
+        otFaultSub.innerText = d.faultNone;
+        dhwDot.className = "w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping";
+        dhwText.innerText = d.dhwActive;
+        dhwText.className = "text-cyan-300 font-extrabold";
+      }
+      else if (scen === 'ot_fault') {
+        // OpenTherm Fault / Low Pressure scenario
+        document.getElementById('btn-otfault').className = "px-3 py-1.5 rounded-xl font-bold bg-rose-500/20 text-rose-400 border border-rose-500/40 shadow-sm transition-all";
+        hero.className = "rounded-3xl glass-panel p-6 relative overflow-hidden flex flex-col justify-between shadow-2xl border border-rose-500/40";
+        badge.className = "px-4 py-1.5 rounded-full text-xs font-black tracking-wider bg-rose-500/20 text-rose-400 border border-rose-500/40 flex items-center gap-2 self-start sm:self-auto";
+        text.innerText = d.warning;
+        alertBox.className = "p-4 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-200 text-xs flex flex-col gap-1";
+        alertTitle.innerText = currentLang === 'it' ? "⚠️ Anomalia Caldaia: Pressione Circuito Idraulico Bassa" : (currentLang === 'ru' ? "⚠️ Ошибка котла: низкое давление теплоносителя" : "⚠️ Boiler Alert: Hydraulic Circuit Low Water Pressure");
+        alertDesc.innerHTML = currentLang === 'it'
+          ? "• Il bus OpenTherm segnala codice errore <b>E04</b>: pressione rilevata <b>0.6 Bar</b> (sotto la soglia minima di sicurezza di 0.8 Bar). Verificare il rubinetto di carico dell'impianto."
+          : (currentLang === 'ru'
+            ? "• Шина OpenTherm сообщает об ошибке <b>E04</b>: давление <b>0.6 Бар</b> (ниже безопасного порога 0.8 Бар). Проверьте кран подпитки системы."
+            : "• OpenTherm bus reports OEM error code <b>E04</b>: measured water pressure <b>0.6 Bar</b> (below the 0.8 Bar safety threshold). Please repressurize heating circuit.");
+
+        otPressVal.innerText = "0.6";
+        otPressVal.className = "text-2xl font-black text-rose-400 animate-pulse";
+        otPressSub.innerText = d.otPressLow;
+        otPressSub.className = "text-[11px] font-semibold text-rose-400 block mt-1";
+        otModVal.innerText = "0%";
+        otFlameIcon.innerText = "⚠️";
+        otFlameSub.innerText = d.flameOff;
+        otFlowVal.innerText = "28°";
+        otReturnVal.innerText = "26°C";
+        otDeltaSub.innerText = "ΔT = 2°C";
+        otFaultVal.innerText = "E04";
+        otFaultVal.className = "text-2xl font-black text-rose-400 animate-pulse";
+        otFaultSub.innerText = d.faultUnderpress;
+        otFaultSub.className = "text-[11px] font-semibold text-rose-400 block mt-1";
+        dhwDot.className = "w-2 h-2 rounded-full bg-slate-500";
+        dhwText.innerText = d.dhwStandby;
       }
     }
   </script>
