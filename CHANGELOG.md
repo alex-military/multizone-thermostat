@@ -1,5 +1,9 @@
 # Changelog
 
+## [4.7.1] - 2026-10-06
+### 🌍 Internationalization
+- **New Languages Added**: Full support for French, German, and Spanish added for the UI Cards and Config Flow.
+
 ## [4.7.0] - 2026-10-06
 ### 🚀 Major Features & Boiler Supervision
 - **Sensor Timeout Watchdog & TRV Fallback**: Added configurable per-zone timeout watchdog (`sensor_timeout_min`, default 60 min). If an external wireless temperature sensor disconnects or runs out of battery, the zone automatically falls back to the TRV's internal temperature probe, keeping the room heated and recording a diagnostic event. Automatically resumes normal precision control when the external sensor recovers.

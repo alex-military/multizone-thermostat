@@ -1166,14 +1166,16 @@ class MultizoneCoordinator:
                     )
                     # H2-FIX: Also set target temperature above frost threshold so TRV internal PID opens valve
                     frost_target = float(self.get_persistent_data(KEY_FROST_PROTECTION_TEMP, DEFAULT_FROST_PROTECTION_TEMP)) + 3.0
-                    self.hass.async_create_task(
-                        self.hass.services.async_call(
-                            CLIMATE_DOMAIN,
-                            SERVICE_SET_TEMPERATURE,
-                            {ATTR_ENTITY_ID: climate_id, ATTR_TEMPERATURE: frost_target},
-                            blocking=False,
+                    st = self.hass.states.get(climate_id)
+                    if not st or st.attributes.get(ATTR_TEMPERATURE) != frost_target:
+                        self.hass.async_create_task(
+                            self.hass.services.async_call(
+                                CLIMATE_DOMAIN,
+                                SERVICE_SET_TEMPERATURE,
+                                {ATTR_ENTITY_ID: climate_id, ATTR_TEMPERATURE: frost_target},
+                                blocking=False,
+                            )
                         )
-                    )
 
         if not self._master_state and not frost_emergency:
             self._boiler_status_reason = "OFF - Master switch is OFF"
@@ -1310,30 +1312,37 @@ class MultizoneCoordinator:
         self.plant_diagnostics.record_boiler_state(norm_demand > 0.0)
         
         try:
+            st = self.hass.states.get(self.opentherm_entity)
             if domain in ["climate", "water_heater"]:
-                await self.hass.services.async_call(
-                    domain,
-                    "set_temperature",
-                    {"entity_id": self.opentherm_entity, "temperature": target_temp},
-                    blocking=False,
-                )
+                current_target = st.attributes.get("temperature") if st else None
+                if current_target != target_temp:
+                    await self.hass.services.async_call(
+                        domain,
+                        "set_temperature",
+                        {"entity_id": self.opentherm_entity, "temperature": target_temp},
+                        blocking=False,
+                    )
                 
                 # Turn OFF if demand is 0, otherwise HEAT
                 if domain == "climate":
                     hvac_mode = "off" if norm_demand <= 0.0 else "heat"
+                    current_mode = st.state if st else None
+                    if current_mode != hvac_mode:
+                        await self.hass.services.async_call(
+                            "climate",
+                            "set_hvac_mode",
+                            {"entity_id": self.opentherm_entity, "hvac_mode": hvac_mode},
+                            blocking=False,
+                        )
+            elif domain == "number":
+                current_val = float(st.state) if st and st.state not in ("unknown", "unavailable") else None
+                if current_val != target_temp:
                     await self.hass.services.async_call(
-                        "climate",
-                        "set_hvac_mode",
-                        {"entity_id": self.opentherm_entity, "hvac_mode": hvac_mode},
+                        "number",
+                        "set_value",
+                        {"entity_id": self.opentherm_entity, "value": target_temp},
                         blocking=False,
                     )
-            elif domain == "number":
-                await self.hass.services.async_call(
-                    "number",
-                    "set_value",
-                    {"entity_id": self.opentherm_entity, "value": target_temp},
-                    blocking=False,
-                )
         except Exception as err:
             _LOGGER.error("Failed to update OpenTherm entity %s: %s", self.opentherm_entity, err)
 

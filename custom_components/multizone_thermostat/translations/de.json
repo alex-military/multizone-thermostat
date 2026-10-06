@@ -1,0 +1,192 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Multizone Thermostat Konfiguration",
+        "description": "Willkommen bei Multizone Thermostat. Bitte wählen Sie den Steuermodus Ihres Hauptkessels.",
+        "data": {
+          "boiler_mode": "Kesselsteuermodus"
+        }
+      },
+      "boiler_relay": {
+        "title": "Kesselrelais Einrichtung",
+        "description": "Wählen Sie den Schalter (Switch), der Ihr Kesselrelais (Umwälzpumpe) steuert.",
+        "data": {
+          "boiler_switch": "Kesselschalter"
+        },
+        "data_description": {
+          "boiler_switch": "Der Schalter/Relais, das die Kesselumwälzpumpe steuert"
+        }
+      },
+      "boiler_opentherm": {
+        "title": "OpenTherm Einrichtung",
+        "description": "Wählen Sie die OpenTherm-Entität, die die Wassertemperatur steuert. Legen Sie auch die minimale und maximale Wassertemperatur fest.",
+        "data": {
+          "opentherm_entity": "OpenTherm-Entität (Climate/Water Heater)",
+          "opentherm_min_temp": "Minimale Wassertemperatur (°C)",
+          "opentherm_max_temp": "Maximale Wassertemperatur (°C)"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Multizone Thermostat ist bereits konfiguriert. Verwenden Sie die Optionen, um Zonen zu ändern.",
+      "no_switches_found": "Keine Schalter in Home Assistant gefunden. Bitte fügen Sie zuerst ein Relais/Schalter hinzu.",
+      "no_zones_configured": "Keine Zonen konfiguriert. Bitte fügen Sie mindestens eine Zone hinzu.",
+      "no_temp_sensors_found": "Keine Temperatursensoren in Home Assistant gefunden."
+    },
+    "error": {
+      "zone_name_required": "Zonenname darf nicht leer sein.",
+      "presence_sensor_required": "Ein Anwesenheitssensor ist erforderlich, wenn Geofencing aktiviert ist.",
+      "invalid_temp_range": "Die Mindesttemperatur muss unter der Höchsttemperatur liegen.",
+      "no_actuators_selected": "Sie müssen mindestens eine Climate-Entität oder einen Schalter für die Zone auswählen.",
+      "zone_name_exists": "Eine Zone mit diesem Namen existiert bereits."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Multizone Thermostat Optionen",
+        "description": "Konfigurierte Zonen: **{zones_count}**\n\nWas möchten Sie ändern?",
+        "data": {
+          "action": "Aktion"
+        }
+      },
+      "change_boiler": {
+        "title": "Kesselmodus ändern",
+        "data": {
+          "boiler_mode": "Kesselsteuermodus"
+        }
+      },
+      "edit_calendar": {
+        "title": "Globaler Kalender",
+        "description": "Wählen Sie eine lokale Kalender-Entität, um den Zeitplan des Multizonen-Systems zu steuern.",
+        "data": {
+          "global_calendar": "Kalender-Entität"
+        }
+      },
+      "add_zone": {
+        "title": "Neue Zone hinzufügen",
+        "data": {
+          "climate_entities": "Climate-Entität",
+          "anti_seize_zone_enable": "Blockierschutz (Sommerschutz) für diese Zone aktivieren",
+          "allow_passive_heat": "Passive Wärme zulassen (Fancoil ohne Ventil / Zwischengeschoss)",
+          "window_sensor": "Fenstersensor (Optional)",
+          "name": "Zonenname",
+          "trv_preset_sync": "TRV-Preset-Synchronisierung aktivieren",
+          "switch_entities": "Zonenschalter / Relais",
+          "temp_sensor": "Zonen-Temperatursensor",
+          "target_temperature": "Basis-Zieltemperatur",
+          "sensor_timeout_min": "Sensor-Watchdog-Timeout (Minuten)"
+        },
+        "data_description": {
+          "climate_entities": "Die Climate-Entität für diesen Raum/Zone",
+          "allow_passive_heat": "Deaktiviert die Erkennung von Geisterheizungsanomalien, wenn diese Zone im Ruhezustand auf natürliche Weise Wärme aufnimmt.",
+          "window_sensor": "Zone automatisch umgehen, wenn dieser Sensor geöffnet ist",
+          "zone_name": "Ein benutzerfreundlicher Name für diese Zone",
+          "zone_trv_sync": "Preset-Modus bei Änderung des HVAC-Modus automatisch synchronisieren",
+          "sensor_timeout_min": "Maximale Dauer ohne Updates, bevor in den Sicherheitsmodus / TRV-internen Sensor gewechselt wird"
+        }
+      },
+      "remove_zone": {
+        "title": "Eine Zone entfernen",
+        "description": "Wählen Sie die zu entfernende Zone aus. Der Schalter für diese Zone wird ebenfalls entfernt.",
+        "data": {
+          "zone_name": "Zone zum Entfernen"
+        }
+      },
+      "edit_zone": {
+        "title": "Zoneneinstellungen bearbeiten",
+        "description": "Bearbeiten Sie die Einstellungen für eine Zone.",
+        "data": {
+          "anti_seize_zone_enable": "Blockierschutz (Sommerschutz) für diese Zone aktivieren",
+          "allow_passive_heat": "Passive Wärme zulassen (Fancoil ohne Ventil / Zwischengeschoss)",
+          "window_sensor": "Fenstersensor (Optional)",
+          "trv_preset_sync": "TRV-Preset-Synchronisierung aktivieren",
+          "zone_name": "Zone",
+          "switch_entities": "Zonenschalter / Relais",
+          "climate_entities": "Zonen-TRVs / Climates",
+          "temp_sensor": "Zonen-Temperatursensor",
+          "target_temperature": "Basis-Zieltemperatur",
+          "sensor_timeout_min": "Sensor-Watchdog-Timeout (Minuten)"
+        }
+      },
+      "edit_geofencing": {
+        "title": "Geofencing & Intelligenter Zeitplan",
+        "description": "Aktivieren oder deaktivieren Sie Geofencing und wählen Sie den Anwesenheitssensor.",
+        "data": {
+          "geofencing_enabled": "Geofencing & Auto-Nacht aktivieren",
+          "presence_sensor": "Anwesenheitssensor"
+        }
+      },
+      "trv_calibration_add": {
+        "title": "TRV-Konfiguration (Externer Sensor) (Hinzufügen)",
+        "description": "Wählen Sie die Entitäten für den Temperaturversatz (Kalibrierung) für jedes TRV. Wenn leer gelassen, verwenden wir die Zieltemperaturkompensation.",
+        "data": {}
+      },
+      "trv_calibration_edit": {
+        "title": "TRV-Konfiguration (Externer Sensor) (Bearbeiten)",
+        "description": "Wählen Sie die Entitäten für den Temperaturversatz (Kalibrierung) für jedes TRV. Wenn leer gelassen, verwenden wir die Zieltemperaturkompensation.",
+        "data": {}
+      },
+      "edit_weather_comp": {
+        "title": "Wetterkompensation bearbeiten",
+        "description": "Wählen Sie einen Außentemperatursensor, um die automatische Wetterkompensation zu aktivieren.",
+        "data": {
+          "weather_sensor": "Außentemperatursensor"
+        }
+      },
+      "boiler_relay": {
+        "title": "Kesselrelais Einrichtung",
+        "description": "Wählen Sie den Schalter (Switch), der Ihr Kesselrelais (Umwälzpumpe) steuert.",
+        "data": {
+          "boiler_switch": "Kesselschalter"
+        },
+        "data_description": {
+          "boiler_switch": "Der Schalter/Relais, das die Kesselumwälzpumpe steuert"
+        }
+      },
+      "boiler_opentherm": {
+        "title": "OpenTherm Einrichtung",
+        "description": "Wählen Sie die OpenTherm-Entität, die die Wassertemperatur steuert. Legen Sie auch die minimale und maximale Wassertemperatur fest.",
+        "data": {
+          "opentherm_entity": "OpenTherm-Entität",
+          "opentherm_min_temp": "Minimale Wassertemperatur (°C)",
+          "opentherm_max_temp": "Maximale Wassertemperatur (°C)"
+        }
+      }
+    },
+    "abort": {
+      "no_zones_configured": "Keine Zonen konfiguriert.",
+      "no_climates_available": "Alle verfügbaren Climate-Entitäten sind bereits als Zonen konfiguriert.",
+      "no_temp_sensors_found": "Keine Temperatursensoren in Home Assistant gefunden.",
+      "no_switches_found": "Keine Schalter in Home Assistant gefunden.",
+      "no_virtual_thermostats": "Keine virtuellen Thermostate konfiguriert."
+    },
+    "error": {
+      "zone_name_required": "Zonenname darf nicht leer sein.",
+      "presence_sensor_required": "Ein Anwesenheitssensor ist erforderlich, wenn Geofencing aktiviert ist.",
+      "invalid_temp_range": "Die Mindesttemperatur muss unter der Höchsttemperatur liegen.",
+      "no_actuators_selected": "Sie müssen mindestens eine Climate-Entität oder einen Schalter für die Zone auswählen.",
+      "zone_name_exists": "Eine Zone mit diesem Namen existiert bereits."
+    }
+  },
+  "entity": {
+    "switch": {
+      "master": {
+        "name": "Heizung Master"
+      }
+    },
+    "select": {
+      "global_preset": {
+        "name": "Globales Preset",
+        "state": {
+          "manual": "Manuell",
+          "eco": "Eco",
+          "comfort": "Komfort",
+          "sleep": "Nacht",
+          "away": "Abwesend"
+        }
+      }
+    }
+  }
+}

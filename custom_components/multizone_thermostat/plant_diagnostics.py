@@ -143,8 +143,9 @@ class PlantDiagnosticsEngine:
         if ent_reg:
             entry = ent_reg.async_get(entity_id)
             if entry and entry.device_id:
-                for ent in ent_reg.entities.values():
-                    if ent.device_id == entry.device_id and ent.domain == "sensor":
+                from homeassistant.helpers import entity_registry as er
+                for ent in er.async_entries_for_device(ent_reg, entry.device_id):
+                    if ent.domain == "sensor":
                         # Check original_device_class, device_class or entity_id naming
                         is_battery = (
                             getattr(ent, "device_class", None) == "battery"
@@ -295,8 +296,9 @@ class PlantDiagnosticsEngine:
         if ent_reg:
             entry = ent_reg.async_get(ot_entity)
             if entry and entry.device_id:
-                for ent in ent_reg.entities.values():
-                    if ent.device_id == entry.device_id and ent.entity_id != ot_entity:
+                from homeassistant.helpers import entity_registry as er
+                for ent in er.async_entries_for_device(ent_reg, entry.device_id):
+                    if ent.entity_id != ot_entity:
                         s_st = self.hass.states.get(ent.entity_id)
                         if not s_st or s_st.state in ("unavailable", "unknown"):
                             continue
@@ -393,7 +395,7 @@ class PlantDiagnosticsEngine:
             if current_temp < 4.0:
                 is_insane = True
             if state["last_temp_seen"] is not None and state["last_temp_time"] is not None:
-                if (state["last_temp_seen"] - current_temp) > 4.0 and (now - state["last_temp_time"]) < 600:
+                if abs(state["last_temp_seen"] - current_temp) > 4.0 and (now - state["last_temp_time"]) < 600:
                     is_insane = True
                     
             if is_insane:

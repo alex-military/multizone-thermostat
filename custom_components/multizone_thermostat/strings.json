@@ -30,23 +30,23 @@
         "description": "Configure a heating zone. {zones_added} zone(s) already added.",
         "data": {
           "climate_entities": "Climate Entity",
-          "name": "Zone Name",
-          "trv_preset_sync": "Enable TRV Preset Sync",
           "anti_seize_zone_enable": "Enable Anti-seize (Summer Protection) for this zone",
           "allow_passive_heat": "Allow Passive Heat (Fancoil without valve / Mezzanine)",
           "window_sensor": "Window Sensor (Optional)",
+          "name": "Zone Name",
+          "trv_preset_sync": "Enable TRV Preset Sync",
           "switch_entities": "Zone Switches / Relays",
           "temp_sensor": "Zone Temperature Sensor",
           "target_temperature": "Base Target Temperature",
-          "sensor_timeout_min": "Timeout Watchdog Sensore (minuti)"
+          "sensor_timeout_min": "Sensor Watchdog Timeout (minutes)"
         },
         "data_description": {
           "climate_entities": "The climate entity for this room/zone",
-          "name": "A friendly name for this zone (pre-filled from climate entity name)",
-          "trv_preset_sync": "Automatically sync preset mode when HVAC mode changes (for physical TRV valves)",
           "allow_passive_heat": "Disables ghost heating anomaly detection if this zone naturally absorbs heat while idle (e.g. open loft/mezzanine or fancoil without a zone valve).",
           "window_sensor": "Automatically bypass the zone when this sensor is open",
-          "sensor_timeout_min": "Tempo massimo senza ricezione dati prima di passare in modalità di sicurezza/fallback su TRV"
+          "zone_name": "A friendly name for this zone (pre-filled from climate entity name)",
+          "zone_trv_sync": "Automatically sync preset mode when HVAC mode changes (for physical TRV valves)",
+          "sensor_timeout_min": "Max duration without updates before falling back to onboard TRV sensors / safety mode"
         }
       },
       "trv_calibration": {
@@ -134,23 +134,23 @@
         "title": "Add New Zone",
         "data": {
           "climate_entities": "Climate Entity",
-          "name": "Zone Name",
-          "trv_preset_sync": "Enable TRV Preset Sync",
           "anti_seize_zone_enable": "Enable Anti-seize (Summer Protection) for this zone",
           "allow_passive_heat": "Allow Passive Heat (Fancoil without valve / Mezzanine)",
           "window_sensor": "Window Sensor (Optional)",
+          "name": "Zone Name",
+          "trv_preset_sync": "Enable TRV Preset Sync",
           "switch_entities": "Zone Switches / Relays",
           "temp_sensor": "Zone Temperature Sensor",
           "target_temperature": "Base Target Temperature",
-          "sensor_timeout_min": "Timeout Watchdog Sensore (minuti)"
+          "sensor_timeout_min": "Sensor Watchdog Timeout (minutes)"
         },
         "data_description": {
           "climate_entities": "The climate entity for this room/zone",
-          "name": "A friendly name for this zone (pre-filled from climate entity name)",
-          "trv_preset_sync": "Automatically sync preset mode when HVAC mode changes (for physical TRV valves)",
           "allow_passive_heat": "Disables ghost heating anomaly detection if this zone naturally absorbs heat while idle (e.g. open loft/mezzanine or fancoil without a zone valve).",
           "window_sensor": "Automatically bypass the zone when this sensor is open",
-          "sensor_timeout_min": "Tempo massimo senza ricezione dati prima di passare in modalità di sicurezza/fallback su TRV"
+          "zone_name": "A friendly name for this zone (pre-filled from climate entity name)",
+          "zone_trv_sync": "Automatically sync preset mode when HVAC mode changes (for physical TRV valves)",
+          "sensor_timeout_min": "Max duration without updates before falling back to onboard TRV sensors / safety mode"
         }
       },
       "remove_zone": {
@@ -164,16 +164,16 @@
         "title": "Edit Zone Settings",
         "description": "Edit settings for a zone.",
         "data": {
-          "trv_preset_sync": "Enable TRV Preset Sync",
           "anti_seize_zone_enable": "Enable Anti-seize (Summer Protection) for this zone",
           "allow_passive_heat": "Allow Passive Heat (Fancoil without valve / Mezzanine)",
           "window_sensor": "Window Sensor (Optional)",
+          "trv_preset_sync": "Enable TRV Preset Sync",
           "zone_name": "Zone",
           "switch_entities": "Zone Switches / Relays",
           "climate_entities": "Zone TRVs / Climates",
           "temp_sensor": "Zone Temperature Sensor",
           "target_temperature": "Base Target Temperature",
-          "sensor_timeout_min": "Timeout Watchdog Sensore (minuti)"
+          "sensor_timeout_min": "Sensor Watchdog Timeout (minutes)"
         }
       },
       "edit_geofencing": {

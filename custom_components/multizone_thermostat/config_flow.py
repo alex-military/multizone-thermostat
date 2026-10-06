@@ -480,16 +480,16 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
     def __init__(self) -> None:
         """Initialize."""
         # self.config_entry is automatically set by Home Assistant 2024.12+
-        self._zones: list[dict[str, Any]] = copy.deepcopy(self.config_entry.data.get(CONF_ZONES, []))
-        self._boiler_mode: str = self.config_entry.data.get(CONF_BOILER_MODE, MODE_RELAY)
-        self._boiler_switch: str = self.config_entry.data.get(CONF_BOILER_SWITCH, "")
-        self._opentherm_entity: str | None = self.config_entry.data.get(CONF_OPENTHERM_ENTITY)
-        self._opentherm_min_temp: float = self.config_entry.data.get(CONF_OPENTHERM_MIN_TEMP, 35.0)
-        self._opentherm_max_temp: float = self.config_entry.data.get(CONF_OPENTHERM_MAX_TEMP, 75.0)
-        self._geofencing_enabled: bool = self.config_entry.data.get(CONF_GEOFENCING_ENABLED, False)
-        self._presence_sensor: str | None = self.config_entry.data.get(CONF_PRESENCE_SENSOR)
-        self._weather_sensor: str | None = self.config_entry.data.get(CONF_WEATHER_SENSOR)
-        self._global_calendar: str | None = self.config_entry.data.get(CONF_GLOBAL_CALENDAR)
+        self._zones: list[dict[str, Any]] = []
+        self._boiler_mode: str = MODE_RELAY
+        self._boiler_switch: str = ""
+        self._opentherm_entity: str | None = None
+        self._opentherm_min_temp: float = 35.0
+        self._opentherm_max_temp: float = 75.0
+        self._geofencing_enabled: bool = False
+        self._presence_sensor: str | None = None
+        self._weather_sensor: str | None = None
+        self._global_calendar: str | None = None
         self._current_zone_name: str | None = None
         self._current_zone_data: dict[str, Any] | None = None
 
@@ -497,6 +497,17 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.FlowResult:
         """Options menu: choose what to edit."""
+        if not self._zones:
+            self._zones = copy.deepcopy(self.config_entry.data.get(CONF_ZONES, []))
+            self._boiler_mode = self.config_entry.data.get(CONF_BOILER_MODE, MODE_RELAY)
+            self._boiler_switch = self.config_entry.data.get(CONF_BOILER_SWITCH, "")
+            self._opentherm_entity = self.config_entry.data.get(CONF_OPENTHERM_ENTITY)
+            self._opentherm_min_temp = self.config_entry.data.get(CONF_OPENTHERM_MIN_TEMP, 35.0)
+            self._opentherm_max_temp = self.config_entry.data.get(CONF_OPENTHERM_MAX_TEMP, 75.0)
+            self._geofencing_enabled = self.config_entry.data.get(CONF_GEOFENCING_ENABLED, False)
+            self._presence_sensor = self.config_entry.data.get(CONF_PRESENCE_SENSOR)
+            self._weather_sensor = self.config_entry.data.get(CONF_WEATHER_SENSOR)
+            self._global_calendar = self.config_entry.data.get(CONF_GLOBAL_CALENDAR)
         if user_input is not None:
             action = user_input.get("action")
             if action == "change_boiler":
