@@ -1,5 +1,9 @@
 # Changelog
 
+## [4.7.2] - 2026-10-06
+### 🛠️ Bug Fixes
+- **Frontend Strategy Registration**: Fixed a JavaScript syntax escape error in card translations that prevented custom element and dashboard strategy registration.
+
 ## [4.7.1] - 2026-10-06
 ### 🌍 Internationalization
 - **New Languages Added**: Full support for French, German, and Spanish added for the UI Cards and Config Flow.

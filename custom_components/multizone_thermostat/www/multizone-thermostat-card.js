@@ -254,7 +254,8 @@ const TRANSLATIONS = {
     critical: "КРИТИЧНО",
     passive_heat_active_tooltip: "Пассивный нагрев АКТИВЕН (Нажмите для отключения)",
     passive_heat_inactive_tooltip: "Пассивный нагрев неактивен (Нажмите для включения)",
-    anomaly_detected: "Обнаружена аномалия",\1
+    anomaly_detected: "Обнаружена аномалия",
+    card_error_title: "Ошибка карточки Multizone Thermostat"
   },
   fr: {
     enabled: "Activé",
