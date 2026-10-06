@@ -171,3 +171,53 @@ By default, all calendar overrides are temporary and vanish when the event ends.
 Because the Multizone Thermostat actively builds a **Thermal Model** of each room (learning its heating rate in °C/hour), it can predict exactly how long a room will take to heat up!
 
 If you schedule an event like `Comfort` at 08:00 AM, the system will look ahead in the calendar. If it predicts that your bedroom needs 45 minutes to reach the Comfort temperature, the boiler will automatically fire up at 07:15 AM (Smart Start), ensuring the room is exactly at the right temperature when your alarm rings at 08:00!
+
+---
+
+## 🐕 Sensor Timeout Watchdog & TRV Fallback (P1)
+
+External wireless thermometers (Zigbee, BLE, Wi-Fi) can run out of battery, drop off the mesh network, or freeze up. When this happens, a traditional thermostat risks staying permanently stuck in heating (burning fuel) or permanently off (freezing the room).
+
+Multizone Thermostat includes an **active sensor watchdog**:
+- **Configurable Timeout**: Set `sensor_timeout_min` per zone (default: 60 minutes; set to `0` to disable).
+- **Graceful Fallback**: If the external temperature sensor doesn't report a new state for longer than the timeout period (or goes `unavailable` / `unknown`), the zone automatically falls back to reading the internal temperature sensor of the assigned TRV(s).
+- **Safety Mode**: TRV calibration offsets and fake target injections are suspended while fallback is active, ensuring the TRV modulates safely based on its local reading.
+- **Trace & Telemetry**: When fallback triggers, a `SENSOR_TIMEOUT_FALLBACK` event is recorded in the diagnostics history, and `safety_fallback_active: true` is set in the zone's thermostat attributes.
+- **Automatic Recovery**: The instant the external thermometer resumes broadcasting valid temperature readings, the zone automatically disengages fallback mode and returns to normal high-precision operation.
+
+---
+
+## 🔥 OpenTherm Telemetry, Fault Codes & DHW Priority
+
+When OpenTherm mode is enabled, the integration does more than just modulate water temperature — it turns Home Assistant into a boiler supervision station:
+
+### Telemetry Auto-Discovery
+The integration automatically queries the OpenTherm gateway and exposes:
+- **Water Pressure (`water_pressure`)**: Measured in Bar. The diagnostic supervisor alerts if water pressure drops below 0.8 Bar (low circuit pressure warning).
+- **Return Temperature (`return_temperature`)**: Flow and return temperature monitoring allows calculating the exact $\Delta T$ of the hydraulic distribution system.
+- **Flame Active (`flame_active`)**: Real-time binary indicator showing whether the burner flame is physically ignited.
+- **Modulation Level (`modulation_level`)**: Current burner modulation percentage (0-100%).
+- **Boiler Fault Code (`fault_code`)**: Direct capture of boiler error codes transmitted over the OpenTherm bus, eliminating the need to physically check the boiler panel.
+
+### Domestic Hot Water (DHW) Priority Freeze
+When a tap or shower is running, modern combination boilers prioritize Domestic Hot Water production over central heating. 
+During this time:
+1. The coordinator detects DHW production (`is_dhw_active: true`).
+2. Zone PID demand calculations are **frozen** (holding the previous integral state) so the integration does not falsely assume radiators are failing to warm the rooms.
+3. False "stuck valve" or "heating anomaly" alarms are suppressed.
+4. The boiler status reason cleanly displays: `HOLD_DHW - Priorità Acqua Calda Sanitaria attiva`.
+5. Once DHW draw-off finishes, central heating resumes immediately without integral windup overshoot.
+
+---
+
+## 🔋 Universal Battery Monitoring & Diagnostics
+
+Managing wireless thermostats and radiator valves across multiple rooms requires clear visibility over battery health:
+- **Automatic Discovery**: The integration resolves battery levels automatically across Zigbee2MQTT, ZHA, and Tuya/Avatto devices without requiring manual sensor mapping.
+- **Zone Thermostat Attributes**: Every zone thermostat entity exposes `battery_level` in its `extra_state_attributes` (reflecting the lowest battery among the zone's external thermometer and TRVs).
+- **Diagnostic Dashboard Card**: The `ZoneEnergyCard` displays real-time battery percentage and color-coded status icons:
+  - 🟢 **> 80%**: Optimal battery health (`mdi:battery`)
+  - 🟡 **40% - 80%**: Normal operation (`mdi:battery-50`)
+  - 🟠 **15% - 40%**: Low battery warning (`mdi:battery-20`)
+  - 🔴 **< 15%**: Critical alert (`mdi:battery-alert`)
+- **Proactive Anomaly Prevention**: Low-battery devices are flagged early in diagnostics before sensor dropouts cause room temperature disruptions.

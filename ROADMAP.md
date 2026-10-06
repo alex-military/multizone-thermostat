@@ -37,11 +37,14 @@ The project is structured in phases to evolve from a simple aggregator to a full
 
 ## 🚀 Future Roadmap & Next Priorities
 
-### PHASE 6 — Advanced AI & Optimization
+### PHASE 6 — Advanced AI, Diagnostics & Boiler Supervision
 - [x] **Adaptive Climate Curve**: Self-learning and continuous adaptation of the weather compensation curve based on history.
-- [x] **Full OpenTherm Support (v4.2)**: Dual-drive architecture for ON/OFF Relays and OpenTherm modulating gateways, mapping house Heat Demand % (0-100%) to boiler water flow temperature.
+- [x] **Full OpenTherm Support (v4.2 - v4.6)**: Dual-drive architecture for ON/OFF Relays and OpenTherm modulating gateways, mapping house Heat Demand % (0-100%) to boiler water flow temperature.
 - [x] **Anti-Frost Protection System (v4.3)**: Global safety override with dedicated switch (`switch.multizone_thermostat_anti_frost_protection`) and threshold control (`number.frost_protection_temp`). Forces emergency heating at 100% demand when room temperature drops below frost threshold, ignoring open window and master off blocks to prevent frozen pipes.
 - [x] **Advanced Diagnostics & Plant Supervision (v4.5)**: Automated detection of stuck valves, ghost heating leakage, boiler short-cycling frequency, 24h runtime telemetry, European building energy class (A4-G), thermal retention time, radiator sizing, and interactive mode switching.
+- [x] **Sensor Timeout Watchdog & TRV Fallback (v4.7)**: Watchdog per zone (`sensor_timeout_min`) that automatically triggers safety fallback to internal TRV temperature sensors when an external thermometer disconnects or fails.
+- [x] **OpenTherm Advanced Telemetry & DHW Priority (v4.7)**: Automatic query of water pressure, return temp, burner flame, modulation %, and OEM fault codes, with PID loop freezing during Domestic Hot Water draw-off.
+- [x] **Universal Battery Monitoring & Dashboard Health (v4.7)**: Automatic discovery of wireless thermometer and TRV battery levels across Zigbee2MQTT, ZHA, and Tuya/Avatto, with battery percentage in thermostat attributes and color-coded health icons in diagnostic cards.
 
 
 ### 🤝 Community Requests & Pull Requests

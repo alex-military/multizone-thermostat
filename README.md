@@ -41,12 +41,15 @@ A comprehensive custom integration for Home Assistant that provides **multi-zone
 ### Hardware Protection & Safety
 - 🛡️ **Anti-Short-Cycle Engine**: Configurable minimum ON and minimum OFF times to prevent rapid boiler cycling and extend burner relay lifespan.
 - ⏱️ **Valve Opening Delay**: Configurable delay to ensure thermoelectric actuators have fully opened before igniting the boiler.
+- 🐕 **Watchdog Sensor Timeout & TRV Fallback (v4.7)**: Configurable per zone (`sensor_timeout_min`). If an external wireless sensor drops offline or its battery runs out, the zone automatically falls back to the TRV's internal temperature probe to maintain heating, automatically restoring once the external sensor recovers.
 - ❄️ **Anti-Frost Protection Override (v4.3)**: Global safety override with dedicated switch (`switch.multizone_thermostat_anti_frost_protection`) and threshold control (`number.frost_protection_temp`). Forces emergency heating at 100% demand when room temperature drops below frost threshold, ignoring open window and master off blocks to prevent frozen pipes.
 - ☀️ **Summer Anti-Seize Protection**: Cyclical exercise of boiler pumps and zone valves during idle summer months to prevent mechanical seizure.
 - 🔄 **Bidirectional Physical Climate Sync (v4.3)**: Dynamic toggle switches allowing physical hardware buttons on TRVs to propagate setpoint adjustments to the virtual zone without fighting, with parental lock capability.
 
-### Plant Diagnostics & Building Efficiency (v4.5+)
+### Plant Diagnostics & Building Efficiency (v4.5 - v4.7)
 - 🔍 **Central Plant Health Monitoring**: Real-time tracking of boiler ignition frequency (cycles/hour), cumulative 24h runtime, and real-time state reasons.
+- 🔥 **OpenTherm Telemetry & Error Bus (v4.7)**: Automatic discovery of water pressure (Bar), return temperature (°C), flame active state, burner modulation %, and OEM fault codes. Includes DHW (Domestic Hot Water) priority detection to freeze zone PID loops during hot water draw-off.
+- 🔋 **Universal Battery Surveillance (v4.7)**: Automatically resolves battery charge levels across Zigbee2MQTT, ZHA, and Tuya/Avatto devices, displaying battery percentages in thermostat attributes and diagnostic cards.
 - 🚨 **Mechanical Anomaly Detection**: Automatic detection of stuck valves (heat demanded for >45m but room temperature drops) and ghost heating leakage (room temperature rises while valve is closed).
 - ♨️ **Apporto Termico Passivo (Passive Heat Intake)**: Switchable per zone (`allow_passive_heat`), tailored for open lofts, mezzanines, or fan coils without cutoff valves to prevent false ghost-heating alerts.
 - 📊 **European Building Energy Classes (A4 → G)**: Theoretical energy grade calculated from thermal dispersion and outdoor weather $\Delta T$.
@@ -95,6 +98,15 @@ $$\text{Water Temperature} = T_{\text{min}} + \left( \frac{\text{Demand \%}}{100
 - **100% Demand**: Target water flow temperature set to maximum output ($75^\circ\text{C}$).
 
 The calculated water temperature is sent directly to your OpenTherm Gateway climate or number entity, allowing the boiler's internal modulation logic to adjust flame height efficiently.
+
+### Advanced OpenTherm Telemetry & DHW Priority (v4.7)
+
+When connected to an OpenTherm gateway, Multizone Thermostat automatically detects and exposes rich boiler diagnostic data:
+- 💧 **Water Pressure**: Monitored continuously (nominal 1.0 - 2.0 Bar, alert < 0.8 Bar).
+- 🌡️ **Flow & Return Temperatures**: Real-time evaluation of thermal extraction delta ($\Delta T$).
+- 🔥 **Flame & Modulation Telemetry**: Real-time flame ignition status and burner power percentage (0-100%).
+- ⚠️ **OEM Fault Codes**: Immediate capture of boiler error codes transmitted via the OpenTherm bus.
+- 🚿 **Domestic Hot Water (DHW) Coordination**: When DHW is active, the coordinator automatically pauses heating calls and freezes zone PID loops to prevent false integral accumulation during shower/tap use.
 
 ---
 

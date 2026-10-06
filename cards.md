@@ -128,6 +128,7 @@ A zero-configuration, glassmorphic card that displays physical boiler telemetry,
 - **Auto-Discovery**: Automatically finds and binds to the central health and boiler runtime sensors.
 - **Short-Cycling Alert**: Monitors hourly ignition frequency and alerts if wear is high (> 5 cycles/h).
 - **Active Anomalies List**: Expands dynamically to display exact room details whenever an anomaly (stuck valve, ghost heating) is active.
+- **OpenTherm Telemetry**: Automatically displays water pressure (Bar), flow & return temperatures (°C), burner flame status, modulation %, and OEM fault codes when OpenTherm mode is active.
 
 ```yaml
 type: custom:multizone-thermostat-plant-card
@@ -142,6 +143,7 @@ A card designed to display the building energy efficiency metrics for a specific
 - **Thermal Retention Time**: Displays hours needed for the room to lose $1.0^\circ\text{C}$.
 - **Radiator Sizing**: Evaluates whether the heating emitter is optimal, undersized, or oversized.
 - **Mechanical Valve Surveillance**: Alerts in real-time if a valve is stuck closed or leaking heat.
+- **Battery Status & Health**: Live battery percentage (%) and color-coded icon (Green >80%, Yellow >40%, Orange >15%, Red <15%) auto-discovered from TRVs and wireless temperature sensors (Zigbee2MQTT, ZHA, Tuya, Avatto).
 - **Interactive Mode Switching**: Click directly on the `PRIMARIA`, `SECONDARIA`, or `BYPASSATA` badge to cycle the zone mode on the fly.
 - **Interactive Passive Heat Switch**: Click directly on the valve status footer to toggle **Apporto Passivo** (passive heat intake) for rooms like open lofts or fan coils without cutoff valves.
 
