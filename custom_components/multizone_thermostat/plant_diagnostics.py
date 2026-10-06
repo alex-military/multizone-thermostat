@@ -20,6 +20,8 @@ ANOMALY_OVERSHOOT = "overshoot"
 ANOMALY_LOW_BATTERY = "low_battery"
 ANOMALY_SENSOR_FAULT = "sensor_fault"
 ANOMALY_SENSOR_TIMEOUT = "sensor_timeout"
+ANOMALY_BOILER_LOW_PRESSURE = "boiler_low_pressure"
+ANOMALY_BOILER_FAULT = "boiler_fault"
 
 # Human-readable anomaly labels (Italian)
 ANOMALY_LABELS = {
@@ -32,6 +34,8 @@ ANOMALY_LABELS = {
     ANOMALY_LOW_BATTERY: "Batteria sensore in esaurimento (<= 10%)",
     ANOMALY_SENSOR_FAULT: "Guasto sensore o temperatura non plausibile",
     ANOMALY_SENSOR_TIMEOUT: "Watchdog: Sonda offline / mancata ricezione dati",
+    ANOMALY_BOILER_LOW_PRESSURE: "Pressione circuito caldaia insufficiente (< 0.8 bar)",
+    ANOMALY_BOILER_FAULT: "Allarme guasto generatore OpenTherm",
 }
 
 
@@ -199,6 +203,148 @@ class PlantDiagnosticsEngine:
         if batteries:
             return min(batteries)
         return None
+
+    def get_opentherm_diagnostics(self) -> dict[str, Any]:
+        """Auto-discover and read OpenTherm telemetry, registers and error flags."""
+        ot_entity = getattr(self.coordinator, "opentherm_entity", None)
+        if not ot_entity:
+            return {"enabled": False}
+
+        result: dict[str, Any] = {
+            "enabled": True,
+            "entity_id": ot_entity,
+            "water_pressure": None,
+            "return_temperature": None,
+            "flow_temperature": None,
+            "flame_active": None,
+            "modulation_level": None,
+            "fault_code": None,
+            "fault_active": False,
+            "dhw_active": False,
+            "condensing_optimal": None,
+        }
+
+        # 1. Inspect direct attributes of opentherm_entity
+        st = self.hass.states.get(ot_entity)
+        if st and st.attributes:
+            attrs = st.attributes
+            # Current / Flow temp
+            for k in ("current_temperature", "flow_temperature", "boiler_temperature", "ch_flow_temperature"):
+                if k in attrs and attrs[k] is not None:
+                    try:
+                        result["flow_temperature"] = float(attrs[k])
+                        break
+                    except (ValueError, TypeError):
+                        pass
+
+            # Return temp
+            for k in ("return_temperature", "return_water_temperature", "ch_return_temperature", "boiler_return_temperature"):
+                if k in attrs and attrs[k] is not None:
+                    try:
+                        result["return_temperature"] = float(attrs[k])
+                        break
+                    except (ValueError, TypeError):
+                        pass
+
+            # Water Pressure
+            for k in ("pressure", "water_pressure", "ch_water_pressure", "boiler_pressure"):
+                if k in attrs and attrs[k] is not None:
+                    try:
+                        result["water_pressure"] = round(float(attrs[k]), 2)
+                        break
+                    except (ValueError, TypeError):
+                        pass
+
+            # Modulation level
+            for k in ("modulation", "modulation_level", "relative_modulation_level", "relative_mod_level"):
+                if k in attrs and attrs[k] is not None:
+                    try:
+                        result["modulation_level"] = round(float(attrs[k]), 1)
+                        break
+                    except (ValueError, TypeError):
+                        pass
+
+            # Flame status
+            for k in ("flame", "flame_active", "flame_on", "flame_status"):
+                if k in attrs:
+                    v = attrs[k]
+                    result["flame_active"] = bool(v) if not isinstance(v, str) else v.lower() in ("true", "on", "1")
+                    break
+
+            # Fault
+            for k in ("fault", "fault_code", "oem_fault_code", "error_code", "fault_flags"):
+                if k in attrs and attrs[k] not in (None, 0, "0", "", "none", "ok", False):
+                    result["fault_code"] = str(attrs[k])
+                    result["fault_active"] = True
+                    break
+
+            # DHW Active
+            for k in ("dhw_active", "dhw_state", "dhw_mode", "hot_water_active"):
+                if k in attrs:
+                    v = attrs[k]
+                    result["dhw_active"] = bool(v) if not isinstance(v, str) else v.lower() in ("true", "on", "1")
+                    break
+
+        # 2. Check Device Registry for companion sensor entities (OpenTherm Gateway / ESPHome)
+        from homeassistant.helpers import entity_registry as er
+        try:
+            ent_reg = er.async_get(self.hass)
+        except Exception:
+            ent_reg = self.hass.data.get("entity_registry")
+
+        if ent_reg:
+            entry = ent_reg.async_get(ot_entity)
+            if entry and entry.device_id:
+                for ent in ent_reg.entities.values():
+                    if ent.device_id == entry.device_id and ent.entity_id != ot_entity:
+                        s_st = self.hass.states.get(ent.entity_id)
+                        if not s_st or s_st.state in ("unavailable", "unknown"):
+                            continue
+                        
+                        eid = ent.entity_id.lower()
+                        dev_cls = getattr(ent, "original_device_class", None) or getattr(ent, "device_class", None)
+                        
+                        # Pressure sensor
+                        if (dev_cls == "pressure" or "pressure" in eid) and result["water_pressure"] is None:
+                            try:
+                                result["water_pressure"] = round(float(s_st.state), 2)
+                            except (ValueError, TypeError):
+                                pass
+
+                        # Return temp sensor
+                        if ("return" in eid and ("temp" in eid or dev_cls == "temperature")) and result["return_temperature"] is None:
+                            try:
+                                result["return_temperature"] = round(float(s_st.state), 1)
+                            except (ValueError, TypeError):
+                                pass
+
+                        # Modulation
+                        if ("modulation" in eid or "mod_level" in eid) and result["modulation_level"] is None:
+                            try:
+                                result["modulation_level"] = round(float(s_st.state), 1)
+                            except (ValueError, TypeError):
+                                pass
+
+                        # Flame
+                        if ("flame" in eid) and result["flame_active"] is None:
+                            result["flame_active"] = s_st.state.lower() in ("on", "true", "1")
+
+                        # Fault / Error
+                        if ("fault" in eid or "error" in eid):
+                            if s_st.state.lower() not in ("off", "none", "0", "ok", "false", "unavailable"):
+                                result["fault_active"] = True
+                                result["fault_code"] = str(s_st.state)
+
+                        # DHW Active
+                        if ("dhw" in eid or "hot_water" in eid):
+                            if s_st.state.lower() in ("on", "true", "1"):
+                                result["dhw_active"] = True
+
+        # Compute condensing optimization metric (condenses when return water < 54°C)
+        if result["return_temperature"] is not None:
+            result["condensing_optimal"] = result["return_temperature"] < 54.0
+
+        return result
 
     def evaluate_zone_anomalies(self, climate_id: str) -> tuple[str, str]:
         """
@@ -460,10 +606,32 @@ class PlantDiagnosticsEngine:
                 "description": f"Frequenza accensioni elevata: {cycles} cicli/ora (possibile usura o sovradimensionamento)",
             })
 
+        # OpenTherm Diagnostics & Anomalies
+        ot_diag = self.get_opentherm_diagnostics()
+        if ot_diag.get("enabled"):
+            # Check Low Pressure
+            press = ot_diag.get("water_pressure")
+            if press is not None and press < 0.8:
+                anomalies_found.append({
+                    "zone": "Centrale Termica",
+                    "climate_id": "boiler_pressure",
+                    "type": ANOMALY_BOILER_LOW_PRESSURE,
+                    "description": f"Pressione circuito bassa ({press:.1f} bar). Ricaricare circuito a 1.2 - 1.5 bar",
+                })
+            # Check Boiler Fault
+            if ot_diag.get("fault_active"):
+                code = ot_diag.get("fault_code", "Attivo")
+                anomalies_found.append({
+                    "zone": "Centrale Termica",
+                    "climate_id": "boiler_fault",
+                    "type": ANOMALY_BOILER_FAULT,
+                    "description": f"Allarme guasto generatore OpenTherm (Codice: {code})",
+                })
+
         if not anomalies_found:
             status = "optimal"
             label = "Ottimale"
-        elif any(a["type"] in (ANOMALY_VALVE_STUCK_CLOSED, ANOMALY_GHOST_HEATING, ANOMALY_STALE_SENSOR) for a in anomalies_found):
+        elif any(a["type"] in (ANOMALY_VALVE_STUCK_CLOSED, ANOMALY_GHOST_HEATING, ANOMALY_STALE_SENSOR, ANOMALY_BOILER_FAULT) for a in anomalies_found):
             status = "critical"
             label = "Critico"
         else:
@@ -477,4 +645,5 @@ class PlantDiagnosticsEngine:
             "anomalies": anomalies_found,
             "cycles_per_hour": cycles,
             "daily_runtime_hours": self.get_boiler_daily_runtime_hours(),
+            "opentherm": ot_diag,
         }

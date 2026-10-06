@@ -209,8 +209,17 @@ class MultizoneCoordinator:
         self._climate_entities.pop(entity_id, None)
 
     @property
+    def is_dhw_active(self) -> bool:
+        """Return True if OpenTherm reports active Domestic Hot Water production."""
+        if hasattr(self, "plant_diagnostics"):
+            return bool(self.plant_diagnostics.get_opentherm_diagnostics().get("dhw_active", False))
+        return False
+
+    @property
     def boiler_status_reason(self) -> str:
         """Return human-readable explanation of why the boiler is currently in its state."""
+        if self.is_dhw_active:
+            return "HOLD_DHW - Priorità Acqua Calda Sanitaria attiva"
         return self._boiler_status_reason
 
     @property
@@ -562,6 +571,10 @@ class MultizoneCoordinator:
                         demand = 0.0
                         _LOGGER.warning("Zone %s: Heating demand forced to 0%% due to critical sensor fault/low battery", entity_id)
                         self.set_zone_demand(entity_id, demand)
+                        return
+
+                    if self.is_dhw_active:
+                        _LOGGER.debug("Zone %s: PID frozen, boiler is currently producing Domestic Hot Water (DHW Active).", entity_id)
                         return
 
                     # Smart Stop: Calculate Effective Target based on learned Inertia

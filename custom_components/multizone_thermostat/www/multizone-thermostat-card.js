@@ -2315,6 +2315,37 @@ class MultizoneThermostatPlantCard extends HTMLElement {
         </div>
       </div>
 
+      <div class="ot-grid" id="ot-grid" style="display:none; margin-bottom: 14px; background: rgba(14, 165, 233, 0.05); border: 1px solid rgba(14, 165, 233, 0.2); border-radius: 14px; padding: 12px 16px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+          <div style="font-weight: 700; font-size: 13px; color: #38bdf8; display: flex; align-items: center; gap: 6px;">
+            <ha-icon icon="mdi:pipe-valve" style="--mdc-icon-size: 16px;"></ha-icon>
+            <span>Telemetria OpenTherm</span>
+          </div>
+          <div id="ot-dhw-badge" style="display:none; font-size: 11px; font-weight: 700; background: rgba(59, 130, 246, 0.2); color: #60a5fa; border-radius: 6px; padding: 2px 8px; border: 1px solid rgba(59, 130, 246, 0.3);">
+            🚿 Acqua Calda (ACS)
+          </div>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(85px, 1fr)); gap: 10px;">
+          <div>
+            <div style="font-size: 11px; color: var(--secondary-text-color, #94a3b8);">Pressione</div>
+            <div style="font-size: 16px; font-weight: 800;" id="ot-pressure-val">-- bar</div>
+          </div>
+          <div>
+            <div style="font-size: 11px; color: var(--secondary-text-color, #94a3b8);">Ritorno Acqua</div>
+            <div style="font-size: 16px; font-weight: 800;" id="ot-return-val">--°C</div>
+            <div style="font-size: 10px; font-weight: 600;" id="ot-condense-eval"></div>
+          </div>
+          <div>
+            <div style="font-size: 11px; color: var(--secondary-text-color, #94a3b8);">Modulazione</div>
+            <div style="font-size: 16px; font-weight: 800;" id="ot-mod-val">--%</div>
+          </div>
+          <div>
+            <div style="font-size: 11px; color: var(--secondary-text-color, #94a3b8);">Stato Fiamma</div>
+            <div style="font-size: 14px; font-weight: 700;" id="ot-flame-val">Spenta</div>
+          </div>
+        </div>
+      </div>
+
       <div class="alert-box alert-ok" id="alert-box">
         <div class="alert-title" id="alert-title-wrap">
           <ha-icon icon="mdi:check-circle-outline" style="--mdc-icon-size: 18px; color: #34d399;"></ha-icon>
@@ -2415,6 +2446,70 @@ class MultizoneThermostatPlantCard extends HTMLElement {
           alertBox.className = "alert-box alert-ok";
           alertDesc.innerText = t('no_anomalies');
         }
+      }
+
+      // OpenTherm Telemetry Update
+      const otGrid = this.shadowRoot.getElementById('ot-grid');
+      const otPressure = this.shadowRoot.getElementById('ot-pressure-val');
+      const otReturn = this.shadowRoot.getElementById('ot-return-val');
+      const otCondense = this.shadowRoot.getElementById('ot-condense-eval');
+      const otMod = this.shadowRoot.getElementById('ot-mod-val');
+      const otFlame = this.shadowRoot.getElementById('ot-flame-val');
+      const otDhw = this.shadowRoot.getElementById('ot-dhw-badge');
+
+      if (otGrid && healthState && healthState.attributes && healthState.attributes.opentherm && healthState.attributes.opentherm.enabled) {
+        const ot = healthState.attributes.opentherm;
+        otGrid.style.display = 'block';
+
+        if (otPressure) {
+          if (ot.water_pressure !== null && ot.water_pressure !== undefined) {
+            otPressure.innerText = `${ot.water_pressure} bar`;
+            otPressure.style.color = (ot.water_pressure < 0.8) ? '#f87171' : (ot.water_pressure > 2.5 ? '#fbbf24' : '#34d399');
+          } else {
+            otPressure.innerText = '-- bar';
+            otPressure.style.color = 'inherit';
+          }
+        }
+
+        if (otReturn) {
+          if (ot.return_temperature !== null && ot.return_temperature !== undefined) {
+            otReturn.innerText = `${ot.return_temperature}°C`;
+            if (otCondense) {
+              if (ot.condensing_optimal) {
+                otCondense.innerText = 'Condensazione OK';
+                otCondense.style.color = '#34d399';
+              } else {
+                otCondense.innerText = 'Ritorno caldo (>54°C)';
+                otCondense.style.color = '#fbbf24';
+              }
+            }
+          } else {
+            otReturn.innerText = '--°C';
+            if (otCondense) otCondense.innerText = '';
+          }
+        }
+
+        if (otMod) {
+          if (ot.modulation_level !== null && ot.modulation_level !== undefined) {
+            otMod.innerText = `${ot.modulation_level}%`;
+          } else {
+            otMod.innerText = '--%';
+          }
+        }
+
+        if (otFlame) {
+          if (ot.flame_active) {
+            otFlame.innerHTML = '<span style="color: #f59e0b;">🔥 Accesa</span>';
+          } else {
+            otFlame.innerHTML = '<span style="color: #94a3b8;">Spenta</span>';
+          }
+        }
+
+        if (otDhw) {
+          otDhw.style.display = ot.dhw_active ? 'inline-block' : 'none';
+        }
+      } else if (otGrid) {
+        otGrid.style.display = 'none';
       }
     } catch (err) {
       console.error("Error updating MultizoneThermostatPlantCard:", err);

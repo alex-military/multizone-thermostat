@@ -41,6 +41,8 @@ async def async_get_config_entry_diagnostics(
         "boiler_mode": coordinator.boiler_mode,
         "boiler_switch": coordinator.boiler_switch,
         "opentherm_entity": coordinator.opentherm_entity,
+        "opentherm_diagnostics": coordinator.plant_diagnostics.get_opentherm_diagnostics() if hasattr(coordinator, "plant_diagnostics") else None,
+        "is_dhw_active": coordinator.is_dhw_active,
         "master_state": coordinator.get_master_state(),
         "boiler_status_reason": getattr(coordinator, "boiler_status_reason", "N/A"),
         "current_global_preset": coordinator.current_global_preset,
