@@ -111,44 +111,93 @@ class PlantDiagnosticsEngine:
 
 
     def get_battery_level(self, entity_id: str) -> int | None:
-        """Find battery level for an entity (attributes or related device sensor)."""
+        """Find battery level for an entity (attributes, device registry, or related sensor)."""
+        if not entity_id:
+            return None
+            
         st = self.hass.states.get(entity_id)
         if not st:
             return None
             
-        # 1. Check direct attributes
-        for attr in ("battery", "battery_level"):
+        # 1. Check direct attributes on the entity
+        for attr in ("battery", "battery_level", "battery_percent"):
             val = st.attributes.get(attr)
             if val is not None:
                 try:
-                    return int(float(val))
+                    return int(round(float(val)))
                 except (ValueError, TypeError):
                     pass
                     
-        # 2. Lookup related battery sensor by device_id
+        # 2. Lookup related battery sensor by device_id in entity registry
         from homeassistant.helpers import entity_registry as er
+        ent_reg = None
         try:
             ent_reg = er.async_get(self.hass)
         except Exception:
             ent_reg = self.hass.data.get("entity_registry")
-        if not ent_reg:
+            
+        if ent_reg:
+            entry = ent_reg.async_get(entity_id)
+            if entry and entry.device_id:
+                for ent in ent_reg.entities.values():
+                    if ent.device_id == entry.device_id and ent.domain == "sensor":
+                        # Check original_device_class, device_class or entity_id naming
+                        is_battery = (
+                            getattr(ent, "device_class", None) == "battery"
+                            or getattr(ent, "original_device_class", None) == "battery"
+                            or "battery" in ent.entity_id
+                            or getattr(ent, "translation_key", None) == "battery"
+                        )
+                        if is_battery:
+                            bat_st = self.hass.states.get(ent.entity_id)
+                            if bat_st and bat_st.state not in ("unavailable", "unknown"):
+                                try:
+                                    return int(round(float(bat_st.state)))
+                                except (ValueError, TypeError):
+                                    pass
+
+        # 3. Name-based matching heuristic (common in Zigbee2MQTT / ZHA)
+        # E.g. sensor.camera_matrimoniale_temperature -> sensor.camera_matrimoniale_battery
+        clean_id = entity_id.replace("sensor.", "").replace("climate.", "")
+        for suffix in ("_temperature", "_temp", "_current_temperature"):
+            if clean_id.endswith(suffix):
+                clean_id = clean_id[:-len(suffix)]
+                break
+                
+        candidate_prefixes = [f"sensor.{clean_id}_battery", f"sensor.{clean_id}_battery_level"]
+        for cand in candidate_prefixes:
+            cand_st = self.hass.states.get(cand)
+            if cand_st and cand_st.state not in ("unavailable", "unknown"):
+                try:
+                    return int(round(float(cand_st.state)))
+                except (ValueError, TypeError):
+                    pass
+
+        return None
+
+    def get_zone_battery_level(self, climate_id: str) -> int | None:
+        """Find lowest battery level for a zone (checking external temp sensor, then TRVs)."""
+        zone = self.coordinator._get_zone(climate_id)
+        if not zone:
             return None
             
-        entry = ent_reg.async_get(entity_id)
-        if not entry or not entry.device_id:
-            return None
-            
-        # Find all entities for this device
-        for ent in ent_reg.entities.values():
-            if ent.device_id == entry.device_id and ent.domain == "sensor":
-                # Check if it's a battery sensor
-                if ent.device_class == "battery" or ent.entity_id.endswith("_battery"):
-                    bat_st = self.hass.states.get(ent.entity_id)
-                    if bat_st and bat_st.state not in ("unavailable", "unknown"):
-                        try:
-                            return int(float(bat_st.state))
-                        except (ValueError, TypeError):
-                            pass
+        batteries = []
+        
+        # Check external sensor
+        sensor_id = zone.get("temp_sensor")
+        if sensor_id:
+            bat = self.get_battery_level(sensor_id)
+            if bat is not None:
+                batteries.append(bat)
+                
+        # Check TRVs in the zone
+        for trv in (zone.get("climate_entities") or []):
+            bat = self.get_battery_level(trv)
+            if bat is not None:
+                batteries.append(bat)
+                
+        if batteries:
+            return min(batteries)
         return None
 
     def evaluate_zone_anomalies(self, climate_id: str) -> tuple[str, str]:

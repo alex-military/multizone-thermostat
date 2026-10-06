@@ -206,8 +206,8 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             "safety_fallback_active": self._safety_fallback_active,
             "sensor_timeout_min": self._sensor_timeout_min,
         }
-        if hasattr(self._coordinator, "plant_diagnostics") and self._temp_sensor:
-            bat = self._coordinator.plant_diagnostics.get_battery_level(self._temp_sensor)
+        if hasattr(self._coordinator, "plant_diagnostics"):
+            bat = self._coordinator.plant_diagnostics.get_zone_battery_level(self.entity_id)
             if bat is not None:
                 attrs["battery_level"] = bat
         return attrs

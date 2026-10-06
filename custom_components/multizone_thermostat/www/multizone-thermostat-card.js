@@ -2888,6 +2888,86 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
           valveText.style.color = "#34d399";
         }
       }
+
+      if (batteryText && batteryIcon) {
+        let batVal = null;
+        if (climateState.attributes && climateState.attributes.battery_level !== undefined && climateState.attributes.battery_level !== null) {
+          batVal = climateState.attributes.battery_level;
+        } else if (this._hass && this._hass.states) {
+          const checkEntityBattery = (entId) => {
+            if (!entId) return null;
+            const clean = entId.replace('sensor.', '').replace('climate.', '').replace(/_temperature|_temp|_current_temperature$/, '');
+            const candidateKeys = [
+              `sensor.${clean}_battery`,
+              `sensor.${clean}_battery_level`,
+            ];
+            for (const cand of candidateKeys) {
+              if (this._hass.states[cand] && !['unavailable', 'unknown'].includes(this._hass.states[cand].state)) {
+                const p = parseFloat(this._hass.states[cand].state);
+                if (!isNaN(p)) return Math.round(p);
+              }
+            }
+            const targetState = this._hass.states[entId];
+            if (targetState && targetState.attributes) {
+              for (const attr of ['battery', 'battery_level', 'battery_percent']) {
+                if (targetState.attributes[attr] !== undefined) {
+                  const p = parseFloat(targetState.attributes[attr]);
+                  if (!isNaN(p)) return Math.round(p);
+                }
+              }
+            }
+            return null;
+          };
+
+          if (climateState.attributes && climateState.attributes.temperature_sensor) {
+            batVal = checkEntityBattery(climateState.attributes.temperature_sensor);
+          }
+          if (batVal === null && climateState.attributes && Array.isArray(climateState.attributes.climates)) {
+            for (const trv of climateState.attributes.climates) {
+              const trvBat = checkEntityBattery(trv);
+              if (trvBat !== null) {
+                batVal = trvBat;
+                break;
+              }
+            }
+          }
+          if (batVal === null) {
+            const batEntity = Object.keys(this._hass.states).find(k => 
+              k.startsWith('sensor.') && 
+              (k.includes('battery') || k.includes('batteria')) && 
+              k.includes(slug) &&
+              !['unavailable', 'unknown'].includes(this._hass.states[k].state)
+            );
+            if (batEntity && this._hass.states[batEntity]) {
+              const parsed = parseFloat(this._hass.states[batEntity].state);
+              if (!isNaN(parsed)) {
+                batVal = Math.round(parsed);
+              }
+            }
+          }
+        }
+
+        if (batVal !== null && batVal !== undefined) {
+          batteryText.innerText = batVal + "%";
+          if (batVal > 80) {
+            batteryIcon.icon = "mdi:battery";
+            batteryIcon.style.color = "#10b981";
+          } else if (batVal > 40) {
+            batteryIcon.icon = "mdi:battery-50";
+            batteryIcon.style.color = "#f39c12";
+          } else if (batVal > 15) {
+            batteryIcon.icon = "mdi:battery-20";
+            batteryIcon.style.color = "#e67e22";
+          } else {
+            batteryIcon.icon = "mdi:battery-alert";
+            batteryIcon.style.color = "#ef4444";
+          }
+        } else {
+          batteryText.innerText = "--%";
+          batteryIcon.icon = "mdi:battery-unknown";
+          batteryIcon.style.color = "var(--secondary-text-color, #94a3b8)";
+        }
+      }
     } catch (err) {
       console.error("Error updating MultizoneThermostatZoneEnergyCard:", err);
     }
