@@ -124,7 +124,11 @@ class PlantDiagnosticsEngine:
                     pass
                     
         # 2. Lookup related battery sensor by device_id
-        ent_reg = self.hass.data.get("entity_registry")
+        from homeassistant.helpers import entity_registry as er
+        try:
+            ent_reg = er.async_get(self.hass)
+        except Exception:
+            ent_reg = self.hass.data.get("entity_registry")
         if not ent_reg:
             return None
             

@@ -189,7 +189,7 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        return {
+        attrs = {
             "temperature_sensor": self._temp_sensor,
             "climates": self._climates,
             "switches": self._switches,
@@ -200,6 +200,11 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             "zone_mode": self._coordinator.get_zone_mode(self.entity_id),
             "allow_passive_heat": self._coordinator.is_passive_heat_allowed(self.entity_id),
         }
+        if hasattr(self._coordinator, "plant_diagnostics") and self._temp_sensor:
+            bat = self._coordinator.plant_diagnostics.get_battery_level(self._temp_sensor)
+            if bat is not None:
+                attrs["battery_level"] = bat
+        return attrs
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         """Set HVAC mode."""

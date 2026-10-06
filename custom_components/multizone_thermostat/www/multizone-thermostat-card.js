@@ -2661,9 +2661,13 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
 
       <div class="bottom-row">
         <span style="color: var(--secondary-text-color, #94a3b8);" id="valve-status-label">${t('valve_status')}</span>
-        <div class="valve-status" id="valve-status">
+        <div class="valve-status" id="valve-status" style="margin-right: auto; padding-left: 10px;">
           <span class="pulse-dot pulse-green" id="valve-dot"></span>
           <span id="valve-text">${t('valve_ok')}</span>
+        </div>
+        <div class="battery-status" id="battery-status" style="display:flex; align-items:center; gap: 4px; font-weight:600;">
+          <ha-icon icon="mdi:battery" id="battery-icon" style="--mdc-icon-size: 18px;"></ha-icon>
+          <span id="battery-text">--%</span>
         </div>
       </div>
     `;
@@ -2702,6 +2706,8 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
       const sizingEval = this.shadowRoot.getElementById('sizing-eval');
       const valveDot = this.shadowRoot.getElementById('valve-dot');
       const valveText = this.shadowRoot.getElementById('valve-text');
+      const batteryText = this.shadowRoot.getElementById('battery-text');
+      const batteryIcon = this.shadowRoot.getElementById('battery-icon');
 
       // Robust determination of zone mode (primary, secondary, bypass)
       let zoneMode = "primary";
