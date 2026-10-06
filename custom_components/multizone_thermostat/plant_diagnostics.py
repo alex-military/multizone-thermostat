@@ -17,6 +17,8 @@ ANOMALY_GHOST_HEATING = "ghost_heating"
 ANOMALY_AIR_IN_RADIATOR = "air_in_radiator"
 ANOMALY_STALE_SENSOR = "stale_sensor"
 ANOMALY_OVERSHOOT = "overshoot"
+ANOMALY_LOW_BATTERY = "low_battery"
+ANOMALY_SENSOR_FAULT = "sensor_fault"
 
 # Human-readable anomaly labels (Italian)
 ANOMALY_LABELS = {
@@ -26,6 +28,8 @@ ANOMALY_LABELS = {
     ANOMALY_AIR_IN_RADIATOR: "Calo di resa termica (Possibile aria nel radiatore)",
     ANOMALY_STALE_SENSOR: "Sensore temperatura non aggiornato da oltre 2 ore",
     ANOMALY_OVERSHOOT: "Superamento anomalo temperatura impostata (>1.5°C)",
+    ANOMALY_LOW_BATTERY: "Batteria sensore in esaurimento (<= 10%)",
+    ANOMALY_SENSOR_FAULT: "Guasto sensore o temperatura non plausibile",
 }
 
 
@@ -103,6 +107,44 @@ class PlantDiagnosticsEngine:
     # Zone Anomaly Evaluation
     # ------------------------------------------------------------------
 
+
+    def get_battery_level(self, entity_id: str) -> int | None:
+        """Find battery level for an entity (attributes or related device sensor)."""
+        st = self.hass.states.get(entity_id)
+        if not st:
+            return None
+            
+        # 1. Check direct attributes
+        for attr in ("battery", "battery_level"):
+            val = st.attributes.get(attr)
+            if val is not None:
+                try:
+                    return int(float(val))
+                except (ValueError, TypeError):
+                    pass
+                    
+        # 2. Lookup related battery sensor by device_id
+        ent_reg = self.hass.data.get("entity_registry")
+        if not ent_reg:
+            return None
+            
+        entry = ent_reg.async_get(entity_id)
+        if not entry or not entry.device_id:
+            return None
+            
+        # Find all entities for this device
+        for ent in ent_reg.entities.values():
+            if ent.device_id == entry.device_id and ent.domain == "sensor":
+                # Check if it's a battery sensor
+                if ent.device_class == "battery" or ent.entity_id.endswith("_battery"):
+                    bat_st = self.hass.states.get(ent.entity_id)
+                    if bat_st and bat_st.state not in ("unavailable", "unknown"):
+                        try:
+                            return int(float(bat_st.state))
+                        except (ValueError, TypeError):
+                            pass
+        return None
+
     def evaluate_zone_anomalies(self, climate_id: str) -> tuple[str, str]:
         """
         Evaluate if a zone exhibits mechanical, hydraulic or sensor anomalies.
@@ -133,6 +175,30 @@ class PlantDiagnosticsEngine:
                 return ANOMALY_NONE, "In attesa lettura temperatura"
 
             current_temp = float(current_temp)
+
+            # 0.a Battery Check (Main Sensor)
+            zone = self.coordinator._get_zone(climate_id)
+            if zone:
+                sensor_id = zone.get("temp_sensor")
+                if sensor_id:
+                    bat = self.get_battery_level(sensor_id)
+                    if bat is not None and bat <= 10:
+                        state["active_anomaly"] = ANOMALY_LOW_BATTERY
+                        state["anomaly_details"] = f"Batteria sensore {sensor_id} in esaurimento ({bat}%)"
+                        return ANOMALY_LOW_BATTERY, state["anomaly_details"]
+
+            # 0.b Sanity Check (Plausibility)
+            is_insane = False
+            if current_temp < 4.0:
+                is_insane = True
+            if state["last_temp_seen"] is not None and state["last_temp_time"] is not None:
+                if (state["last_temp_seen"] - current_temp) > 4.0 and (now - state["last_temp_time"]) < 600:
+                    is_insane = True
+                    
+            if is_insane:
+                state["active_anomaly"] = ANOMALY_SENSOR_FAULT
+                state["anomaly_details"] = f"Lettura temperatura non plausibile o sbalzo anomalo ({current_temp}°C)"
+                return ANOMALY_SENSOR_FAULT, state["anomaly_details"]
 
             # If the zone is Bypassed, it is intentionally excluded from heating
             zone_mode = self.coordinator.get_zone_mode(climate_id)
@@ -291,6 +357,13 @@ class PlantDiagnosticsEngine:
                 return "Sovradimensionato"
         except Exception:
             return "In apprendimento..."
+
+    def has_critical_sensor_fault(self, climate_id: str) -> bool:
+        """Return True if the zone sensor has a low battery or implausible reading."""
+        state = self._zone_anomaly_state.get(climate_id)
+        if not state:
+            return False
+        return state.get("active_anomaly") in (ANOMALY_LOW_BATTERY, ANOMALY_SENSOR_FAULT)
 
     def get_plant_health_summary(self) -> dict[str, Any]:
         """

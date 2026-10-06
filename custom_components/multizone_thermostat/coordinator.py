@@ -557,6 +557,13 @@ class MultizoneCoordinator:
                 zone_mode = self.get_zone_mode(entity_id)
                 if hvac_mode == HVAC_MODE_HEAT and zone_mode != ZONE_MODE_BYPASS:
                     
+                    is_faulty = self.plant_diagnostics.has_critical_sensor_fault(entity_id) if hasattr(self, "plant_diagnostics") else False
+                    if is_faulty:
+                        demand = 0.0
+                        _LOGGER.warning("Zone %s: Heating demand forced to 0%% due to critical sensor fault/low battery", entity_id)
+                        self.set_zone_demand(entity_id, demand)
+                        return
+
                     # Smart Stop: Calculate Effective Target based on learned Inertia
                     thermal_model = self._thermal_models[entity_id]
                     effective_target = target_temp
@@ -1096,7 +1103,8 @@ class MultizoneCoordinator:
         # Try virtual thermostat temperature first
         st = self.hass.states.get(climate_id)
         current_temp = None
-        if st:
+        is_faulty = self.plant_diagnostics.has_critical_sensor_fault(climate_id) if hasattr(self, "plant_diagnostics") else False
+        if st and not is_faulty:
             current_temp = st.attributes.get("current_temperature")
 
         # WARN-02: Fallback — average TRV sensor readings if virtual thermostat has no temperature yet

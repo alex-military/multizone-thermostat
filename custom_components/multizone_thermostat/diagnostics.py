@@ -75,6 +75,7 @@ async def async_get_config_entry_diagnostics(
             "mode": coordinator.get_zone_mode(climate_id),
             "demand_percent": coordinator.get_zone_demand(climate_id),
             "is_frost_emergency": coordinator.is_zone_in_frost_emergency(climate_id),
+            "battery_level": coordinator.plant_diagnostics.get_battery_level(zone.get("temp_sensor")) if getattr(coordinator, "plant_diagnostics", None) and zone.get("temp_sensor") else None,
             "climates_configured": zone.get("climate_entities", []),
             "switches_configured": zone.get("switch_entities", []),
             "autotuner": {
