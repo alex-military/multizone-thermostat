@@ -132,7 +132,7 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         safe_name = self._name.lower().replace(" ", "_").replace("-", "_")
         safe_name = "".join(c for c in safe_name if c.isalnum() or c == "_")
         self._attr_unique_id = f"{DOMAIN}_{entry_id}_zone_{safe_name}"
-        self._sync_switch_key = f"{KEY_PHYSICAL_SYNC_PREFIX}{safe_name}"  # BUG-04: pre-computed once
+        
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_zones")},
             name="Heating Zones",
@@ -159,6 +159,13 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             }
             for trv in self._climates
         }
+
+    @property
+    def _sync_switch_key(self) -> str:
+        """Return the dynamic key for physical sync persistence."""
+        safe_name = self._name.lower().replace(" ", "_").replace("-", "_")
+        safe_name = "".join(c for c in safe_name if c.isalnum() or c == "_")
+        return f"{KEY_PHYSICAL_SYNC_PREFIX}{safe_name}"
 
     @property
     def name(self) -> str:
@@ -563,13 +570,7 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
                         current_device_target = st.attributes.get(ATTR_TEMPERATURE)
                         if mode_changed or current_device_target != trv_target:
                             health = self._trv_health.setdefault(trv, {})
-                            health["last_command_target"] = trv_target
-                            health["last_command_mode"] = str(target_hvac_mode)
-                            health["last_command_time"] = dt_util.now().isoformat()
-                            health["last_command_time_monotonic"] = time.monotonic()
-                            health["sync_status"] = "PENDING_CONFIRMATION"
 
-                            # BUG-01: register pending ONLY on successful send; clean up on failure
                             try:
                                 await self.hass.services.async_call(
                                     "climate",
@@ -578,6 +579,13 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
                                     blocking=True,
                                     context=self._internal_context,
                                 )
+                                
+                                health["last_command_target"] = trv_target
+                                health["last_command_mode"] = str(target_hvac_mode)
+                                health["last_command_time"] = dt_util.now().isoformat()
+                                health["last_command_time_monotonic"] = time.monotonic()
+                                health["sync_status"] = "PENDING_CONFIRMATION"
+
                                 self._pending_trv_targets[trv] = trv_target
                                 self._coordinator.record_diagnostic_event("TRV_COMMAND_SENT", {
                                     "zone": self._name,

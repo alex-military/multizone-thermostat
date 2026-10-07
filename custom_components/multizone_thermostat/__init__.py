@@ -198,6 +198,5 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Handle options update — config_flow already triggers reload via async_reload,
     but this listener acts as a safety net to ensure any direct option changes are applied."""
-    # NEW-BUG-01: was a no-op. Trigger reload to apply any changes.
     _LOGGER.info("Options updated for Multizone Thermostat, reloading integration...")
     await hass.config_entries.async_reload(entry.entry_id)

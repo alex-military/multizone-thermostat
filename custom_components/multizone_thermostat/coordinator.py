@@ -585,7 +585,6 @@ class MultizoneCoordinator:
                         # Limit to avoid lowering it too much if inertia is crazy high
                         effective_target = max(target_temp - 1.0, effective_target)
                     
-                    # BUG-07: Capture tuner state BEFORE updating, so we can detect the transition
                     tuner = self._autotuners[entity_id]
                         
                     if tuner.state != tuner.STATE_COMPLETED:
@@ -636,7 +635,6 @@ class MultizoneCoordinator:
                     
                 self.set_zone_demand(entity_id, demand)
                 
-                # BUG-07: Update Autotuner AFTER demand is calculated; detect just-completed transition
                 tuner = self._autotuners[entity_id]
                 if tuner.state != tuner.STATE_COMPLETED:
                     tuner.update(current_temp, demand > 0)
@@ -929,14 +927,16 @@ class MultizoneCoordinator:
             
             for event in events:
                 try:
-                    # NEW-BUG-07: calendar.get_events might return naive or aware datetimes
-                    # convert both to local aware to safely compare with `now`
                     start = dt_util.parse_datetime(event["start"])
                     if start:
+                        if start.tzinfo is None:
+                            start = start.replace(tzinfo=dt_util.DEFAULT_TIME_ZONE)
                         start = dt_util.as_local(start)
                     
                     end = dt_util.parse_datetime(event["end"])
                     if end:
+                        if end.tzinfo is None:
+                            end = end.replace(tzinfo=dt_util.DEFAULT_TIME_ZONE)
                         end = dt_util.as_local(end)
                     
                     if start and end:
@@ -1161,9 +1161,8 @@ class MultizoneCoordinator:
                     # Force zone demand to 100% so boiler PWM activates
                     self.set_zone_demand(climate_id, 100.0)
                     # BUG-02: Force zone into HEAT mode so TRVs physically open and heat reaches radiators
-                    self.hass.async_create_task(
-                        self._async_set_hvac_mode(climate_id, HVAC_MODE_HEAT)
-                    )
+                    await self._async_set_hvac_mode(climate_id, HVAC_MODE_HEAT)
+                    
                     # H2-FIX: Also set target temperature above frost threshold so TRV internal PID opens valve
                     frost_target = float(self.get_persistent_data(KEY_FROST_PROTECTION_TEMP, DEFAULT_FROST_PROTECTION_TEMP)) + 3.0
                     st = self.hass.states.get(climate_id)

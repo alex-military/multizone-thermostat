@@ -1,5 +1,13 @@
 # Changelog
 
+## [4.7.3] - 2026-10-07
+### ?? Bug Fixes & Code Cleanup
+- **Physical Sync Switch**: Improved entity identity handling to prevent orphaned sync switches when renaming zones.
+- **Anti-Frost Emergency**: Fixed race condition during frost-protection forced heating by appropriately awaiting mode switch before injecting targets.
+- **TRV Command Robustness**: Fixed issue where failed API calls to unresponsive TRVs would permanently wedge the sync status as pending.
+- **Calendar Parsing**: Replaced unsafe datetime operations, enforcing localized timezone conversion for naive events retrieved via Home Assistant calendar integrations.
+- **Codebase Audit**: Evaluated and removed legacy bug markers confirming the implementation logic is structurally intact.
+
 ## [4.7.2] - 2026-10-06
 ### 🛠️ Bug Fixes
 - **Frontend Strategy Registration**: Fixed a JavaScript syntax escape error in card translations that prevented custom element and dashboard strategy registration.

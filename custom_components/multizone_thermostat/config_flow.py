@@ -743,8 +743,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                 ent_reg.async_remove(select_entity_id)
                 _LOGGER.debug("Removed orphaned select entity %s from registry", select_entity_id)
                 
-            # Physical Sync Switch
-            # NEW-BUG-03: Also remove the physical sync switch for the removed zone
+            # Physical Sync Switch: Also remove the physical sync switch for the removed zone
             safe_name = zone_to_remove.lower().replace(" ", "_").replace("-", "_")
             safe_name = "".join(c for c in safe_name if c.isalnum() or c == "_")
             sync_unique_id = f"{DOMAIN}_{self.config_entry.entry_id}_physical_sync_{safe_name}"
