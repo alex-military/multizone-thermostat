@@ -7,6 +7,17 @@
 
 A comprehensive custom integration for Home Assistant that provides **multi-zone heating management**, **centralized boiler supervision**, **dual-drive OpenTherm/Relay modulation**, and **building energy diagnostics**. No YAML automations or scripts required — everything is configured seamlessly through the Home Assistant UI.
 
+> [!NOTE]
+> ### 🚧 Under Active Modular Refactoring & Hardening
+> We are currently conducting a comprehensive, step-by-step modular refactoring of the entire integration.
+> 
+> **Goals & Architecture Roadmap:**
+> * 🧩 **Decoupled Modular Architecture**: Slicing the monolithic coordinator into isolated, single-responsibility domains (`boiler/`, `safety/`, `demand/`, `zone/`, `storage/`).
+> * 🛡️ **Fault Compartmentalization**: Isolating edge-cases and failures within dedicated modules without risking the core heating supervision loop.
+> * 🧪 **Simulation & Regression Test Suites**: Validating each subsystem with automated simulation suites before integration to guarantee zero regressions and rock-solid reliability.
+> 
+> *The current stable release (`v4.7.2`) is fully operational and supported while the next-generation modular architecture is being developed.*
+
 ![Dashboard Preview](images/dashboard_3col.png)
 
 ---
