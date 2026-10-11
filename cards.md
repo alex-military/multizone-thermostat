@@ -44,7 +44,7 @@ A compact button-based thermostat card designed for spaces where a circular dial
 
 ## 4. Global Preset Card (`custom:multizone-thermostat-preset-card`)
 A zero-configuration, multi-button card designed for quick selection of the global heating preset (Manual, Eco, Comfort, Sleep, Away). 
-- **Auto-Discovery**: Automatically finds and binds to the `select.multizone_thermostat_global_preset` entity without any configuration.
+- **Auto-Discovery**: Automatically finds and binds to the `select.master_control_global_preset` entity without any configuration.
 - **Dynamic Styling**: The active preset is dynamically highlighted using your current Home Assistant theme colors.
 - **Smart Memory**: Changing the preset instantly recalls the exact temperatures and zone modes (Primary/Secondary/Bypass) you had previously set for that specific preset.
 
@@ -79,7 +79,7 @@ The preset card automatically finds your global preset entity. You can optionall
 ```yaml
 type: custom:multizone-thermostat-preset-card
 # title: "My Presets"                           # (Optional) Custom title
-# entity: select.multizone_thermostat_global_preset # (Optional) Override auto-discovery
+# entity: select.master_control_global_preset # (Optional) Override auto-discovery
 ```
 
 > **Tip**: To find your exact entity IDs, go to **Settings → Devices & Services → Multizone Thermostat** and click on any entity. The entity ID is shown at the bottom of the entity page.

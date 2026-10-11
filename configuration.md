@@ -21,7 +21,7 @@ If you want to use the **Global Calendar & Smart Start** feature, you must first
 3. Follow the setup wizard:
    - **Step 1 (Boiler Mode)**: Choose between **Relay (ON/OFF)** and **OpenTherm (Modulating)**.
    - **Step 1a (Relay Mode)**: Select your central boiler relay / circulator pump (`switch`).
-   - **Step 1b (OpenTherm Mode)**: Select your OpenTherm entity (`climate`, `water_heater`, or `number`) and set the Minimum ($T_{\text{min}}$, default 35°C) and Maximum ($T_{\text{max}}$, default 75°C) boiler water temperatures.
+   - **Step 1b (OpenTherm Mode)**: Select your OpenTherm entity (`climate`, `water_heater`, or `number`), optionally specify a dedicated Central Heating toggle switch (`opentherm_ch_switch`), and set the Minimum ($T_{\text{min}}$, default 35°C) and Maximum ($T_{\text{max}}$, default 75°C) boiler water temperatures.
    - **Step 2 (Add Zone)**: Create your first thermal zone. Assign all its hardware in a single page: Name, Temperature Sensor (optional), TRVs (`climate`), Heater Switches (`switch`), Window Sensor, and toggle Anti-seize/Preset Sync.
    - **Step 3 (TRV Calibration - Conditional)**: If in Step 2 you assigned *both* TRVs and a pure external Temperature Sensor, you will be asked if you want to assign a `Local Temperature Calibration` entity to each TRV (for the mathematical offset injection).
    - **Step 4 (More Zones)**: Choose whether to add another zone or proceed to global settings.
@@ -46,18 +46,39 @@ In the new V3 architecture, a **Zone** is a powerful virtual aggregator. You don
 
 > **Note:** Entity IDs are assigned by Home Assistant based on the entity's unique ID and device name. The actual IDs may differ slightly from the examples below. Always copy the exact entity ID from **Settings → Devices & Services → Multizone Thermostat** or from the entity's settings page.
 
-| Entity (example ID) | Description |
-|--------|-------------|
-| `switch.multizone_thermostat_heating_master` | Master on/off for the entire heating system |
-| `select.zone_modes_[zone_name]_mode` | Per-zone mode selector (Primary, Secondary, Bypass) |
-| `select.multizone_thermostat_global_preset` | Global preset selector (Manual, Eco, Comfort, Sleep, Away) |
-| `number.multizone_thermostat_min_cycle_on` | Minimum boiler ON time (minutes, default: 5) |
-| `number.multizone_thermostat_min_cycle_off` | Minimum boiler OFF time (minutes, default: 5) |
-| `number.multizone_thermostat_valve_delay` | Valve opening delay before boiler starts (seconds, default: 0) |
-| `switch.multizone_thermostat_anti_seize_summer_protection` | Global ON/OFF toggle for the Summer Anti-seize protection |
-| `number.multizone_thermostat_anti_seize_idle_days` | Number of idle days before triggering the Anti-seize cycle (default: 15) |
-| `number.multizone_thermostat_anti_seize_duration` | Duration in minutes of the Anti-seize cycle (default: 2) |
-| `binary_sensor.multizone_thermostat_boiler_status` | Status of the boiler |
+| Entity (example ID) | Platform | Description |
+|----------------------|----------|-------------|
+| `switch.master_control_heating_master` | Switch | Master on/off for the entire heating system |
+| `switch.master_control_anti_seize_summer_protection` | Switch | Global toggle for the Summer Anti-seize protection |
+| `switch.master_control_anti_frost_protection` | Switch | Emergency frost protection toggle |
+| `switch.time_geofencing_geofencing` | Switch | Geofencing automation toggle |
+| `switch.time_geofencing_auto_night_mode` | Switch | Automated night mode toggle |
+| `switch.zone_modes_sync_controlli_fisici_[zone]` | Switch | Bidirectional physical TRV button synchronization toggle |
+| `switch.zone_modes_apporto_passivo_[zone]` | Switch | Passive heat intake toggle (fancoils without valves / mezzanines) |
+| `select.zone_modes_[zone]_mode` | Select | Per-zone mode selector (`primary`, `secondary`, `bypass`) |
+| `select.master_control_global_preset` | Select | Global preset selector (`manual`, `eco`, `comfort`, `sleep`, `away`) |
+| `number.master_control_min_cycle_on` | Number | Minimum boiler ON time (minutes, default: 5) |
+| `number.master_control_min_cycle_off` | Number | Minimum boiler OFF time (minutes, default: 5) |
+| `number.master_control_valve_delay` | Number | Valve opening delay before boiler starts (seconds, default: 0) |
+| `number.master_control_anti_seize_idle_days` | Number | Idle days before triggering Anti-seize exercise (default: 15) |
+| `number.master_control_anti_seize_duration` | Number | Duration in minutes of Anti-seize exercise (default: 2) |
+| `number.master_control_weather_curve` | Number | Outdoor weather compensation curve multiplier (default: 0.0) |
+| `number.master_control_anti_frost_temperature` | Number | Emergency anti-frost target temperature threshold (default: 7.0°C) |
+| `time.time_geofencing_morning_time` | Time | Morning comfort transition time |
+| `time.time_geofencing_night_time` | Time | Night sleep transition time |
+| `binary_sensor.master_control_plant_anomaly` | Binary Sensor | Plant-wide anomaly detection indicator |
+| `binary_sensor.heating_zones_[zone]_anomaly` | Binary Sensor | Per-zone heating circuit anomaly indicator |
+| `sensor.master_control_stato_salute_impianto` | Sensor | Overall heating plant health score (0-100%) |
+| `sensor.master_control_frequenza_accensioni_caldaia` | Sensor | Boiler hourly ignition cycle frequency |
+| `sensor.master_control_ore_funzionamento_caldaia_24h` | Sensor | Boiler cumulative runtime in the last 24h |
+| `sensor.multizone_brain_[zone]_fabbisogno` | Sensor | Real-time zone PID heat demand (0-100%) |
+| `sensor.multizone_brain_[zone]_autotuning` | Sensor | Self-learning PID status and learned parameters |
+| `sensor.multizone_brain_[zone]_velocita_riscaldamento` | Sensor | Room heating rate (°C/h) |
+| `sensor.multizone_brain_[zone]_dispersione` | Sensor | Room natural cooling/dispersion rate (°C/h) |
+| `sensor.multizone_brain_[zone]_inerzia_termica` | Sensor | Thermal inertia estimate (minutes) |
+| `sensor.multizone_brain_[zone]_classe_energetica` | Sensor | Theoretical building energy class (A4 to G) |
+| `sensor.multizone_brain_[zone]_tempo_ritenzione_termica`| Sensor | Thermal retention duration (hours to lose 1°C) |
+| `sensor.multizone_brain_[zone]_dimensionamento_radiatore`| Sensor | Radiator power sizing adequacy estimate |
 
 ---
 
@@ -118,13 +139,13 @@ Only enable this for zones with physical TRV valves that support preset modes.
 During the summer months, thermostatic valves and boiler circulator pumps can remain inactive for long periods, which may cause them to mechanically seize or become stuck.
 The integration includes a built-in safety mechanism to periodically cycle them:
 
-1. Enable the `switch.multizone_thermostat_anti_seize_summer_protection` entity.
+1. Enable the `switch.master_control_anti_seize_summer_protection` entity.
 2. The system tracks the exact time since the heating was last turned on.
-3. If the system remains completely idle for the configured number of days (`number.multizone_thermostat_anti_seize_idle_days`, default 15 days), the integration will:
+3. If the system remains completely idle for the configured number of days (`number.master_control_anti_seize_idle_days`, default 15 days), the integration will:
    - Save the current state of all zones.
    - Force all zones that have the anti-seize feature enabled to turn ON (opening their valves).
    - Wait for the configured valve opening delay.
-   - Wait for the configured duration (`number.multizone_thermostat_anti_seize_duration`, default 2 minutes).
+   - Wait for the configured duration (`number.master_control_anti_seize_duration`, default 2 minutes).
    - Restore all zones to their previous state.
 
 **Note**: You can selectively disable the Anti-seize protection for specific zones (e.g., fancoil units that don't have moving mechanical valves) through the UI Options flow (**Edit a zone** -> Disable "Enable Anti-seize (Summer Protection) for this zone").
