@@ -1723,24 +1723,12 @@ class MultizoneThermostatStatusCard extends HTMLElement {
   }
 
   handleTap() {
-    const presetEntity = findPresetEntity(this._hass);
-    if (!presetEntity) return;
+    const masterEntity = findMasterEntity(this._hass);
+    if (!masterEntity) return;
 
-    const presetState = this._hass.states[presetEntity];
-    if (!presetState) return;
-
-    // Toggle between manual (off) and the first available heating preset (like 'home')
-    const options = presetState.attributes.options || [];
-    let newPreset = "manual";
-    if (presetState.state === "manual" && options.length > 1) {
-        // Find the first option that isn't manual
-        newPreset = options.find(o => o !== "manual") || "manual";
-    }
-
-    const domain = presetEntity.split('.')[0];
-    this._hass.callService(domain, "select_option", {
-      entity_id: presetEntity,
-      option: newPreset
+    const domain = masterEntity.split('.')[0];
+    this._hass.callService(domain, "toggle", {
+      entity_id: masterEntity
     });
   }
 
@@ -1748,15 +1736,15 @@ class MultizoneThermostatStatusCard extends HTMLElement {
     if (!this._hass || !this._hass.states) return;
     if (!this._hass || !this._rendered) return;
 
-    // We no longer rely on a master switch, we use the global preset to determine if system is ON
-    const presetEntity = findPresetEntity(this._hass);
+    // Use the actual master switch entity to determine if system is ON
+    const masterEntity = findMasterEntity(this._hass);
     let isMasterOn = false;
     let boilerEntity = null;
 
-    if (presetEntity) {
-      const presetState = this._hass.states[presetEntity];
-      if (presetState) {
-        isMasterOn = presetState.state !== "manual" && presetState.state !== "off";
+    if (masterEntity) {
+      const masterState = this._hass.states[masterEntity];
+      if (masterState) {
+        isMasterOn = masterState.state === "on";
       }
     }
 
@@ -1781,16 +1769,21 @@ class MultizoneThermostatStatusCard extends HTMLElement {
       }
     }
     const boilerState = boilerEntity ? this._hass.states[boilerEntity] : null;
-    let isBoilerOn = boilerState ? boilerState.state === "on" : false;
+    let isBoilerOn = false;
 
-    // Fallback for OpenTherm or unreadable boiler state: check if any hybrid zone is actively heating
-    if (!isBoilerOn) {
-      const isAnyZoneHeating = Object.values(this._hass.states).some(s => 
+    if (boilerEntity && boilerState) {
+      // In relay mode, strictly reflect the physical state of the configured boiler relay
+      isBoilerOn = boilerState.state === "on";
+    } else {
+      // Fallback only if no boiler switch entity exists (e.g. OpenTherm): check active PRIMARY zones
+      const isAnyPrimaryHeating = Object.values(this._hass.states).some(s => 
         s.entity_id.startsWith('climate.') && 
         s.attributes && 
+        s.attributes.hybrid_zone === true &&
+        s.attributes.zone_mode === 'primary' &&
         s.attributes.hvac_action === 'heating'
       );
-      if (isAnyZoneHeating) {
+      if (isAnyPrimaryHeating) {
         isBoilerOn = true;
       }
     }

@@ -45,7 +45,7 @@ class MultizoneNightTimeEntity(TimeEntity):
             name="Time & Geofencing",
             manufacturer="Custom Integration",
             model="Time & Geofencing Settings",
-            via_device_id=coordinator.master_device_id,
+            via_device=coordinator.master_device_id,
         )
 
     @property
@@ -84,7 +84,7 @@ class MultizoneMorningTimeEntity(TimeEntity):
             name="Time & Geofencing",
             manufacturer="Custom Integration",
             model="Time & Geofencing Settings",
-            via_device_id=coordinator.master_device_id,
+            via_device=coordinator.master_device_id,
         )
 
     @property

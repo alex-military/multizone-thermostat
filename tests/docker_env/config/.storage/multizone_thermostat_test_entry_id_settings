@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "minor_version": 1,
+  "key": "multizone_thermostat_test_entry_id_settings",
+  "data": {
+    "thermal_models": {
+      "zone1": {
+        "heat": 1
+      }
+    }
+  }
+}

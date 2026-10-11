@@ -7,8 +7,6 @@ import logging
 import time
 from typing import Any
 
-import homeassistant.util.dt as dt_util
-
 from homeassistant.components.climate import (
     ClimateEntity,
     ClimateEntityFeature,
@@ -17,16 +15,12 @@ from homeassistant.components.climate import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
-    ATTR_ENTITY_ID,
     ATTR_TEMPERATURE,
-    SERVICE_TURN_OFF,
-    SERVICE_TURN_ON,
-    STATE_ON,
     STATE_UNAVAILABLE,
     STATE_UNKNOWN,
     UnitOfTemperature,
 )
-from homeassistant.core import HomeAssistant, callback, Event, State, Context
+from homeassistant.core import HomeAssistant, callback, Event, State
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import (
@@ -48,12 +42,11 @@ from .const import (
     DEFAULT_SENSOR_TIMEOUT_MIN,
     DOMAIN,
     make_zone_entity_id,
-    KEY_PHYSICAL_SYNC_PREFIX,
 )
-from .pwm_engine import PWMEngine
+from .sync_manager import ZoneSyncManager
+from .state_restorer import ZoneStateRestorer
 
 _LOGGER = logging.getLogger(__name__)
-
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -61,7 +54,8 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Hybrid Master Virtual Thermostats from a config entry."""
-    zones = config_entry.data.get(CONF_ZONES, [])
+    coordinator = hass.data[DOMAIN][config_entry.entry_id]["coordinator"]
+    zones = coordinator.zones
 
     if not zones:
         return
@@ -107,27 +101,13 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         self._sensor_timeout_min = zone_data.get(CONF_ZONE_SENSOR_TIMEOUT, DEFAULT_SENSOR_TIMEOUT_MIN)
         self._safety_fallback_active = False
         
-        # State
         self._hvac_mode = HVACMode.OFF
         self._target_temperature = zone_data.get(CONF_ZONE_TARGET_TEMP, 20.0)
         self._current_temperature: float | None = None
         
         self._coordinator = hass.data[DOMAIN][entry_id]["coordinator"]
-        
-        # Syncing locks and state tracking
-        self._sync_lock = asyncio.Lock()
-        self._trv_event_lock = asyncio.Lock()  # Serializes concurrent TRV change events
-        self._syncing_trvs = False
-        self._last_known_trv_targets = {}
-        self._pending_trv_targets = {}
-        self._internal_context = Context()
-        
-        # Local PWM Engine for Switches (e.g. Relays, local valves)
-        self._local_pwm = PWMEngine(pwm_interval=900.0, min_on=0.0, min_off=0.0)
-        self._local_pwm_state = False
         self._entry_id = entry_id
         
-        # Entity setup
         vt_entity_id = make_zone_entity_id(self._name)
         safe_name = self._name.lower().replace(" ", "_").replace("-", "_")
         safe_name = "".join(c for c in safe_name if c.isalnum() or c == "_")
@@ -138,34 +118,21 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             name="Heating Zones",
             manufacturer="Multizone Thermostat",
             model="Hybrid Zone Controller",
-            via_device_id=getattr(self._coordinator, "master_device_id", None),
+            via_device=getattr(self._coordinator, "master_device_id", None),
         )
 
         self.entity_id = vt_entity_id
         self._unsub_listeners: list = []
-        
-        # Diagnostics: TRV Health, Latency & Communication Status
-        self._trv_health: dict[str, dict[str, Any]] = {
-            trv: {
-                "sync_status": "INITIALIZED",
-                "last_command_target": None,
-                "last_command_mode": None,
-                "last_command_time": None,
-                "last_ack_time": None,
-                "last_reported_temp": None,
-                "latency_s": None,
-                "consecutive_timeouts": 0,
-                "last_error": None,
-            }
-            for trv in self._climates
-        }
 
-    @property
-    def _sync_switch_key(self) -> str:
-        """Return the dynamic key for physical sync persistence."""
-        safe_name = self._name.lower().replace(" ", "_").replace("-", "_")
-        safe_name = "".join(c for c in safe_name if c.isalnum() or c == "_")
-        return f"{KEY_PHYSICAL_SYNC_PREFIX}{safe_name}"
+        self._sync_manager = ZoneSyncManager(
+            hass=self.hass,
+            coordinator=self._coordinator,
+            zone_name=self._name,
+            entity_id=self.entity_id,
+            climates=self._climates,
+            switches=self._switches,
+            calibrations=self._calibrations,
+        )
 
     @property
     def name(self) -> str:
@@ -180,7 +147,6 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         if self._hvac_mode == HVACMode.OFF:
             return HVACAction.OFF
             
-        # Get demand from coordinator
         demand = self._coordinator.get_zone_demand(self.entity_id)
         if demand > 0:
             return HVACAction.HEATING
@@ -192,8 +158,7 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
 
     @property
     def target_temperature(self) -> float | None:
-        # Prioritize calendar override
-        override_temp = self._coordinator._calendar_temp_overrides.get(self.entity_id)
+        override_temp = self._coordinator.calendar_manager.temp_overrides.get(self.entity_id)
         if override_temp is not None:
             return override_temp
         return self._target_temperature
@@ -206,10 +171,10 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             "switches": self._switches,
             "calibrations": self._calibrations,
             "hybrid_zone": True,
-            "local_pwm_active": self._local_pwm_state,
+            "local_pwm_active": self._sync_manager.local_pwm_state,
             "boiler_entity_id": self._coordinator.boiler_switch,
             "zone_mode": self._coordinator.get_zone_mode(self.entity_id),
-            "allow_passive_heat": self._coordinator.is_passive_heat_allowed(self.entity_id),
+            "allow_passive_heat": self._coordinator.zone_manager.is_passive_heat_allowed(self.entity_id),
             "safety_fallback_active": self._safety_fallback_active,
             "sensor_timeout_min": self._sensor_timeout_min,
         }
@@ -223,8 +188,8 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         """Set HVAC mode."""
         self._hvac_mode = hvac_mode
         self.async_write_ha_state()
-        await self._async_sync_trvs()
-        await self._async_sync_switches()
+        await self._trigger_trv_sync()
+        await self._sync_manager.async_sync_switches()
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
         """Set target temperature."""
@@ -234,7 +199,11 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
 
         self._target_temperature = temperature
         self.async_write_ha_state()
-        await self._async_sync_trvs()
+        await self._trigger_trv_sync()
+        
+        current_preset = self._coordinator.get_global_preset()
+        if current_preset not in ("manual", "none"):
+            self._coordinator.zone_manager.update_preset_temperature(current_preset, self.entity_id, temperature)
 
     async def async_added_to_hass(self) -> None:
         """Run when entity about to be added."""
@@ -242,50 +211,35 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         
         self._coordinator.register_climate(self.entity_id, self.async_write_ha_state, self)
 
-        last_state = await self.async_get_last_state()
-        if last_state is not None:
-            if last_state.state in (HVACMode.HEAT, HVACMode.OFF):
-                self._hvac_mode = HVACMode(last_state.state)
-            if last_state.attributes.get(ATTR_TEMPERATURE) is not None:
-                self._target_temperature = float(last_state.attributes[ATTR_TEMPERATURE])
+        self._hvac_mode, self._target_temperature = await ZoneStateRestorer.async_restore_state(
+            self, self._hvac_mode, self._target_temperature
+        )
                 
-        # Read current temperature
         self._update_current_temp()
 
         if self._temp_sensor:
             self._unsub_listeners.append(
                 async_track_state_change_event(
-                    self.hass,
-                    [self._temp_sensor],
-                    self._on_temp_changed,
+                    self.hass, [self._temp_sensor], self._on_temp_changed
                 )
             )
 
         if self._climates:
             self._unsub_listeners.append(
                 async_track_state_change_event(
-                    self.hass,
-                    self._climates,
-                    self._on_trv_changed_wrapper,
+                    self.hass, self._climates, self._on_trv_changed_wrapper
                 )
             )
-            # Initialize known TRV targets
-            for trv in self._climates:
-                st = self.hass.states.get(trv)
-                if st and st.attributes.get(ATTR_TEMPERATURE) is not None:
-                    self._last_known_trv_targets[trv] = float(st.attributes[ATTR_TEMPERATURE])
+            self._sync_manager.init_known_targets()
 
-        # Start periodic local PWM evaluation for switches
         if self._switches:
             self._unsub_listeners.append(
                 async_track_time_interval(
-                    self.hass,
-                    self._async_pwm_tick,
-                    timedelta(seconds=10)
+                    self.hass, self._async_pwm_tick, timedelta(seconds=10)
                 )
             )
 
-        await self._async_sync_trvs()
+        await self._trigger_trv_sync()
 
     async def async_will_remove_from_hass(self) -> None:
         """Clean up listeners."""
@@ -296,12 +250,7 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
 
     def get_trv_health(self) -> dict[str, Any]:
         """Return sanitized TRV health, communication status and latency statistics."""
-        sanitized = {}
-        for trv, health in self._trv_health.items():
-            entry = dict(health)
-            entry.pop("last_command_time_monotonic", None)
-            sanitized[trv] = entry
-        return sanitized
+        return self._sync_manager.get_trv_health()
 
     @callback
     def _on_temp_changed(self, event: Event) -> None:
@@ -313,15 +262,12 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         try:
             self._current_temperature = float(new_state.state)
             self.async_write_ha_state()
-            
-            # Since external temp changed, update TRV calibrations or fake targets
-            self.hass.async_create_task(self._async_sync_trvs())
+            self.hass.async_create_task(self._trigger_trv_sync())
         except ValueError:
             _LOGGER.error("Unable to parse temperature: %s", new_state.state)
 
     def _update_current_temp(self) -> None:
         """Fetch current temperature, falling back to internal TRV readings if sensor is offline/timed out."""
-        # Check if external sensor is available and responsive
         ext_temp_valid = False
         if self._temp_sensor:
             state = self.hass.states.get(self._temp_sensor)
@@ -331,7 +277,6 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
                     reported = state.last_reported if hasattr(state, "last_reported") else state.last_updated
                     elapsed = (now - reported.timestamp()) if reported else 0
                     
-                    # If sensor exceeded timeout, flag safety fallback
                     if elapsed <= (self._sensor_timeout_min * 60):
                         self._current_temperature = float(state.state)
                         ext_temp_valid = True
@@ -343,7 +288,6 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
                 except (ValueError, TypeError):
                     pass
 
-        # If no external sensor or external sensor failed/timed out, fallback to averaging TRVs
         if not ext_temp_valid:
             temps = []
             for trv in self._climates:
@@ -358,14 +302,10 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
                 if self._temp_sensor and not self._safety_fallback_active:
                     self._safety_fallback_active = True
                     _LOGGER.warning("Zone %s: Safety fallback active, using onboard TRV average: %.1f°C", self._name, self._current_temperature)
-            elif not ext_temp_valid:
-                # If neither external sensor nor TRVs have a reading, maintain None
-                pass
 
     @callback
     def _on_trv_changed_wrapper(self, event: Event) -> None:
         """Wrapper for TRV changes."""
-        # Update measured room temperature if no external sensor OR if safety fallback is active
         if not self._temp_sensor or self._safety_fallback_active:
             new_state: State | None = event.data.get("new_state")
             old_state: State | None = event.data.get("old_state")
@@ -379,267 +319,40 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         self.hass.async_create_task(self._async_on_trv_changed(event))
 
     async def _async_on_trv_changed(self, event: Event) -> None:
-        """Handle TRV knob changes — serialized to prevent race conditions from rapid events."""
-        async with self._trv_event_lock:
-            # Filter out events generated by our own sync operations (WARN-01: use .id for reliable comparison)
-            entity_ctx = self._context
-            internal_id = self._internal_context.id
-            if (entity_ctx and event.context.id == entity_ctx.id) or event.context.id == internal_id:
-                return
+        """Handle TRV knob changes delegating to SyncManager."""
+        ctx_id = self._context.id if self._context else None
+        new_mode, delta_temp = await self._sync_manager.process_trv_change(
+            event=event,
+            master_context_id=ctx_id,
+            master_hvac_mode=self._hvac_mode,
+            master_min_temp=self._attr_min_temp,
+            master_max_temp=self._attr_max_temp
+        )
 
-            entity_id = event.data.get("entity_id")
-            new_state: State | None = event.data.get("new_state")
-            old_state: State | None = event.data.get("old_state")
-
-            if not new_state or not old_state:
-                return
-
-            new_temp = new_state.attributes.get(ATTR_TEMPERATURE)
-            old_temp = self._last_known_trv_targets.get(entity_id)
-
-            # Check if physical controls synchronization is enabled (BUG-04: key pre-computed in __init__)
-            physical_sync_enabled = self._coordinator.get_persistent_data(self._sync_switch_key, True)
-
-            # Handle physical hardware Mode transitions (e.g. wall thermostat OFF or ON pressed)
-            if physical_sync_enabled:
-                # Physical device turned OFF (e.g. wall thermostat or primary TRV)
-                if new_state.state == HVACMode.OFF and old_state.state != HVACMode.OFF:
-                    if self._hvac_mode != HVACMode.OFF:
-                        _LOGGER.info("Physical device %s turned OFF. Propagating OFF to Zone %s", entity_id, self._name)
-                        await self.async_set_hvac_mode(HVACMode.OFF)
-                    if new_temp is not None:
-                        self._last_known_trv_targets[entity_id] = float(new_temp)
-                    return
-
-                # Physical device turned HEAT from OFF
-                elif new_state.state == HVACMode.HEAT and old_state.state == HVACMode.OFF:
-                    if self._hvac_mode != HVACMode.HEAT:
-                        _LOGGER.info("Physical device %s turned HEAT. Propagating HEAT to Zone %s", entity_id, self._name)
-                        await self.async_set_hvac_mode(HVACMode.HEAT)
-
-            # 1. If physical sync is disabled for this zone, ignore physical setpoint changes
-            if not physical_sync_enabled:
-                if new_temp is not None:
-                    self._last_known_trv_targets[entity_id] = float(new_temp)
-                return
-
-            # 2. If Master virtual zone is OFF, ignore any incoming physical target adjustment
-            if self._hvac_mode == HVACMode.OFF:
-                if new_temp is not None:
-                    self._last_known_trv_targets[entity_id] = float(new_temp)
-                return
-
-            # 3. If TRV is OFF or transitioning to OFF, do not interpret target drops as a user knob change
-            if new_state.state == HVACMode.OFF or old_state.state == HVACMode.OFF:
-                if new_temp is not None:
-                    self._last_known_trv_targets[entity_id] = float(new_temp)
-                return
-
-            # 4. Protect against transitional targets during activation (e.g. Sonoff 5°C -> 21°C -> desired target)
-            if entity_id in self._pending_trv_targets:
-                pending = self._pending_trv_targets[entity_id]
-                if new_temp is not None and abs(float(new_temp) - pending) < 0.01:
-                    # Reached expected target sent by us, clear pending
-                    self._pending_trv_targets.pop(entity_id, None)
-                    self._last_known_trv_targets[entity_id] = float(new_temp)
-                    health = self._trv_health.setdefault(entity_id, {})
-                    sent_mono = health.get("last_command_time_monotonic")
-                    latency = round(time.monotonic() - sent_mono, 2) if sent_mono else None
-                    health["sync_status"] = "IN_SYNC"
-                    health["latency_s"] = latency
-                    health["last_ack_time"] = dt_util.now().isoformat()
-                    health["last_reported_temp"] = float(new_temp)
-                    health["consecutive_timeouts"] = 0
-                    self._coordinator.record_diagnostic_event("TRV_CONFIRMED", {
-                        "zone": self._name,
-                        "trv": entity_id,
-                        "target": float(new_temp),
-                        "latency_s": latency,
-                    })
-                    return
-                else:
-                    # Still intermediate/transient state reported by device on activation, ignore delta
-                    _LOGGER.debug(
-                        "Ignoring intermediate TRV target %s for %s while waiting for %s",
-                        new_temp, entity_id, pending
-                    )
-                    return
-
-            if new_temp is not None and old_temp is not None:
-                new_temp = float(new_temp)
-                old_temp = float(old_temp)
-                if abs(new_temp - old_temp) > 0.01:
-                    delta = new_temp - old_temp
-                    _LOGGER.info("TRV %s changed target by %.1f°. Applying delta to Zone %s", entity_id, delta, self._name)
-                    self._coordinator.record_diagnostic_event("TRV_KNOB_DELTA", {
-                        "zone": self._name,
-                        "trv": entity_id,
-                        "delta": round(delta, 1),
-                        "old_temp": old_temp,
-                        "new_temp": new_temp,
-                    })
-
-                    # Apply delta to Master target
-                    if self._target_temperature is not None:
-                        self._target_temperature = max(self._attr_min_temp, min(self._attr_max_temp, self._target_temperature + delta))
-                        self.async_write_ha_state()
-
-                    # Sync all other TRVs now
-                    await self._async_sync_trvs()
-
-
-
-    async def _async_sync_trvs(self) -> None:
-        """Sync target temperature and mode to all sub-slave TRVs."""
-        if not self._climates:
-            return
+        needs_sync = False
+        if new_mode is not None:
+            self._hvac_mode = new_mode
+            needs_sync = True
             
-        async with self._sync_lock:
-            try:
-                demand = self._coordinator.get_zone_demand(self.entity_id)
+        if delta_temp is not None and self._target_temperature is not None:
+            self._target_temperature = max(self._attr_min_temp, min(self._attr_max_temp, self._target_temperature + delta_temp))
+            needs_sync = True
             
-                # If Master is OFF force TRVs OFF
-                target_hvac_mode = HVACMode.HEAT
-                if self._hvac_mode == HVACMode.OFF:
-                    target_hvac_mode = HVACMode.OFF
-                    
-                for trv in self._climates:
-                    st = self.hass.states.get(trv)
-                    if not st:
-                        continue
-                        
-                    mode_changed = (st.state != target_hvac_mode)
-                    # Sync HVAC Mode
-                    if mode_changed:
-                        await self.hass.services.async_call(
-                            "climate",
-                            "set_hvac_mode",
-                            {"entity_id": trv, "hvac_mode": target_hvac_mode},
-                            blocking=True,
-                            context=self._internal_context,
-                        )
+        if needs_sync:
+            self.async_write_ha_state()
+            await self._trigger_trv_sync()
 
-                    # WARN-04: When syncing OFF, update last_known to current target so delta is correct on resume
-                    if target_hvac_mode == HVACMode.OFF:
-                        device_target = st.attributes.get(ATTR_TEMPERATURE)
-                        if device_target is not None:
-                            self._last_known_trv_targets[trv] = float(device_target)
-                        continue
-
-                    # Sync Target Temp & Calibration
-                    if self.target_temperature is not None:
-                        trv_target = self.target_temperature
-                        
-                        calib_entity = self._calibrations.get(trv)
-                        trv_current = st.attributes.get("current_temperature")
-                        
-                        if self._temp_sensor and not self._safety_fallback_active and self._current_temperature is not None and trv_current is not None:
-                            # Scenario B: Ext Sensor + Calibration Entity
-                            if calib_entity:
-                                calib_state = self.hass.states.get(calib_entity)
-                                current_calib_value = float(calib_state.state) if calib_state and calib_state.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN) else 0.0
-                                offset = current_calib_value + (self._current_temperature - float(trv_current))
-                                
-                                domain = "number"
-                                if calib_entity.startswith("input_number."):
-                                    domain = "input_number"
-                                    
-                                await self.hass.services.async_call(
-                                    domain,
-                                    "set_value",
-                                    {"entity_id": calib_entity, "value": offset},
-                                    blocking=True,
-                                    context=self._internal_context,
-                                    )
-                            # Scenario C: Ext Sensor + NO Calibration (Fake Target)
-                            else:
-                                trv_target = self.target_temperature + (float(trv_current) - self._current_temperature)
-                                trv_target = max(5.0, min(35.0, trv_target))
-                        
-                        # Round target to TRV's native step to prevent rounding-induced feedback loops
-                        step = st.attributes.get("target_temp_step", 0.5)
-                        if step and float(step) > 0:
-                            trv_target = round(trv_target / float(step)) * float(step)
-
-                        # Clamp target to physical TRV min/max limits
-                        trv_min = st.attributes.get("min_temp", 5.0)
-                        trv_max = st.attributes.get("max_temp", 35.0)
-                        trv_target = max(float(trv_min), min(float(trv_max), trv_target))
-
-                        # Send target to TRV (always send if mode changed, or if target differs)
-                        current_device_target = st.attributes.get(ATTR_TEMPERATURE)
-                        if mode_changed or current_device_target != trv_target:
-                            health = self._trv_health.setdefault(trv, {})
-
-                            try:
-                                await self.hass.services.async_call(
-                                    "climate",
-                                    "set_temperature",
-                                    {"entity_id": trv, "temperature": trv_target},
-                                    blocking=True,
-                                    context=self._internal_context,
-                                )
-                                
-                                health["last_command_target"] = trv_target
-                                health["last_command_mode"] = str(target_hvac_mode)
-                                health["last_command_time"] = dt_util.now().isoformat()
-                                health["last_command_time_monotonic"] = time.monotonic()
-                                health["sync_status"] = "PENDING_CONFIRMATION"
-
-                                self._pending_trv_targets[trv] = trv_target
-                                self._coordinator.record_diagnostic_event("TRV_COMMAND_SENT", {
-                                    "zone": self._name,
-                                    "trv": trv,
-                                    "target": trv_target,
-                                    "mode": str(target_hvac_mode),
-                                })
-                            except Exception as err:
-                                _LOGGER.error("Failed to send temperature to TRV %s: %s", trv, err)
-                                health["sync_status"] = "FAILED"
-                                health["consecutive_timeouts"] = health.get("consecutive_timeouts", 0) + 1
-                                health["last_error"] = str(err)
-                                self._coordinator.record_diagnostic_event("TRV_COMMAND_FAILED", {
-                                    "zone": self._name,
-                                    "trv": trv,
-                                    "error": str(err),
-                                })
-                                # Remove any stale pending to avoid permanently ignoring this TRV
-                                self._pending_trv_targets.pop(trv, None)
-
-                        # Save last known target to avoid delta loops
-                        self._last_known_trv_targets[trv] = trv_target
-            except Exception as err:
-                _LOGGER.error("Error syncing TRVs in zone %s: %s", self._name, err)
+    async def _trigger_trv_sync(self) -> None:
+        """Helper to invoke SyncManager's TRV sync."""
+        await self._sync_manager.async_sync_trvs(
+            master_hvac_mode=self._hvac_mode,
+            master_target_temp=self.target_temperature,
+            master_current_temp=self._current_temperature,
+            safety_fallback_active=self._safety_fallback_active,
+            has_external_sensor=bool(self._temp_sensor)
+        )
 
     async def _async_pwm_tick(self, now: Any) -> None:
         """Evaluate local PWM for switches."""
-        if not self._switches:
-            return
-            
-        if self._hvac_mode == HVACMode.OFF:
-            new_pwm_state = False
-        else:
-            demand = self._coordinator.get_zone_demand(self.entity_id)
-            new_pwm_state = self._local_pwm.calculate(demand)
-            
-        if new_pwm_state != self._local_pwm_state:
-            self._local_pwm_state = new_pwm_state
-            await self._async_sync_switches()
+        if await self._sync_manager.async_pwm_tick(self._hvac_mode):
             self.async_write_ha_state()
-
-    async def _async_sync_switches(self) -> None:
-        """Turn local switches ON or OFF based on PWM state."""
-        if not self._switches:
-            return
-            
-        service = SERVICE_TURN_ON if self._local_pwm_state else SERVICE_TURN_OFF
-        
-        for switch in self._switches:
-            st = self.hass.states.get(switch)
-            if st and st.state != (STATE_ON if self._local_pwm_state else "off"):
-                await self.hass.services.async_call(
-                    "switch",
-                    service,
-                    {ATTR_ENTITY_ID: switch},
-                    context=self._internal_context,
-                )

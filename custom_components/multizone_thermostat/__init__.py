@@ -144,7 +144,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 integration = await async_get_integration(hass, DOMAIN)
                 version = integration.version if integration else "unknown"
                 
-                base_url = "/multizone_thermostat_card/multizone-thermostat-card.js"
+                base_url = "/multizone_thermostat_card/multizone-thermostat-card-v24.js"
                 url = f"{base_url}?v={version}"
                 
                 existing_item = None

@@ -33,6 +33,17 @@ The project is structured in phases to evolve from a simple aggregator to a full
 - [x] **Future Temperature Prediction (SAT) & Smart Start**: Predictive early start based on thermal data and calendar events.
 - [x] **Global Calendar Integration**: Scheduling of global presets and dynamic overrides natively tied into the Home Assistant Local Calendar.
 
+### PHASE 5.0.0 — Modular Architecture & Code Hardening (Refactored Core)
+- [x] **Monolith Decomposition**: Decomposed 1,460+ line `coordinator.py` into dedicated SRP services (`zone_controller.py`, `demand_aggregator.py`, `zone_manager.py`, `calendar_manager.py`, `routine_manager.py`).
+- [x] **Subsystem Packages**: Created isolated modular sub-packages for `boiler/` (Relay & OpenTherm backends), `safety/` (Anti-frost, Anti-seize, Sensor Watchdog, Interlocks), `plant_diagnostics/` (Anomalies & Energy efficiency), `storage/` (Storage manager with native HA debounced save), and `config_flow/` (MVC structure with schemas, validators, helpers).
+- [x] **Unified Testing Framework & dummy_ha Mock**: Comprehensive 60-test automated test suite operating against standalone `dummy_ha` package without external HA dependencies.
+- [x] **DHW & Safety Bug Fixes (P0/P1)**: Zero-demand suppression during DHW, bumpless PID recovery, instantaneous offline sensor fallback, and valve delay re-verification.
+
+---
+
+## 📖 Immediate Next Priority: Documentation Realignment (Post v5.0.0)
+> ⚠️ **Scheduled immediately after v5.0.0 release**: Complete overhaul and alignment of integration documentation (`README.md`, `configuration.md`, `cards.md`) to reflect the new modular architecture, supervisory timer execution, and full entity catalog before starting subsequent functional enhancements.
+
 ---
 
 ## 🚀 Future Roadmap & Next Priorities

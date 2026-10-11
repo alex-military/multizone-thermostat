@@ -144,6 +144,9 @@ class MultizoneCoordinator:
         self._min_cycle_off = float(entry.data.get(CONF_MIN_CYCLE_OFF, DEFAULT_MIN_CYCLE_OFF))
         self._valve_delay = float(entry.data.get(CONF_VALVE_DELAY, DEFAULT_VALVE_DELAY))
         self._climate_callbacks = {}
+
+
+
         self._last_boiler_change = 0.0
         self._last_active_time = time.monotonic() # Default to now until loaded
         self._anti_seize_running = False
@@ -157,6 +160,64 @@ class MultizoneCoordinator:
         self._store = Store(hass, WINDOW_STORAGE_VERSION, WINDOW_STORAGE_KEY)
         self._preset_store = Store(hass, PRESET_STORAGE_VERSION, f"{DOMAIN}_{entry.entry_id}_presets")
         self._settings_store = Store(hass, SETTINGS_STORAGE_VERSION, f"{DOMAIN}_{entry.entry_id}_settings")
+
+        from .zone_manager import ZoneManager
+        self.zone_manager = ZoneManager(hass, self)
+
+        from .demand_aggregator import DemandAggregator
+        self.demand_aggregator = DemandAggregator(
+            zones=self.zones,
+            mode_getter=lambda cid: self.get_zone_mode(cid)
+        )
+
+        from .zone_controller import ZoneController
+        self.zone_controller = ZoneController(hass, self)
+
+        from .storage.storage_manager import StorageManager
+        self.storage = StorageManager(hass, self.entry_id)
+
+        from .calendar_manager import CalendarManager
+        self.calendar_manager = CalendarManager(self)
+
+        from .routine_manager import RoutineManager
+        self.routine_manager = RoutineManager(
+            hass,
+            self.presence_sensor,
+            self.get_persistent_data,
+            self.async_set_persistent_data,
+            self.get_global_preset,
+            self.async_set_global_preset
+        )
+
+        from .safety.frost import FrostManager
+        self.frost_manager = FrostManager(hass, self)
+
+        from .safety.anti_seize import AntiSeizeManager
+        self.anti_seize_manager = AntiSeizeManager(hass, self)
+
+        from .plant_diagnostics.engine import PlantDiagnosticsEngine
+        self.plant_diagnostics = PlantDiagnosticsEngine(self)
+
+        from .boiler.opentherm_backend import OpenThermBoilerBackend
+        from .boiler.relay_backend import RelayBoilerBackend
+        if self.boiler_mode == "opentherm":
+            self.boiler_backend = OpenThermBoilerBackend(
+                hass, 
+                self, 
+                self.opentherm_entity, 
+                self.opentherm_min_temp, 
+                self.opentherm_max_temp
+            )
+        else:
+            self.boiler_backend = RelayBoilerBackend(
+                hass, 
+                self, 
+                self.boiler_switch, 
+                self._min_cycle_on, 
+                self._min_cycle_off, 
+                self._valve_delay
+            )
+
 
         self._anti_seize_task: asyncio.Task | None = None
         self._pending_boiler_task: asyncio.Task | None = None
@@ -193,13 +254,18 @@ class MultizoneCoordinator:
         self._climate_entities: dict[str, Any] = {}
         self._boiler_status_reason: str = "OFF - Initializing"
 
-        # Plant Diagnostics & Anomaly Detection Engine
-        from .plant_diagnostics import PlantDiagnosticsEngine
-        self.plant_diagnostics = PlantDiagnosticsEngine(self)
+        from .boiler.plant_orchestrator import PlantOrchestrator
+        self.plant_orchestrator = PlantOrchestrator(hass, self.demand_aggregator, self.boiler_backend, self)
+
+
+    def register_master_switch(self, switch_entity) -> None:
+        """Register the master switch entity."""
+        self._master_switch = switch_entity
 
     def register_climate(self, entity_id: str, callback, entity_instance: Any = None) -> None:
         """Register a climate entity for state updates and diagnostics."""
         self._climate_callbacks[entity_id] = callback
+        self.demand_aggregator.register_climate_callback(entity_id, callback)
         if entity_instance is not None:
             self._climate_entities[entity_id] = entity_instance
 
@@ -212,21 +278,19 @@ class MultizoneCoordinator:
     def is_dhw_active(self) -> bool:
         """Return True if OpenTherm reports active Domestic Hot Water production."""
         if hasattr(self, "plant_diagnostics"):
-            return bool(self.plant_diagnostics.get_opentherm_diagnostics().get("dhw_active", False))
+            return self.plant_diagnostics.get_opentherm_diagnostics().get("dhw_active", False)
         return False
-
+                    
     @property
     def boiler_status_reason(self) -> str:
         """Return human-readable explanation of why the boiler is currently in its state."""
-        if self.is_dhw_active:
-            return "HOLD_DHW - Priorità Acqua Calda Sanitaria attiva"
-        return self._boiler_status_reason
-
+        return getattr(self.boiler_backend, "status_reason", "unknown")
+                    
     @property
     def diagnostics_history(self) -> list[dict[str, Any]]:
         """Return recent diagnostic trace history."""
         return list(self._diagnostics_history)
-
+        
     def record_diagnostic_event(self, event_type: str, details: dict[str, Any] | None = None) -> None:
         """Record a diagnostic event in the circular trace buffer (fail-safe)."""
         try:
@@ -240,26 +304,31 @@ class MultizoneCoordinator:
         except Exception:
             pass
 
+
+    @property
+    def current_global_preset(self) -> str:
+        return self.zone_manager.current_global_preset
+
+    def get_global_preset(self) -> str:
+        return self.zone_manager.get_global_preset()
+
+    async def async_set_global_preset(self, preset: str) -> None:
+        await self.zone_manager.async_set_global_preset(preset)
+
     def get_persistent_data(self, key: str, default: Any = None) -> Any:
         """Get a persistent setting."""
         return self._settings.get(key, default)
-
+        
     async def async_set_persistent_data(self, key: str, value: Any) -> None:
         """Set a persistent setting."""
         self._settings[key] = value
         await self._settings_store.async_save(self._settings)
 
-    def is_passive_heat_allowed(self, climate_id: str) -> bool:
-        """Return True if passive heat is allowed dynamically or via zone config."""
-        for z in self.zones:
-            zone_name = z.get(CONF_ZONE_NAME, "")
-            if make_zone_entity_id(zone_name) == climate_id:
-                safe_name = zone_name.lower().replace(" ", "_").replace("-", "_")
-                safe_name = "".join(c for c in safe_name if c.isalnum() or c == "_")
-                key = f"{KEY_PASSIVE_HEAT_PREFIX}{safe_name}"
-                default_val = bool(z.get(CONF_ZONE_ALLOW_PASSIVE_HEAT, False))
-                return bool(self.get_persistent_data(key, default_val))
-        return False
+
+
+    def debounced_save_thermal_states(self, thermal_models) -> None:
+        if hasattr(self, "storage") and self.storage:
+            self.storage.debounced_save_thermal_states(thermal_models)
 
     async def async_load_storage(self) -> None:
         """Load stored window states and presets."""
@@ -280,8 +349,12 @@ class MultizoneCoordinator:
             
             # Load stored zone modes
             saved_zone_modes = self._settings.get("zone_modes", {})
+            self.zone_manager.load_state(
+                getattr(self, "_pre_window_state", {}),
+                getattr(self, "_presets", {}),
+                saved_zone_modes
+            )
             for cid, mode in saved_zone_modes.items():
-                self._zone_modes[cid] = mode
                 if cid in self._climate_callbacks:
                     self._climate_callbacks[cid]()
             
@@ -320,126 +393,39 @@ class MultizoneCoordinator:
 
     async def _async_save_presets_storage(self) -> None:
         """Save presets to storage."""
-        await self._preset_store.async_save(self._presets)
+        # Save the dictionary maintained by the zone manager
+        await self._preset_store.async_save(self.zone_manager._presets)
 
     def register_select(self, key: str, select_entity: Any) -> None:
         """Register a select entity."""
         self._select_entities[key] = select_entity
 
-    def get_autotuner(self, climate_id: str):
-        """Get the autotuner instance for a given zone."""
-        return self._autotuners.get(climate_id)
+
+    def set_min_cycle_on(self, value: float) -> None:
+        self._min_cycle_on = value
+        if hasattr(self, "boiler_backend") and hasattr(self.boiler_backend, "_min_cycle_on"):
+            self.boiler_backend._min_cycle_on = value
+            self.boiler_backend._boiler_pwm.min_on = value * 60
         
-    def get_thermal_model(self, climate_id: str):
-        """Get the thermal model instance for a given zone."""
-        return self._thermal_models.get(climate_id)
+    def set_min_cycle_off(self, value: float) -> None:
+        self._min_cycle_off = value
+        if hasattr(self, "boiler_backend") and hasattr(self.boiler_backend, "_min_cycle_off"):
+            self.boiler_backend._min_cycle_off = value
+            self.boiler_backend._boiler_pwm.min_off = value * 60
+        
+    def set_valve_delay(self, value: float) -> None:
+        self._valve_delay = value
+        if hasattr(self, "boiler_backend") and hasattr(self.boiler_backend, "_valve_delay"):
+            self.boiler_backend._valve_delay = value
 
     def set_master_state(self, state: bool) -> None:
         """Set master state (called by master switch entity)."""
         self._master_state = state
 
-    def get_zone_mode(self, climate_entity: str) -> str:
-        """Get current zone mode, prioritizing calendar overrides."""
-        if climate_entity in self._calendar_mode_overrides:
-            return self._calendar_mode_overrides[climate_entity]
-        return self._zone_modes.get(climate_entity, ZONE_MODE_PRIMARY)
-        
-    def get_zone_demand(self, climate_id: str) -> float:
-        """Get the PID demand for a zone (0-100%)."""
-        return self._zone_demands.get(climate_id, 0.0)
-
-    def set_zone_demand(self, climate_id: str, demand: float) -> None:
-        """Set the PID demand for a zone."""
-        old_demand = self._zone_demands.get(climate_id)
-        self._zone_demands[climate_id] = demand
-        if old_demand != demand and climate_id in self._climate_callbacks:
-            self._climate_callbacks[climate_id]()
-
-    def get_pid(self, climate_id: str):
-        """Get the PID controller for a zone."""
-        return self._pids.get(climate_id)
-
-    def set_zone_mode(self, climate_entity: str, mode: str) -> None:
-        """Set zone mode (called by zone select entity)."""
-        self._zone_modes[climate_entity] = mode
-
-        # Persist zone mode directly in settings
-        if "zone_modes" not in self._settings:
-            self._settings["zone_modes"] = {}
-        self._settings["zone_modes"][climate_entity] = mode
-        self.hass.async_create_task(self._settings_store.async_save(self._settings))
-
-        # Notify climate entity callback so extra_state_attributes update immediately
-        if climate_entity in self._climate_callbacks:
-            self._climate_callbacks[climate_entity]()
-
-        # If a preset is active, save the mode state
-        if self._current_global_preset:
-            if self._current_global_preset not in self._presets:
-                self._presets[self._current_global_preset] = {}
-            if climate_entity not in self._presets[self._current_global_preset]:
-                self._presets[self._current_global_preset][climate_entity] = {}
-
-            self._presets[self._current_global_preset][climate_entity]["mode"] = mode
-            self.hass.async_create_task(self._async_save_presets_storage())
-
-    @property
-    def current_global_preset(self) -> str:
-        """Return the current global preset."""
-        return self._current_global_preset
-
-    def set_global_preset(self, preset: str) -> None:
-        """Set the global preset (used on restore)."""
-        self._current_global_preset = preset
-
-    def get_global_preset(self) -> str:
-        """Get the current global preset."""
-        return self._current_global_preset
-
-    async def async_set_global_preset(self, preset: str) -> None:
-        """Set the global preset and apply it to all zones."""
-        self._current_global_preset = preset
-        _LOGGER.debug("Global preset changed to: %s", preset)
-        
-        # Notify the UI select entity if it's registered
-        if "global_preset" in self._select_entities:
-            self._select_entities["global_preset"].async_write_ha_state()
-
-        if preset not in self._presets:
-            return
-            
-        preset_data = self._presets[preset]
-        for climate_entity, data in preset_data.items():
-            if "target_temp" in data:
-                try:
-                    await self.hass.services.async_call(
-                        "climate",
-                        "set_temperature",
-                        {"entity_id": climate_entity, "temperature": data["target_temp"]},
-                        blocking=False,
-                    )
-                except Exception as ex:
-                    _LOGGER.warning("Could not set temperature for %s: %s", climate_entity, ex)
-            
-            # Legacy preset support
-            mode = ZONE_MODE_PRIMARY
-            if "mode" in data:
-                mode = data["mode"]
-            elif "bypassed" in data:
-                mode = ZONE_MODE_BYPASS if data["bypassed"] else ZONE_MODE_PRIMARY
-
-            zone_select = self._select_entities.get(f"zone_mode_{climate_entity}")
-            if zone_select:
-                try:
-                    await zone_select.async_select_option(mode)
-                except Exception as ex:
-                    _LOGGER.warning("Could not set zone mode for %s: %s", climate_entity, ex)
-
     def get_master_state(self) -> bool:
         """Get current master state."""
         return self._master_state
 
-    @callback
     def async_setup_listeners(self) -> None:
         """Set up state change listeners for all climate entities."""
         climate_entities = [make_zone_entity_id(z[CONF_ZONE_NAME]) for z in self.zones]
@@ -449,7 +435,7 @@ class MultizoneCoordinator:
                 async_track_state_change_event(
                     self.hass,
                     climate_entities,
-                    self._on_climate_state_changed,
+                    self._async_on_climate_state_changed,
                 )
             )
             _LOGGER.debug(
@@ -467,7 +453,7 @@ class MultizoneCoordinator:
                 async_track_state_change_event(
                     self.hass,
                     window_sensors,
-                    self._async_on_window_state_changed,
+                    self.zone_manager.async_on_window_state_changed,
                 )
             )
             _LOGGER.debug(
@@ -478,36 +464,20 @@ class MultizoneCoordinator:
         self._unsub_listeners.append(
             async_track_time_interval(
                 self.hass,
-                self._async_pwm_tick,
+                self.plant_orchestrator.async_tick,
                 timedelta(seconds=10)
             )
         )
 
-        # Listen to presence sensor if configured
-        if self.presence_sensor:
-            self._unsub_listeners.append(
-                async_track_state_change_event(
-                    self.hass,
-                    [self.presence_sensor],
-                    self._async_on_presence_changed,
-                )
-            )
-            _LOGGER.debug("Listening to presence sensor: %s", self.presence_sensor)
+        self.routine_manager.async_setup_listeners()
 
-        # Listen every minute for Schedule check (Night / Morning)
-        self._unsub_listeners.append(
-            async_track_time_interval(
-                self.hass,
-                self._async_check_schedule,
-                timedelta(minutes=1),
-            )
-        )
+
         
         # Listen every hour for Anti-Seize check
         self._unsub_listeners.append(
             async_track_time_interval(
                 self.hass,
-                self._async_check_anti_seize,
+                self.anti_seize_manager.check_anti_seize,
                 timedelta(hours=1),
             )
         )
@@ -517,14 +487,14 @@ class MultizoneCoordinator:
             self._unsub_listeners.append(
                 async_track_time_interval(
                     self.hass,
-                    self._async_check_global_calendar,
+                    self.calendar_manager.async_check_global_calendar,
                     timedelta(minutes=5),
                 )
             )
             # Check immediately on startup
-            self.hass.async_create_task(self._async_check_global_calendar(dt_util.now()))
+            self.hass.async_create_task(self.calendar_manager.async_check_global_calendar(dt_util.now()))
 
-    @callback
+
     def async_teardown_listeners(self) -> None:
         """Remove all state change listeners."""
         if self._anti_seize_task and not self._anti_seize_task.done():
@@ -541,578 +511,34 @@ class MultizoneCoordinator:
             unsub()
         self._unsub_listeners.clear()
 
-    @callback
-    def _on_climate_state_changed(self, event: Event) -> None:
-        """Sync wrapper for climate state changes (required by async_track_state_change_event)."""
-        self.hass.async_create_task(self._async_on_climate_state_changed(event))
 
-    async def _async_on_climate_state_changed(self, event: Event) -> None:
-        """Handle state changes of any managed climate entity."""
-        try:
-            entity_id = event.data.get("entity_id")
-            new_state = event.data.get("new_state")
-            old_state = event.data.get("old_state")
-
-            if not new_state:
-                return
-
-            # Phase 4: Calculate PID demand for this zone
-            current_temp = new_state.attributes.get("current_temperature")
-            target_temp = new_state.attributes.get("temperature")
-            
-            if current_temp is not None and target_temp is not None:
-                # Check mode (don't calculate if off/bypass)
-                hvac_mode = new_state.state
-                zone_mode = self.get_zone_mode(entity_id)
-                if hvac_mode == HVAC_MODE_HEAT and zone_mode != ZONE_MODE_BYPASS:
-                    
-                    is_faulty = self.plant_diagnostics.has_critical_sensor_fault(entity_id) if hasattr(self, "plant_diagnostics") else False
-                    if is_faulty:
-                        demand = 0.0
-                        _LOGGER.warning("Zone %s: Heating demand forced to 0%% due to critical sensor fault/low battery", entity_id)
-                        self.set_zone_demand(entity_id, demand)
-                        return
-
-                    if self.is_dhw_active:
-                        _LOGGER.debug("Zone %s: PID frozen, boiler is currently producing Domestic Hot Water (DHW Active).", entity_id)
-                        return
-
-                    # Smart Stop: Calculate Effective Target based on learned Inertia
-                    thermal_model = self._thermal_models[entity_id]
-                    effective_target = target_temp
-                    if thermal_model.thermal_inertia > 0.05:
-                        effective_target = target_temp - thermal_model.thermal_inertia
-                        # Limit to avoid lowering it too much if inertia is crazy high
-                        effective_target = max(target_temp - 1.0, effective_target)
-                    
-                    tuner = self._autotuners[entity_id]
-                        
-                    if tuner.state != tuner.STATE_COMPLETED:
-                        # Hysteresis Fallback Mode (Learning phase)
-                        tolerance = 0.3
-                        current_demand = self.get_zone_demand(entity_id)
-                        if current_temp <= effective_target - tolerance:
-                            demand = 100.0
-                        elif current_temp >= effective_target + tolerance:
-                            demand = 0.0
-                        else:
-                            demand = current_demand # Keep previous demand inside the hysteresis band
-                    else:
-                        # Smart PID Mode
-                        demand = self._pids[entity_id].calc(current_temp, effective_target)
-                        
-                        # Apply Weather Compensation (Feed Forward)
-                        curve_val = self.get_persistent_data(KEY_WEATHER_CURVE, 0.0)
-                        if self.weather_sensor_id:
-                            weather_state = self.hass.states.get(self.weather_sensor_id)
-                            if weather_state and weather_state.state not in ("unavailable", "unknown"):
-                                try:
-                                    outdoor_temp = None
-                                    if weather_state.domain == "weather":
-                                        temp_attr = weather_state.attributes.get("temperature")
-                                        if temp_attr is not None:
-                                            outdoor_temp = float(temp_attr)
-                                    else:
-                                        outdoor_temp = float(weather_state.state)
-                                        
-                                        if outdoor_temp is not None:
-                                            # Adaptive Curve Calculation (SAT Math)
-                                            curve_val = thermal_model.get_weather_multiplier(manual_base_curve=curve_val)
-                                            
-                                            # (Target - OutdoorTemp) * Ke
-                                            delta_t = effective_target - outdoor_temp
-                                            if delta_t > 0.0 and curve_val > 0.0:
-                                                ff_demand = delta_t * curve_val
-                                                # Clamp the weather bonus to a max of +40% to avoid it dominating the PID
-                                                ff_demand = min(40.0, ff_demand)
-                                                demand = min(100.0, max(0.0, demand + ff_demand))
-                                                _LOGGER.debug("[%s] SAT Weather Comp: Target=%.1f, Outdoor=%.1f, Ke=%.2f, FF=+%.1f%%, Final=%.1f%%", 
-                                                              entity_id, effective_target, outdoor_temp, curve_val, ff_demand, demand)
-                                except ValueError:
-                                    pass
-                else:
-                    demand = 0.0
-                    
-                self.set_zone_demand(entity_id, demand)
-                
-                tuner = self._autotuners[entity_id]
-                if tuner.state != tuner.STATE_COMPLETED:
-                    tuner.update(current_temp, demand > 0)
-                    # Check if this update just completed the learning phase
-                    if tuner.state == tuner.STATE_COMPLETED:
-                        self._pids[entity_id].set_pid_param(kp=tuner.kp, ki=tuner.ki, kd=tuner.kd)
-                        _LOGGER.info(
-                            "Autotuning just completed for %s! Smart PID activated. Kp=%.1f, Ki=%.4f, Kd=%.1f",
-                            entity_id, tuner.kp, tuner.ki, tuner.kd,
-                        )
-                        await self._async_save_autotuner_states()
-                    
-                # Feed Thermal Observer
-                self._thermal_models[entity_id].update(current_temp, demand > 0)
-                # Debounced save: avoid writing to disk on every state change (SD card wear)
-                if not getattr(self, "_storage_save_pending", False):
-                    self._storage_save_pending = True
-                    async def _debounced_thermal_save():
-                        try:
-                            await asyncio.sleep(120)  # Wait 2 minutes before writing
-                            self._storage_save_pending = False
-                            await self._async_save_thermal_states()
-                        except asyncio.CancelledError:
-                            self._storage_save_pending = False
-                            raise
-                    self._debounce_save_task = self.hass.async_create_task(_debounced_thermal_save())
-                    
-                _LOGGER.debug("Zone '%s' Demand updated: %.1f%% (Temp: %s, Target: %s, Mode: %s)", 
-                              entity_id, demand, current_temp, target_temp, "PID" if tuner.state == tuner.STATE_COMPLETED else "Hysteresis")
-
-            else:
-                demand = 0.0
-                self.set_zone_demand(entity_id, 0.0)
-
-            # Trigger boiler update if action changed (Legacy fallback check)
-            _LOGGER.debug("Climate state changed: %s → %s", entity_id, new_state.state)
-
-            # 0. Check for target temperature changes to save to preset memory
-            old_state = event.data.get("old_state")
-            if old_state is not None and self._current_global_preset:
-                new_temp = new_state.attributes.get("temperature")
-                old_temp = old_state.attributes.get("temperature")
-                if new_temp is not None and new_temp != old_temp:
-                    if self._current_global_preset not in self._presets:
-                        self._presets[self._current_global_preset] = {}
-                    if entity_id not in self._presets[self._current_global_preset]:
-                        self._presets[self._current_global_preset][entity_id] = {}
-                    
-                    self._presets[self._current_global_preset][entity_id]["target_temp"] = new_temp
-                    self.hass.async_create_task(self._async_save_presets_storage())
-                    _LOGGER.debug("Saved new target temp %s for %s in preset %s", new_temp, entity_id, self._current_global_preset)
-
-            # 1. Boiler demand is managed by the periodic PWM tick
-
-            # 2. TRV preset sync (if enabled for this zone)
-            zone = self._get_zone(entity_id)
-            if zone and zone.get(CONF_ZONE_TRV_SYNC, False):
-                self.hass.async_create_task(
-                    self._async_sync_trv_preset(entity_id, new_state.state)
-                )
-                
-        except Exception as err:
-            _LOGGER.error("Error handling climate state change for %s: %s", event.data.get("entity_id", "unknown"), err)
-
-    async def _async_sync_trv_preset(self, zone_id: str, new_state: str) -> None:
-        """Sync TRV activation/presets based on Zone state (heat/off)."""
-        zone = self._get_zone(zone_id)
-        if not zone:
-            return
-            
-        climates = zone.get(CONF_ZONE_CLIMATES, [])
-        for trv in climates:
-            trv_state = self.hass.states.get(trv)
-            if not trv_state:
-                continue
-                
-            supported_presets = trv_state.attributes.get("preset_modes") or []
-            target_preset = None
-            
-            if new_state == HVAC_MODE_HEAT:
-                # Try to wake up the TRV
-                if "manual" in supported_presets:
-                    target_preset = "manual"
-                elif "none" in supported_presets:
-                    target_preset = "none"
-                elif "boost" in supported_presets:
-                    target_preset = "boost"
-            elif new_state == HVAC_MODE_OFF:
-                # Try to put the TRV to sleep
-                if "off" in supported_presets:
-                    target_preset = "off"
-                elif "none" in supported_presets:
-                    target_preset = "none"
-                    
-            if target_preset:
-                _LOGGER.debug("Syncing TRV preset for %s to %s (Zone is %s)", trv, target_preset, new_state)
-                await self.hass.services.async_call(
-                    CLIMATE_DOMAIN,
-                    SERVICE_SET_PRESET_MODE,
-                    {ATTR_ENTITY_ID: trv, ATTR_PRESET_MODE: target_preset},
-                    blocking=False,
-                )
-
-    @callback
-    def _async_on_window_state_changed(self, event: Event) -> None:
-        """Handle window sensor state changes → bypass/restore zone."""
-        sensor_id = event.data.get("entity_id")
+    async def _async_on_climate_state_changed(self, event) -> None:
+        entity_id = event.data.get("entity_id")
         new_state = event.data.get("new_state")
+        if not new_state:
+            return
+        demand = await self.zone_controller.async_update_zone(entity_id, new_state)
+        self.demand_aggregator.set_zone_demand(entity_id, demand)
+        # Immediatly trigger boiler update to improve UI responsiveness when lowering target
+        if hasattr(self, "plant_orchestrator"):
+            await self.plant_orchestrator._async_update_boiler()
+
+
+    def get_zone_mode(self, climate_id: str) -> str:
+        return self.zone_manager.get_zone_mode(climate_id)
+
+    def set_zone_mode(self, climate_id: str, mode: str) -> None:
+        self.zone_manager.set_zone_mode(climate_id, mode)
         
-        _LOGGER.debug("Window listener fired: %s -> %s", sensor_id, new_state.state if new_state else "None")
+    def get_zone_demand(self, climate_id: str) -> float:
+        return self.demand_aggregator.get_zone_demand(climate_id)
 
-        if new_state is None:
-            return
-            
-        # Find ALL zones this sensor belongs to
-        matching_zones = [z for z in self.zones if z.get(CONF_ZONE_WINDOW_SENSOR) == sensor_id]
-        _LOGGER.debug("Window listener: matching zones: %s", matching_zones)
-        if not matching_zones:
-            return
-            
-        for zone in matching_zones:
-            climate_id = make_zone_entity_id(zone[CONF_ZONE_NAME])
-            zone_select = self._select_entities.get(f"zone_mode_{climate_id}")
-            _LOGGER.debug("Window listener: zone_select for %s: %s", climate_id, zone_select)
-            
-            if new_state.state == "on":
-                # Window OPENED
-                # Check Anti-Frost: if temperature is below frost threshold, prevent bypass to avoid freezing
-                anti_frost_active = self.is_zone_in_frost_emergency(climate_id)
-                if anti_frost_active:
-                    _LOGGER.warning("Window opened (%s) for %s, but Anti-Frost protection is active! Skipping bypass to prevent freezing.", sensor_id, climate_id)
-                    continue
-
-                _LOGGER.debug("Window opened (%s), bypassing zone %s", sensor_id, climate_id)
-                # Save current state if not already saved
-                if climate_id not in self._pre_window_state:
-                    current_mode = self.get_zone_mode(climate_id)
-                    self._pre_window_state[climate_id] = current_mode
-                    self.hass.async_create_task(self.async_save_storage())
-                
-                # Change mode to Bypass
-                if zone_select and self.get_zone_mode(climate_id) != ZONE_MODE_BYPASS:
-                    self.record_diagnostic_event("WINDOW_OPENED_BYPASS", {"sensor": sensor_id, "zone": climate_id})
-                    self.hass.async_create_task(zone_select.async_select_option(ZONE_MODE_BYPASS))
-                    
-            elif new_state.state == "off":
-                # Window CLOSED
-                _LOGGER.debug("Window closed (%s), restoring zone %s", sensor_id, climate_id)
-                if climate_id in self._pre_window_state:
-                    was_mode = self._pre_window_state.pop(climate_id)
-                    self.hass.async_create_task(self.async_save_storage())
-                    
-                    # Restore the mode
-                    if zone_select and self.get_zone_mode(climate_id) != was_mode:
-                        self.record_diagnostic_event("WINDOW_CLOSED_RESTORE", {"sensor": sensor_id, "zone": climate_id, "mode": was_mode})
-                        self.hass.async_create_task(zone_select.async_select_option(was_mode))
-
-    @callback
-    def _async_on_presence_changed(self, event: Event) -> None:
-        """Handle presence sensor state changes (Geofencing logic)."""
-        if not self.get_persistent_data(KEY_GEOFENCING_TOGGLE, True):
-            return  # Geofencing is disabled dynamically
-
-        new_state = event.data.get("new_state")
-        old_state = event.data.get("old_state")
-        if new_state is None or old_state is None:
-            return
-            
-        old_val = old_state.state
-        new_val = new_state.state
-        if old_val == new_val:
-            return
-            
-        _LOGGER.info("Presence changed: %s -> %s", old_val, new_val)
-        
-        # Consider 0, 'not_home', or 'off' as Away
-        is_away = new_val != "home"
-        was_away = old_val != "home"
-        
-        if is_away and not was_away:
-            # Everyone left! Save current preset and set to Away
-            _LOGGER.info("Geofencing: Everyone left. Setting to Away mode.")
-            self.hass.async_create_task(self.async_set_persistent_data(KEY_PRE_AWAY_PRESET, self._current_global_preset))
-            self.hass.async_create_task(self.async_set_global_preset(GLOBAL_PRESET_AWAY))
-            
-        elif not is_away and was_away:
-            # Someone returned!
-            _LOGGER.info("Geofencing: Someone returned.")
-            
-            night_time_str = self.get_persistent_data(KEY_NIGHT_TIME, "22:30")
-            morning_time_str = self.get_persistent_data(KEY_MORNING_TIME, "07:00")
-            is_night = False
-            try:
-                n_hour, n_minute = map(int, night_time_str.split(":"))
-                m_hour, m_minute = map(int, morning_time_str.split(":"))
-                now = dt_util.now().time()
-                night_time = dt_time(n_hour, n_minute)
-                morning_time = dt_time(m_hour, m_minute)
-                
-                if night_time > morning_time:
-                    if now >= night_time or now <= morning_time:
-                        is_night = True
-                else:
-                    if now >= night_time and now <= morning_time:
-                        is_night = True
-                        
-                _LOGGER.debug("Geofencing schedule: night_time=%s, morning_time=%s, now=%s, is_night=%s", night_time, morning_time, now, is_night)
-            except Exception as ex:
-                _LOGGER.warning("Geofencing schedule exception: %s", ex)
-                
-            if is_night:
-                _LOGGER.info("Geofencing: Returned at night. Setting Sleep mode.")
-                pre_away = self.get_persistent_data(KEY_PRE_AWAY_PRESET, GLOBAL_PRESET_COMFORT)
-                self.hass.async_create_task(self.async_set_persistent_data(KEY_PRE_NIGHT_PRESET, pre_away))
-                self.hass.async_create_task(self.async_set_global_preset(GLOBAL_PRESET_SLEEP))
-            else:
-                pre_away = self.get_persistent_data(KEY_PRE_AWAY_PRESET, GLOBAL_PRESET_COMFORT)
-                _LOGGER.info("Geofencing: Restoring previous mode: %s", pre_away)
-                self.hass.async_create_task(self.async_set_global_preset(pre_away))
-
-    @callback
-    def _async_check_schedule(self, now: datetime) -> None:
-        """Check if it's time to trigger Auto Night Mode or Morning Mode."""
-        if not self.get_persistent_data(KEY_AUTO_NIGHT_MODE, False):
-            return
-
-        local_now = dt_util.now()
-        current_date = local_now.date()
-
-        # Check Night Time
-        night_time_str = self.get_persistent_data(KEY_NIGHT_TIME, "22:30")
-        try:
-            hour, minute = map(int, night_time_str.split(":"))
-            if local_now.hour == hour and local_now.minute == minute:
-                if self._last_night_trigger_date != current_date:
-                    self._last_night_trigger_date = current_date
-                    if self._current_global_preset in (GLOBAL_PRESET_MANUAL, "none"):
-                        _LOGGER.info("Auto Night Mode skipped because system is in Manual mode.")
-                    elif self._current_global_preset != GLOBAL_PRESET_SLEEP:
-                        _LOGGER.info("Auto Night Mode triggered. Setting Sleep mode.")
-                        self.hass.async_create_task(self.async_set_persistent_data(KEY_PRE_NIGHT_PRESET, self._current_global_preset))
-                        self.hass.async_create_task(self.async_set_global_preset(GLOBAL_PRESET_SLEEP))
-        except Exception:
-            pass
-
-        # Check Morning Time
-        morning_time_str = self.get_persistent_data(KEY_MORNING_TIME, "07:00")
-        try:
-            hour, minute = map(int, morning_time_str.split(":"))
-            if local_now.hour == hour and local_now.minute == minute:
-                if self._last_morning_trigger_date != current_date:
-                    self._last_morning_trigger_date = current_date
-                    if self._current_global_preset in (GLOBAL_PRESET_MANUAL, "none"):
-                        _LOGGER.info("Auto Morning Mode skipped because system is in Manual mode.")
-                    else:
-                        pre_night = self.get_persistent_data(KEY_PRE_NIGHT_PRESET, GLOBAL_PRESET_COMFORT)
-                        _LOGGER.info("Auto Morning Mode triggered. Restoring mode: %s", pre_night)
-                        self.hass.async_create_task(self.async_set_global_preset(pre_night))
-        except Exception:
-            pass
-
-    async def _async_check_global_calendar(self, now: datetime) -> None:
-        """Fetch and parse calendar events for scheduling and Smart Start."""
-        if not self.global_calendar_id:
-            return
-            
-        # 1. Fetch events from now to +24 hours
-        end_time = now + timedelta(hours=24)
-        try:
-            response = await self.hass.services.async_call(
-                "calendar",
-                "get_events",
-                {
-                    "entity_id": self.global_calendar_id,
-                    "start_date_time": now.isoformat(),
-                    "end_date_time": end_time.isoformat()
-                },
-                blocking=True,
-                return_response=True
-            )
-            
-            if not response or self.global_calendar_id not in response:
-                return
-                
-            events = response[self.global_calendar_id].get("events", [])
-            
-            # Find current and next event
-            current_event = None
-            next_event = None
-            
-            for event in events:
-                try:
-                    start = dt_util.parse_datetime(event["start"])
-                    if start:
-                        if start.tzinfo is None:
-                            start = start.replace(tzinfo=dt_util.DEFAULT_TIME_ZONE)
-                        start = dt_util.as_local(start)
-                    
-                    end = dt_util.parse_datetime(event["end"])
-                    if end:
-                        if end.tzinfo is None:
-                            end = end.replace(tzinfo=dt_util.DEFAULT_TIME_ZONE)
-                        end = dt_util.as_local(end)
-                    
-                    if start and end:
-                        if start <= now < end:
-                            if not current_event:
-                                current_event = event
-                        elif now < start:
-                            if not next_event:
-                                next_event = event
-                                break # Found the immediate next
-                except Exception as ex:
-                    _LOGGER.warning("Error parsing calendar event dates: %s", ex)
-                    
-            await self._async_process_calendar_events(current_event, next_event, now)
-                
-        except Exception as ex:
-            _LOGGER.error("Error fetching calendar events: %s", ex)
-
-    async def _async_process_calendar_events(self, current_event: dict | None, next_event: dict | None, now: datetime) -> None:
-        """Process current and future events."""
-        # 1. Process Current Event
-        if current_event:
-            # We use a unique ID based on start time and title to avoid re-applying SET constantly
-            event_uid = f"{current_event.get('start', '')}_{current_event.get('summary', 'Untitled')}"
-            
-            if self._calendar_active_event_id != event_uid:
-                _LOGGER.info("Calendar Event Started: %s", current_event.get("summary", "Untitled"))
-                self._calendar_active_event_id = event_uid
-                
-                if self._pre_calendar_preset is None:
-                    self._pre_calendar_preset = self._current_global_preset
-                
-                # Clear temporary overrides from previous events
-                self._calendar_temp_overrides.clear()
-                self._calendar_mode_overrides.clear()
-                
-                # Parse
-                parsed = parse_calendar_event(current_event.get("summary", ""))
-                
-                # Apply Global Settings
-                if parsed["global_preset"]:
-                    await self.async_set_global_preset(parsed["global_preset"])
-                    
-                if parsed["global_temperature"]:
-                    for zone in self.zones:
-                        climate_id = make_zone_entity_id(zone[CONF_ZONE_NAME])
-                        # Set temp temporarily
-                        self._calendar_temp_overrides[climate_id] = parsed["global_temperature"]
-                        
-                # Apply Zone Overrides
-                for zone_name, override in parsed["overrides"].items():
-                    # Find real entity_id
-                    climate_id = None
-                    for z in self.zones:
-                        if z[CONF_ZONE_NAME].lower() == zone_name:
-                            climate_id = make_zone_entity_id(z[CONF_ZONE_NAME])
-                            break
-                            
-                    if not climate_id:
-                        continue
-                        
-                    # Modes
-                    if override.mode:
-                        if override.is_permanent:
-                            zone_select = self._select_entities.get(f"zone_mode_{climate_id}")
-                            if zone_select:
-                                await zone_select.async_select_option(override.mode)
-                        else:
-                            self._calendar_mode_overrides[climate_id] = override.mode
-                            
-                    # Temperatures
-                    if override.temperature is not None:
-                        if override.is_permanent:
-                            # Save permanently to current preset
-                            if self._current_global_preset:
-                                if self._current_global_preset not in self._presets:
-                                    self._presets[self._current_global_preset] = {}
-                                if climate_id not in self._presets[self._current_global_preset]:
-                                    self._presets[self._current_global_preset][climate_id] = {}
-                                self._presets[self._current_global_preset][climate_id]["target_temp"] = override.temperature
-                                await self._async_save_presets_storage()
-                        else:
-                            # Save temporarily
-                            self._calendar_temp_overrides[climate_id] = override.temperature
-                            
-                # Trigger a refresh of climate entities
-                for cb in self._climate_callbacks.values():
-                    cb()
-        else:
-            if self._calendar_active_event_id is not None:
-                _LOGGER.info("Calendar Event Ended. Restoring base state.")
-                self._calendar_active_event_id = None
-                self._calendar_temp_overrides.clear()
-                self._calendar_mode_overrides.clear()
-                
-                if self._pre_calendar_preset is not None:
-                    await self.async_set_global_preset(self._pre_calendar_preset)
-                    self._pre_calendar_preset = None
-                    
-                for cb in self._climate_callbacks.values():
-                    cb()
-
-        # 2. Process Smart Start (Next Event)
-        # Check if next event requires pre-heating
-        if next_event:
-            start_time = dt_util.as_local(dt_util.parse_datetime(next_event["start"]))
-            if start_time:
-                parsed_next = parse_calendar_event(next_event.get("summary", ""))
-                # We only preheat if there is a target temperature shift
-                # For each zone, calculate if we need to start
-                for zone in self.zones:
-                    climate_id = make_zone_entity_id(zone[CONF_ZONE_NAME])
-                    target = None
-                    
-                    # Does next event have specific temp override?
-                    zone_name_lower = zone[CONF_ZONE_NAME].lower()
-                    if zone_name_lower in parsed_next["overrides"]:
-                        target = parsed_next["overrides"][zone_name_lower].temperature
-                        
-                    if target is None and parsed_next["global_temperature"]:
-                        target = parsed_next["global_temperature"]
-                        
-                    if target is None and parsed_next["global_preset"]:
-                        # Look up base preset temp for this zone
-                        target = self._presets.get(parsed_next["global_preset"], {}).get(climate_id, {}).get("target_temp")
-                        
-                    if target is not None:
-                        current_temp = None
-                        state = self.hass.states.get(climate_id)
-                        if state:
-                            current_temp = state.attributes.get("current_temperature")
-                            
-                        if current_temp is not None and current_temp < target:
-                            # We need to heat. Calculate time.
-                            thermal_model = self._thermal_models.get(climate_id)
-                            if thermal_model and thermal_model.heating_rate > 0.05: # At least 0.05 deg/hour
-                                delta_t = target - current_temp
-                                hours_needed = delta_t / thermal_model.heating_rate
-                                time_needed = timedelta(hours=hours_needed)
-                                
-                                if now + time_needed >= start_time:
-                                    _LOGGER.info("Smart Start Triggered for %s! Target: %.1f, Need: %s", climate_id, target, time_needed)
-                                    # Override current target temp temporarily
-                                    self._calendar_temp_overrides[climate_id] = target
-                                    # Wake up zone if in Sleep/Eco
-                                    if self._calendar_mode_overrides.get(climate_id) == "off":
-                                        del self._calendar_mode_overrides[climate_id]
-                                    if climate_id in self._climate_callbacks:
-                                        self._climate_callbacks[climate_id]()
-
-    def _get_zone(self, climate_entity: str) -> dict | None:
-        """Get zone config by climate entity ID."""
-        for zone in self.zones:
-            if make_zone_entity_id(zone[CONF_ZONE_NAME]) == climate_entity:
-                return zone
-        return None
-
-    def set_min_cycle_on(self, value: int) -> None:
-        """Set the min cycle on time (minutes)."""
-        self._min_cycle_on = value
-        self._boiler_pwm.set_params(min_on=value * 60)
-        
-    def set_min_cycle_off(self, value: int) -> None:
-        """Set the min cycle off time (minutes)."""
-        self._min_cycle_off = value
-        self._boiler_pwm.set_params(min_off=value * 60)
-        
-    def set_valve_delay(self, value: int) -> None:
-        """Set the valve delay time (seconds)."""
-        self._valve_delay = value
-
+    def get_autotuner(self, climate_id: str):
+        return self.zone_controller.get_autotuner(climate_id)
     def is_zone_in_frost_emergency(self, climate_id: str) -> bool:
         """Return True if anti-frost is enabled and zone temperature is below the safety threshold."""
         if not self.get_persistent_data(KEY_ANTI_FROST_ENABLED, DEFAULT_ANTI_FROST_ENABLED):
             return False
-
         # Try virtual thermostat temperature first
         st = self.hass.states.get(climate_id)
         current_temp = None
@@ -1123,7 +549,7 @@ class MultizoneCoordinator:
         # WARN-02: Fallback — average TRV sensor readings if virtual thermostat has no temperature yet
         # (e.g., right after boot before TRVs have reported back)
         if current_temp is None:
-            zone = self._get_zone(climate_id)
+            zone = self.zone_manager.get_zone(climate_id)
             if zone:
                 trv_temps = []
                 for trv in zone.get(CONF_ZONE_CLIMATES, []):
@@ -1138,288 +564,15 @@ class MultizoneCoordinator:
 
         if current_temp is None:
             return False
-
         frost_temp = float(self.get_persistent_data(KEY_FROST_PROTECTION_TEMP, DEFAULT_FROST_PROTECTION_TEMP))
-        return float(current_temp) < frost_temp
-
-    async def _async_pwm_tick(self, now: datetime) -> None:
-        """Periodic PWM tick for boiler (Peak Load + Anti-Frost Safety)."""
-        if self._anti_seize_running:
-            return
-
-        # Check global Anti-Frost safety across all zones (even if Master is OFF)
-        frost_emergency = False
-        if self.get_persistent_data(KEY_ANTI_FROST_ENABLED, DEFAULT_ANTI_FROST_ENABLED):
-            for zone in self.zones:
-                climate_id = make_zone_entity_id(zone[CONF_ZONE_NAME])
-                if self.is_zone_in_frost_emergency(climate_id):
-                    frost_emergency = True
-                    _LOGGER.warning(
-                        "Anti-Frost emergency triggered for zone %s! Forcing emergency heating.",
-                        climate_id,
-                    )
-                    # Force zone demand to 100% so boiler PWM activates
-                    self.set_zone_demand(climate_id, 100.0)
-                    # BUG-02: Force zone into HEAT mode so TRVs physically open and heat reaches radiators
-                    await self._async_set_hvac_mode(climate_id, HVAC_MODE_HEAT)
-                    
-                    # H2-FIX: Also set target temperature above frost threshold so TRV internal PID opens valve
-                    frost_target = float(self.get_persistent_data(KEY_FROST_PROTECTION_TEMP, DEFAULT_FROST_PROTECTION_TEMP)) + 3.0
-                    st = self.hass.states.get(climate_id)
-                    if not st or st.attributes.get(ATTR_TEMPERATURE) != frost_target:
-                        self.hass.async_create_task(
-                            self.hass.services.async_call(
-                                CLIMATE_DOMAIN,
-                                SERVICE_SET_TEMPERATURE,
-                                {ATTR_ENTITY_ID: climate_id, ATTR_TEMPERATURE: frost_target},
-                                blocking=False,
-                            )
-                        )
-
-        if not self._master_state and not frost_emergency:
-            self._boiler_status_reason = "OFF - Master switch is OFF"
-            return
-            
-        # Phase 4: Calculate Peak Demand
-        peak_demand = 100.0 if frost_emergency else 0.0
-        peak_zone = "Frost Emergency" if frost_emergency else None
-        for zone in self.zones:
-            climate_id = make_zone_entity_id(zone[CONF_ZONE_NAME])
-            mode = self.get_zone_mode(climate_id)
-            if mode != ZONE_MODE_PRIMARY and not frost_emergency:
-                continue
-            demand = self.get_zone_demand(climate_id)
-            if demand > peak_demand:
-                peak_demand = demand
-                peak_zone = zone[CONF_ZONE_NAME]
-                
-        # Track activity for anti-seize (both modes)
-        if peak_demand > 0:
-            self._last_active_time = time.monotonic()
-            
-        if self.boiler_mode == MODE_OPENTHERM:
-            await self._async_update_opentherm_boiler(peak_demand)
-            norm = max(0.0, min(1.0, peak_demand / 100.0))
-            water_target = round(self.opentherm_min_temp + (norm * (self.opentherm_max_temp - self.opentherm_min_temp)), 1)
-            self._boiler_status_reason = f"MODULATING - Target water: {water_target}°C (Demand: {round(peak_demand, 1)}% from {peak_zone or 'None'})"
-            return
-
-        # Feed Peak Load to PWM Engine
-        wanted_state = self._boiler_pwm.calculate(peak_demand)
+        return current_temp < frost_temp
         
-        boiler_state = self.hass.states.get(self.boiler_switch) if self.boiler_switch else None
-        current_boiler_on = boiler_state is not None and boiler_state.state == STATE_ON
-        if current_boiler_on and self.plant_diagnostics._current_boiler_start is None:
-            self.plant_diagnostics.record_boiler_state(True)
-            
-        if wanted_state and not current_boiler_on:
-            # Hard lock: prevent turning ON if min_cycle_off hasn't elapsed
-            time_since_change = time.monotonic() - self._last_boiler_change
-            min_off_sec = self._min_cycle_off * 60
-            if time_since_change < min_off_sec:
-                self._boiler_status_reason = f"HOLD_OFF - min_cycle_off active ({round(min_off_sec - time_since_change)}s remaining)"
-                _LOGGER.debug("PWM Tick: Boiler wants to turn ON, but min_cycle_off (%.0fs) hasn't elapsed. Waiting...", min_off_sec)
-                return
-                
-            _LOGGER.debug("PWM Tick: Boiler → ON (Peak Demand: %.1f%%)", peak_demand)
-            
-            # BOILER SAFETY: Check if TRVs are physically open (>10%)
-            trvs_ready = False
-            for zone in self.zones:
-                climate_id = make_zone_entity_id(zone[CONF_ZONE_NAME])
-                mode = self.get_zone_mode(climate_id)
-                if mode == ZONE_MODE_PRIMARY and self.get_zone_demand(climate_id) > 0:
-                    trv_list = zone.get(CONF_ZONE_CLIMATES) or []
-                    for trv in trv_list:
-                        trv_state = self.hass.states.get(trv)
-                        if trv_state:
-                            position = None
-                            for attr in ["position", "valve_position", "pi_heating_demand", "heating_demand", "valve_state"]:
-                                if attr in trv_state.attributes:
-                                    position = trv_state.attributes[attr]
-                                    break
-                            if position is not None:
-                                try:
-                                    if float(position) > 10.0:
-                                        trvs_ready = True
-                                        break
-                                except (ValueError, TypeError):
-                                    if isinstance(position, str) and position.lower() in ("open", "heating", "on", "true"):
-                                        trvs_ready = True
-                                        break
-                            else:
-                                # Assume ready if TRV doesn't expose position
-                                trvs_ready = True
-                                break
-                if trvs_ready:
-                    break
-                    
-            if not trvs_ready and any((zone.get(CONF_ZONE_CLIMATES) or []) for zone in self.zones) and not frost_emergency:
-                # BUG-03: During frost_emergency, skip this check — TRVs are being forced HEAT above,
-                # they may not be physically open yet but anti-frost takes priority over boiler safety
-                self._boiler_status_reason = "HOLD_TRV_CLOSED - TRVs not physically open > 10%"
-                _LOGGER.warning("PWM Tick: Boiler wants to turn ON, but no TRVs are open > 10%. Delaying boiler ignition.")
-                return
-
-            if self._valve_delay > 0:
-                if not self._pending_boiler_task:
-                    self._boiler_status_reason = f"WAITING_VALVES - Valve delay active ({self._valve_delay}s)"
-                    _LOGGER.debug("Waiting %s seconds for valves to open...", self._valve_delay)
-                    self._schedule_boiler_check(self._valve_delay, True)
-            else:
-                self._boiler_status_reason = f"ON - Demand {round(peak_demand, 1)}% from {peak_zone or 'Zone'}"
-                await self._force_boiler_on()
-        elif not wanted_state:
-            # Hard lock: prevent turning OFF if min_cycle_on hasn't elapsed
-            # (unless it's already off, then we just ensure pending tasks are cancelled)
-            time_since_change = time.monotonic() - self._last_boiler_change
-            min_on_sec = self._min_cycle_on * 60
-            if current_boiler_on and time_since_change < min_on_sec:
-                self._boiler_status_reason = f"HOLD_ON - min_cycle_on active ({round(min_on_sec - time_since_change)}s remaining)"
-                _LOGGER.debug("PWM Tick: Boiler wants to turn OFF, but min_cycle_on (%.0fs) hasn't elapsed. Waiting...", min_on_sec)
-                return
-                
-            # Cancel any pending valve-delay task even if boiler isn't on yet
-            if self._pending_boiler_task:
-                _LOGGER.debug("PWM Tick: Cancelling pending valve-delay task (Peak Demand: %.1f%%)", peak_demand)
-                self._pending_boiler_task.cancel()
-                self._pending_boiler_task = None
-            if current_boiler_on:
-                self._boiler_status_reason = f"OFF - Cycle ended (Peak Demand: {round(peak_demand, 1)}%)"
-                _LOGGER.debug("PWM Tick: Boiler → OFF (Peak Demand: %.1f%%)", peak_demand)
-                await self._force_boiler_off()
-            else:
-                self._boiler_status_reason = f"OFF - Idle (Peak Demand: {round(peak_demand, 1)}%)"
-        else:
-            # wanted_state and current_boiler_on (steady heating)
-            self._boiler_status_reason = f"ON - Heating (Peak Demand: {round(peak_demand, 1)}% from {peak_zone or 'Zone'})"
-
-    async def _async_update_opentherm_boiler(self, demand: float) -> None:
-        """Map demand to OpenTherm target temperature."""
-        if not self.opentherm_entity:
-            return
-            
-        # Normalize demand from 0-100 to 0.0-1.0 and clamp
-        norm_demand = max(0.0, min(1.0, demand / 100.0))
-            
-        target_temp = self.opentherm_min_temp + (norm_demand * (self.opentherm_max_temp - self.opentherm_min_temp))
-        target_temp = round(target_temp, 1)
-        
-        domain = self.opentherm_entity.split(".")[0]
-        
-        _LOGGER.debug("OpenTherm: Demand %.1f%% -> Target Water Temp: %.1f°C", norm_demand * 100, target_temp)
-        self.plant_diagnostics.record_boiler_state(norm_demand > 0.0)
-        
-        try:
-            st = self.hass.states.get(self.opentherm_entity)
-            if domain in ["climate", "water_heater"]:
-                current_target = st.attributes.get("temperature") if st else None
-                if current_target != target_temp:
-                    await self.hass.services.async_call(
-                        domain,
-                        "set_temperature",
-                        {"entity_id": self.opentherm_entity, "temperature": target_temp},
-                        blocking=False,
-                    )
-                
-                # Turn OFF if demand is 0, otherwise HEAT
-                if domain == "climate":
-                    hvac_mode = "off" if norm_demand <= 0.0 else "heat"
-                    current_mode = st.state if st else None
-                    if current_mode != hvac_mode:
-                        await self.hass.services.async_call(
-                            "climate",
-                            "set_hvac_mode",
-                            {"entity_id": self.opentherm_entity, "hvac_mode": hvac_mode},
-                            blocking=False,
-                        )
-            elif domain == "number":
-                current_val = float(st.state) if st and st.state not in ("unknown", "unavailable") else None
-                if current_val != target_temp:
-                    await self.hass.services.async_call(
-                        "number",
-                        "set_value",
-                        {"entity_id": self.opentherm_entity, "value": target_temp},
-                        blocking=False,
-                    )
-        except Exception as err:
-            _LOGGER.error("Failed to update OpenTherm entity %s: %s", self.opentherm_entity, err)
-
-    async def _async_update_boiler(self, emergency_off: bool = False) -> None:
-        """Fallback for emergency off and anti-seize."""
-        if emergency_off:
-            _LOGGER.debug("Emergency OFF triggered. Stopping boiler.")
-            if self.boiler_mode == MODE_OPENTHERM:
-                await self._async_update_opentherm_boiler(0.0)
-            else:
-                if self._pending_boiler_task:
-                    self._pending_boiler_task.cancel()
-                    self._pending_boiler_task = None
-                await self._force_boiler_off()
-
-    def _schedule_boiler_check(self, delay_seconds: float, turn_on: bool) -> None:
-        """Schedule a delayed boiler update (used for valve delay)."""
-        if self._pending_boiler_task:
-            self._pending_boiler_task.cancel()
-
-        async def _delayed_check():
-            try:
-                await asyncio.sleep(delay_seconds)
-                if turn_on:
-                    await self._force_boiler_on()
-                else:
-                    await self._force_boiler_off()
-            except asyncio.CancelledError:
-                pass
-
-        self._pending_boiler_task = self.hass.async_create_task(_delayed_check())
-
-    async def _force_boiler_on(self) -> None:
-        """Actually turn the boiler on and set locks."""
-        if self.boiler_mode == MODE_OPENTHERM or not self.boiler_switch:
-            return
-
-        if self._pending_boiler_task:
-            # We don't cancel inside force_boiler_on/off because they might be called from the task itself.
-            pass
-
-        await self.hass.services.async_call(
-            "switch",
-            SERVICE_TURN_ON,
-            {ATTR_ENTITY_ID: self.boiler_switch},
-            blocking=False,
-        )
-        self._last_boiler_change = time.monotonic()
-        self.record_diagnostic_event("BOILER_SWITCH_ON", {"switch": self.boiler_switch, "reason": self._boiler_status_reason})
-        self.plant_diagnostics.record_boiler_state(True)
-        _LOGGER.debug("Boiler forced ON")
-
-    async def _force_boiler_off(self) -> None:
-        """Actually turn the boiler off and set locks."""
-        if self.boiler_mode == MODE_OPENTHERM or not self.boiler_switch:
-            return
-
-        if self._pending_boiler_task:
-            # We don't cancel inside force_boiler_on/off because they might be called from the task itself.
-            pass
-
-        await self.hass.services.async_call(
-            "switch",
-            SERVICE_TURN_OFF,
-            {ATTR_ENTITY_ID: self.boiler_switch},
-            blocking=False,
-        )
-        self._last_boiler_change = time.monotonic()
-        self.record_diagnostic_event("BOILER_SWITCH_OFF", {"switch": self.boiler_switch, "reason": self._boiler_status_reason})
-        self.plant_diagnostics.record_boiler_state(False)
-        _LOGGER.debug("Boiler forced OFF")
-
     async def async_apply_master_on(self) -> None:
         """Master turned ON: set heat mode for enabled zones, off for disabled."""
         _LOGGER.debug("Master ON → applying to all zones")
         for zone in self.zones:
             climate_id = make_zone_entity_id(zone[CONF_ZONE_NAME])
-            mode = self._zone_modes.get(climate_id, ZONE_MODE_PRIMARY)
+            mode = self.zone_manager.get_zone_mode(climate_id)
             zone_enabled = (mode != ZONE_MODE_BYPASS)
             if zone_enabled:
                 await self._async_set_hvac_mode(climate_id, HVAC_MODE_HEAT)
@@ -1434,7 +587,7 @@ class MultizoneCoordinator:
             await self._async_set_hvac_mode(climate_id, HVAC_MODE_OFF)
         # Boiler will auto-turn off via state change listener,
         # but we also force it off here for safety ignoring locks
-        await self._async_update_boiler(emergency_off=True)
+        await self.plant_orchestrator.boiler_backend.async_emergency_off()
 
 
 
@@ -1444,11 +597,10 @@ class MultizoneCoordinator:
         if state is None:
             _LOGGER.warning("Climate entity %s not found, skipping", climate_entity)
             return
-
+            
         current_mode = state.state
         if current_mode == mode:
-            return  # Already in correct mode
-
+            return
         _LOGGER.debug("Setting %s → hvac_mode: %s", climate_entity, mode)
         await self.hass.services.async_call(
             CLIMATE_DOMAIN,
@@ -1456,118 +608,4 @@ class MultizoneCoordinator:
             {ATTR_ENTITY_ID: climate_entity, ATTR_HVAC_MODE: mode},
             blocking=False,
         )
-
-    @callback
-    def _async_check_anti_seize(self, now: datetime) -> None:
-        """Check if we need to run the anti-seize routine."""
-        if not self.get_persistent_data(KEY_ANTI_SEIZE_ENABLED, False):
-            return
-            
-        if self._anti_seize_running:
-            return
-            
-        idle_seconds = time.monotonic() - self._last_active_time
-        idle_days = idle_seconds / 86400.0
-        anti_seize_idle_days = self.get_persistent_data(KEY_ANTI_SEIZE_IDLE_DAYS, 15)
-        
-        if idle_days >= anti_seize_idle_days:
-            _LOGGER.info("Anti-seize triggered. System idle for %.1f days (threshold: %d days).", idle_days, anti_seize_idle_days)
-            self._anti_seize_task = self.hass.async_create_task(self._async_execute_anti_seize())
-
-    async def _async_execute_anti_seize(self) -> None:
-        """Execute the anti-seize routine."""
-        self._anti_seize_running = True
-        
-        try:
-            _LOGGER.info("Starting Anti-seize routine...")
-            
-            # 1. Save current state of all enabled zones and open them
-            self._pre_anti_seize_state.clear()
-            zones_to_open = []
-            
-            for zone in self.zones:
-                climate_id = make_zone_entity_id(zone[CONF_ZONE_NAME])
-                # Check if zone has anti-seize enabled
-                if not zone.get(CONF_ZONE_ANTI_SEIZE, True):
-                    _LOGGER.debug("Skipping zone %s (anti-seize disabled)", climate_id)
-                    continue
-                    
-                state = self.hass.states.get(climate_id)
-                if state:
-                    self._pre_anti_seize_state[climate_id] = state.state
-                    zones_to_open.append(climate_id)
-            
-            if not zones_to_open:
-                _LOGGER.info("No zones enabled for anti-seize. Skipping routine.")
-                self._last_active_time = time.monotonic()
-                return
-                
-            _LOGGER.debug("Opening zones: %s", zones_to_open)
-            for climate_id in zones_to_open:
-                # To force open, we set to Heat. If it's a TRV, it will open. If it's a VT, it will turn on relay.
-                # Ideally, we should also set temperature to max, but just turning to HEAT usually opens it fully 
-                # or enough to move the mechanism.
-                await self._async_set_hvac_mode(climate_id, HVAC_MODE_HEAT)
-                
-            # 2. Wait for valves to open
-            if self._valve_delay > 0:
-                _LOGGER.debug("Waiting %s seconds for valves to open...", self._valve_delay)
-                await asyncio.sleep(self._valve_delay)
-                
-            # 3. Fire boiler if configured
-            anti_seize_boiler = self.get_persistent_data(CONF_ANTI_SEIZE_BOILER, False)
-            if anti_seize_boiler:
-                _LOGGER.debug("Activating boiler for anti-seize...")
-                if self.boiler_mode == MODE_OPENTHERM:
-                    await self._async_update_opentherm_boiler(100.0)
-                elif self.boiler_switch:
-                    await self.hass.services.async_call(
-                        "switch",
-                        SERVICE_TURN_ON,
-                        {ATTR_ENTITY_ID: self.boiler_switch},
-                        blocking=False,
-                    )
-                
-            # 4. Wait for the duration
-            anti_seize_duration = self.get_persistent_data(KEY_ANTI_SEIZE_DURATION, 2)
-            duration_seconds = anti_seize_duration * 60
-            _LOGGER.debug("Running anti-seize for %d secondi...", duration_seconds)
-            await asyncio.sleep(duration_seconds)
-            
-            # 5. Turn off boiler if we turned it on
-            if anti_seize_boiler:
-                _LOGGER.debug("Deactivating boiler after anti-seize...")
-                if self.boiler_mode == MODE_OPENTHERM:
-                    await self._async_update_opentherm_boiler(0.0)
-                elif self.boiler_switch:
-                    await self.hass.services.async_call(
-                        "switch",
-                        SERVICE_TURN_OFF,
-                        {ATTR_ENTITY_ID: self.boiler_switch},
-                        blocking=False,
-                    )
-                
-            # 6. Restore all zones
-            _LOGGER.debug("Restoring zones to pre-anti-seize state...")
-            for climate_id, old_state in self._pre_anti_seize_state.items():
-                await self._async_set_hvac_mode(climate_id, old_state)
-                    
-            _LOGGER.info("Anti-seize routine completed successfully.")
-            self._last_active_time = time.monotonic()
-            
-        except asyncio.CancelledError:
-            _LOGGER.warning("Anti-seize routine was cancelled! Initiating emergency shutdown of boiler and valves.")
-            async def _emergency_cleanup():
-                if self.boiler_mode == MODE_OPENTHERM:
-                    await self._async_update_opentherm_boiler(0.0)
-                elif self.boiler_switch:
-                    await self.hass.services.async_call("switch", SERVICE_TURN_OFF, {ATTR_ENTITY_ID: self.boiler_switch}, blocking=False)
-                for climate_id, old_state in self._pre_anti_seize_state.items():
-                    await self._async_set_hvac_mode(climate_id, old_state)
-            self.hass.async_create_task(_emergency_cleanup())
-            raise
-        except Exception as e:
-            _LOGGER.error("Error during anti-seize routine: %s", e)
-        finally:
-            self._anti_seize_running = False
 

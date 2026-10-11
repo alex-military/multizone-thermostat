@@ -26,7 +26,7 @@ async def async_setup_entry(
 ) -> None:
     """Set up demand and diagnostic sensors for each virtual thermostat and plant."""
     coordinator = hass.data[DOMAIN][config_entry.entry_id]["coordinator"]
-    zones = config_entry.data.get(CONF_ZONES, [])
+    zones = coordinator.zones
     if not zones:
         return
 
@@ -74,7 +74,7 @@ class DemandSensor(SensorEntity):
             name="Multizone Brain",
             manufacturer="Custom Integration",
             model="Multizone Brain",
-            via_device_id=getattr(coordinator, "master_device_id", None),
+            via_device=getattr(coordinator, "master_device_id", None),
         )
 
     @property
@@ -122,7 +122,7 @@ class AutotuneSensor(SensorEntity):
             name="Multizone Brain",
             manufacturer="Custom Integration",
             model="Multizone Brain",
-            via_device_id=getattr(coordinator, "master_device_id", None),
+            via_device=getattr(coordinator, "master_device_id", None),
         )
 
     @property
@@ -132,7 +132,7 @@ class AutotuneSensor(SensorEntity):
     @property
     def native_value(self) -> str:
         """Return the current autotuner state."""
-        tuner = self._coordinator.get_autotuner(self._climate_entity_id)
+        tuner = self._coordinator.zone_controller.get_autotuner(self._climate_entity_id)
         if not tuner:
             return "unknown"
         if tuner.state == tuner.STATE_COMPLETED:
@@ -142,7 +142,7 @@ class AutotuneSensor(SensorEntity):
     @property
     def extra_state_attributes(self):
         """Return computed PID parameters."""
-        tuner = self._coordinator.get_autotuner(self._climate_entity_id)
+        tuner = self._coordinator.zone_controller.get_autotuner(self._climate_entity_id)
         if not tuner:
             return {}
         if tuner.state == tuner.STATE_COMPLETED:
@@ -189,7 +189,7 @@ class ThermalSensorBase(SensorEntity):
             name="Multizone Brain",
             manufacturer="Custom Integration",
             model="Multizone Brain",
-            via_device_id=getattr(coordinator, "master_device_id", None),
+            via_device=getattr(coordinator, "master_device_id", None),
         )
 
     async def async_added_to_hass(self) -> None:
@@ -218,7 +218,7 @@ class HeatingRateSensor(ThermalSensorBase):
         
     @property
     def native_value(self) -> float:
-        model = self._coordinator.get_thermal_model(self._climate_entity_id)
+        model = self._coordinator.zone_controller.get_thermal_model(self._climate_entity_id)
         return round(model.heating_rate, 2) if model else 0.0
 
     @property
@@ -239,7 +239,7 @@ class CoolingRateSensor(ThermalSensorBase):
         
     @property
     def native_value(self) -> float:
-        model = self._coordinator.get_thermal_model(self._climate_entity_id)
+        model = self._coordinator.zone_controller.get_thermal_model(self._climate_entity_id)
         return round(model.cooling_rate, 2) if model else 0.0
 
     @property
@@ -260,7 +260,7 @@ class ThermalInertiaSensor(ThermalSensorBase):
         
     @property
     def native_value(self) -> float:
-        model = self._coordinator.get_thermal_model(self._climate_entity_id)
+        model = self._coordinator.zone_controller.get_thermal_model(self._climate_entity_id)
         return round(model.thermal_inertia, 2) if model else 0.0
 
     @property
@@ -423,7 +423,7 @@ class MultizoneZoneEnergyClassSensor(ThermalSensorBase):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        thermal = self._coordinator.get_thermal_model(self._climate_entity_id)
+        thermal = self._coordinator.zone_controller.get_thermal_model(self._climate_entity_id)
         return {
             "cooling_rate": round(thermal.cooling_rate, 3) if thermal else 0.0,
             "heating_rate": round(thermal.heating_rate, 3) if thermal else 0.0,
@@ -476,7 +476,7 @@ class MultizoneZoneRadiatorSizingSensor(ThermalSensorBase):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        thermal = self._coordinator.get_thermal_model(self._climate_entity_id)
+        thermal = self._coordinator.zone_controller.get_thermal_model(self._climate_entity_id)
         if thermal and thermal.cooling_rate > 0.01:
             ratio = round(thermal.heating_rate / thermal.cooling_rate, 2)
         else:
@@ -484,3 +484,6 @@ class MultizoneZoneRadiatorSizingSensor(ThermalSensorBase):
         return {
             "power_to_loss_ratio": ratio,
         }
+
+
+

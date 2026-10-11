@@ -1,5 +1,12 @@
 __pycache__/
 *.pyc
+*.log
+*.log.*
+*.db
+.ha_run.lock
+.pytest_cache/
+.cache/
+**/.cache/
 *.txt
 *.json
 !hacs.json
@@ -7,6 +14,7 @@ __pycache__/
 !strings.json
 !custom_components/multizone_thermostat/translations/*.json
 simulate*.py
-test_*.py
+!tests/test_*.py
 .agents/
 reset_integration.py
+

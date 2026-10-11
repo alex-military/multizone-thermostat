@@ -27,7 +27,7 @@ async def async_setup_entry(
 ) -> None:
     """Set up binary sensors for Multizone Thermostat."""
     coordinator = hass.data[DOMAIN][config_entry.entry_id]["coordinator"]
-    zones = config_entry.data.get(CONF_ZONES, [])
+    zones = coordinator.zones
 
     entities: list[BinarySensorEntity] = []
 
@@ -150,7 +150,7 @@ class MultizoneZoneAnomalyBinarySensor(BinarySensorEntity):
             name="Heating Zones",
             manufacturer="Multizone Thermostat",
             model="Hybrid Zone Controller",
-            via_device_id=getattr(coordinator, "master_device_id", None),
+            via_device=getattr(coordinator, "master_device_id", None),
         )
 
     @property
@@ -188,3 +188,6 @@ class MultizoneZoneAnomalyBinarySensor(BinarySensorEntity):
                 timedelta(seconds=60),
             )
         )
+
+
+

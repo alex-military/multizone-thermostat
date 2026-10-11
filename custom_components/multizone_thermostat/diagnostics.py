@@ -45,7 +45,7 @@ async def async_get_config_entry_diagnostics(
         "is_dhw_active": coordinator.is_dhw_active,
         "master_state": coordinator.get_master_state(),
         "boiler_status_reason": getattr(coordinator, "boiler_status_reason", "N/A"),
-        "current_global_preset": coordinator.current_global_preset,
+        "current_global_preset": coordinator.zone_manager.current_global_preset,
         "geofencing_configured": bool(entry.data.get("geofencing_enabled", False)),
         "geofencing_enabled": coordinator.get_persistent_data("geofencing_toggle", True),
         "weather_sensor_id": coordinator.weather_sensor_id,
@@ -54,7 +54,7 @@ async def async_get_config_entry_diagnostics(
         "min_cycle_off_minutes": coordinator._min_cycle_off,
         "valve_delay_seconds": coordinator._valve_delay,
         "pre_window_state": coordinator._pre_window_state,
-        "anti_seize_running": coordinator._anti_seize_running,
+        "anti_seize_running": hasattr(coordinator, "anti_seize_manager") and coordinator.anti_seize_manager.is_running,
         "last_active_time_uptime": round(coordinator._last_active_time, 1),
     }
 
@@ -67,8 +67,8 @@ async def async_get_config_entry_diagnostics(
         # Get climate entity instance if registered
         climate_entity = coordinator._climate_entities.get(climate_id)
 
-        tuner = coordinator.get_autotuner(climate_id)
-        thermal = coordinator.get_thermal_model(climate_id)
+        tuner = coordinator.zone_controller.get_autotuner(climate_id)
+        thermal = coordinator.zone_controller.get_thermal_model(climate_id)
         pid = coordinator._pids.get(climate_id)
 
         zone_info: dict[str, Any] = {

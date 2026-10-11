@@ -61,7 +61,8 @@ async def async_setup_entry(
     entities.append(MultizoneAntiFrostSwitch(coordinator, config_entry.entry_id))
 
     # Per-Zone Physical Control Synchronization Switches (for zones with climates)
-    zones = config_entry.data.get(CONF_ZONES, [])
+    coordinator = hass.data[DOMAIN][config_entry.entry_id]["coordinator"]
+    zones = coordinator.zones
     for zone in zones:
         zone_name = zone[CONF_ZONE_NAME]
         if zone.get(CONF_ZONE_CLIMATES):
@@ -80,7 +81,7 @@ def _make_device_info(entry_id: str, master_device_id: str | None = None, device
             name="Time & Geofencing",
             manufacturer="Custom Integration",
             model="Time & Geofencing Settings",
-            via_device_id=master_device_id,
+            via_device=master_device_id,
         )
     elif device_type == "zone_modes":
         return DeviceInfo(
@@ -88,7 +89,7 @@ def _make_device_info(entry_id: str, master_device_id: str | None = None, device
             name="Zone Modes",
             manufacturer="Custom Integration",
             model="Zone Modes",
-            via_device_id=master_device_id,
+            via_device=master_device_id,
         )
         
     return DeviceInfo(
@@ -117,7 +118,7 @@ class MultizoneMasterSwitch(RestoreEntity, SwitchEntity):
     @property
     def is_on(self) -> bool:
         """Return true if switch is on."""
-        return self._is_on
+        return self._coordinator._master_state
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -133,6 +134,7 @@ class MultizoneMasterSwitch(RestoreEntity, SwitchEntity):
         """Turn master on."""
         self._is_on = True
         self._coordinator.set_master_state(True)
+        await self._coordinator.async_apply_master_on()
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
@@ -145,11 +147,12 @@ class MultizoneMasterSwitch(RestoreEntity, SwitchEntity):
     async def async_added_to_hass(self) -> None:
         """Restore state on HA restart."""
         await super().async_added_to_hass()
+        self._coordinator.register_master_switch(self)
         last_state = await self.async_get_last_state()
         if last_state is not None:
-            self._is_on = last_state.state == "on"
-            self._coordinator.set_master_state(self._is_on)
-            _LOGGER.debug("Master switch restored to: %s", self._is_on)
+            is_on = last_state.state == "on"
+            self._coordinator.set_master_state(is_on)
+            _LOGGER.debug("Master switch restored to: %s", is_on)
 
 
 
@@ -330,7 +333,7 @@ class MultizonePassiveHeatSwitch(SwitchEntity):
     @property
     def is_on(self) -> bool:
         """Return true if passive heat is allowed for this zone."""
-        return self._coordinator.is_passive_heat_allowed(self._climate_id)
+        return self._coordinator.zone_manager.is_passive_heat_allowed(self._climate_id)
 
     @property
     def icon(self) -> str:
@@ -348,5 +351,8 @@ class MultizonePassiveHeatSwitch(SwitchEntity):
         key = f"{KEY_PASSIVE_HEAT_PREFIX}{self._safe_name}"
         await self._coordinator.async_set_persistent_data(key, False)
         self.async_write_ha_state()
+
+
+
 
 

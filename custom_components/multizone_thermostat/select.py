@@ -72,16 +72,16 @@ class MultizoneGlobalPresetSelect(RestoreEntity, SelectEntity):
     @property
     def current_option(self) -> str:
         """Return the current selected option."""
-        return self._coordinator.current_global_preset
+        return self._coordinator.zone_manager.current_global_preset
 
     async def async_added_to_hass(self) -> None:
         """Restore previous state."""
         await super().async_added_to_hass()
         last_state = await self.async_get_last_state()
         if last_state is not None and last_state.state in self.options:
-            self._coordinator.set_global_preset(last_state.state)
+            self._coordinator.zone_manager.set_global_preset(last_state.state)
         else:
-            self._coordinator.set_global_preset(GLOBAL_PRESET_MANUAL)
+            self._coordinator.zone_manager.set_global_preset(GLOBAL_PRESET_MANUAL)
             
         self._coordinator.register_select("global_preset", self)
 
@@ -92,7 +92,7 @@ class MultizoneGlobalPresetSelect(RestoreEntity, SelectEntity):
             return
 
         # Notify coordinator to apply the new preset to all zones
-        await self._coordinator.async_set_global_preset(option)
+        await self._coordinator.zone_manager.async_set_global_preset(option)
         self.async_write_ha_state()  # NEW-WARN-03: ensure UI updates immediately
 
     async def async_will_remove_from_hass(self) -> None:
@@ -128,7 +128,7 @@ class MultizoneZoneSelect(RestoreEntity, SelectEntity):
             name="Zone Modes",
             manufacturer="Custom Integration",
             model="Zone Modes",
-            via_device_id=getattr(self._coordinator, "master_device_id", None),
+            via_device=getattr(self._coordinator, "master_device_id", None),
         )
 
     @property

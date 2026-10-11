@@ -1,0 +1,32 @@
+# Configurazione base per il container di test
+default_config:
+
+logger:
+  default: info
+  logs:
+    custom_components.multizone_thermostat: debug
+
+# Entita fittizie (Mock) per i test
+input_boolean:
+  dummy_window_sensor:
+    name: "Finestra di Test"
+    icon: mdi:window-open
+
+input_number:
+  dummy_temperature_sensor:
+    name: "Sonda Temp Test"
+    min: 0
+    max: 50
+    step: 0.1
+    mode: slider
+
+template:
+  - switch:
+      - name: "dummy_boiler_relay"
+        state: "off"
+        turn_on:
+          action: delay
+          delay: "00:00:01"
+        turn_off:
+          action: delay
+          delay: "00:00:01"
