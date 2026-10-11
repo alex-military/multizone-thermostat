@@ -1,6 +1,5 @@
 {
   "name": "Multizone Thermostat",
   "render_readme": true,
-  "homeassistant": "2024.1.0",
-  "iot_class": "Local Push"
+  "homeassistant": "2024.1.0"
 }
