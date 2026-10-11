@@ -90,7 +90,8 @@
         "data": {
           "opentherm_entity": "OpenTherm Climate/Water Heater Entity",
           "opentherm_min_temp": "Minimum Water Temperature (°C)",
-          "opentherm_max_temp": "Maximum Water Temperature (°C)"
+          "opentherm_max_temp": "Maximum Water Temperature (°C)",
+          "opentherm_ch_switch": "CH enable switch (optional)"
         }
       }
     },
@@ -217,7 +218,8 @@
         "data": {
           "opentherm_entity": "OpenTherm Climate/Water Heater Entity",
           "opentherm_min_temp": "Minimum Water Temperature (°C)",
-          "opentherm_max_temp": "Maximum Water Temperature (°C)"
+          "opentherm_max_temp": "Maximum Water Temperature (°C)",
+          "opentherm_ch_switch": "CH enable switch (optional)"
         }
       }
     },

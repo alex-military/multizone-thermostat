@@ -263,7 +263,8 @@ def evaluate_zone_anomalies(
     Updates the `state` dict in-place and returns (anomaly_type, human_readable_description).
     """
     try:
-        now = time.time()
+        now_wall = time.time()
+        now_mono = time.monotonic()
         st = hass.states.get(climate_id)
         if not st:
             return ANOMALY_NONE, "Zona non pronta"
@@ -289,11 +290,13 @@ def evaluate_zone_anomalies(
                     return ANOMALY_LOW_BATTERY, state["anomaly_details"]
 
         # 0.b Sanity Check (Plausibility)
+        # Only physically impossible values are flagged: cold rooms (garage,
+        # unheated houses) legitimately read below 4°C.
         is_insane = False
-        if current_temp < 4.0:
+        if current_temp < -30.0 or current_temp > 60.0:
             is_insane = True
         if state["last_temp_seen"] is not None and state["last_temp_time"] is not None:
-            if abs(state["last_temp_seen"] - current_temp) > 4.0 and (now - state["last_temp_time"]) < 600:
+            if abs(state["last_temp_seen"] - current_temp) > 4.0 and (now_mono - state["last_temp_time"]) < 600:
                 is_insane = True
                 
         if is_insane:
@@ -302,6 +305,7 @@ def evaluate_zone_anomalies(
             return ANOMALY_SENSOR_FAULT, state["anomaly_details"]
 
         # 0.c Watchdog Sensor Timeout Check
+        state["fallback_ok"] = False
         timeout_min = zone.get("sensor_timeout_min", 60) if zone else 60
         sensor_entity = zone.get("temp_sensor") if zone else None
         if sensor_entity:
@@ -309,10 +313,17 @@ def evaluate_zone_anomalies(
             if s_state:
                 s_reported = s_state.last_reported if hasattr(s_state, "last_reported") else s_state.last_updated
                 if s_reported:
-                    elapsed_sec = now - s_reported.timestamp()
+                    elapsed_sec = now_wall - s_reported.timestamp()
                     if elapsed_sec > (timeout_min * 60):
+                        # Degraded (not critical) if a valid TRV temperature is available as fallback
+                        for trv in (zone.get("climate_entities") or []):
+                            trv_st = hass.states.get(trv)
+                            if trv_st and trv_st.attributes.get("current_temperature") is not None:
+                                state["fallback_ok"] = True
+                                break
                         state["active_anomaly"] = ANOMALY_SENSOR_TIMEOUT
-                        state["anomaly_details"] = f"Sonda {sensor_entity} non aggiornata da oltre {int(elapsed_sec / 60)} min (limite: {timeout_min} min)"
+                        suffix = " - fallback sui TRV attivo" if state["fallback_ok"] else ""
+                        state["anomaly_details"] = f"Sonda {sensor_entity} non aggiornata da oltre {int(elapsed_sec / 60)} min (limite: {timeout_min} min){suffix}"
                         return ANOMALY_SENSOR_TIMEOUT, state["anomaly_details"]
 
         # If the zone is Bypassed, it is intentionally excluded from heating
@@ -325,9 +336,9 @@ def evaluate_zone_anomalies(
         # 1. Staleness Check: Has the temperature sensor not updated in > 2 hours?
         if state["last_temp_seen"] is None or state["last_temp_seen"] != current_temp:
             state["last_temp_seen"] = current_temp
-            state["last_temp_time"] = now
+            state["last_temp_time"] = now_mono
             
-        if state["last_temp_time"] is not None and (now - state["last_temp_time"]) > 7200:
+        if state["last_temp_time"] is not None and (now_mono - state["last_temp_time"]) > 7200:
             # Same exact float value for > 2 hours
             state["active_anomaly"] = ANOMALY_STALE_SENSOR
             state["anomaly_details"] = ANOMALY_LABELS[ANOMALY_STALE_SENSOR]
@@ -335,11 +346,11 @@ def evaluate_zone_anomalies(
 
         # Update last heating time
         if boiler_on and demand > 0.0:
-            state["last_heating_time"] = now
+            state["last_heating_time"] = now_mono
 
         # 2. Overshoot Check: Only if heating was active recently (within the last 2 ore)
         # If the heating wasn't active recently, warm room temperature is natural ambient/solar heat.
-        heated_recently = state["last_heating_time"] is not None and (now - state["last_heating_time"]) < 7200
+        heated_recently = state["last_heating_time"] is not None and (now_mono - state["last_heating_time"]) < 7200
         if heated_recently and target_temp is not None and current_temp > (float(target_temp) + 1.5):
             state["active_anomaly"] = ANOMALY_OVERSHOOT
             state["anomaly_details"] = f"Temperatura attuale ({current_temp}°C) supera il target ({target_temp}°C) di oltre 1.5°C per calore residuo"
@@ -348,9 +359,9 @@ def evaluate_zone_anomalies(
         # 3. Stuck Closed Valve: Demand == 100% for > 75 min, but temperature did not rise >= 0.2°C
         if demand >= 99.0 and boiler_on:
             if state["high_demand_start_time"] is None:
-                state["high_demand_start_time"] = now
+                state["high_demand_start_time"] = now_mono
                 state["high_demand_start_temp"] = current_temp
-            elif (now - state["high_demand_start_time"]) > 4500:  # 75 minutes
+            elif (now_mono - state["high_demand_start_time"]) > 4500:  # 75 minutes
                 start_t = state["high_demand_start_temp"]
                 if start_t is not None and (current_temp - start_t) < 0.2:
                     state["active_anomaly"] = ANOMALY_VALVE_STUCK_CLOSED

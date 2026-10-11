@@ -1,6 +1,8 @@
 """Binary sensor component for dummy Home Assistant."""
 from homeassistant.helpers.entity import Entity
 
+DOMAIN = "binary_sensor"
+
 class BinarySensorDeviceClass:
     PROBLEM = "problem"
     OPENING = "opening"
@@ -8,3 +10,4 @@ class BinarySensorDeviceClass:
 
 class BinarySensorEntity(Entity):
     pass
+

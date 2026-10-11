@@ -4,13 +4,15 @@ import time
 import asyncio
 
 from homeassistant.core import HomeAssistant
-from homeassistant.const import ATTR_ENTITY_ID, SERVICE_TURN_ON, SERVICE_TURN_OFF, STATE_ON
+from homeassistant.const import ATTR_ENTITY_ID, SERVICE_TURN_ON, SERVICE_TURN_OFF, STATE_ON, STATE_OFF
 
 from .base import BoilerBackend
 from ..pwm_engine import PWMEngine
 from ..const import CONF_ZONE_NAME, CONF_ZONE_CLIMATES, ZONE_MODE_PRIMARY, make_zone_entity_id
 
 _LOGGER = logging.getLogger(__name__)
+
+COMMAND_CONFIRM_TIMEOUT = 60.0  # seconds to wait for the switch entity to confirm a command
 
 class RelayBoilerBackend(BoilerBackend):
     """Handles Relay/On-Off boilers via PWM."""
@@ -36,6 +38,10 @@ class RelayBoilerBackend(BoilerBackend):
         self._last_boiler_change = 0.0
         self._pending_boiler_task: asyncio.Task | None = None
         self._status_reason = "INIT"
+        self._last_demand = 0.0
+        self._last_frost_emergency = False
+        # Command confirmation tracking: None | ("on"/"off", monotonic_ts)
+        self._pending_command: tuple[str, float] | None = None
 
     @property
     def status_reason(self) -> str:
@@ -65,13 +71,31 @@ class RelayBoilerBackend(BoilerBackend):
             try:
                 await asyncio.sleep(delay_seconds)
                 if turn_on:
+                    if not self._conditions_still_valid():
+                        _LOGGER.debug("Valve delay expired but heat request no longer valid. Boiler stays OFF.")
+                        self._status_reason = "OFF - Heat request ended during valve delay"
+                        return
+                    self._status_reason = f"ON - Demand {round(self._last_demand, 1)}% (after valve delay)"
                     await self._force_boiler_on()
                 else:
                     await self._force_boiler_off()
             except asyncio.CancelledError:
                 pass
+            finally:
+                if self._pending_boiler_task is asyncio.current_task():
+                    self._pending_boiler_task = None
 
         self._pending_boiler_task = self.hass.async_create_task(_delayed_check())
+
+    def _conditions_still_valid(self) -> bool:
+        """Re-check Master, DHW and demand before igniting after valve delay."""
+        if self._last_frost_emergency:
+            return True
+        if not self.coordinator.get_master_state():
+            return False
+        if self.coordinator.is_dhw_active:
+            return False
+        return self._last_demand > 0.0
 
     async def _force_boiler_on(self) -> None:
         """Actually turn the boiler on and set locks."""
@@ -88,8 +112,8 @@ class RelayBoilerBackend(BoilerBackend):
             blocking=False,
         )
         self._last_boiler_change = time.monotonic()
+        self._pending_command = ("on", time.monotonic())
         self.coordinator.record_diagnostic_event("BOILER_SWITCH_ON", {"switch": self.boiler_switch, "reason": self._status_reason})
-        self.coordinator.plant_diagnostics.record_boiler_state(True)
         _LOGGER.debug("Boiler forced ON")
 
     async def _force_boiler_off(self) -> None:
@@ -107,8 +131,8 @@ class RelayBoilerBackend(BoilerBackend):
             blocking=False,
         )
         self._last_boiler_change = time.monotonic()
+        self._pending_command = ("off", time.monotonic())
         self.coordinator.record_diagnostic_event("BOILER_SWITCH_OFF", {"switch": self.boiler_switch, "reason": self._status_reason})
-        self.coordinator.plant_diagnostics.record_boiler_state(False)
         _LOGGER.debug("Boiler forced OFF")
 
     async def async_emergency_off(self) -> None:
@@ -121,14 +145,30 @@ class RelayBoilerBackend(BoilerBackend):
 
     async def async_update(self, demand: float, peak_zone: str | None, frost_emergency: bool) -> None:
         """Feed Peak Load to PWM Engine and control the relay."""
+        self._last_demand = demand
+        self._last_frost_emergency = frost_emergency
         wanted_state = self._boiler_pwm.calculate(demand)
 
         boiler_state = self.hass.states.get(self.boiler_switch) if self.boiler_switch else None
         current_boiler_on = boiler_state is not None and boiler_state.state == STATE_ON
-        
-        # Track start time in diagnostics if it turned on externally
-        if current_boiler_on and self.coordinator.plant_diagnostics._current_boiler_start is None:
-            self.coordinator.plant_diagnostics.record_boiler_state(True)
+
+        # Diagnostics follow the CONFIRMED entity state, not the command sent
+        diag = self.coordinator.plant_diagnostics
+        if current_boiler_on and diag._current_boiler_start is None:
+            diag.record_boiler_state(True)
+        elif boiler_state is not None and boiler_state.state == STATE_OFF and diag._current_boiler_start is not None:
+            diag.record_boiler_state(False)
+        if self._pending_command is not None:
+            cmd, ts = self._pending_command
+            if (cmd == "on" and current_boiler_on) or (cmd == "off" and boiler_state is not None and not current_boiler_on):
+                self._pending_command = None
+            elif time.monotonic() - ts > COMMAND_CONFIRM_TIMEOUT:
+                _LOGGER.warning("Boiler switch %s did not confirm '%s' within %ss", self.boiler_switch, cmd, COMMAND_CONFIRM_TIMEOUT)
+                self.coordinator.record_diagnostic_event("BOILER_COMMAND_TIMEOUT", {"switch": self.boiler_switch, "command": cmd})
+                self._pending_command = None
+
+        # DHW priority: heating request is suppressed, so release the relay even if min_cycle_on is active
+        dhw_override = bool(getattr(self.coordinator, "is_dhw_active", False)) and not frost_emergency
 
         if wanted_state and not current_boiler_on:
             time_since_change = time.monotonic() - self._last_boiler_change
@@ -190,7 +230,7 @@ class RelayBoilerBackend(BoilerBackend):
         elif not wanted_state:
             time_since_change = time.monotonic() - self._last_boiler_change
             min_on_sec = self._min_cycle_on * 60
-            if current_boiler_on and time_since_change < min_on_sec:
+            if current_boiler_on and time_since_change < min_on_sec and not dhw_override:
                 self._status_reason = f"HOLD_ON - min_cycle_on active ({round(min_on_sec - time_since_change)}s remaining)"
                 _LOGGER.debug("PWM Tick: Boiler wants to turn OFF, but min_cycle_on (%.0fs) hasn't elapsed. Waiting...", min_on_sec)
                 return

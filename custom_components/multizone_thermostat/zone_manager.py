@@ -234,7 +234,7 @@ class ZoneManager:
                 if climate_id not in self._pre_window_state:
                     current_mode = self.get_zone_mode(climate_id)
                     self._pre_window_state[climate_id] = current_mode
-                    self.hass.async_create_task(self.coordinator._async_save_presets_storage())
+                    self.hass.async_create_task(self.coordinator.async_save_storage())
                 
                 if zone_select and self.get_zone_mode(climate_id) != ZONE_MODE_BYPASS:
                     self.coordinator.record_diagnostic_event("WINDOW_OPENED_BYPASS", {"sensor": sensor_id, "zone": climate_id})
@@ -245,7 +245,7 @@ class ZoneManager:
                 _LOGGER.debug("Window closed or sensor lost (%s), restoring zone %s", sensor_id, climate_id)
                 if climate_id in self._pre_window_state:
                     was_mode = self._pre_window_state.pop(climate_id)
-                    self.hass.async_create_task(self.coordinator._async_save_presets_storage())
+                    self.hass.async_create_task(self.coordinator.async_save_storage())
                     
                     if zone_select and self.get_zone_mode(climate_id) != was_mode:
                         self.coordinator.record_diagnostic_event("WINDOW_CLOSED_RESTORE", {"sensor": sensor_id, "zone": climate_id, "mode": was_mode})

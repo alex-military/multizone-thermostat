@@ -34,6 +34,9 @@ class PlantOrchestrator:
             return
             
         dhw_active = getattr(self.coordinator, "is_dhw_active", False)
-        agg = self.demand_aggregator.calculate(is_dhw_active=dhw_active)
+        agg = self.demand_aggregator.calculate(
+            is_dhw_active=dhw_active,
+            frost_emergency=frost_emergency,
+        )
                 
         await self.boiler_backend.async_update(agg.demand, agg.peak_zone, frost_emergency)

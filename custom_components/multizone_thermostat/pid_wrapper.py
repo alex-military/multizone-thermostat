@@ -25,7 +25,8 @@ class MultizonePID:
         self._pid = PID(kp, ki, kd, out_min=out_min, out_max=out_max, sampling_period=0)
         self.sensor_timeout = sensor_timeout
         self.update_sensor_timestamp()
-        self.last_sensor_update = time.time()
+        self.last_sensor_update = time.monotonic()
+        self._last_input_time: float | None = None
         self._last_demand = 0.0
         
     @property
@@ -40,15 +41,19 @@ class MultizonePID:
         self._pid.set_pid_param(kp=kp, ki=ki, kd=kd)
         
     def clear_samples(self):
+        """Clear samples, dt tracking, integral and refresh sensor timestamp."""
+        self._last_input_time = None
         self._pid.clear_samples()
+        self._pid.integral = 0.0
+        self.update_sensor_timestamp()
         
     def update_sensor_timestamp(self):
         """Called externally when the temperature sensor actually reports a new value."""
-        self.last_sensor_update = time.time()
+        self.last_sensor_update = time.monotonic()
         
     def calc(self, current_temp: float, target_temp: float) -> float:
         """Calculate the new demand percentage."""
-        now = time.time()
+        now = time.monotonic()
         
         # Dead Sensor Timeout Check
         if self.sensor_timeout > 0 and (now - self.last_sensor_update) > self.sensor_timeout:
@@ -56,7 +61,8 @@ class MultizonePID:
             self._last_demand = 0.0
             return self._last_demand
             
-        # Calculate PID
-        demand, _ = self._pid.calc(current_temp, target_temp, input_time=now)
+        # Calculate PID with tracked last_input_time to ensure proper dt calculation without jumps
+        demand, _ = self._pid.calc(current_temp, target_temp, input_time=now, last_input_time=self._last_input_time)
+        self._last_input_time = now
         self._last_demand = demand
         return self._last_demand

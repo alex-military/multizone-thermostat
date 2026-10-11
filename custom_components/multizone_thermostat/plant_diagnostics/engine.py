@@ -68,7 +68,7 @@ class PlantDiagnosticsEngine:
 
     def record_boiler_state(self, is_on: bool) -> None:
         """Record a boiler switch ON or OFF transition."""
-        now = time.time()
+        now = time.monotonic()
         try:
             if is_on:
                 if self._current_boiler_start is None:
@@ -83,13 +83,13 @@ class PlantDiagnosticsEngine:
 
     def get_boiler_cycles_per_hour(self) -> int:
         """Calculate boiler ignition cycles in the past 60 minutes."""
-        now = time.time()
+        now = time.monotonic()
         one_hour_ago = now - 3600.0
         return sum(1 for t in self._boiler_on_events if t >= one_hour_ago)
 
     def get_boiler_daily_runtime_hours(self) -> float:
         """Calculate total boiler running hours in the past 24 hours."""
-        now = time.time()
+        now = time.monotonic()
         twenty_four_hours_ago = now - 86400.0
         total_seconds = 0.0
 
@@ -146,7 +146,11 @@ class PlantDiagnosticsEngine:
         state = self._zone_anomaly_state.get(climate_id)
         if not state:
             return False
-        return state.get("active_anomaly") in (ANOMALY_LOW_BATTERY, ANOMALY_SENSOR_FAULT, ANOMALY_SENSOR_TIMEOUT)
+        anomaly = state.get("active_anomaly")
+        if anomaly == ANOMALY_SENSOR_TIMEOUT and state.get("fallback_ok"):
+            # Degraded: a valid TRV fallback measurement exists, keep heating.
+            return False
+        return anomaly in (ANOMALY_LOW_BATTERY, ANOMALY_SENSOR_FAULT, ANOMALY_SENSOR_TIMEOUT)
 
     def get_plant_health_summary(self) -> dict[str, Any]:
         """

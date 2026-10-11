@@ -10,6 +10,7 @@ CONF_BOILER_SWITCH = "boiler_switch"
 CONF_OPENTHERM_ENTITY = "opentherm_entity"
 CONF_OPENTHERM_MIN_TEMP = "opentherm_min_temp"
 CONF_OPENTHERM_MAX_TEMP = "opentherm_max_temp"
+CONF_OPENTHERM_CH_SWITCH = "opentherm_ch_switch"
 
 CONF_ZONES = "zones"
 CONF_ZONE_NAME = "name"

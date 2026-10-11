@@ -1,5 +1,22 @@
 # Changelog
 
+## [5.0.0] - 2026-10-11
+### Major Release: Modular Architecture, End-to-End Hardening & Comprehensive Testing Suite
+- **Monolith Decomposition & Modular Architecture**:
+  - coordinator.py refactored into Single Responsibility Principle services (zone_controller, demand_aggregator, zone_manager, calendar_manager, 
+outine_manager).
+  - Specialized subsystem packages: oiler/ (Relay & OpenTherm backends, Plant Orchestrator), safety/ (Watchdog, Frost Manager, Anti-Seize), plant_diagnostics/, storage/, and config_flow/.
+- **OpenTherm CH Switch Support**: Dedicated opentherm_ch_switch configuration option to cleanly toggle central heating on/off without disturbing flow temperature setpoints; safe fallback to entity min attribute or zero.
+- **Immediate TRV Fallback**: Sensor offline/unavailable transitions trigger immediate onboard TRV averaging (_update_current_temp), preventing heating dropouts during network transitions.
+- **Bumpless Post-DHW Recovery**: Automatic detection of DHW falling edge resets PID samples, timestamps, and integrals (clear_samples()), eliminating thermal surges after prolonged DHW usage.
+- **Boiler Command Confirmation & Hardware Watchdog**: Diagnostics track confirmed hardware switch state; unconfirmed commands raise BOILER_COMMAND_TIMEOUT after 60s and retry intelligently if demand persists.
+- **Safe Valve Delay & State Re-Verification**: Re-evaluates Master switch, DHW status, and heat demand after valve opening delays before igniting the boiler.
+- **Storage Isolation & Clean Lifecycle**: Storage isolated per entry ID ({DOMAIN}_{entry_id}_*) with automatic migration from legacy structures; clean setup, options reload, and unload without dangling callbacks.
+- **Monotonic Clock Discipline**: In-process durations in PWM, PID, thermal model, and diagnostics use 	ime.monotonic(), making regulation immune to NTP time jumps and DST transitions.
+- **Comprehensive Quality Assurance**:
+  - Full automated suite of 105 integration unit tests running under -W error.
+  - Deterministic Virtual Testing Lab (multizone_lab) covering priority scenarios P1–P10, full 7-day minute-by-minute simulation, and invariant validation.
+
 ## [4.7.3] - 2026-10-07
 ### ?? Bug Fixes & Code Cleanup
 - **Physical Sync Switch**: Improved entity identity handling to prevent orphaned sync switches when renaming zones.

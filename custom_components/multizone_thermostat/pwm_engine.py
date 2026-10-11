@@ -18,7 +18,7 @@ class PWMEngine:
         self.min_on = min_on
         self.min_off = min_off
         
-        self.cycle_start_time = time.time()
+        self.cycle_start_time = time.monotonic()
         self.current_state = False
         self.time_on = 0.0
         self.time_off = pwm_interval
@@ -37,7 +37,7 @@ class PWMEngine:
             self.current_state = True
             return self.current_state
             
-        now = time.time()
+        now = time.monotonic()
         time_passed = now - self.cycle_start_time
         
         # Calculate raw times

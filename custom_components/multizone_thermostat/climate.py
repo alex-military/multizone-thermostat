@@ -118,7 +118,7 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             name="Heating Zones",
             manufacturer="Multizone Thermostat",
             model="Hybrid Zone Controller",
-            via_device=getattr(self._coordinator, "master_device_id", None),
+            via_device=(DOMAIN, entry_id),
         )
 
         self.entity_id = vt_entity_id
@@ -257,6 +257,10 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         """Handle external temperature sensor changes."""
         new_state: State | None = event.data.get("new_state")
         if new_state is None or new_state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+            # Sensore non valido: valuta subito il fallback sui TRV senza
+            # attendere il prossimo aggiornamento periodico.
+            self._update_current_temp()
+            self.async_write_ha_state()
             return
 
         try:

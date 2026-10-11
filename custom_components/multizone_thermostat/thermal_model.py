@@ -29,7 +29,7 @@ class ThermalObserver:
 
     def update(self, current_temp: float, is_heating: bool):
         """Update the observer with the latest temperature and state."""
-        now = time.time()
+        now = time.monotonic()
         
         if self._last_temp is None:
             self._last_temp = current_temp

@@ -25,6 +25,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
         self._opentherm_entity: str | None = None
         self._opentherm_min_temp: float = 35.0
         self._opentherm_max_temp: float = 75.0
+        self._opentherm_ch_switch: str | None = None
         self._geofencing_enabled: bool = False
         self._presence_sensor: str | None = None
         self._weather_sensor: str | None = None
@@ -43,6 +44,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             self._opentherm_entity = self.config_entry.data.get(CONF_OPENTHERM_ENTITY)
             self._opentherm_min_temp = self.config_entry.data.get(CONF_OPENTHERM_MIN_TEMP, 35.0)
             self._opentherm_max_temp = self.config_entry.data.get(CONF_OPENTHERM_MAX_TEMP, 75.0)
+            self._opentherm_ch_switch = self.config_entry.data.get(CONF_OPENTHERM_CH_SWITCH)
             self._geofencing_enabled = self.config_entry.data.get(CONF_GEOFENCING_ENABLED, False)
             self._presence_sensor = self.config_entry.data.get(CONF_PRESENCE_SENSOR)
             self._weather_sensor = self.config_entry.data.get(CONF_WEATHER_SENSOR)
@@ -120,11 +122,14 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             self._opentherm_entity = user_input[CONF_OPENTHERM_ENTITY]
             self._opentherm_min_temp = user_input[CONF_OPENTHERM_MIN_TEMP]
             self._opentherm_max_temp = user_input[CONF_OPENTHERM_MAX_TEMP]
+            self._opentherm_ch_switch = user_input.get(CONF_OPENTHERM_CH_SWITCH) or None
             errors.update(validate_opentherm_temps(self._opentherm_min_temp, self._opentherm_max_temp))
             if not errors:
                 return self._save_options()
 
-        schema = get_options_boiler_opentherm_schema(self._opentherm_entity, self._opentherm_min_temp, self._opentherm_max_temp)
+        schema = get_options_boiler_opentherm_schema(
+            self._opentherm_entity, self._opentherm_min_temp, self._opentherm_max_temp, self._opentherm_ch_switch
+        )
 
         return self.async_show_form(step_id="boiler_opentherm", data_schema=schema, errors=errors)
 
@@ -405,6 +410,8 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                 CONF_ZONES: self._zones,
                 CONF_GEOFENCING_ENABLED: self._geofencing_enabled,
             }
+            if self._opentherm_ch_switch:
+                data[CONF_OPENTHERM_CH_SWITCH] = self._opentherm_ch_switch
         if self._geofencing_enabled and self._presence_sensor:
             data[CONF_PRESENCE_SENSOR] = self._presence_sensor
             

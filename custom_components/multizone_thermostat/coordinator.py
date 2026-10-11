@@ -40,6 +40,7 @@ from .const import (
     CONF_OPENTHERM_ENTITY,
     CONF_OPENTHERM_MIN_TEMP,
     CONF_OPENTHERM_MAX_TEMP,
+    CONF_OPENTHERM_CH_SWITCH,
     CONF_ZONES,
     CONF_PRESENCE_SENSOR,
     CONF_ANTI_SEIZE_ENABLED,
@@ -124,6 +125,7 @@ class MultizoneCoordinator:
         self.opentherm_entity = entry.data.get(CONF_OPENTHERM_ENTITY)
         self.opentherm_min_temp = entry.data.get(CONF_OPENTHERM_MIN_TEMP, 35.0)
         self.opentherm_max_temp = entry.data.get(CONF_OPENTHERM_MAX_TEMP, 75.0)
+        self.opentherm_ch_switch = entry.data.get(CONF_OPENTHERM_CH_SWITCH)
         self.zones = entry.data.get(CONF_ZONES, [])
         self.presence_sensor = entry.data.get(CONF_PRESENCE_SENSOR)
         self.weather_sensor_id = entry.data.get(CONF_WEATHER_SENSOR)
@@ -132,34 +134,11 @@ class MultizoneCoordinator:
         
         # Internal state tracking
         self._master_state: bool = False
-        self._zone_modes: dict[str, str] = {
-            make_zone_entity_id(z[CONF_ZONE_NAME]): ZONE_MODE_PRIMARY for z in self.zones
-        }
-        self._zone_demands: dict[str, float] = {
-            make_zone_entity_id(z[CONF_ZONE_NAME]): 0.0 for z in self.zones
-        }
-        self._pre_window_state: dict[str, str] = {}
-        self._pre_anti_seize_state: dict[str, str] = {}
         self._min_cycle_on = float(entry.data.get(CONF_MIN_CYCLE_ON, DEFAULT_MIN_CYCLE_ON))
         self._min_cycle_off = float(entry.data.get(CONF_MIN_CYCLE_OFF, DEFAULT_MIN_CYCLE_OFF))
         self._valve_delay = float(entry.data.get(CONF_VALVE_DELAY, DEFAULT_VALVE_DELAY))
         self._climate_callbacks = {}
-
-
-
-        self._last_boiler_change = 0.0
-        self._last_active_time = time.monotonic() # Default to now until loaded
-        self._anti_seize_running = False
-        self._storage_save_pending: bool = False
-        
-        self._calendar_active_event_id: str | None = None
-        self._calendar_temp_overrides: dict[str, float] = {}
-        self._calendar_mode_overrides: dict[str, str] = {}
-        self._pre_calendar_preset: str | None = None
-        
-        self._store = Store(hass, WINDOW_STORAGE_VERSION, WINDOW_STORAGE_KEY)
-        self._preset_store = Store(hass, PRESET_STORAGE_VERSION, f"{DOMAIN}_{entry.entry_id}_presets")
-        self._settings_store = Store(hass, SETTINGS_STORAGE_VERSION, f"{DOMAIN}_{entry.entry_id}_settings")
+        self._last_active_time = time.monotonic()
 
         from .zone_manager import ZoneManager
         self.zone_manager = ZoneManager(hass, self)
@@ -175,6 +154,11 @@ class MultizoneCoordinator:
 
         from .storage.storage_manager import StorageManager
         self.storage = StorageManager(hass, self.entry_id)
+
+        self._store = Store(hass, WINDOW_STORAGE_VERSION, f"{DOMAIN}_{entry.entry_id}_window_states")
+        self._legacy_window_store = Store(hass, WINDOW_STORAGE_VERSION, f"{DOMAIN}.window_states")
+        self._preset_store = Store(hass, PRESET_STORAGE_VERSION, f"{DOMAIN}_{entry.entry_id}_presets")
+        self._settings_store = Store(hass, SETTINGS_STORAGE_VERSION, f"{DOMAIN}_{entry.entry_id}_settings")
 
         from .calendar_manager import CalendarManager
         self.calendar_manager = CalendarManager(self)
@@ -206,7 +190,8 @@ class MultizoneCoordinator:
                 self, 
                 self.opentherm_entity, 
                 self.opentherm_min_temp, 
-                self.opentherm_max_temp
+                self.opentherm_max_temp,
+                self.opentherm_ch_switch,
             )
         else:
             self.boiler_backend = RelayBoilerBackend(
@@ -220,26 +205,15 @@ class MultizoneCoordinator:
 
 
         self._anti_seize_task: asyncio.Task | None = None
-        self._pending_boiler_task: asyncio.Task | None = None
-        self._boiler_pwm = PWMEngine(pwm_interval=900.0, min_on=self._min_cycle_on * 60, min_off=self._min_cycle_off * 60)
         
         self._unsub_listeners: list = []
         self._select_entities: dict[str, Any] = {}  # key -> select object
         
-        # Centralized PIDs for all zones (TRVs and Virtual)
-        from .pid_wrapper import MultizonePID
-        from .autotune import PassiveAutotuneObserver
-        self._pids: dict[str, MultizonePID] = {}
-        self._autotuners: dict[str, PassiveAutotuneObserver] = {}
-        self._thermal_models: dict[str, ThermalObserver] = {}
-        for zone in self.zones:
-            climate_id = make_zone_entity_id(zone[CONF_ZONE_NAME])
-            # Default Kp=100, Ki=0, Kd=0 (will be overridden by Autolearning later)
-            self._pids[climate_id] = MultizonePID(kp=100.0, ki=0.0, kd=0.0, out_min=0.0, out_max=100.0, sensor_timeout=7200.0)
-            self._autotuners[climate_id] = PassiveAutotuneObserver(climate_id, required_cycles=3)
-            self._thermal_models[climate_id] = ThermalObserver(climate_id)
-
-
+        # PID / autotune / thermal models are owned by ZoneController; these are
+        # aliases to the SAME dicts (no duplicate, stale objects).
+        self._pids = self.zone_controller.pids
+        self._autotuners = self.zone_controller.autotuners
+        self._thermal_models = self.zone_controller.thermal_models
 
         self._presets: dict[str, dict[str, dict[str, Any]]] = {}
         self._current_global_preset: str = GLOBAL_PRESET_MANUAL
@@ -273,6 +247,36 @@ class MultizoneCoordinator:
         """Unregister a climate entity on removal."""
         self._climate_callbacks.pop(entity_id, None)
         self._climate_entities.pop(entity_id, None)
+        if hasattr(self, "demand_aggregator"):
+            self.demand_aggregator.unregister_climate_callback(entity_id)
+
+    @property
+    def _zone_modes(self) -> dict[str, str]:
+        """Alias to zone modes owned by ZoneManager."""
+        return self.zone_manager._zone_modes
+
+    @property
+    def _zone_demands(self) -> dict[str, float]:
+        """Alias to zone demands owned by DemandAggregator."""
+        return self.demand_aggregator._zone_demands
+
+    @property
+    def _pre_window_state(self) -> dict[str, str]:
+        """Alias to pre-window states owned by ZoneManager."""
+        return self.zone_manager._pre_window_state
+
+    @_pre_window_state.setter
+    def _pre_window_state(self, val: dict[str, str]) -> None:
+        self.zone_manager._pre_window_state = val
+
+    @property
+    def last_active_time(self) -> float:
+        """Return monotonic timestamp of when system was last active."""
+        return self._last_active_time
+
+    def reset_last_active_time(self) -> None:
+        """Reset the last active time timestamp to now."""
+        self._last_active_time = time.monotonic()
 
     @property
     def is_dhw_active(self) -> bool:
@@ -333,9 +337,15 @@ class MultizoneCoordinator:
     async def async_load_storage(self) -> None:
         """Load stored window states and presets."""
         stored = await self._store.async_load()
+        if stored is None and hasattr(self, "_legacy_window_store"):
+            stored = await self._legacy_window_store.async_load()
+            if stored and isinstance(stored, dict):
+                _LOGGER.info("Migrating legacy window states to entry storage")
+                await self._store.async_save(stored)
         if stored and isinstance(stored, dict):
-            self._pre_window_state = stored
-            _LOGGER.debug("Loaded pre_window_state from storage: %s", self._pre_window_state)
+            self.zone_manager._pre_window_state.clear()
+            self.zone_manager._pre_window_state.update(stored)
+            _LOGGER.debug("Loaded pre_window_state from storage: %s", self.zone_manager._pre_window_state)
             
         preset_stored = await self._preset_store.async_load()
         if preset_stored and isinstance(preset_stored, dict):
@@ -350,7 +360,7 @@ class MultizoneCoordinator:
             # Load stored zone modes
             saved_zone_modes = self._settings.get("zone_modes", {})
             self.zone_manager.load_state(
-                getattr(self, "_pre_window_state", {}),
+                self.zone_manager._pre_window_state,
                 getattr(self, "_presets", {}),
                 saved_zone_modes
             )
@@ -379,7 +389,7 @@ class MultizoneCoordinator:
 
     async def async_save_storage(self) -> None:
         """Save window states to storage."""
-        await self._store.async_save(self._pre_window_state)
+        await self._store.async_save(self.zone_manager._pre_window_state)
 
     async def _async_save_autotuner_states(self) -> None:
         """Save autotuner learning progress to storage."""
@@ -403,20 +413,18 @@ class MultizoneCoordinator:
 
     def set_min_cycle_on(self, value: float) -> None:
         self._min_cycle_on = value
-        if hasattr(self, "boiler_backend") and hasattr(self.boiler_backend, "_min_cycle_on"):
-            self.boiler_backend._min_cycle_on = value
-            self.boiler_backend._boiler_pwm.min_on = value * 60
+        if hasattr(self, "boiler_backend") and hasattr(self.boiler_backend, "set_min_cycle_on"):
+            self.boiler_backend.set_min_cycle_on(int(value))
         
     def set_min_cycle_off(self, value: float) -> None:
         self._min_cycle_off = value
-        if hasattr(self, "boiler_backend") and hasattr(self.boiler_backend, "_min_cycle_off"):
-            self.boiler_backend._min_cycle_off = value
-            self.boiler_backend._boiler_pwm.min_off = value * 60
+        if hasattr(self, "boiler_backend") and hasattr(self.boiler_backend, "set_min_cycle_off"):
+            self.boiler_backend.set_min_cycle_off(int(value))
         
     def set_valve_delay(self, value: float) -> None:
         self._valve_delay = value
-        if hasattr(self, "boiler_backend") and hasattr(self.boiler_backend, "_valve_delay"):
-            self.boiler_backend._valve_delay = value
+        if hasattr(self, "boiler_backend") and hasattr(self.boiler_backend, "set_valve_delay"):
+            self.boiler_backend.set_valve_delay(int(value))
 
     def set_master_state(self, state: bool) -> None:
         """Set master state (called by master switch entity)."""
@@ -500,9 +508,10 @@ class MultizoneCoordinator:
         if self._anti_seize_task and not self._anti_seize_task.done():
             self._anti_seize_task.cancel()
             self._anti_seize_task = None
-        if self._pending_boiler_task and not self._pending_boiler_task.done():
-            self._pending_boiler_task.cancel()
-            self._pending_boiler_task = None
+        backend_task = getattr(self.boiler_backend, "_pending_boiler_task", None)
+        if backend_task and not backend_task.done():
+            backend_task.cancel()
+            self.boiler_backend._pending_boiler_task = None
         if getattr(self, "_debounce_save_task", None) and not self._debounce_save_task.done():
             self._debounce_save_task.cancel()
             self._debounce_save_task = None

@@ -45,6 +45,8 @@ class RoutineManager:
         self._last_morning_trigger_date: datetime.date | None = None
         
         self._unsub_listeners: list[Callable[[], None]] = []
+        # Last reliable presence value (never "unknown"/"unavailable")
+        self._last_known_presence: str | None = None
         
     def async_setup_listeners(self) -> None:
         """Initialize listeners."""
@@ -82,14 +84,25 @@ class RoutineManager:
         new_state = event.data.get("new_state")
         old_state = event.data.get("old_state")
         
-        if not new_state or not old_state:
+        if not new_state:
             return
             
-        old_val = old_state.state
+        invalid = ("unavailable", "unknown")
         new_val = new_state.state
+        old_val = old_state.state if old_state else None
         
-        # Bug 3 FIX: Ignore temporary sensor glitches like 'unavailable' or 'unknown'
-        if old_val == new_val or new_val in ("unavailable", "unknown") or old_val in ("unavailable", "unknown"):
+        # Unknown/unavailable never trigger Away: keep the last reliable condition.
+        if new_val in invalid:
+            return
+
+        if old_val in invalid:
+            old_val = None
+        # Compare with the last RELIABLE value so home -> unavailable -> not_home is still detected
+        if self._last_known_presence is not None:
+            old_val = self._last_known_presence
+        self._last_known_presence = new_val
+
+        if old_val is None or old_val == new_val:
             return
             
         _LOGGER.info("Presence changed: %s -> %s", old_val, new_val)

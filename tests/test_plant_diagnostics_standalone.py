@@ -82,7 +82,7 @@ def test_engine():
     assert cid in engine._zone_anomaly_state
     
     import time
-    now = time.time()
+    now = time.monotonic()
     
     # Mock states
     hass.states.set(cid, MockState("heat", {"current_temperature": 20.0, "temperature": 22.0}))

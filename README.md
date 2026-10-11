@@ -16,7 +16,7 @@ A comprehensive custom integration for Home Assistant that provides **multi-zone
 > * 🛡️ **Fault Compartmentalization**: Isolating edge-cases and failures within dedicated modules without risking the core heating supervision loop.
 > * 🧪 **Simulation & Regression Test Suites**: Validating each subsystem with automated simulation suites before integration to guarantee zero regressions and rock-solid reliability.
 > 
-> *The current stable release (`v4.7.2`) is fully operational and supported while the next-generation modular architecture is being developed.*
+> *The modular architecture is released as `v5.0.0`. If you hit any regression, please open an issue and, if needed, roll back to `v4.7.3` via HACS.
 
 ![Dashboard Preview](images/dashboard_3col.png)
 
@@ -109,6 +109,8 @@ $$\text{Water Temperature} = T_{\text{min}} + \left( \frac{\text{Demand \%}}{100
 - **100% Demand**: Target water flow temperature set to maximum output ($75^\circ\text{C}$).
 
 The calculated water temperature is sent directly to your OpenTherm Gateway climate or number entity, allowing the boiler's internal modulation logic to adjust flame height efficiently.
+
+**Heating OFF (CH enable):** with a bare `number` entity there is no real OFF command. At 0% demand the integration writes the lowest value accepted by the entity (its `min` attribute, otherwise 0); the actual effect depends on your OpenTherm integration/boiler. For a true OFF, set the optional **CH enable switch** in the boiler settings: at 0% demand it is turned off (and back on when there is demand) while the flow setpoint stays untouched.
 
 ### Advanced OpenTherm Telemetry & DHW Priority (v4.7)
 

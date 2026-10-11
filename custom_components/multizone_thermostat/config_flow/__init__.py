@@ -21,6 +21,7 @@ from ..const import (
     CONF_GEOFENCING_ENABLED,
     CONF_OPENTHERM_ENTITY,
     CONF_OPENTHERM_MAX_TEMP,
+    CONF_OPENTHERM_CH_SWITCH,
     CONF_OPENTHERM_MIN_TEMP,
     CONF_PRESENCE_SENSOR,
     CONF_ZONE_NAME,
@@ -67,6 +68,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._opentherm_entity: str | None = None
         self._opentherm_min_temp: float = 35.0
         self._opentherm_max_temp: float = 75.0
+        self._opentherm_ch_switch: str | None = None
         self._zones: list[dict] = []
         self._geofencing_enabled: bool = True
         self._presence_sensor: str | None = None
@@ -128,6 +130,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._opentherm_entity = user_input[CONF_OPENTHERM_ENTITY]
             self._opentherm_min_temp = user_input[CONF_OPENTHERM_MIN_TEMP]
             self._opentherm_max_temp = user_input[CONF_OPENTHERM_MAX_TEMP]
+            self._opentherm_ch_switch = user_input.get(CONF_OPENTHERM_CH_SWITCH) or None
             errors.update(validate_opentherm_temps(self._opentherm_min_temp, self._opentherm_max_temp))
             if not errors:
                 return await self.async_step_add_zone()
@@ -320,6 +323,8 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_ZONES: self._zones,
                     CONF_GEOFENCING_ENABLED: self._geofencing_enabled,
                 }
+                if self._opentherm_ch_switch:
+                    data[CONF_OPENTHERM_CH_SWITCH] = self._opentherm_ch_switch
             if self._geofencing_enabled and self._presence_sensor:
                 data[CONF_PRESENCE_SENSOR] = self._presence_sensor
             if self._weather_sensor:

@@ -19,7 +19,7 @@ from .const import (
     PRESET_SLEEP,
     PRESET_ACTIVITY,
 )
-from homeassistant.helpers.restore_state import RestoreEntity
+from homeassistant.helpers.entity import Entity
 
-class ClimateEntity(RestoreEntity):
+class ClimateEntity(Entity):
     pass

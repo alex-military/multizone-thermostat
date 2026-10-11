@@ -65,7 +65,16 @@ def mock_hass():
     hass = MagicMock()
     hass.states.get.return_value = None
     hass.services.async_call = AsyncMock()
-    hass.async_create_task = MagicMock()
+    def _create_task(coro):
+        if asyncio.iscoroutine(coro):
+            try:
+                loop = asyncio.get_running_loop()
+                return loop.create_task(coro)
+            except RuntimeError:
+                coro.close()
+                return MagicMock()
+        return MagicMock()
+    hass.async_create_task = MagicMock(side_effect=_create_task)
     return hass
 
 @pytest.fixture

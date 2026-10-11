@@ -148,6 +148,10 @@ class DemandAggregator:
         """Register a callback for climate state changes when demand changes."""
         self._climate_callbacks.setdefault(climate_id, []).append(callback)
 
+    def unregister_climate_callback(self, climate_id: str) -> None:
+        """Unregister all climate callbacks for a zone."""
+        self._climate_callbacks.pop(climate_id, None)
+
     def register_on_demand_changed(
         self, callback: Callable[[str, float], None]
     ) -> None:

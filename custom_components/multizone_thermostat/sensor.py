@@ -74,7 +74,7 @@ class DemandSensor(SensorEntity):
             name="Multizone Brain",
             manufacturer="Custom Integration",
             model="Multizone Brain",
-            via_device=getattr(coordinator, "master_device_id", None),
+            via_device=(DOMAIN, entry_id),
         )
 
     @property
@@ -122,7 +122,7 @@ class AutotuneSensor(SensorEntity):
             name="Multizone Brain",
             manufacturer="Custom Integration",
             model="Multizone Brain",
-            via_device=getattr(coordinator, "master_device_id", None),
+            via_device=(DOMAIN, entry_id),
         )
 
     @property
@@ -189,7 +189,7 @@ class ThermalSensorBase(SensorEntity):
             name="Multizone Brain",
             manufacturer="Custom Integration",
             model="Multizone Brain",
-            via_device=getattr(coordinator, "master_device_id", None),
+            via_device=(DOMAIN, entry_id),
         )
 
     async def async_added_to_hass(self) -> None:

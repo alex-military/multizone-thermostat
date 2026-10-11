@@ -13,6 +13,7 @@ from ..const import (
     CONF_GEOFENCING_ENABLED,
     CONF_OPENTHERM_ENTITY,
     CONF_OPENTHERM_MAX_TEMP,
+    CONF_OPENTHERM_CH_SWITCH,
     CONF_OPENTHERM_MIN_TEMP,
     CONF_PRESENCE_SENSOR,
     CONF_ZONE_NAME,
@@ -64,6 +65,7 @@ def get_boiler_opentherm_schema() -> vol.Schema:
         vol.Required(CONF_OPENTHERM_MAX_TEMP, default=75.0): selector.NumberSelector(
             selector.NumberSelectorConfig(min=20, max=90, step=1, mode=selector.NumberSelectorMode.BOX)
         ),
+        vol.Optional(CONF_OPENTHERM_CH_SWITCH): selector.EntitySelector(selector.EntitySelectorConfig(domain=SWITCH_DOMAIN)),
     })
 
 
@@ -154,7 +156,12 @@ def get_options_boiler_relay_schema(boiler_switch: str) -> vol.Schema:
     return vol.Schema(schema_dict)
 
 
-def get_options_boiler_opentherm_schema(opentherm_entity: str | None, opentherm_min_temp: float, opentherm_max_temp: float) -> vol.Schema:
+def get_options_boiler_opentherm_schema(
+    opentherm_entity: str | None,
+    opentherm_min_temp: float,
+    opentherm_max_temp: float,
+    opentherm_ch_switch: str | None = None,
+) -> vol.Schema:
     schema_dict = {}
     if opentherm_entity:
         schema_dict[vol.Required(CONF_OPENTHERM_ENTITY, default=opentherm_entity)] = selector.EntitySelector(
@@ -170,6 +177,12 @@ def get_options_boiler_opentherm_schema(opentherm_entity: str | None, opentherm_
     schema_dict[vol.Required(CONF_OPENTHERM_MAX_TEMP, default=opentherm_max_temp)] = selector.NumberSelector(
         selector.NumberSelectorConfig(min=20, max=90, step=1, mode=selector.NumberSelectorMode.BOX)
     )
+    ch_key = (
+        vol.Optional(CONF_OPENTHERM_CH_SWITCH, description={"suggested_value": opentherm_ch_switch})
+        if opentherm_ch_switch
+        else vol.Optional(CONF_OPENTHERM_CH_SWITCH)
+    )
+    schema_dict[ch_key] = selector.EntitySelector(selector.EntitySelectorConfig(domain=SWITCH_DOMAIN))
     return vol.Schema(schema_dict)
 
 

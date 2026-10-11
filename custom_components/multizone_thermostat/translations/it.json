@@ -90,7 +90,8 @@
         "data": {
           "opentherm_entity": "Entità OpenTherm (Climate / Scaldabagno)",
           "opentherm_min_temp": "Temperatura Minima Acqua (°C)",
-          "opentherm_max_temp": "Temperatura Massima Acqua (°C)"
+          "opentherm_max_temp": "Temperatura Massima Acqua (°C)",
+          "opentherm_ch_switch": "Switch abilitazione riscaldamento CH (opzionale)"
         }
       }
     },
@@ -217,7 +218,8 @@
         "data": {
           "opentherm_entity": "Entità OpenTherm (Climate / Scaldabagno)",
           "opentherm_min_temp": "Temperatura Minima Acqua (°C)",
-          "opentherm_max_temp": "Temperatura Massima Acqua (°C)"
+          "opentherm_max_temp": "Temperatura Massima Acqua (°C)",
+          "opentherm_ch_switch": "Switch abilitazione riscaldamento CH (opzionale)"
         }
       }
     },

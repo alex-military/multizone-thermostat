@@ -44,6 +44,8 @@ class ZoneController:
             self._autotuners[climate_id] = PassiveAutotuneObserver(climate_id, required_cycles=3)
             self._thermal_models[climate_id] = ThermalObserver(climate_id)
 
+        self._was_dhw_active: bool = False
+
     @property
     def pids(self) -> dict[str, MultizonePID]:
         """Return dict of zone PIDs."""
@@ -134,7 +136,16 @@ class ZoneController:
                 self.coordinator.demand_aggregator.set_zone_demand(entity_id, demand)
                 return 0.0
 
-            if self.coordinator.is_dhw_active:
+            is_dhw = bool(getattr(self.coordinator, "is_dhw_active", False))
+            if self._was_dhw_active and not is_dhw:
+                _LOGGER.info(
+                    "Domestic Hot Water (DHW) production ended: resetting PID integrals, dt and timestamps for all zones."
+                )
+                for p in self._pids.values():
+                    p.clear_samples()
+            self._was_dhw_active = is_dhw
+
+            if is_dhw:
                 _LOGGER.debug(
                     "Zone %s: PID frozen, boiler is currently producing Domestic Hot Water (DHW Active).",
                     entity_id,

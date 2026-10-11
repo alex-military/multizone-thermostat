@@ -49,24 +49,27 @@ class PassiveAutotuneObserver:
     def update(self, current_temp: float, is_heating: bool, now: float = None):
         """Called periodically or on state change."""
         if now is None:
-            now = time.time()
-        
+            now_mono = time.monotonic()
+            wall_time = time.time()
+        else:
+            now_mono = now
+            wall_time = now if now > 1e8 else time.time()
         
         if self.state == self.STATE_COMPLETED:
             return
             
         if self.state == self.STATE_IDLE:
             if is_heating:
-                self._start_heating(now, current_temp)
+                self._start_heating(now_mono, current_temp)
                 
         elif self.state == self.STATE_HEATING:
-            self.history.append((now, current_temp))
+            self.history.append((now_mono, current_temp))
             if not is_heating:
-                self._stop_heating(now, current_temp)
+                self._stop_heating(now_mono, current_temp, wall_time=wall_time)
                 
         elif self.state == self.STATE_COOLING:
             if is_heating:
-                self._start_heating(now, current_temp)
+                self._start_heating(now_mono, current_temp)
 
     def _start_heating(self, now: float, temp: float):
         _LOGGER.info("Autotune [%s]: Heating started. Recording cycle.", self.zone_name)
@@ -76,7 +79,7 @@ class PassiveAutotuneObserver:
         self.history.clear()
         self.history.append((now, temp))
         
-    def _stop_heating(self, now: float, temp: float):
+    def _stop_heating(self, now: float, temp: float, wall_time: float | None = None):
         _LOGGER.info("Autotune [%s]: Heating stopped. Analyzing cycle...", self.zone_name)
         self.state = self.STATE_COOLING
         
@@ -155,7 +158,7 @@ class PassiveAutotuneObserver:
             "Kp": kp_calc,
             "Ki": ki_calc,
             "Kd": kd_calc,
-            "timestamp": now
+            "timestamp": wall_time if wall_time is not None else time.time(),
         })
         
         if len(self.completed_cycles) >= self.required_cycles:

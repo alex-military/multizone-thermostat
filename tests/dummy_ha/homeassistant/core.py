@@ -14,6 +14,11 @@ class HomeAssistant:
         self.states = MagicMock()
         self.data = {}
         self.loop = MagicMock()
+        self.config = MagicMock()
+        self.config.path = lambda *args: "/".join(args)
+        self.http = MagicMock()
+        self.http.async_register_static_paths = AsyncMock()
+        self.async_add_executor_job = AsyncMock(return_value=False)
 
 class Event:
     def __init__(self, event_type, data=None, time_fired=None):
