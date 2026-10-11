@@ -6,9 +6,6 @@
         "description": "Select how you want to control your central heating system (Relay ON/OFF or OpenTherm Modulating).",
         "data": {
           "boiler_mode": "Boiler Control Mode"
-        },
-        "data_description": {
-          "boiler_switch": "The switch/relay that controls the boiler circulator pump"
         }
       },
       "weather": {
@@ -44,9 +41,9 @@
           "climate_entities": "The climate entity for this room/zone",
           "allow_passive_heat": "Disables ghost heating anomaly detection if this zone naturally absorbs heat while idle (e.g. open loft/mezzanine or fancoil without a zone valve).",
           "window_sensor": "Automatically bypass the zone when this sensor is open",
-          "zone_name": "A friendly name for this zone (pre-filled from climate entity name)",
-          "zone_trv_sync": "Automatically sync preset mode when HVAC mode changes (for physical TRV valves)",
-          "sensor_timeout_min": "Max duration without updates before falling back to onboard TRV sensors / safety mode"
+          "sensor_timeout_min": "Max duration without updates before falling back to onboard TRV sensors / safety mode",
+          "name": "A friendly name for this zone (pre-filled from climate entity name)",
+          "trv_preset_sync": "Automatically sync preset mode when HVAC mode changes (for physical TRV valves)"
         }
       },
       "trv_calibration": {
@@ -149,9 +146,9 @@
           "climate_entities": "The climate entity for this room/zone",
           "allow_passive_heat": "Disables ghost heating anomaly detection if this zone naturally absorbs heat while idle (e.g. open loft/mezzanine or fancoil without a zone valve).",
           "window_sensor": "Automatically bypass the zone when this sensor is open",
-          "zone_name": "A friendly name for this zone (pre-filled from climate entity name)",
-          "zone_trv_sync": "Automatically sync preset mode when HVAC mode changes (for physical TRV valves)",
-          "sensor_timeout_min": "Max duration without updates before falling back to onboard TRV sensors / safety mode"
+          "sensor_timeout_min": "Max duration without updates before falling back to onboard TRV sensors / safety mode",
+          "name": "A friendly name for this zone (pre-filled from climate entity name)",
+          "trv_preset_sync": "Automatically sync preset mode when HVAC mode changes (for physical TRV valves)"
         }
       },
       "remove_zone": {

@@ -6,9 +6,6 @@
         "description": "Seleziona come vuoi controllare il tuo sistema di riscaldamento centrale (Relè ON/OFF o OpenTherm Modulante).",
         "data": {
           "boiler_mode": "Modalità Controllo Caldaia"
-        },
-        "data_description": {
-          "boiler_switch": "Lo switch/relè che controlla la pompa del circolatore della caldaia"
         }
       },
       "weather": {
@@ -44,9 +41,9 @@
           "climate_entities": "L'entità climate per questa stanza/zona",
           "allow_passive_heat": "Disattiva il rilevamento del riscaldamento fantasma se la stanza riceve calore passivo anche quando è a riposo (es. ventilconvettore senza valvola di zona o soppalco aperto con calore dal piano inferiore).",
           "window_sensor": "Bypassa automaticamente la zona quando questo sensore è aperto",
-          "zone_name": "Un nome per questa zona (precompilato dal nome dell'entità climate)",
-          "zone_trv_sync": "Sincronizza automaticamente la modalità preset quando cambia la modalità HVAC (per valvole TRV fisiche)",
-          "sensor_timeout_min": "Tempo massimo senza ricezione dati prima di passare in modalità di sicurezza/fallback su TRV"
+          "sensor_timeout_min": "Tempo massimo senza ricezione dati prima di passare in modalità di sicurezza/fallback su TRV",
+          "name": "Un nome per questa zona (precompilato dal nome dell'entità climate)",
+          "trv_preset_sync": "Sincronizza automaticamente la modalità preset quando cambia la modalità HVAC (per valvole TRV fisiche)"
         }
       },
       "trv_calibration": {
@@ -149,9 +146,9 @@
           "climate_entities": "L'entità climate per questa stanza/zona",
           "allow_passive_heat": "Disattiva il rilevamento del riscaldamento fantasma se la stanza riceve calore passivo anche quando è a riposo (es. ventilconvettore senza valvola di zona o soppalco aperto con calore dal piano inferiore).",
           "window_sensor": "Bypassa automaticamente la zona quando questo sensore è aperto",
-          "zone_name": "Un nome per questa zona (precompilato dal nome dell'entità climate)",
-          "zone_trv_sync": "Sincronizza automaticamente la modalità preset quando cambia la modalità HVAC (per valvole TRV fisiche)",
-          "sensor_timeout_min": "Tempo massimo senza ricezione dati prima di passare in modalità di sicurezza/fallback su TRV"
+          "sensor_timeout_min": "Tempo massimo senza ricezione dati prima di passare in modalità di sicurezza/fallback su TRV",
+          "name": "Un nome per questa zona (precompilato dal nome dell'entità climate)",
+          "trv_preset_sync": "Sincronizza automaticamente la modalità preset quando cambia la modalità HVAC (per valvole TRV fisiche)"
         }
       },
       "remove_zone": {

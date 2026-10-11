@@ -1,16 +1,16 @@
 {
     "domain": "multizone_thermostat",
     "name": "Multizone Thermostat",
-    "version": "5.0.0",
+    "codeowners": [],
     "config_flow": true,
     "dependencies": [
         "frontend",
         "http"
     ],
     "documentation": "https://github.com/alex-military/multizone-thermostat",
-    "issue_tracker": "https://github.com/alex-military/multizone-thermostat/issues",
-    "codeowners": [],
-    "requirements": [],
+    "integration_type": "service",
     "iot_class": "local_push",
-    "integration_type": "service"
+    "issue_tracker": "https://github.com/alex-military/multizone-thermostat/issues",
+    "requirements": [],
+    "version": "5.0.0"
 }
