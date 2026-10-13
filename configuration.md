@@ -22,7 +22,12 @@ If you want to use the **Global Calendar & Smart Start** feature, you must first
    - **Step 1 (Boiler Mode)**: Choose between **Relay (ON/OFF)** and **OpenTherm (Modulating)**.
    - **Step 1a (Relay Mode)**: Select your central boiler relay / circulator pump (`switch`).
    - **Step 1b (OpenTherm Mode)**: Select your OpenTherm entity (`climate`, `water_heater`, or `number`), optionally specify a dedicated Central Heating toggle switch (`opentherm_ch_switch`), and set the Minimum ($T_{\text{min}}$, default 35°C) and Maximum ($T_{\text{max}}$, default 75°C) boiler water temperatures.
-   - **Step 2 (Add Zone)**: Create your first thermal zone. Assign all its hardware in a single page: Name, Temperature Sensor (optional), TRVs (`climate`), Heater Switches (`switch`), Window Sensor, and toggle Anti-seize/Preset Sync.
+   - **Step 2 (Add Zone)**: Create your thermal zone through intuitive collapsible sections:
+     - **Main Settings**: Name, primary Temperature Sensor, and Base Target Temperature.
+     - **▶ TRVs (Standard)**: Assign smart thermostatic radiator valves (`climate`) and enable preset sync.
+     - **▶ Proportional & 0-10V Valves**: Assign direct-opening actuators (`valve`, `number`) and choose scaling (**Percentage 0–100%** or **Voltage 0.0–10.0 V**).
+     - **▶ Relay Actuators (PWM)**: Assign switches/relays for thermal ON/OFF actuators.
+     - **▶ Protections & Advanced**: Assign Window Sensors, adjust Sensor Watchdog Timeout, toggle Summer Anti-seize, or enable Passive Heat intake.
    - **Step 3 (TRV Calibration - Conditional)**: If in Step 2 you assigned *both* TRVs and a pure external Temperature Sensor, you will be asked if you want to assign a `Local Temperature Calibration` entity to each TRV (for the mathematical offset injection).
    - **Step 4 (More Zones)**: Choose whether to add another zone or proceed to global settings.
    - **Step 5 (Global Calendar)**: Select the Local Calendar entity you created in the prerequisite step. Leave blank if you don't want to use calendar scheduling.
@@ -34,10 +39,12 @@ If you want to use the **Global Calendar & Smart Start** feature, you must first
 
 ## 🧠 Zone Intelligence & Hardware Aggregation
 
-In the new V3 architecture, a **Zone** is a powerful virtual aggregator. You don't need to create separate "virtual thermostats" anymore. 
+In the modular architecture, a **Zone** is a powerful virtual aggregator:
 
-- **Pure TRV Room**: Assign one or multiple TRVs to the zone. The zone will average their temperatures and sync their targets.
-- **Relay/Underfloor Room**: Assign a simple relay switch and a temperature sensor. The zone automatically acts as a virtual thermostat, computing PID and driving the relay via PWM!
+- **Pure TRV Room**: Assign one or multiple TRVs to the zone. The zone averages their temperatures and syncs their setpoints.
+- **Relay / Underfloor Room**: Assign a simple relay switch and a temperature sensor. The zone automatically acts as a virtual thermostat, computing PID and driving the relay via PWM!
+- **Proportional / 0-10V Analog Actuators**: Assign motorized valves or 0-10V DAC/dimmer modules (e.g. Shelly Dimmer 0-10V, ESPHome). The zone maps the calculated PID demand (0-100%) directly into opening percentage or analog voltage (0-10V), bypassing PWM clicking completely!
+- **Direct-Pin TRVs**: TRVs that expose an internal valve opening percentage or `valve` entity can be driven directly via the Proportional Valves section for continuous micro-regulation without local setpoint fighting.
 - **Hybrid TRV + External Sensor**: Assign your TRVs AND a pure external temperature sensor. The zone intercepts the TRVs and injects a fake target (or a dynamic calibration offset) to force the physical TRV to align with the pure external sensor, bypassing the TRV's inaccurate internal thermometer!
 
 ---

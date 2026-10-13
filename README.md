@@ -28,7 +28,8 @@ A comprehensive custom integration for Home Assistant that provides **multi-zone
 ## ⚡ Complete Feature Matrix
 
 ### Core Climate & Zone Management
-- 🖥️ **100% UI Config Flow & Reconfiguration Wizard**: Select your boiler mode, add zones, configure actuators and sensors directly from the HA interface without YAML.
+- 🖥️ **100% UI Config Flow & Collapsible Sections (v5.0.1)**: Clean, accordion-style configuration wizard organized into collapsible sections (*TRVs*, *Proportional & 0-10V Valves*, *Relay Actuators*, *Protections & Advanced Settings*) without YAML.
+- 🎛️ **Proportional & 0-10V Valve Control (v5.0.1)**: Direct, continuous opening control for motorized actuators, underfloor manifolds, and direct-pin TRVs. Supports both percentage (`0-100%`) and analog voltage (`0.0-10.0 V`) via `valve` or `number` entities with integrated bus anti-chatter deadband.
 - 🔘 **Master Switch**: One central switch to enable or disable the entire heating system with safe shutdown.
 - 🏠 **Hierarchical Zone Modes**: Per-zone selector (`Primary`, `Secondary`, `Bypass`) accessible directly from Lovelace cards.
 - 📍 **Geofencing & Dynamic Presence**: Automatically switches to Away or Sleep presets based on home occupancy sensors.
