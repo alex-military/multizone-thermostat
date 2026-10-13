@@ -26,24 +26,49 @@
         "title": "Add Heating Zone ({zone_number})",
         "description": "Configure a heating zone. {zones_added} zone(s) already added.",
         "data": {
-          "climate_entities": "Climate Entity",
-          "anti_seize_zone_enable": "Enable Anti-seize (Summer Protection) for this zone",
-          "allow_passive_heat": "Allow Passive Heat (Fancoil without valve / Mezzanine)",
-          "window_sensor": "Window Sensor (Optional)",
           "name": "Zone Name",
-          "trv_preset_sync": "Enable TRV Preset Sync",
-          "switch_entities": "Zone Switches / Relays",
           "temp_sensor": "Zone Temperature Sensor",
-          "target_temperature": "Base Target Temperature",
-          "sensor_timeout_min": "Sensor Watchdog Timeout (minutes)"
+          "target_temperature": "Base Target Temperature"
+        },
+        "sections": {
+          "trv_settings": {
+            "name": "Thermostatic Radiator Valves (TRV)",
+            "description": "Standard smart thermostatic radiator valves with temperature control.",
+            "data": {
+              "climate_entities": "Climate Entity",
+              "trv_preset_sync": "Enable TRV Preset Sync"
+            }
+          },
+          "valve_settings": {
+            "name": "Proportional & 0-10V Valves",
+            "description": "Direct opening percentage or 0-10V analog voltage control.",
+            "data": {
+              "valve_entities": "Valve / Actuator Entities",
+              "valve_scale": "Output Scale Mode"
+            }
+          },
+          "relay_settings": {
+            "name": "Relay Actuators (PWM)",
+            "description": "ON/OFF switches and thermal actuators controlled via pulse-width modulation.",
+            "data": {
+              "switch_entities": "Zone Switches / Relays"
+            }
+          },
+          "safety_settings": {
+            "name": "Protections & Advanced Settings",
+            "description": "Window bypass, safety timeouts, and summer anti-seize cycling.",
+            "data": {
+              "window_sensor": "Window Sensor (Optional)",
+              "sensor_timeout_min": "Sensor Watchdog Timeout (minutes)",
+              "anti_seize_zone_enable": "Enable Anti-seize (Summer Protection) for this zone",
+              "allow_passive_heat": "Allow Passive Heat (Fancoil without valve / Mezzanine)"
+            }
+          }
         },
         "data_description": {
-          "climate_entities": "The climate entity for this room/zone",
-          "allow_passive_heat": "Disables ghost heating anomaly detection if this zone naturally absorbs heat while idle (e.g. open loft/mezzanine or fancoil without a zone valve).",
-          "window_sensor": "Automatically bypass the zone when this sensor is open",
-          "sensor_timeout_min": "Max duration without updates before falling back to onboard TRV sensors / safety mode",
-          "name": "A friendly name for this zone (pre-filled from climate entity name)",
-          "trv_preset_sync": "Automatically sync preset mode when HVAC mode changes (for physical TRV valves)"
+          "name": "A friendly name for this zone",
+          "temp_sensor": "Zone primary ambient temperature sensor",
+          "target_temperature": "Default setpoint target for this zone"
         }
       },
       "trv_calibration": {
@@ -162,16 +187,43 @@
         "title": "Edit Zone Settings",
         "description": "Edit settings for a zone.",
         "data": {
-          "anti_seize_zone_enable": "Enable Anti-seize (Summer Protection) for this zone",
-          "allow_passive_heat": "Allow Passive Heat (Fancoil without valve / Mezzanine)",
-          "window_sensor": "Window Sensor (Optional)",
-          "trv_preset_sync": "Enable TRV Preset Sync",
-          "zone_name": "Zone",
-          "switch_entities": "Zone Switches / Relays",
-          "climate_entities": "Zone TRVs / Climates",
           "temp_sensor": "Zone Temperature Sensor",
-          "target_temperature": "Base Target Temperature",
-          "sensor_timeout_min": "Sensor Watchdog Timeout (minutes)"
+          "target_temperature": "Base Target Temperature"
+        },
+        "sections": {
+          "trv_settings": {
+            "name": "Thermostatic Radiator Valves (TRV)",
+            "description": "Standard smart thermostatic radiator valves with temperature control.",
+            "data": {
+              "climate_entities": "Zone TRVs / Climates",
+              "trv_preset_sync": "Enable TRV Preset Sync"
+            }
+          },
+          "valve_settings": {
+            "name": "Proportional & 0-10V Valves",
+            "description": "Direct opening percentage or 0-10V analog voltage control.",
+            "data": {
+              "valve_entities": "Valve / Actuator Entities",
+              "valve_scale": "Output Scale Mode"
+            }
+          },
+          "relay_settings": {
+            "name": "Relay Actuators (PWM)",
+            "description": "ON/OFF switches and thermal actuators controlled via pulse-width modulation.",
+            "data": {
+              "switch_entities": "Zone Switches / Relays"
+            }
+          },
+          "safety_settings": {
+            "name": "Protections & Advanced Settings",
+            "description": "Window bypass, safety timeouts, and summer anti-seize cycling.",
+            "data": {
+              "window_sensor": "Window Sensor (Optional)",
+              "sensor_timeout_min": "Sensor Watchdog Timeout (minutes)",
+              "anti_seize_zone_enable": "Enable Anti-seize (Summer Protection) for this zone",
+              "allow_passive_heat": "Allow Passive Heat (Fancoil without valve / Mezzanine)"
+            }
+          }
         }
       },
       "edit_geofencing": {

@@ -1,5 +1,21 @@
 # Changelog
 
+## [5.0.1] - 2026-10-13
+### Feat: Proportional & 0-10V Valve Control and Collapsible UI Sections
+- **Proportional & 0-10V Valve Support**:
+  - Direct opening percentage (0–100%) and analog voltage (0.0–10.0 V) control for underfloor heating, fancoil valves, or direct-pin TRVs.
+  - Automatic entity domain detection (`valve` with `set_valve_position` and `number` / `input_number` with `set_value`).
+  - Integrated command deadband (>=0.5% or 0.05V) to protect Zigbee/Z-Wave/Wi-Fi buses from high-frequency micro-jitter.
+  - Automatic safety shutdown: valves are immediately forced to 0% / 0V when the zone is set to `OFF` or placed in `bypass` (e.g. open window).
+- **Collapsible UI Sections in Config & Options Flow**:
+  - Reorganized zone configuration into intuitive collapsible accordion sections:
+    - *Thermostatic Radiator Valves (TRV)*
+    - *Proportional & 0-10V Valves*
+    - *Relay Actuators (PWM)*
+    - *Protections & Advanced Settings*
+- **Test Suite Expansion**:
+  - Added full test coverage in `tests/test_proportional_valves.py` (all 109 integration tests passing).
+
 ## [5.0.0] - 2026-10-11
 ### Major Release: Modular Architecture, End-to-End Hardening & Comprehensive Testing Suite
 - **Monolith Decomposition & Modular Architecture**:

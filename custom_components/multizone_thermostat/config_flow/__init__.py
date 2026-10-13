@@ -27,6 +27,9 @@ from ..const import (
     CONF_ZONE_NAME,
     CONF_ZONE_CLIMATES,
     CONF_ZONE_SWITCHES,
+    CONF_ZONE_VALVES,
+    CONF_VALVE_SCALE,
+    DEFAULT_VALVE_SCALE,
     CONF_ZONE_TEMP_SENSOR,
     CONF_ZONE_TARGET_TEMP,
     CONF_ZONE_TRV_SYNC,
@@ -51,7 +54,7 @@ _LOGGER = logging.getLogger(__name__)
 
 from .validators import validate_opentherm_temps, validate_zone_input, validate_geofencing
 from .schemas import *
-from .helpers import _get_switch_entities, _get_climate_entities, _get_binary_sensor_entities, _get_temperature_sensor_entities, _remove_entity_from_registry
+from .helpers import _get_switch_entities, _get_climate_entities, _get_binary_sensor_entities, _get_temperature_sensor_entities, _remove_entity_from_registry, flatten_zone_user_input
 
 
 from .options_flow import MultizoneOptionsFlow
@@ -151,16 +154,20 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         already_added = [z.get(CONF_ZONE_NAME, 'Unnamed Zone') for z in self._zones]
 
         if user_input is not None:
+            user_input = flatten_zone_user_input(user_input)
             zone_name = user_input[CONF_ZONE_NAME].strip()
             climates = user_input.get(CONF_ZONE_CLIMATES, [])
             switches = user_input.get(CONF_ZONE_SWITCHES, [])
+            valves = user_input.get(CONF_ZONE_VALVES, [])
             
-            errors.update(validate_zone_input(zone_name, climates, switches, already_added))
+            errors.update(validate_zone_input(zone_name, climates, switches, already_added, valves=valves))
             if not errors:
                 zone_data = {
                     CONF_ZONE_NAME: zone_name,
                     CONF_ZONE_CLIMATES: climates,
                     CONF_ZONE_SWITCHES: switches,
+                    CONF_ZONE_VALVES: valves,
+                    CONF_VALVE_SCALE: user_input.get(CONF_VALVE_SCALE, DEFAULT_VALVE_SCALE),
                     CONF_ZONE_TRV_SYNC: user_input.get(CONF_ZONE_TRV_SYNC, DEFAULT_TRV_SYNC),
                     CONF_ZONE_ANTI_SEIZE: user_input.get(CONF_ZONE_ANTI_SEIZE, True),
                     CONF_ZONE_ALLOW_PASSIVE_HEAT: user_input.get(CONF_ZONE_ALLOW_PASSIVE_HEAT, False),

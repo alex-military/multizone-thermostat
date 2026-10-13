@@ -12,12 +12,12 @@ from homeassistant.const import ATTR_ENTITY_ID, ATTR_TEMPERATURE, SERVICE_TURN_O
 from homeassistant.core import HomeAssistant, Context, State, Event
 
 from .pwm_engine import PWMEngine
-from .const import KEY_PHYSICAL_SYNC_PREFIX
+from .const import KEY_PHYSICAL_SYNC_PREFIX, VALVE_SCALE_VOLT, DEFAULT_VALVE_SCALE
 
 _LOGGER = logging.getLogger(__name__)
 
 class ZoneSyncManager:
-    """Manages the synchronization of state from virtual zone to physical TRVs and Switches."""
+    """Manages the synchronization of state from virtual zone to physical TRVs, Switches, and Proportional Valves."""
 
     def __init__(
         self,
@@ -28,6 +28,8 @@ class ZoneSyncManager:
         climates: list[str],
         switches: list[str],
         calibrations: dict[str, str],
+        valves: list[str] | None = None,
+        valve_scale: str = DEFAULT_VALVE_SCALE,
     ) -> None:
         """Initialize the sync manager."""
         self.hass = hass
@@ -36,7 +38,10 @@ class ZoneSyncManager:
         self._entity_id = entity_id
         self._climates = climates
         self._switches = switches
+        self._valves = valves or []
+        self._valve_scale = valve_scale
         self._calibrations = calibrations
+        self._last_valve_positions: dict[str, float] = {}
 
         self._sync_lock = asyncio.Lock()
         self._trv_event_lock = asyncio.Lock()
@@ -235,6 +240,50 @@ class ZoneSyncManager:
                     {ATTR_ENTITY_ID: switch},
                     context=self._internal_context,
                 )
+
+    async def async_sync_proportional_valves(self, master_hvac_mode: HVACMode) -> None:
+        """Synchronize proportional and 0-10V valves to current zone demand."""
+        if not self._valves:
+            return
+
+        zone_mode = self._coordinator.get_zone_mode(self._entity_id) if hasattr(self._coordinator, "get_zone_mode") else None
+        if master_hvac_mode == HVACMode.OFF or zone_mode == "bypass":
+            target_pct = 0.0
+        else:
+            target_pct = float(self._coordinator.get_zone_demand(self._entity_id))
+
+        target_pct = max(0.0, min(100.0, target_pct))
+
+        for valve_entity in self._valves:
+            target_val = round(target_pct / 10.0, 1) if self._valve_scale == VALVE_SCALE_VOLT else round(target_pct, 1)
+            last_val = self._last_valve_positions.get(valve_entity)
+
+            # Deadband: only update if change is significant (>= 0.5% or 0.05V) or when going to 0 / 100
+            if last_val is not None:
+                threshold = 0.05 if self._valve_scale == VALVE_SCALE_VOLT else 0.5
+                if abs(target_val - last_val) < threshold and target_val not in (0.0, 100.0, 10.0):
+                    continue
+
+            domain = valve_entity.split(".", 1)[0]
+            try:
+                if domain == "valve":
+                    await self.hass.services.async_call(
+                        "valve",
+                        "set_valve_position",
+                        {ATTR_ENTITY_ID: valve_entity, "position": int(round(target_pct))},
+                        context=self._internal_context,
+                    )
+                elif domain in ("number", "input_number"):
+                    await self.hass.services.async_call(
+                        domain,
+                        "set_value",
+                        {ATTR_ENTITY_ID: valve_entity, "value": target_val},
+                        context=self._internal_context,
+                    )
+                self._last_valve_positions[valve_entity] = target_val
+            except Exception as err:
+                _LOGGER.error("Failed to set proportional valve position for %s: %s", valve_entity, err)
+
 
     async def process_trv_change(
         self,

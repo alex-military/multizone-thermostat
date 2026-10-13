@@ -7,6 +7,8 @@ from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN
 from homeassistant.components.binary_sensor import DOMAIN as BINARY_SENSOR_DOMAIN
 from homeassistant.helpers import selector
 
+from homeassistant import data_entry_flow
+
 from ..const import (
     CONF_BOILER_MODE,
     CONF_BOILER_SWITCH,
@@ -19,6 +21,11 @@ from ..const import (
     CONF_ZONE_NAME,
     CONF_ZONE_CLIMATES,
     CONF_ZONE_SWITCHES,
+    CONF_ZONE_VALVES,
+    CONF_VALVE_SCALE,
+    VALVE_SCALE_PERCENT,
+    VALVE_SCALE_VOLT,
+    DEFAULT_VALVE_SCALE,
     CONF_ZONE_TEMP_SENSOR,
     CONF_ZONE_TARGET_TEMP,
     CONF_ZONE_TRV_SYNC,
@@ -72,17 +79,55 @@ def get_boiler_opentherm_schema() -> vol.Schema:
 def get_add_zone_schema() -> vol.Schema:
     return vol.Schema({
         vol.Required(CONF_ZONE_NAME): str,
-        vol.Optional(CONF_ZONE_CLIMATES, default=[]): selector.EntitySelector(selector.EntitySelectorConfig(domain=CLIMATE_DOMAIN, multiple=True)),
-        vol.Optional(CONF_ZONE_SWITCHES, default=[]): selector.EntitySelector(selector.EntitySelectorConfig(domain=SWITCH_DOMAIN, multiple=True)),
         vol.Optional(CONF_ZONE_TEMP_SENSOR): selector.EntitySelector(selector.EntitySelectorConfig(domain=SENSOR_DOMAIN, device_class="temperature")),
         vol.Optional(CONF_ZONE_TARGET_TEMP, default=20.0): selector.NumberSelector(selector.NumberSelectorConfig(min=5, max=35, step=0.5, mode=selector.NumberSelectorMode.BOX)),
-        vol.Optional(CONF_ZONE_SENSOR_TIMEOUT, default=DEFAULT_SENSOR_TIMEOUT_MIN): selector.NumberSelector(
-            selector.NumberSelectorConfig(min=10, max=180, step=5, mode=selector.NumberSelectorMode.BOX)
+        
+        # Section 1: TRV Standard
+        vol.Optional("trv_settings"): data_entry_flow.section(
+            vol.Schema({
+                vol.Optional(CONF_ZONE_CLIMATES, default=[]): selector.EntitySelector(selector.EntitySelectorConfig(domain=CLIMATE_DOMAIN, multiple=True)),
+                vol.Optional(CONF_ZONE_TRV_SYNC, default=DEFAULT_TRV_SYNC): bool,
+            }),
+            {"collapsed": True},
         ),
-        vol.Optional(CONF_ZONE_TRV_SYNC, default=DEFAULT_TRV_SYNC): bool,
-        vol.Optional(CONF_ZONE_ANTI_SEIZE, default=True): bool,
-        vol.Optional(CONF_ZONE_ALLOW_PASSIVE_HEAT, default=False): bool,
-        vol.Optional(CONF_ZONE_WINDOW_SENSOR): selector.EntitySelector(selector.EntitySelectorConfig(domain=BINARY_SENSOR_DOMAIN)),
+
+        # Section 2: Valvole Proporzionali / 0-10V
+        vol.Optional("valve_settings"): data_entry_flow.section(
+            vol.Schema({
+                vol.Optional(CONF_ZONE_VALVES, default=[]): selector.EntitySelector(selector.EntitySelectorConfig(domain=["number", "valve"], multiple=True)),
+                vol.Optional(CONF_VALVE_SCALE, default=DEFAULT_VALVE_SCALE): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[
+                            selector.SelectOptionDict(value=VALVE_SCALE_PERCENT, label="Percentage (0 - 100%)"),
+                            selector.SelectOptionDict(value=VALVE_SCALE_VOLT, label="Voltage (0.0 - 10.0 V)"),
+                        ],
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+            }),
+            {"collapsed": True},
+        ),
+
+        # Section 3: Attuatori a Relè (PWM)
+        vol.Optional("relay_settings"): data_entry_flow.section(
+            vol.Schema({
+                vol.Optional(CONF_ZONE_SWITCHES, default=[]): selector.EntitySelector(selector.EntitySelectorConfig(domain=SWITCH_DOMAIN, multiple=True)),
+            }),
+            {"collapsed": True},
+        ),
+
+        # Section 4: Protezioni & Funzioni Avanzate
+        vol.Optional("safety_settings"): data_entry_flow.section(
+            vol.Schema({
+                vol.Optional(CONF_ZONE_WINDOW_SENSOR): selector.EntitySelector(selector.EntitySelectorConfig(domain=BINARY_SENSOR_DOMAIN)),
+                vol.Optional(CONF_ZONE_SENSOR_TIMEOUT, default=DEFAULT_SENSOR_TIMEOUT_MIN): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=10, max=180, step=5, mode=selector.NumberSelectorMode.BOX)
+                ),
+                vol.Optional(CONF_ZONE_ANTI_SEIZE, default=True): bool,
+                vol.Optional(CONF_ZONE_ALLOW_PASSIVE_HEAT, default=False): bool,
+            }),
+            {"collapsed": True},
+        ),
     })
 
 
@@ -194,17 +239,55 @@ def get_zone_select_schema(zone_options: dict[str, str]) -> vol.Schema:
 
 def get_options_edit_zone_schema(zone_data: dict[str, Any], temp_desc: dict[str, Any], window_desc: dict[str, Any]) -> vol.Schema:
     return vol.Schema({
-        vol.Optional(CONF_ZONE_CLIMATES, default=zone_data.get(CONF_ZONE_CLIMATES, [])): selector.EntitySelector(selector.EntitySelectorConfig(domain=CLIMATE_DOMAIN, multiple=True)),
-        vol.Optional(CONF_ZONE_SWITCHES, default=zone_data.get(CONF_ZONE_SWITCHES, [])): selector.EntitySelector(selector.EntitySelectorConfig(domain=SWITCH_DOMAIN, multiple=True)),
         vol.Optional(CONF_ZONE_TEMP_SENSOR, **temp_desc): selector.EntitySelector(selector.EntitySelectorConfig(domain=SENSOR_DOMAIN, device_class="temperature")),
         vol.Optional(CONF_ZONE_TARGET_TEMP, default=zone_data.get(CONF_ZONE_TARGET_TEMP, 20.0)): selector.NumberSelector(selector.NumberSelectorConfig(min=5, max=35, step=0.5, mode=selector.NumberSelectorMode.BOX)),
-        vol.Optional(CONF_ZONE_SENSOR_TIMEOUT, default=zone_data.get(CONF_ZONE_SENSOR_TIMEOUT, DEFAULT_SENSOR_TIMEOUT_MIN)): selector.NumberSelector(
-            selector.NumberSelectorConfig(min=10, max=180, step=5, mode=selector.NumberSelectorMode.BOX)
+
+        # Section 1: TRV Standard
+        vol.Optional("trv_settings"): data_entry_flow.section(
+            vol.Schema({
+                vol.Optional(CONF_ZONE_CLIMATES, default=zone_data.get(CONF_ZONE_CLIMATES, [])): selector.EntitySelector(selector.EntitySelectorConfig(domain=CLIMATE_DOMAIN, multiple=True)),
+                vol.Optional(CONF_ZONE_TRV_SYNC, default=zone_data.get(CONF_ZONE_TRV_SYNC, DEFAULT_TRV_SYNC)): bool,
+            }),
+            {"collapsed": True},
         ),
-        vol.Optional(CONF_ZONE_TRV_SYNC, default=zone_data.get(CONF_ZONE_TRV_SYNC, DEFAULT_TRV_SYNC)): bool,
-        vol.Optional(CONF_ZONE_ANTI_SEIZE, default=zone_data.get(CONF_ZONE_ANTI_SEIZE, True)): bool,
-        vol.Optional(CONF_ZONE_ALLOW_PASSIVE_HEAT, default=zone_data.get(CONF_ZONE_ALLOW_PASSIVE_HEAT, False)): bool,
-        vol.Optional(CONF_ZONE_WINDOW_SENSOR, **window_desc): selector.EntitySelector(selector.EntitySelectorConfig(domain=BINARY_SENSOR_DOMAIN)),
+
+        # Section 2: Valvole Proporzionali / 0-10V
+        vol.Optional("valve_settings"): data_entry_flow.section(
+            vol.Schema({
+                vol.Optional(CONF_ZONE_VALVES, default=zone_data.get(CONF_ZONE_VALVES, [])): selector.EntitySelector(selector.EntitySelectorConfig(domain=["number", "valve"], multiple=True)),
+                vol.Optional(CONF_VALVE_SCALE, default=zone_data.get(CONF_VALVE_SCALE, DEFAULT_VALVE_SCALE)): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[
+                            selector.SelectOptionDict(value=VALVE_SCALE_PERCENT, label="Percentage (0 - 100%)"),
+                            selector.SelectOptionDict(value=VALVE_SCALE_VOLT, label="Voltage (0.0 - 10.0 V)"),
+                        ],
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+            }),
+            {"collapsed": True},
+        ),
+
+        # Section 3: Attuatori a Relè (PWM)
+        vol.Optional("relay_settings"): data_entry_flow.section(
+            vol.Schema({
+                vol.Optional(CONF_ZONE_SWITCHES, default=zone_data.get(CONF_ZONE_SWITCHES, [])): selector.EntitySelector(selector.EntitySelectorConfig(domain=SWITCH_DOMAIN, multiple=True)),
+            }),
+            {"collapsed": True},
+        ),
+
+        # Section 4: Protezioni & Funzioni Avanzate
+        vol.Optional("safety_settings"): data_entry_flow.section(
+            vol.Schema({
+                vol.Optional(CONF_ZONE_WINDOW_SENSOR, **window_desc): selector.EntitySelector(selector.EntitySelectorConfig(domain=BINARY_SENSOR_DOMAIN)),
+                vol.Optional(CONF_ZONE_SENSOR_TIMEOUT, default=zone_data.get(CONF_ZONE_SENSOR_TIMEOUT, DEFAULT_SENSOR_TIMEOUT_MIN)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=10, max=180, step=5, mode=selector.NumberSelectorMode.BOX)
+                ),
+                vol.Optional(CONF_ZONE_ANTI_SEIZE, default=zone_data.get(CONF_ZONE_ANTI_SEIZE, True)): bool,
+                vol.Optional(CONF_ZONE_ALLOW_PASSIVE_HEAT, default=zone_data.get(CONF_ZONE_ALLOW_PASSIVE_HEAT, False)): bool,
+            }),
+            {"collapsed": True},
+        ),
     })
 
 

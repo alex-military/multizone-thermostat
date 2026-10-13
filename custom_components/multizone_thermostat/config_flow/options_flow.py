@@ -4,7 +4,7 @@ from homeassistant import config_entries
 from homeassistant.core import callback
 from .schemas import *
 from .validators import validate_opentherm_temps, validate_zone_input, validate_geofencing
-from .helpers import _remove_entity_from_registry
+from .helpers import _remove_entity_from_registry, flatten_zone_user_input
 from ..const import *
 import logging
 from homeassistant.helpers import entity_registry as er
@@ -141,16 +141,20 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
         already_added = [z.get(CONF_ZONE_NAME, 'Unnamed Zone') for z in self._zones]
 
         if user_input is not None:
+            user_input = flatten_zone_user_input(user_input)
             name = user_input[CONF_ZONE_NAME].strip()
             climates = user_input.get(CONF_ZONE_CLIMATES, [])
             switches = user_input.get(CONF_ZONE_SWITCHES, [])
+            valves = user_input.get(CONF_ZONE_VALVES, [])
             
-            errors.update(validate_zone_input(name, climates, switches, already_added))
+            errors.update(validate_zone_input(name, climates, switches, already_added, valves=valves))
             if not errors:
                 zone_data = {
                     CONF_ZONE_NAME: name,
                     CONF_ZONE_CLIMATES: climates,
                     CONF_ZONE_SWITCHES: switches,
+                    CONF_ZONE_VALVES: valves,
+                    CONF_VALVE_SCALE: user_input.get(CONF_VALVE_SCALE, DEFAULT_VALVE_SCALE),
                     CONF_ZONE_TRV_SYNC: user_input.get(CONF_ZONE_TRV_SYNC, DEFAULT_TRV_SYNC),
                     CONF_ZONE_ANTI_SEIZE: user_input.get(CONF_ZONE_ANTI_SEIZE, True),
                     CONF_ZONE_ALLOW_PASSIVE_HEAT: user_input.get(CONF_ZONE_ALLOW_PASSIVE_HEAT, False),
@@ -253,15 +257,19 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
 
         if user_input is not None:
             if self._current_zone_name is not None:
+                user_input = flatten_zone_user_input(user_input)
                 climates = user_input.get(CONF_ZONE_CLIMATES, [])
                 switches = user_input.get(CONF_ZONE_SWITCHES, [])
-                if not climates and not switches:
+                valves = user_input.get(CONF_ZONE_VALVES, [])
+                if not climates and not switches and not valves:
                     errors["base"] = "no_actuators_selected"
                 else:
                     for i, z in enumerate(self._zones):
                         if z.get(CONF_ZONE_NAME, 'Unnamed Zone') == self._current_zone_name:
                             self._zones[i][CONF_ZONE_CLIMATES] = climates
                             self._zones[i][CONF_ZONE_SWITCHES] = switches
+                            self._zones[i][CONF_ZONE_VALVES] = valves
+                            self._zones[i][CONF_VALVE_SCALE] = user_input.get(CONF_VALVE_SCALE, DEFAULT_VALVE_SCALE)
                             self._zones[i][CONF_ZONE_TRV_SYNC] = user_input.get(CONF_ZONE_TRV_SYNC, DEFAULT_TRV_SYNC)
                             self._zones[i][CONF_ZONE_ANTI_SEIZE] = user_input.get(CONF_ZONE_ANTI_SEIZE, True)
                             self._zones[i][CONF_ZONE_ALLOW_PASSIVE_HEAT] = user_input.get(CONF_ZONE_ALLOW_PASSIVE_HEAT, False)

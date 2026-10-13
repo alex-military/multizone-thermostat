@@ -34,6 +34,9 @@ from .const import (
     CONF_ZONE_NAME,
     CONF_ZONE_CLIMATES,
     CONF_ZONE_SWITCHES,
+    CONF_ZONE_VALVES,
+    CONF_VALVE_SCALE,
+    DEFAULT_VALVE_SCALE,
     CONF_ZONE_TEMP_SENSOR,
     CONF_ZONE_TARGET_TEMP,
     CONF_ZONE_CALIBRATIONS,
@@ -97,6 +100,8 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         self._temp_sensor = zone_data.get(CONF_ZONE_TEMP_SENSOR)
         self._climates = zone_data.get(CONF_ZONE_CLIMATES, [])
         self._switches = zone_data.get(CONF_ZONE_SWITCHES, [])
+        self._valves = zone_data.get(CONF_ZONE_VALVES, [])
+        self._valve_scale = zone_data.get(CONF_VALVE_SCALE, DEFAULT_VALVE_SCALE)
         self._calibrations = zone_data.get(CONF_ZONE_CALIBRATIONS, {})
         self._sensor_timeout_min = zone_data.get(CONF_ZONE_SENSOR_TIMEOUT, DEFAULT_SENSOR_TIMEOUT_MIN)
         self._safety_fallback_active = False
@@ -132,6 +137,8 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             climates=self._climates,
             switches=self._switches,
             calibrations=self._calibrations,
+            valves=self._valves,
+            valve_scale=self._valve_scale,
         )
 
     @property
@@ -169,6 +176,8 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             "temperature_sensor": self._temp_sensor,
             "climates": self._climates,
             "switches": self._switches,
+            "valves": self._valves,
+            "valve_scale": self._valve_scale,
             "calibrations": self._calibrations,
             "hybrid_zone": True,
             "local_pwm_active": self._sync_manager.local_pwm_state,
@@ -190,6 +199,7 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         self.async_write_ha_state()
         await self._trigger_trv_sync()
         await self._sync_manager.async_sync_switches()
+        await self._sync_manager.async_sync_proportional_valves(self._hvac_mode)
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
         """Set target temperature."""
@@ -239,7 +249,16 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
                 )
             )
 
+        if self._valves:
+            self._unsub_listeners.append(
+                async_track_time_interval(
+                    self.hass, self._async_valve_tick, timedelta(seconds=10)
+                )
+            )
+
         await self._trigger_trv_sync()
+        if self._valves:
+            await self._sync_manager.async_sync_proportional_valves(self._hvac_mode)
 
     async def async_will_remove_from_hass(self) -> None:
         """Clean up listeners."""
@@ -360,3 +379,8 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         """Evaluate local PWM for switches."""
         if await self._sync_manager.async_pwm_tick(self._hvac_mode):
             self.async_write_ha_state()
+
+    async def _async_valve_tick(self, now: Any) -> None:
+        """Evaluate and synchronize proportional valves."""
+        await self._sync_manager.async_sync_proportional_valves(self._hvac_mode)
+
