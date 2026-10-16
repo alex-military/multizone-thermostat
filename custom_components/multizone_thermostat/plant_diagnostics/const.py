@@ -12,17 +12,17 @@ ANOMALY_SENSOR_TIMEOUT = "sensor_timeout"
 ANOMALY_BOILER_LOW_PRESSURE = "boiler_low_pressure"
 ANOMALY_BOILER_FAULT = "boiler_fault"
 
-# Human-readable anomaly labels (Italian)
+# Human-readable anomaly labels
 ANOMALY_LABELS = {
-    ANOMALY_NONE: "Nessuna anomalia",
-    ANOMALY_VALVE_STUCK_CLOSED: "Possibile valvola bloccata chiusa / Nessun apporto termico",
-    ANOMALY_GHOST_HEATING: "Possibile trafilamento o valvola aperta (Riscaldamento fantasma)",
-    ANOMALY_AIR_IN_RADIATOR: "Calo di resa termica (Possibile aria nel radiatore)",
-    ANOMALY_STALE_SENSOR: "Sensore temperatura non aggiornato da oltre 2 ore",
-    ANOMALY_OVERSHOOT: "Superamento anomalo temperatura impostata (>1.5°C)",
-    ANOMALY_LOW_BATTERY: "Batteria sensore in esaurimento (<= 10%)",
-    ANOMALY_SENSOR_FAULT: "Guasto sensore o temperatura non plausibile",
-    ANOMALY_SENSOR_TIMEOUT: "Watchdog: Sonda offline / mancata ricezione dati",
-    ANOMALY_BOILER_LOW_PRESSURE: "Pressione circuito caldaia insufficiente (< 0.8 bar)",
-    ANOMALY_BOILER_FAULT: "Allarme guasto generatore OpenTherm",
+    ANOMALY_NONE: "No anomaly",
+    ANOMALY_VALVE_STUCK_CLOSED: "Possible valve stuck closed / No heat delivery",
+    ANOMALY_GHOST_HEATING: "Possible valve leakage or open valve (Ghost heating)",
+    ANOMALY_AIR_IN_RADIATOR: "Thermal output drop (Possible air in radiator)",
+    ANOMALY_STALE_SENSOR: "Temperature sensor not updated for over 2 hours",
+    ANOMALY_OVERSHOOT: "Abnormal temperature overshoot (>1.5°C)",
+    ANOMALY_LOW_BATTERY: "Sensor battery low (<= 10%)",
+    ANOMALY_SENSOR_FAULT: "Sensor fault or implausible temperature",
+    ANOMALY_SENSOR_TIMEOUT: "Watchdog: Sensor offline / no data received",
+    ANOMALY_BOILER_LOW_PRESSURE: "Boiler circuit pressure low (< 0.8 bar)",
+    ANOMALY_BOILER_FAULT: "OpenTherm boiler fault alarm",
 }

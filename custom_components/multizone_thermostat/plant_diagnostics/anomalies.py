@@ -267,14 +267,14 @@ def evaluate_zone_anomalies(
         now_mono = time.monotonic()
         st = hass.states.get(climate_id)
         if not st:
-            return ANOMALY_NONE, "Zona non pronta"
+            return ANOMALY_NONE, "Zone not ready"
 
         current_temp = st.attributes.get("current_temperature")
         target_temp = st.attributes.get("temperature")
         demand = coordinator.get_zone_demand(climate_id)
 
         if current_temp is None:
-            return ANOMALY_NONE, "In attesa lettura temperatura"
+            return ANOMALY_NONE, "Waiting for temperature reading"
 
         current_temp = float(current_temp)
 
@@ -286,7 +286,7 @@ def evaluate_zone_anomalies(
                 bat = get_battery_level(hass, sensor_id)
                 if bat is not None and bat <= 10:
                     state["active_anomaly"] = ANOMALY_LOW_BATTERY
-                    state["anomaly_details"] = f"Batteria sensore {sensor_id} in esaurimento ({bat}%)"
+                    state["anomaly_details"] = f"Sensor {sensor_id} battery low ({bat}%)"
                     return ANOMALY_LOW_BATTERY, state["anomaly_details"]
 
         # 0.b Sanity Check (Plausibility)
@@ -301,45 +301,59 @@ def evaluate_zone_anomalies(
                 
         if is_insane:
             state["active_anomaly"] = ANOMALY_SENSOR_FAULT
-            state["anomaly_details"] = f"Lettura temperatura non plausibile o sbalzo anomalo ({current_temp}°C)"
+            state["anomaly_details"] = f"Implausible temperature reading or abnormal spike ({current_temp}°C)"
             return ANOMALY_SENSOR_FAULT, state["anomaly_details"]
 
         # 0.c Watchdog Sensor Timeout Check
         state["fallback_ok"] = False
-        timeout_min = zone.get("sensor_timeout_min", 60) if zone else 60
+        timeout_min = zone.get("sensor_timeout_min", 240) if zone else 240
         sensor_entity = zone.get("temp_sensor") if zone else None
-        if sensor_entity:
+        if sensor_entity and timeout_min > 0:
             s_state = hass.states.get(sensor_entity)
             if s_state:
+                is_disconnected = s_state.state in ("unavailable", "unknown")
                 s_reported = s_state.last_reported if hasattr(s_state, "last_reported") else s_state.last_updated
                 if s_reported:
                     elapsed_sec = now_wall - s_reported.timestamp()
-                    if elapsed_sec > (timeout_min * 60):
-                        # Degraded (not critical) if a valid TRV temperature is available as fallback
-                        for trv in (zone.get("climate_entities") or []):
-                            trv_st = hass.states.get(trv)
-                            if trv_st and trv_st.attributes.get("current_temperature") is not None:
+                    # Check for TRV fallback
+                    trvs = (zone.get("climates") or zone.get("climate_entities") or [])
+                    for trv in trvs:
+                        trv_st = hass.states.get(trv)
+                        if trv_st and trv_st.attributes.get("current_temperature") is not None:
+                            state["fallback_ok"] = True
+                            break
+
+                    if is_disconnected or elapsed_sec > (timeout_min * 60):
+                        # If the sensor is online with a valid reading, it's just a sleeping battery device
+                        if not is_disconnected:
+                            try:
+                                _ = float(s_state.state)
                                 state["fallback_ok"] = True
-                                break
+                            except (ValueError, TypeError):
+                                pass
+
                         state["active_anomaly"] = ANOMALY_SENSOR_TIMEOUT
-                        suffix = " - fallback sui TRV attivo" if state["fallback_ok"] else ""
-                        state["anomaly_details"] = f"Sonda {sensor_entity} non aggiornata da oltre {int(elapsed_sec / 60)} min (limite: {timeout_min} min){suffix}"
+                        suffix = " - active fallback" if state["fallback_ok"] else ""
+                        if is_disconnected:
+                            state["anomaly_details"] = f"Sensor {sensor_entity} offline/unavailable ({s_state.state}){suffix}"
+                        else:
+                            state["anomaly_details"] = f"Sensor {sensor_entity} quiet: no updates for {int(elapsed_sec / 60)} min (limit: {timeout_min} min){suffix}"
                         return ANOMALY_SENSOR_TIMEOUT, state["anomaly_details"]
 
         # If the zone is Bypassed, it is intentionally excluded from heating
         zone_mode = coordinator.get_zone_mode(climate_id)
         if zone_mode == "bypass":
             state["active_anomaly"] = ANOMALY_NONE
-            state["anomaly_details"] = "Zona bypassata (Esclusa dal riscaldamento)"
+            state["anomaly_details"] = "Zone bypassed (Excluded from heating)"
             return ANOMALY_NONE, state["anomaly_details"]
 
-        # 1. Staleness Check: Has the temperature sensor not updated in > 2 hours?
+        # 1. Staleness Check: Has the temperature sensor not changed in > 6 hours?
         if state["last_temp_seen"] is None or state["last_temp_seen"] != current_temp:
             state["last_temp_seen"] = current_temp
             state["last_temp_time"] = now_mono
             
-        if state["last_temp_time"] is not None and (now_mono - state["last_temp_time"]) > 7200:
-            # Same exact float value for > 2 hours
+        if state["last_temp_time"] is not None and (now_mono - state["last_temp_time"]) > 21600:
+            # Same exact float value for > 6 hours
             state["active_anomaly"] = ANOMALY_STALE_SENSOR
             state["anomaly_details"] = ANOMALY_LABELS[ANOMALY_STALE_SENSOR]
             return ANOMALY_STALE_SENSOR, state["anomaly_details"]
@@ -353,7 +367,7 @@ def evaluate_zone_anomalies(
         heated_recently = state["last_heating_time"] is not None and (now_mono - state["last_heating_time"]) < 7200
         if heated_recently and target_temp is not None and current_temp > (float(target_temp) + 1.5):
             state["active_anomaly"] = ANOMALY_OVERSHOOT
-            state["anomaly_details"] = f"Temperatura attuale ({current_temp}°C) supera il target ({target_temp}°C) di oltre 1.5°C per calore residuo"
+            state["anomaly_details"] = f"Current temperature ({current_temp}°C) exceeds target ({target_temp}°C) by >1.5°C from residual heat"
             return ANOMALY_OVERSHOOT, state["anomaly_details"]
 
         # 3. Stuck Closed Valve: Demand == 100% for > 75 min, but temperature did not rise >= 0.2°C
@@ -365,7 +379,7 @@ def evaluate_zone_anomalies(
                 start_t = state["high_demand_start_temp"]
                 if start_t is not None and (current_temp - start_t) < 0.2:
                     state["active_anomaly"] = ANOMALY_VALVE_STUCK_CLOSED
-                    state["anomaly_details"] = f"Riscaldamento attivo al 100% da oltre 75 min ma la temperatura non sale ({start_t}°C → {current_temp}°C)"
+                    state["anomaly_details"] = f"Heating active at 100% for >75 min but temperature is not rising ({start_t}°C → {current_temp}°C)"
                     return ANOMALY_VALVE_STUCK_CLOSED, state["anomaly_details"]
         elif demand < 80.0:
             # Reset stuck-closed tracker if demand dropped below 80%
@@ -384,7 +398,7 @@ def evaluate_zone_anomalies(
                 state["ghost_heat_start_temp"] = current_temp
             elif (current_temp - state["ghost_heat_start_temp"]) > 0.8:
                 state["active_anomaly"] = ANOMALY_GHOST_HEATING
-                state["anomaly_details"] = f"Temperatura salita da {state['ghost_heat_start_temp']}°C a {current_temp}°C con zona a 0% richiesta"
+                state["anomaly_details"] = f"Temperature rose from {state['ghost_heat_start_temp']}°C to {current_temp}°C with 0% zone demand"
                 return ANOMALY_GHOST_HEATING, state["anomaly_details"]
         else:
             state["ghost_heat_start_temp"] = None
@@ -396,4 +410,4 @@ def evaluate_zone_anomalies(
 
     except Exception as err:
         _LOGGER.debug("Error in evaluate_zone_anomalies for %s: %s", climate_id, err)
-        return ANOMALY_NONE, "Errore valutazione"
+        return ANOMALY_NONE, "Evaluation error"

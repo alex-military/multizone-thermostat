@@ -53,7 +53,7 @@ class PlantDiagnosticsEngine:
             climate_id = make_zone_entity_id(zone[CONF_ZONE_NAME])
             self._zone_anomaly_state[climate_id] = {
                 "active_anomaly": ANOMALY_NONE,
-                "anomaly_details": "Nessuna anomalia rilevata",
+                "anomaly_details": "No anomaly detected",
                 "high_demand_start_time": None,
                 "high_demand_start_temp": None,
                 "ghost_heat_start_temp": None,
@@ -121,7 +121,7 @@ class PlantDiagnosticsEngine:
     def evaluate_zone_anomalies(self, climate_id: str) -> tuple[str, str]:
         state = self._zone_anomaly_state.setdefault(climate_id, {
             "active_anomaly": ANOMALY_NONE,
-            "anomaly_details": "Nessuna anomalia rilevata",
+            "anomaly_details": "No anomaly detected",
             "high_demand_start_time": None,
             "high_demand_start_temp": None,
             "ghost_heat_start_temp": None,
@@ -172,10 +172,10 @@ class PlantDiagnosticsEngine:
         cycles = self.get_boiler_cycles_per_hour()
         if cycles > 5:
             anomalies_found.append({
-                "zone": "Caldaia",
+                "zone": "Boiler",
                 "climate_id": "boiler",
                 "type": "short_cycling",
-                "description": f"Frequenza accensioni elevata: {cycles} cicli/ora (possibile usura o sovradimensionamento)",
+                "description": f"High cycle frequency: {cycles} cycles/hour (possible wear or oversizing)",
             })
 
         # OpenTherm Diagnostics & Anomalies
@@ -185,30 +185,30 @@ class PlantDiagnosticsEngine:
             press = ot_diag.get("water_pressure")
             if press is not None and press < 0.8:
                 anomalies_found.append({
-                    "zone": "Centrale Termica",
+                    "zone": "Boiler Plant",
                     "climate_id": "boiler_pressure",
                     "type": ANOMALY_BOILER_LOW_PRESSURE,
-                    "description": f"Pressione circuito bassa ({press:.1f} bar). Ricaricare circuito a 1.2 - 1.5 bar",
+                    "description": f"Low circuit pressure ({press:.1f} bar). Refill circuit to 1.2 - 1.5 bar",
                 })
             # Check Boiler Fault
             if ot_diag.get("fault_active"):
-                code = ot_diag.get("fault_code", "Attivo")
+                code = ot_diag.get("fault_code", "Active")
                 anomalies_found.append({
-                    "zone": "Centrale Termica",
+                    "zone": "Boiler Plant",
                     "climate_id": "boiler_fault",
                     "type": ANOMALY_BOILER_FAULT,
-                    "description": f"Allarme guasto generatore OpenTherm (Codice: {code})",
+                    "description": f"OpenTherm generator fault alarm (Code: {code})",
                 })
 
         if not anomalies_found:
             status = "optimal"
-            label = "Ottimale"
+            label = "Optimal"
         elif any(a["type"] in (ANOMALY_VALVE_STUCK_CLOSED, ANOMALY_GHOST_HEATING, ANOMALY_STALE_SENSOR, ANOMALY_BOILER_FAULT) for a in anomalies_found):
             status = "critical"
-            label = "Critico"
+            label = "Critical"
         else:
             status = "warning"
-            label = "Attenzione"
+            label = "Warning"
 
         return {
             "status": status,

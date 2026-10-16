@@ -9,7 +9,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, KEY_NIGHT_TIME, KEY_MORNING_TIME
+from .const import DOMAIN, KEY_NIGHT_TIME, KEY_MORNING_TIME, make_via_device_kwargs
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -40,12 +40,13 @@ class MultizoneNightTimeEntity(TimeEntity):
         self._attr_unique_id = f"{DOMAIN}_{entry_id}_night_time"
         
         from homeassistant.helpers.entity import DeviceInfo
+        master_dev_id = getattr(self.coordinator, "master_device_id", None)
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_time_geofencing")},
             name="Time & Geofencing",
             manufacturer="Custom Integration",
             model="Time & Geofencing Settings",
-            via_device=(DOMAIN, entry_id),
+            **make_via_device_kwargs(entry_id, master_dev_id),
         )
 
     @property
@@ -79,12 +80,13 @@ class MultizoneMorningTimeEntity(TimeEntity):
         self._attr_unique_id = f"{DOMAIN}_{entry_id}_morning_time"
         
         from homeassistant.helpers.entity import DeviceInfo
+        master_dev_id = getattr(self.coordinator, "master_device_id", None)
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_time_geofencing")},
             name="Time & Geofencing",
             manufacturer="Custom Integration",
             model="Time & Geofencing Settings",
-            via_device=(DOMAIN, entry_id),
+            **make_via_device_kwargs(entry_id, master_dev_id),
         )
 
     @property

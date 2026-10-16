@@ -15,7 +15,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_time_interval
 
-from .const import DOMAIN, CONF_ZONES, CONF_ZONE_NAME, make_zone_entity_id
+from .const import DOMAIN, CONF_ZONES, CONF_ZONE_NAME, make_zone_entity_id, make_via_device_kwargs
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -107,8 +107,8 @@ class MultizonePlantAnomalyBinarySensor(BinarySensorEntity):
                     "create",
                     {
                         "notification_id": "multizone_thermostat_plant_anomaly",
-                        "title": "Multizone Thermostat — Notifica Impianto",
-                        "message": f"Attenzione: rilevate anomalie nell'impianto termico:\n\n{bullet_lines}\n\nConsulta la dashboard Diagnostica per maggiori dettagli.",
+                        "title": "Multizone Thermostat — Plant Notification",
+                        "message": f"Warning: anomalies detected in heating plant:\n\n{bullet_lines}\n\nCheck Diagnostics dashboard for details.",
                     },
                 )
             elif not anomalies and self._notified_active:
@@ -145,12 +145,13 @@ class MultizoneZoneAnomalyBinarySensor(BinarySensorEntity):
         self._climate_id = climate_id
         self._attr_name = f"{name} Anomaly"
         self._attr_unique_id = f"{DOMAIN}_{entry_id}_anomaly_{climate_id}"
+        master_dev_id = getattr(coordinator, "master_device_id", None)
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_zones")},
             name="Heating Zones",
             manufacturer="Multizone Thermostat",
             model="Hybrid Zone Controller",
-            via_device=(DOMAIN, entry_id),
+            **make_via_device_kwargs(entry_id, master_dev_id),
         )
 
     @property

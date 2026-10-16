@@ -15,7 +15,7 @@ from homeassistant.helpers.event import (
     async_track_time_interval,
 )
 
-from .const import DOMAIN, CONF_ZONES, CONF_ZONE_NAME, make_zone_entity_id
+from .const import DOMAIN, CONF_ZONES, CONF_ZONE_NAME, make_zone_entity_id, make_via_device_kwargs
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -69,17 +69,18 @@ class DemandSensor(SensorEntity):
         self._coordinator = coordinator
         self._attr_unique_id = f"{DOMAIN}_{entry_id}_demand_{climate_entity_id}"
         
+        master_dev_id = getattr(coordinator, "master_device_id", None)
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_virtual_thermostats")},
             name="Multizone Brain",
             manufacturer="Custom Integration",
             model="Multizone Brain",
-            via_device=(DOMAIN, entry_id),
+            **make_via_device_kwargs(entry_id, master_dev_id),
         )
 
     @property
     def name(self) -> str:
-        return f"{self._name} Fabbisogno"
+        return f"{self._name} Demand"
 
     @property
     def native_value(self) -> float:
@@ -117,12 +118,13 @@ class AutotuneSensor(SensorEntity):
         self._coordinator = coordinator
         self._attr_unique_id = f"{DOMAIN}_{entry_id}_autotune_{climate_entity_id}"
         
+        master_dev_id = getattr(coordinator, "master_device_id", None)
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_virtual_thermostats")},
             name="Multizone Brain",
             manufacturer="Custom Integration",
             model="Multizone Brain",
-            via_device=(DOMAIN, entry_id),
+            **make_via_device_kwargs(entry_id, master_dev_id),
         )
 
     @property
@@ -184,12 +186,13 @@ class ThermalSensorBase(SensorEntity):
         self._climate_entity_id = climate_entity_id
         self._coordinator = coordinator
         
+        master_dev_id = getattr(coordinator, "master_device_id", None)
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_virtual_thermostats")},
             name="Multizone Brain",
             manufacturer="Custom Integration",
             model="Multizone Brain",
-            via_device=(DOMAIN, entry_id),
+            **make_via_device_kwargs(entry_id, master_dev_id),
         )
 
     async def async_added_to_hass(self) -> None:
@@ -214,7 +217,7 @@ class HeatingRateSensor(ThermalSensorBase):
     
     @property
     def name(self) -> str:
-        return f"{self._name} Velocità Riscaldamento"
+        return f"{self._name} Heating Rate"
         
     @property
     def native_value(self) -> float:
@@ -235,7 +238,7 @@ class CoolingRateSensor(ThermalSensorBase):
     
     @property
     def name(self) -> str:
-        return f"{self._name} Dispersione"
+        return f"{self._name} Cooling Rate"
         
     @property
     def native_value(self) -> float:
@@ -256,7 +259,7 @@ class ThermalInertiaSensor(ThermalSensorBase):
     
     @property
     def name(self) -> str:
-        return f"{self._name} Inerzia Termica"
+        return f"{self._name} Thermal Inertia"
         
     @property
     def native_value(self) -> float:
@@ -277,7 +280,7 @@ class MultizonePlantHealthSensor(SensorEntity):
         self.hass = hass
         self._coordinator = coordinator
         self._attr_unique_id = f"{DOMAIN}_{entry_id}_plant_health"
-        self._attr_name = "Stato Salute Impianto"
+        self._attr_name = "Plant Health Status"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry_id)},
             name="Master Control",
@@ -291,7 +294,7 @@ class MultizonePlantHealthSensor(SensorEntity):
         engine = getattr(self._coordinator, "plant_diagnostics", None)
         if not engine:
             return "N/A"
-        return engine.get_plant_health_summary().get("label", "Ottimale")
+        return engine.get_plant_health_summary().get("label", "Optimal")
 
     @property
     def icon(self) -> str:
@@ -329,14 +332,14 @@ class MultizoneBoilerCyclesSensor(SensorEntity):
 
     _attr_has_entity_name = True
     _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_native_unit_of_measurement = "cicli/h"
+    _attr_native_unit_of_measurement = "cycles/h"
     _attr_icon = "mdi:fire-alert"
 
     def __init__(self, hass: HomeAssistant, entry_id: str, coordinator) -> None:
         self.hass = hass
         self._coordinator = coordinator
         self._attr_unique_id = f"{DOMAIN}_{entry_id}_boiler_cycles_per_hour"
-        self._attr_name = "Frequenza Accensioni Caldaia"
+        self._attr_name = "Boiler Cycles per Hour"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry_id)},
             name="Master Control",
@@ -374,7 +377,7 @@ class MultizoneBoilerDailyRuntimeSensor(SensorEntity):
         self.hass = hass
         self._coordinator = coordinator
         self._attr_unique_id = f"{DOMAIN}_{entry_id}_boiler_daily_runtime"
-        self._attr_name = "Ore Funzionamento Caldaia (24h)"
+        self._attr_name = "Boiler Daily Runtime (24h)"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry_id)},
             name="Master Control",
@@ -443,7 +446,7 @@ class MultizoneZoneRetentionTimeSensor(ThermalSensorBase):
 
     @property
     def name(self) -> str:
-        return f"{self._name} Tempo Ritenzione Termica"
+        return f"{self._name} Thermal Retention Time"
 
     @property
     def native_value(self) -> float | None:
@@ -465,7 +468,7 @@ class MultizoneZoneRadiatorSizingSensor(ThermalSensorBase):
 
     @property
     def name(self) -> str:
-        return f"{self._name} Dimensionamento Radiatore"
+        return f"{self._name} Radiator Sizing"
 
     @property
     def native_value(self) -> str:

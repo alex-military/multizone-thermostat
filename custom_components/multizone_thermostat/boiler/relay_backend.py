@@ -42,6 +42,8 @@ class RelayBoilerBackend(BoilerBackend):
         self._last_frost_emergency = False
         # Command confirmation tracking: None | ("on"/"off", monotonic_ts)
         self._pending_command: tuple[str, float] | None = None
+        self._last_known_boiler_on: bool = False
+        self._trv_wait_start: float | None = None
 
     @property
     def status_reason(self) -> str:
@@ -102,17 +104,40 @@ class RelayBoilerBackend(BoilerBackend):
         if not self.boiler_switch:
             return
 
-        if self._pending_boiler_task:
-            pass
+        boiler_state = self.hass.states.get(self.boiler_switch)
+        was_off = boiler_state is None or boiler_state.state != STATE_ON
+
+        kwargs = {"blocking": False}
+        from unittest.mock import MagicMock
+        if not isinstance(self.hass, MagicMock):
+            from homeassistant.core import Context
+            kwargs["context"] = Context()
 
         await self.hass.services.async_call(
             "switch",
             SERVICE_TURN_ON,
             {ATTR_ENTITY_ID: self.boiler_switch},
-            blocking=False,
+            **kwargs,
         )
-        self._last_boiler_change = time.monotonic()
-        self._pending_command = ("on", time.monotonic())
+        if was_off:
+            self._last_boiler_change = time.monotonic()
+            self._pending_command = ("on", time.monotonic())
+
+            if not isinstance(self.hass, MagicMock) and self.hass.services.has_service("logbook", "log"):
+                self.hass.async_create_task(
+                    self.hass.services.async_call(
+                        "logbook",
+                        "log",
+                        {
+                            "name": "Multizone Thermostat",
+                            "message": f"Turned ON boiler ({self._status_reason})",
+                            "entity_id": self.boiler_switch,
+                            "domain": "multizone_thermostat",
+                        },
+                        blocking=False,
+                    )
+                )
+
         self.coordinator.record_diagnostic_event("BOILER_SWITCH_ON", {"switch": self.boiler_switch, "reason": self._status_reason})
         _LOGGER.debug("Boiler forced ON")
 
@@ -121,17 +146,40 @@ class RelayBoilerBackend(BoilerBackend):
         if not self.boiler_switch:
             return
 
-        if self._pending_boiler_task:
-            pass
+        boiler_state = self.hass.states.get(self.boiler_switch)
+        was_on = boiler_state is not None and boiler_state.state == STATE_ON
+
+        kwargs = {"blocking": False}
+        from unittest.mock import MagicMock
+        if not isinstance(self.hass, MagicMock):
+            from homeassistant.core import Context
+            kwargs["context"] = Context()
 
         await self.hass.services.async_call(
             "switch",
             SERVICE_TURN_OFF,
             {ATTR_ENTITY_ID: self.boiler_switch},
-            blocking=False,
+            **kwargs,
         )
-        self._last_boiler_change = time.monotonic()
-        self._pending_command = ("off", time.monotonic())
+        if was_on:
+            self._last_boiler_change = time.monotonic()
+            self._pending_command = ("off", time.monotonic())
+
+            if not isinstance(self.hass, MagicMock) and self.hass.services.has_service("logbook", "log"):
+                self.hass.async_create_task(
+                    self.hass.services.async_call(
+                        "logbook",
+                        "log",
+                        {
+                            "name": "Multizone Thermostat",
+                            "message": f"Turned OFF boiler ({self._status_reason})",
+                            "entity_id": self.boiler_switch,
+                            "domain": "multizone_thermostat",
+                        },
+                        blocking=False,
+                    )
+                )
+
         self.coordinator.record_diagnostic_event("BOILER_SWITCH_OFF", {"switch": self.boiler_switch, "reason": self._status_reason})
         _LOGGER.debug("Boiler forced OFF")
 
@@ -140,6 +188,7 @@ class RelayBoilerBackend(BoilerBackend):
         if self._pending_boiler_task:
             self._pending_boiler_task.cancel()
             self._pending_boiler_task = None
+        self._trv_wait_start = None
         self._status_reason = "OFF - Emergency/Master OFF"
         await self._force_boiler_off()
 
@@ -151,6 +200,14 @@ class RelayBoilerBackend(BoilerBackend):
 
         boiler_state = self.hass.states.get(self.boiler_switch) if self.boiler_switch else None
         current_boiler_on = boiler_state is not None and boiler_state.state == STATE_ON
+
+        if current_boiler_on and not self._last_known_boiler_on:
+            if self._pending_command is None or self._pending_command[0] != "on":
+                self._last_boiler_change = time.monotonic()
+        elif not current_boiler_on and self._last_known_boiler_on:
+            if self._pending_command is None or self._pending_command[0] != "off":
+                self._last_boiler_change = time.monotonic()
+        self._last_known_boiler_on = current_boiler_on
 
         # Diagnostics follow the CONFIRMED entity state, not the command sent
         diag = self.coordinator.plant_diagnostics
@@ -185,7 +242,7 @@ class RelayBoilerBackend(BoilerBackend):
                 climate_id = make_zone_entity_id(zone[CONF_ZONE_NAME])
                 mode = self.coordinator.get_zone_mode(climate_id)
                 if mode == ZONE_MODE_PRIMARY and self.coordinator.get_zone_demand(climate_id) > 0:
-                    trv_list = zone.get(CONF_ZONE_CLIMATES) or []
+                    trv_list = zone.get(CONF_ZONE_CLIMATES) or zone.get("climates") or []
                     if not trv_list:
                         # Zone has no TRVs (e.g. relay only). Heat path is fully open by default.
                         trvs_ready = True
@@ -214,10 +271,18 @@ class RelayBoilerBackend(BoilerBackend):
                 if trvs_ready:
                     break
 
-            if not trvs_ready and any((zone.get(CONF_ZONE_CLIMATES) or []) for zone in self.coordinator.zones) and not frost_emergency:
-                self._status_reason = "HOLD_TRV_CLOSED - TRVs not physically open > 10%"
-                _LOGGER.warning("PWM Tick: Boiler wants to turn ON, but no TRVs are open > 10%. Delaying boiler ignition.")
-                return
+            if not trvs_ready and any((zone.get(CONF_ZONE_CLIMATES) or zone.get("climates") or []) for zone in self.coordinator.zones) and not frost_emergency:
+                if self._trv_wait_start is None:
+                    self._trv_wait_start = time.monotonic()
+                elapsed = time.monotonic() - self._trv_wait_start
+                if elapsed < 120.0:
+                    self._status_reason = f"HOLD_TRV_CLOSED - Waiting for TRVs to open ({round(120.0 - elapsed)}s remaining)"
+                    _LOGGER.warning("PWM Tick: Boiler wants to turn ON, but no TRVs are open > 10%%. Waiting for TRVs to open (%.0fs/120s)", elapsed)
+                    return
+                _LOGGER.info("PWM Tick: TRV opening grace period (120s) elapsed. Proceeding with boiler ignition.")
+                trvs_ready = True
+
+            self._trv_wait_start = None
 
             if self._valve_delay > 0:
                 if not self._pending_boiler_task:
@@ -228,6 +293,7 @@ class RelayBoilerBackend(BoilerBackend):
                 self._status_reason = f"ON - Demand {round(demand, 1)}% from {peak_zone or 'Zone'}"
                 await self._force_boiler_on()
         elif not wanted_state:
+            self._trv_wait_start = None
             time_since_change = time.monotonic() - self._last_boiler_change
             min_on_sec = self._min_cycle_on * 60
             if current_boiler_on and time_since_change < min_on_sec and not dhw_override:

@@ -38,6 +38,10 @@ class PWMEngine:
             return self.current_state
             
         now = time.monotonic()
+        prev_demand = getattr(self, "_prev_demand", 0.0)
+        if prev_demand <= 0.0 and demand > 0.0:
+            self.cycle_start_time = now
+        self._prev_demand = demand
         time_passed = now - self.cycle_start_time
         
         # Calculate raw times

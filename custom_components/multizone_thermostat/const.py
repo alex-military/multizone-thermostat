@@ -1,4 +1,6 @@
 """Constants for Multizone Thermostat integration."""
+from __future__ import annotations
+from typing import Any
 
 DOMAIN = "multizone_thermostat"
 
@@ -29,7 +31,7 @@ VALVE_SCALE_VOLT = "volt"
 DEFAULT_VALVE_SCALE = VALVE_SCALE_PERCENT
 CONF_ZONE_ALLOW_PASSIVE_HEAT = "allow_passive_heat"
 CONF_ZONE_SENSOR_TIMEOUT = "sensor_timeout_min"
-DEFAULT_SENSOR_TIMEOUT_MIN = 60
+DEFAULT_SENSOR_TIMEOUT_MIN = 240
 CONF_GLOBAL_CALENDAR = "global_calendar"
 
 # Geofencing keys
@@ -130,3 +132,14 @@ def make_zone_entity_id(name: str) -> str:
     safe = name.lower().replace(" ", "_").replace("-", "_")
     safe = "".join(c for c in safe if c.isalnum() or c == "_")
     return f"climate.{DOMAIN}_{safe}"
+
+
+def make_via_device_kwargs(entry_id: str, master_device_id: str | None = None) -> dict[str, Any]:
+    """Return backward- and forward-compatible DeviceInfo via_device kwargs."""
+    try:
+        from homeassistant.helpers.device_registry import DeviceInfo as HADeviceInfo
+        if hasattr(HADeviceInfo, "__annotations__") and "via_device_id" in HADeviceInfo.__annotations__ and master_device_id:
+            return {"via_device_id": master_device_id}
+    except Exception:
+        pass
+    return {"via_device": (DOMAIN, entry_id)}

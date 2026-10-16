@@ -26,6 +26,7 @@ from .const import (
     CONF_ZONE_NAME,
     CONF_ZONE_CLIMATES,
     make_zone_entity_id,
+    make_via_device_kwargs,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -75,13 +76,14 @@ async def async_setup_entry(
 
 def _make_device_info(entry_id: str, master_device_id: str | None = None, device_type: str = "main") -> DeviceInfo:
     """Create a shared device info for all entities of this integration instance."""
+    via_kwargs = make_via_device_kwargs(entry_id, master_device_id)
     if device_type == "time_geofencing":
         return DeviceInfo(
             identifiers={(DOMAIN, f"{entry_id}_time_geofencing")},
             name="Time & Geofencing",
             manufacturer="Custom Integration",
             model="Time & Geofencing Settings",
-            via_device=(DOMAIN, entry_id),
+            **via_kwargs,
         )
     elif device_type == "zone_modes":
         return DeviceInfo(
@@ -89,7 +91,7 @@ def _make_device_info(entry_id: str, master_device_id: str | None = None, device
             name="Zone Modes",
             manufacturer="Custom Integration",
             model="Zone Modes",
-            via_device=(DOMAIN, entry_id),
+            **via_kwargs,
         )
         
     return DeviceInfo(
@@ -290,7 +292,7 @@ class MultizonePhysicalSyncSwitch(SwitchEntity):
         safe_name = "".join(c for c in safe_name if c.isalnum() or c == "_")
         self._safe_name = safe_name
         self._attr_unique_id = f"{DOMAIN}_{entry_id}_physical_sync_{safe_name}"
-        self._attr_name = f"Sync Controlli Fisici {zone_name}"
+        self._attr_name = f"Physical Controls Sync {zone_name}"
         self._attr_device_info = _make_device_info(entry_id, getattr(coordinator, "master_device_id", None), "zone_modes")
 
     @property
@@ -327,7 +329,7 @@ class MultizonePassiveHeatSwitch(SwitchEntity):
         self._safe_name = safe_name
         self._climate_id = make_zone_entity_id(zone_name)
         self._attr_unique_id = f"{DOMAIN}_{entry_id}_passive_heat_{safe_name}"
-        self._attr_name = f"Apporto Passivo {zone_name}"
+        self._attr_name = f"Passive Heat {zone_name}"
         self._attr_device_info = _make_device_info(entry_id, getattr(coordinator, "master_device_id", None), "zone_modes")
 
     @property

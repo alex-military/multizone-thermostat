@@ -14,7 +14,7 @@ def get_zone_energy_class(coordinator: Any, hass: HomeAssistant, climate_id: str
     try:
         thermal = coordinator.zone_controller.get_thermal_model(climate_id)
         if not thermal or thermal.cooling_rate <= 0.02:
-            return "In apprendimento..."
+            return "Learning..."
 
         st = hass.states.get(climate_id)
         current_temp = float(st.attributes.get("current_temperature", 20.0)) if st else 20.0
@@ -31,11 +31,11 @@ def get_zone_energy_class(coordinator: Any, hass: HomeAssistant, climate_id: str
 
         # If weather is mild (inside - outside < 7.0°C), thermal gradient is too small for reliable calculation
         if outdoor_temp is None:
-            return "In apprendimento..."
+            return "Learning..."
             
         delta_t = current_temp - outdoor_temp
         if delta_t < 7.0:
-            return "In apprendimento..."
+            return "Learning..."
         normalized_dispersion = (thermal.cooling_rate / delta_t) * 20.0
 
         # Scale mapping: European Energy Efficiency Class
@@ -58,7 +58,7 @@ def get_zone_energy_class(coordinator: Any, hass: HomeAssistant, climate_id: str
 
     except Exception as err:
         _LOGGER.debug("Error calculating energy class for %s: %s", climate_id, err)
-        return "Non disponibile"
+        return "Unavailable"
 
 def get_zone_thermal_retention_hours(coordinator: Any, climate_id: str) -> float | None:
     """Calculate how many hours the room takes to lose 1°C."""
@@ -78,14 +78,14 @@ def get_zone_radiator_sizing(coordinator: Any, climate_id: str) -> str:
     try:
         thermal = coordinator.zone_controller.get_thermal_model(climate_id)
         if not thermal or thermal.heating_rate < 0.1 or thermal.cooling_rate < 0.05:
-            return "In apprendimento..."
+            return "Learning..."
 
         ratio = thermal.heating_rate / thermal.cooling_rate
         if ratio < 1.3:
-            return "Sottodimensionato"
+            return "Undersized"
         elif ratio <= 3.8:
-            return "Ottimale"
+            return "Optimal"
         else:
-            return "Sovradimensionato"
+            return "Oversized"
     except Exception:
-        return "In apprendimento..."
+        return "Learning..."

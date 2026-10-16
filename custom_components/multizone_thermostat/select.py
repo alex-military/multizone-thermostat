@@ -21,6 +21,7 @@ from .const import (
     ZONE_MODE_BYPASS,
     CONF_ZONE_NAME,
     make_zone_entity_id,
+    make_via_device_kwargs,
 )
 from .coordinator import MultizoneCoordinator
 
@@ -123,12 +124,13 @@ class MultizoneZoneSelect(RestoreEntity, SelectEntity):
     @property
     def device_info(self) -> DeviceInfo:
         """Return device info."""
+        master_dev_id = getattr(self._coordinator, "master_device_id", None)
         return DeviceInfo(
             identifiers={(DOMAIN, f"{self._entry_id}_zone_modes")},
             name="Zone Modes",
             manufacturer="Custom Integration",
             model="Zone Modes",
-            via_device=(DOMAIN, self._entry_id),
+            **make_via_device_kwargs(self._entry_id, master_dev_id),
         )
 
     @property
