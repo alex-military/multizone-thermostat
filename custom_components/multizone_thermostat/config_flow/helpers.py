@@ -17,14 +17,18 @@ def _get_entities_by_domain(hass: HomeAssistant, domain: str, include_none: bool
     entity_reg = er.async_get(hass)
     entities = {"none": "None"} if include_none else {}
     
-    for entry in er.async_entries_for_domain(entity_reg, domain):
-        if not entry.disabled:
+    entries = entity_reg.entities.values() if hasattr(entity_reg, "entities") and hasattr(entity_reg.entities, "values") else []
+    for entry in entries:
+        if getattr(entry, "domain", None) == domain and not getattr(entry, "disabled", False):
             state = hass.states.get(entry.entity_id)
             name = state.attributes.get("friendly_name", entry.entity_id) if state else entry.entity_id
             entities[entry.entity_id] = name
             
     for state in hass.states.async_all(domain):
         if state.entity_id not in entities:
+            reg_entry = entity_reg.async_get(state.entity_id) if hasattr(entity_reg, "async_get") else None
+            if reg_entry and getattr(reg_entry, "disabled", False):
+                continue
             entities[state.entity_id] = state.attributes.get("friendly_name", state.entity_id)
             
     if include_none:

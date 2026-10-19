@@ -22,15 +22,6 @@ _REGISTRY = EntityRegistry()
 def async_get(hass):
     return _REGISTRY
 
-def async_entries_for_domain(registry, domain):
-    if hasattr(registry, "entities"):
-        entries = registry.entities.values() if isinstance(registry.entities, dict) else registry.entities
-        return [
-            e for e in entries 
-            if getattr(e, "domain", None) == domain or getattr(e, "entity_id", "").startswith(domain + ".")
-        ]
-    return []
-
 def async_entries_for_device(registry, device_id):
     if hasattr(registry, "entities"):
         entries = registry.entities.values() if isinstance(registry.entities, dict) else registry.entities

@@ -28,6 +28,8 @@ class HomeAssistantMockFinder(importlib.abc.MetaPathFinder):
             if fullname == 'homeassistant.core':
                 mock_module.HomeAssistant = MagicMock
                 mock_module.callback = lambda f: f
+            if fullname == 'homeassistant.helpers.entity_registry':
+                del mock_module.async_entries_for_domain
             return importlib.machinery.ModuleSpec(fullname, HomeAssistantMockLoader(mock_module))
         return None
 
@@ -62,6 +64,7 @@ class TestConfigFlowHelpers(unittest.TestCase):
         # Mock per er.async_get(hass)
         self.mock_er = MagicMock()
         self.mock_er.entities = self.registry_entities
+        self.mock_er.async_get.side_effect = lambda entity_id: self.registry_entities.get(entity_id)
         
         # Patch dell'entity_registry
         self.er_patcher = unittest.mock.patch("custom_components.multizone_thermostat.config_flow.helpers.er.async_get")
@@ -110,20 +113,26 @@ class TestConfigFlowHelpers(unittest.TestCase):
         self._add_registry_entity("switch.uno", "switch")
         self._add_state("switch.uno", "switch", "Switch 1")
         
-        # 2. Uno switch disabled (deve essere ignorato)
+        # 2. Uno switch disabled nel registry E con state (deve essere ignorato)
         self._add_registry_entity("switch.disabled", "switch", disabled=True)
+        self._add_state("switch.disabled", "switch", "Disabled Switch")
         
         # 3. Uno switch solo in states (non nel registry)
         self._add_state("switch.due", "switch", "Switch 2")
+
+        # 4. Uno switch nel registry senza state (fallback su entity_id)
+        self._add_registry_entity("switch.tre", "switch")
         
         res = _get_switch_entities(self.hass)
         
-        self.assertEqual(len(res), 2)
+        self.assertEqual(len(res), 3)
         self.assertEqual(res["switch.uno"], "Switch 1")
         self.assertEqual(res["switch.due"], "Switch 2")
+        self.assertEqual(res["switch.tre"], "switch.tre")
+        self.assertNotIn("switch.disabled", res)
         
         # Deve essere ordinato alfabeticamente per nome
-        self.assertEqual(list(res.keys()), ["switch.uno", "switch.due"])
+        self.assertEqual(list(res.keys()), ["switch.uno", "switch.due", "switch.tre"])
 
     def test_get_climate_entities(self):
         self._add_registry_entity("climate.a", "climate")
@@ -165,6 +174,7 @@ class TestConfigFlowHelpers(unittest.TestCase):
         self.assertEqual(res["weather.home"], "Home Weather")
 
     def test_remove_entity_from_registry(self):
+        self.mock_er.async_get.side_effect = None
         self.mock_er.async_get.return_value = True # simula che l'entita esiste
         _remove_entity_from_registry(self.hass, "climate.old")
         self.mock_er.async_remove.assert_called_once_with("climate.old")
