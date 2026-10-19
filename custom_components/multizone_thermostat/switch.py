@@ -52,7 +52,8 @@ async def async_setup_entry(
     entities.append(MultizoneAutoNightModeSwitch(coordinator, config_entry.entry_id))
 
     # Geofencing (if enabled)
-    if config_entry.data.get(CONF_GEOFENCING_ENABLED, True):
+    cfg = {**config_entry.data, **getattr(config_entry, "options", {})}
+    if cfg.get(CONF_GEOFENCING_ENABLED, True):
         entities.append(MultizoneGeofencingSwitch(coordinator, config_entry.entry_id))
 
     # Anti-seize Switch
@@ -62,11 +63,10 @@ async def async_setup_entry(
     entities.append(MultizoneAntiFrostSwitch(coordinator, config_entry.entry_id))
 
     # Per-Zone Physical Control Synchronization Switches (for zones with climates)
-    coordinator = hass.data[DOMAIN][config_entry.entry_id]["coordinator"]
     zones = coordinator.zones
     for zone in zones:
         zone_name = zone[CONF_ZONE_NAME]
-        if zone.get(CONF_ZONE_CLIMATES):
+        if zone.get(CONF_ZONE_CLIMATES) or zone.get("climate_entities"):
             entities.append(MultizonePhysicalSyncSwitch(coordinator, config_entry.entry_id, zone_name))
         # Per-Zone Passive Heat Switch (Dynamic Toggle for fancoils without valves / mezzanines)
         entities.append(MultizonePassiveHeatSwitch(coordinator, config_entry.entry_id, zone_name))

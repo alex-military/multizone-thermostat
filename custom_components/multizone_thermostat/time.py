@@ -55,9 +55,10 @@ class MultizoneNightTimeEntity(TimeEntity):
         # Read from coordinator persistent data
         time_str = self.coordinator.get_persistent_data(KEY_NIGHT_TIME, "22:30")
         try:
-            hour, minute = map(int, time_str.split(":"))
+            parts = str(time_str).split(":")
+            hour, minute = int(parts[0]), int(parts[1])
             return datetime.time(hour=hour, minute=minute)
-        except (ValueError, AttributeError):
+        except (ValueError, AttributeError, IndexError):
             return datetime.time(22, 30)
 
     async def async_set_value(self, value: datetime.time) -> None:
@@ -94,9 +95,10 @@ class MultizoneMorningTimeEntity(TimeEntity):
         """Return the value of the time entity."""
         time_str = self.coordinator.get_persistent_data(KEY_MORNING_TIME, "07:00")
         try:
-            hour, minute = map(int, time_str.split(":"))
+            parts = str(time_str).split(":")
+            hour, minute = int(parts[0]), int(parts[1])
             return datetime.time(hour=hour, minute=minute)
-        except (ValueError, AttributeError):
+        except (ValueError, AttributeError, IndexError):
             return datetime.time(7, 0)
 
     async def async_set_value(self, value: datetime.time) -> None:

@@ -245,3 +245,37 @@ async def test_zone_manager_window_event_triggers_window_storage_save():
     coord.async_save_storage.assert_called_once()
     coord._async_save_presets_storage.assert_not_called()
     assert zone_id not in zm._pre_window_state
+
+
+@pytest.mark.asyncio
+async def test_shared_storage_no_split_brain_and_teardown_cleans_routine():
+    """Verify coordinator and StorageManager share backing dicts/stores and teardown calls routine_manager.cleanup()."""
+    coord, _, _, coros = _create_test_coordinator()
+
+    assert coord._settings is coord.storage._settings
+    assert coord._presets is coord.storage._presets
+    assert coord._settings_store is coord.storage._settings_store
+
+    coord._store.async_load = AsyncMock(return_value={})
+    coord._preset_store.async_load = AsyncMock(return_value={"eco": {"climate.living_room": {"target_temp": 18.0}}})
+    coord._settings_store.async_load = AsyncMock(return_value={})
+    coord._settings_store.async_save = AsyncMock()
+
+    # Load storage when settings_stored is empty -> presets must still be loaded into zone_manager
+    await coord.async_load_storage()
+    assert coord.zone_manager._presets == {"eco": {"climate.living_room": {"target_temp": 18.0}}}
+
+    # Saving persistent data via coordinator must be visible in coord.storage.settings
+    await coord.async_set_persistent_data("passive_heat_living_room", True)
+    assert coord.storage.get_data("passive_heat_living_room") is True
+
+    # Passive heat key lookup must match "passive_heat_living_room"
+    z_living = make_zone_entity_id("Living Room")
+    assert coord.zone_manager.is_passive_heat_allowed(z_living) is True
+
+    # Teardown must invoke routine_manager.cleanup()
+    coord.routine_manager.cleanup = MagicMock()
+    coord.async_teardown_listeners()
+    coord.routine_manager.cleanup.assert_called_once()
+    for c in coros:
+        c.close()

@@ -101,7 +101,7 @@ def get_zone_battery_level(coordinator: Any, hass: HomeAssistant, climate_id: st
             batteries.append(bat)
             
     # Check TRVs in the zone
-    for trv in (zone.get("climate_entities") or []):
+    for trv in (zone.get("climates") or zone.get("climate_entities") or []):
         bat = get_battery_level(hass, trv)
         if bat is not None:
             batteries.append(bat)
@@ -172,7 +172,7 @@ def get_opentherm_diagnostics(coordinator: Any, hass: HomeAssistant) -> dict[str
 
         # Flame status
         for k in ("flame", "flame_active", "flame_on", "flame_status"):
-            if k in attrs:
+            if k in attrs and attrs[k] is not None:
                 v = attrs[k]
                 result["flame_active"] = bool(v) if not isinstance(v, str) else v.lower() in ("true", "on", "1")
                 break
@@ -186,7 +186,7 @@ def get_opentherm_diagnostics(coordinator: Any, hass: HomeAssistant) -> dict[str
 
         # DHW Active
         for k in ("dhw_active", "dhw_state", "dhw_mode", "hot_water_active"):
-            if k in attrs:
+            if k in attrs and attrs[k] is not None:
                 v = attrs[k]
                 result["dhw_active"] = bool(v) if not isinstance(v, str) else v.lower() in ("true", "on", "1")
                 break

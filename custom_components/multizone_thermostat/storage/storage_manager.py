@@ -58,23 +58,27 @@ class StorageManager:
         if stored_windows is None:
             # Try to migrate from legacy global window store
             stored_windows = await self._legacy_window_store.async_load()
-            if stored_windows:
+            if stored_windows and isinstance(stored_windows, dict):
                 _LOGGER.info("Migrating legacy window states to entry-specific storage")
+                self._pre_window_state.clear()
                 self._pre_window_state.update(stored_windows)
                 # Save immediately to new store
                 self._window_store.async_delay_save(self._get_window_data, 1.0)
         
         if stored_windows and isinstance(stored_windows, dict):
+            self._pre_window_state.clear()
             self._pre_window_state.update(stored_windows)
             _LOGGER.debug("Loaded pre_window_state from storage: %s", self._pre_window_state)
             
         stored_presets = await self._preset_store.async_load()
         if stored_presets and isinstance(stored_presets, dict):
+            self._presets.clear()
             self._presets.update(stored_presets)
             _LOGGER.debug("Loaded presets from storage: %s", self._presets)
             
         stored_settings = await self._settings_store.async_load()
         if stored_settings and isinstance(stored_settings, dict):
+            self._settings.clear()
             self._settings.update(stored_settings)
             _LOGGER.debug("Loaded settings from storage: %s", self._settings)
 
@@ -90,13 +94,17 @@ class StorageManager:
 
     async def async_save_windows(self, pre_window_state: dict[str, str]) -> None:
         """Save window states to storage."""
-        self._pre_window_state = pre_window_state
+        if pre_window_state is not self._pre_window_state:
+            self._pre_window_state.clear()
+            self._pre_window_state.update(pre_window_state)
         # Bug 3 Fixed: Use delay_save
         self._window_store.async_delay_save(self._get_window_data, 5.0)
 
     async def async_save_presets(self, presets: dict[str, dict]) -> None:
         """Save presets to storage."""
-        self._presets = presets
+        if presets is not self._presets:
+            self._presets.clear()
+            self._presets.update(presets)
         # Bug 3 Fixed: Use delay_save
         self._preset_store.async_delay_save(self._get_preset_data, 5.0)
 

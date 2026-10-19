@@ -61,6 +61,13 @@ class ThermalObserver:
                 _LOGGER.debug("[%s] Inertia window closed: +%.2f°C", self.zone_id, inertia)
                 self._shutdown_time = None  # Stop tracking inertia after 1 hour
 
+        # Reset rate baseline when switching between heating and cooling so durations are not mixed
+        if self._is_heating != is_heating:
+            self._last_temp = current_temp
+            self._last_temp_time = now
+            self._is_heating = is_heating
+            return
+
         # Calculate Rates (dT/dt) if temperature changed enough
         delta_temp = current_temp - self._last_temp
         

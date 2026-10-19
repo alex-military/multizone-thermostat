@@ -2,6 +2,8 @@
 import logging
 from typing import Any, Dict
 
+from .const import GLOBAL_PRESETS, ZONE_MODE_BYPASS, ZONE_MODE_PRIMARY, ZONE_MODES
+
 _LOGGER = logging.getLogger(__name__)
 
 class CalendarOverride:
@@ -18,7 +20,7 @@ def parse_calendar_event(title: str) -> dict[str, Any]:
     """
     Parses a calendar event title.
     Returns a dict with:
-    - 'global_preset': str | None (e.g. 'eco', 'comfort', 'off')
+    - 'global_preset': str | None (e.g. 'eco', 'comfort', 'away', 'sleep', 'manual')
     - 'global_temperature': float | None (if the whole title is just a number)
     - 'overrides': dict[zone_name_lower, CalendarOverride]
     """
@@ -45,14 +47,15 @@ def parse_calendar_event(title: str) -> dict[str, Any]:
             val = float(first_part_lower)
             result["global_temperature"] = val
         except ValueError:
-            # It's a preset or mode like "Comfort", "Eco", "Summer"
-            result["global_preset"] = first_part_lower
+            # Only accept valid global presets so ordinary calendar events are ignored
+            if first_part_lower in GLOBAL_PRESETS:
+                result["global_preset"] = first_part_lower
         
         override_parts = parts[1:]
     else:
         override_parts = parts
 
-    valid_modes = {"primary", "secondary", "bypass", "standalone"}
+    valid_modes = set(ZONE_MODES)
 
     for part in override_parts:
         if ":" not in part:
@@ -71,7 +74,9 @@ def parse_calendar_event(title: str) -> dict[str, Any]:
             elif cmd in valid_modes:
                 override.mode = cmd
             elif cmd == "off":
-                override.mode = "off"
+                override.mode = ZONE_MODE_BYPASS
+            elif cmd == "standalone":
+                override.mode = ZONE_MODE_PRIMARY
             else:
                 try:
                     override.temperature = float(cmd)

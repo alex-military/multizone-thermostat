@@ -18,7 +18,7 @@ ANOMALY_LABELS = {
     ANOMALY_VALVE_STUCK_CLOSED: "Possible valve stuck closed / No heat delivery",
     ANOMALY_GHOST_HEATING: "Possible valve leakage or open valve (Ghost heating)",
     ANOMALY_AIR_IN_RADIATOR: "Thermal output drop (Possible air in radiator)",
-    ANOMALY_STALE_SENSOR: "Temperature sensor not updated for over 2 hours",
+    ANOMALY_STALE_SENSOR: "Temperature sensor not updated for over 6 hours",
     ANOMALY_OVERSHOOT: "Abnormal temperature overshoot (>1.5°C)",
     ANOMALY_LOW_BATTERY: "Sensor battery low (<= 10%)",
     ANOMALY_SENSOR_FAULT: "Sensor fault or implausible temperature",

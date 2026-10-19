@@ -35,6 +35,7 @@ class AntiSeizeManager:
         self._running: bool = False
         self._task: asyncio.Task | None = None
         self._pre_anti_seize_state: dict[str, str] = {}
+        self._pre_anti_seize_demand: dict[str, float] = {}
 
     @property
     def is_running(self) -> bool:
@@ -101,6 +102,7 @@ class AntiSeizeManager:
 
             # 1. Save current state of all enabled zones and open them
             self._pre_anti_seize_state.clear()
+            self._pre_anti_seize_demand.clear()
             zones_to_open = []
 
             for zone in self.coordinator.zones:
@@ -112,6 +114,13 @@ class AntiSeizeManager:
                 state = self.hass.states.get(climate_id)
                 if state:
                     self._pre_anti_seize_state[climate_id] = state.state
+                    if hasattr(self.coordinator, "get_zone_demand"):
+                        try:
+                            self._pre_anti_seize_demand[climate_id] = float(
+                                self.coordinator.get_zone_demand(climate_id)
+                            )
+                        except (ValueError, TypeError):
+                            self._pre_anti_seize_demand[climate_id] = 0.0
                     zones_to_open.append(climate_id)
 
             if not zones_to_open:
@@ -122,6 +131,8 @@ class AntiSeizeManager:
             _LOGGER.debug("Opening zones: %s", zones_to_open)
             for climate_id in zones_to_open:
                 await self.coordinator._async_set_hvac_mode(climate_id, HVAC_MODE_HEAT)
+                if hasattr(self.coordinator, "set_zone_demand"):
+                    self.coordinator.set_zone_demand(climate_id, 100.0)
 
             # 2. Wait for valves to open
             valve_delay = getattr(self.coordinator, "_valve_delay", 0)
@@ -149,6 +160,8 @@ class AntiSeizeManager:
             # 6. Restore all zones
             _LOGGER.debug("Restoring zones to pre-anti-seize state...")
             for climate_id, old_state in self._pre_anti_seize_state.items():
+                if hasattr(self.coordinator, "set_zone_demand") and climate_id in self._pre_anti_seize_demand:
+                    self.coordinator.set_zone_demand(climate_id, self._pre_anti_seize_demand[climate_id])
                 await self.coordinator._async_set_hvac_mode(climate_id, old_state)
 
             _LOGGER.info("Anti-seize routine completed successfully.")
@@ -160,6 +173,8 @@ class AntiSeizeManager:
             async def _emergency_cleanup():
                 await self._turn_boiler_off()
                 for climate_id, old_state in self._pre_anti_seize_state.items():
+                    if hasattr(self.coordinator, "set_zone_demand") and climate_id in self._pre_anti_seize_demand:
+                        self.coordinator.set_zone_demand(climate_id, self._pre_anti_seize_demand[climate_id])
                     await self.coordinator._async_set_hvac_mode(climate_id, old_state)
 
             self.hass.async_create_task(_emergency_cleanup())

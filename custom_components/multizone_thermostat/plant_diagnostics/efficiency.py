@@ -17,7 +17,8 @@ def get_zone_energy_class(coordinator: Any, hass: HomeAssistant, climate_id: str
             return "Learning..."
 
         st = hass.states.get(climate_id)
-        current_temp = float(st.attributes.get("current_temperature", 20.0)) if st else 20.0
+        raw_cur = st.attributes.get("current_temperature") if st else None
+        current_temp = float(raw_cur) if raw_cur is not None else 20.0
 
         # Outdoor temperature lookup
         outdoor_temp = None
@@ -25,7 +26,8 @@ def get_zone_energy_class(coordinator: Any, hass: HomeAssistant, climate_id: str
             w_st = hass.states.get(coordinator.weather_sensor_id)
             if w_st and w_st.state not in ("unavailable", "unknown"):
                 try:
-                    outdoor_temp = float(w_st.attributes.get("temperature", w_st.state))
+                    raw_out = w_st.attributes.get("temperature")
+                    outdoor_temp = float(raw_out if raw_out is not None else w_st.state)
                 except (ValueError, TypeError):
                     pass
 

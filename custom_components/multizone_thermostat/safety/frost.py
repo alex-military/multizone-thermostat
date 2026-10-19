@@ -56,7 +56,7 @@ class FrostManager:
             zone = self.coordinator.zone_manager.get_zone(climate_id)
             if zone:
                 trv_temps = []
-                for trv in zone.get(CONF_ZONE_CLIMATES, []):
+                for trv in (zone.get(CONF_ZONE_CLIMATES) or zone.get("climate_entities") or []):
                     trv_st = self.hass.states.get(trv)
                     if trv_st:
                         t = trv_st.attributes.get("current_temperature")

@@ -198,6 +198,9 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         """Set HVAC mode."""
         self._hvac_mode = hvac_mode
+        if hvac_mode == HVACMode.OFF:
+            self._sync_manager._local_pwm_state = False
+            self._coordinator.set_zone_demand(self.entity_id, 0.0)
         self.async_write_ha_state()
         await self._trigger_trv_sync()
         await self._sync_manager.async_sync_switches()
@@ -210,6 +213,11 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             return
 
         self._target_temperature = temperature
+        if (
+            hasattr(self._coordinator, "calendar_manager")
+            and self.entity_id in self._coordinator.calendar_manager.temp_overrides
+        ):
+            self._coordinator.calendar_manager.temp_overrides[self.entity_id] = temperature
         self.async_write_ha_state()
         await self._trigger_trv_sync()
         

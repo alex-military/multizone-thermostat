@@ -76,6 +76,9 @@ class OpenThermBoilerBackend(BoilerBackend):
             else:
                 confirmed_on = st_check is not None and st_check.state not in ("unavailable", "unknown", "off")
 
+        if (confirmed_on or wanted_on) and hasattr(self.coordinator, "reset_last_active_time"):
+            self.coordinator.reset_last_active_time()
+
         if diag:
             if confirmed_on and diag._current_boiler_start is None:
                 diag.record_boiler_state(True)
@@ -100,7 +103,10 @@ class OpenThermBoilerBackend(BoilerBackend):
                     )
                 self._pending_command = None
 
-        self._status_reason = f"MODULATING - Target water: {target_temp}°C (Demand: {round(demand, 1)}% from {peak_zone or 'None'})"
+        if norm_demand > 0.0:
+            self._status_reason = f"MODULATING - Target water: {target_temp}°C (Demand: {round(demand, 1)}% from {peak_zone or 'None'})"
+        elif self._status_reason != "OFF - Emergency/Master OFF":
+            self._status_reason = "OFF - No Demand"
 
         try:
             st = self.hass.states.get(self.opentherm_entity)
@@ -114,7 +120,7 @@ class OpenThermBoilerBackend(BoilerBackend):
                         blocking=False,
                     )
 
-                # Turn OFF if demand is 0, otherwise HEAT
+                # Turn OFF if demand is 0, otherwise HEAT / ON
                 if domain == "climate":
                     hvac_mode = "off" if norm_demand <= 0.0 else "heat"
                     current_mode = st.state if st else None
@@ -124,6 +130,24 @@ class OpenThermBoilerBackend(BoilerBackend):
                             "climate",
                             "set_hvac_mode",
                             {"entity_id": self.opentherm_entity, "hvac_mode": hvac_mode},
+                            blocking=False,
+                        )
+                elif domain == "water_heater":
+                    current_state = st.state if st else None
+                    if norm_demand <= 0.0 and current_state not in ("off", None):
+                        self._pending_command = ("off", time.monotonic())
+                        await self.hass.services.async_call(
+                            "water_heater",
+                            "turn_off",
+                            {"entity_id": self.opentherm_entity},
+                            blocking=False,
+                        )
+                    elif norm_demand > 0.0 and current_state == "off":
+                        self._pending_command = ("on", time.monotonic())
+                        await self.hass.services.async_call(
+                            "water_heater",
+                            "turn_on",
+                            {"entity_id": self.opentherm_entity},
                             blocking=False,
                         )
             elif domain == "number":

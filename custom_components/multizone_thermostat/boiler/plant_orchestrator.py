@@ -1,5 +1,6 @@
 from datetime import datetime
 import asyncio
+import inspect
 import logging
 
 _LOGGER = logging.getLogger(__name__)
@@ -23,10 +24,16 @@ class PlantOrchestrator:
     async def _async_update_boiler(self) -> None:
         """Handle the logic for pushing demand to boiler backend."""
         frost_emergency = False
-        for climate_id in list(self.coordinator._climate_callbacks.keys()):
-            if hasattr(self.coordinator, "is_zone_in_frost_emergency") and self.coordinator.is_zone_in_frost_emergency(climate_id):
-                frost_emergency = True
-                break
+        frost_mgr = getattr(self.coordinator, "frost_manager", None)
+        handle_fn = getattr(frost_mgr, "async_handle_frost_emergencies", None)
+        if inspect.iscoroutinefunction(handle_fn):
+            frost_emergency = bool(await handle_fn())
+
+        if not frost_emergency:
+            for climate_id in list(getattr(self.coordinator, "_climate_callbacks", {}).keys()):
+                if hasattr(self.coordinator, "is_zone_in_frost_emergency") and self.coordinator.is_zone_in_frost_emergency(climate_id):
+                    frost_emergency = True
+                    break
 
         # Hard stop if master switch is OFF
         if not self.coordinator.get_master_state() and not frost_emergency:

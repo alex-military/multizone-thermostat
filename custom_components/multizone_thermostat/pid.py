@@ -121,8 +121,8 @@ class PID:
 
     @integral.setter
     def integral(self, i):
-        assert isinstance(i, float), "Integral should be a float"
-        self._integral = i
+        assert isinstance(i, (int, float)), "Integral should be a float"
+        self._integral = float(i)
 
     @property
     def derivative(self):
@@ -223,18 +223,19 @@ class PID:
         self._external = self._Ke * self._dext
 
         # Anti-windup: always integrate, but clamp to prevent windup
-        # Reset integral on setpoint change to allow faster convergence
-        if self._last_set_point != self._set_point:
-            self._integral = 0  # Reset integral if set point has changed
+        # Reset integral on large setpoint change (>= 1.5°C) to allow faster convergence
+        # without wiping integral on minor thermal-inertia effective_target shifts
+        if self._last_set_point is not None and abs(self._last_set_point - self._set_point) >= 1.5:
+            self._integral = 0  # Reset integral if set point has changed significantly
         else:
             self._integral += self._Ki * self._error * self._dt
             # Clamp integral to output bounds (accounting for external compensation)
             self._integral = max(min(self._integral, self._out_max - self._external), self._out_min - self._external)
 
         self._proportional = self._Kp * self._error
-        if self._dt != 0:
+        if self._dt >= 1.0:
             self._derivative = -(self._Kd * self._input_diff) / self._dt
-        else:
+        elif self._last_input is None:
             self._derivative = 0.0
 
         # Compute PID Output
@@ -539,4 +540,4 @@ class PIDAutotune:
                 period2 = self._peak_timestamps[4] - self._peak_timestamps[2]
                 self._Pu = 0.5 * (period1 + period2)
                 return True
-            return False
+        return False

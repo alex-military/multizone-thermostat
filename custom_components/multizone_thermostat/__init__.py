@@ -54,9 +54,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Migrate old config format to new Hybrid Zones format
     migrated = False
     new_data = dict(entry.data)
+    new_options = dict(entry.options) if entry.options else {}
     
     # 1. Migrate old virtual thermostats to new zones
     old_vts = new_data.pop("virtual_thermostats", [])
+    if not old_vts and "virtual_thermostats" in new_options:
+        old_vts = new_options.pop("virtual_thermostats", [])
     if old_vts:
         migrated = True
         for vt in old_vts:
@@ -81,14 +84,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             zone["target_temperature"] = 20.0
             
     # Migrate boiler mode for pre-OpenTherm installations
-    if CONF_BOILER_MODE not in new_data:
+    if CONF_BOILER_MODE not in new_data and CONF_BOILER_MODE not in new_options:
         new_data[CONF_BOILER_MODE] = MODE_RELAY
         migrated = True
 
     if migrated:
         _LOGGER.info("Migrating Multizone Thermostat config to new Hybrid Zones format.")
-        new_data["zones"] = zones
-        hass.config_entries.async_update_entry(entry, data=new_data)
+        new_data[CONF_ZONES] = zones
+        if CONF_ZONES in new_options:
+            new_options[CONF_ZONES] = zones
+            hass.config_entries.async_update_entry(entry, data=new_data, options=new_options)
+        else:
+            hass.config_entries.async_update_entry(entry, data=new_data)
 
 
     from homeassistant.helpers import device_registry as dr
@@ -115,16 +122,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         "coordinator": coordinator,
     }
 
+    # Set up platforms first so entities are registered before listeners/calendar fire
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
     # Set up state listeners
     coordinator.async_setup_listeners()
 
-    # Set up platforms (switch)
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-
-    # Register static path for Lovelace custom card (NEW-WARN-04: only if www dir exists)
+    # Register static path for Lovelace custom card once per HA instance
     import os
     www_path = hass.config.path("custom_components/multizone_thermostat/www")
-    if await hass.async_add_executor_job(os.path.isdir, www_path):
+    if not hass.data[DOMAIN].get("_static_path_registered") and await hass.async_add_executor_job(os.path.isdir, www_path):
         await hass.http.async_register_static_paths([
             StaticPathConfig(
                 url_path="/multizone_thermostat_card",
@@ -132,12 +139,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 cache_headers=False,
             )
         ])
+        hass.data[DOMAIN]["_static_path_registered"] = True
 
     # Register Lovelace custom card resource automatically
     try:
         if "lovelace" in hass.data:
             resources = hass.data["lovelace"].resources
-            if hasattr(resources, "async_get_info"):
+            if hasattr(resources, "async_get_info") and hasattr(resources, "async_create_item"):
                 await resources.async_get_info()
                 
                 from homeassistant.loader import async_get_integration

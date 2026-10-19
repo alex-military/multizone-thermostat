@@ -300,9 +300,9 @@ class MultizonePlantHealthSensor(SensorEntity):
     def icon(self) -> str:
         """Dynamic icon based on health status."""
         val = self.native_value
-        if val == "Ottimale":
+        if val in ("Optimal", "Ottimale"):
             return "mdi:check-decagram"
-        elif val == "Critico":
+        elif val in ("Critical", "Critico"):
             return "mdi:alert-octagon"
         return "mdi:alert"
 

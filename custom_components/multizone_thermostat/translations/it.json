@@ -167,6 +167,41 @@
           "target_temperature": "Base Target Temperature",
           "sensor_timeout_min": "Timeout Watchdog Sensore (minuti)"
         },
+        "sections": {
+          "trv_settings": {
+            "name": "Testine Termostatiche (TRV)",
+            "description": "Valvole termostatiche smart tradizionali con regolazione a temperatura.",
+            "data": {
+              "climate_entities": "Entità Climate / TRV",
+              "trv_preset_sync": "Abilita Sincronizzazione Preset TRV"
+            }
+          },
+          "valve_settings": {
+            "name": "Valvole Proporzionali & 0-10V",
+            "description": "Controllo diretto della percentuale di apertura o tensione analogica 0-10V.",
+            "data": {
+              "valve_entities": "Entità Valvole / Attuatori",
+              "valve_scale": "Scala Uscita"
+            }
+          },
+          "relay_settings": {
+            "name": "Attuatori a Relè (PWM)",
+            "description": "Interruttori ON/OFF ed elettrotermici controllati a modulazione d'impulso.",
+            "data": {
+              "switch_entities": "Interruttori / Relè di Zona"
+            }
+          },
+          "safety_settings": {
+            "name": "Protezioni & Funzioni Avanzate",
+            "description": "Bypass finestre aperte, watchdog sensori e ciclo estivo antibloccaggio.",
+            "data": {
+              "window_sensor": "Sensore Finestra (Opzionale)",
+              "sensor_timeout_min": "Timeout Watchdog Sensore (minuti)",
+              "anti_seize_zone_enable": "Abilita Antigrippaggio (Protezione Estiva) per questa zona",
+              "allow_passive_heat": "Consenti Apporto Termico Passivo (Fancoil senza valvola / Soppalco aperto)"
+            }
+          }
+        },
         "data_description": {
           "climate_entities": "L'entità climate per questa stanza/zona",
           "allow_passive_heat": "Disattiva il rilevamento del riscaldamento fantasma se la stanza riceve calore passivo anche quando è a riposo (es. ventilconvettore senza valvola di zona o soppalco aperto con calore dal piano inferiore).",
@@ -187,6 +222,7 @@
         "title": "Modifica Zona",
         "description": "Modifica le impostazioni per questa zona.",
         "data": {
+          "zone_name": "Zona",
           "temp_sensor": "Sensore Temperatura Zona",
           "target_temperature": "Temperatura Target Base"
         },

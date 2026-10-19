@@ -98,7 +98,8 @@ class MultizoneGlobalPresetSelect(RestoreEntity, SelectEntity):
 
     async def async_will_remove_from_hass(self) -> None:
         """Unregister from coordinator on removal."""
-        pass
+        if hasattr(self._coordinator, "_selects"):
+            self._coordinator._selects.pop("global_preset", None)
 
 
 class MultizoneZoneSelect(RestoreEntity, SelectEntity):
@@ -153,9 +154,9 @@ class MultizoneZoneSelect(RestoreEntity, SelectEntity):
         await super().async_added_to_hass()
         last_state = await self.async_get_last_state()
         if last_state is not None and last_state.state in self.options:
-            self._coordinator.set_zone_mode(self._climate_id, last_state.state)
+            self._coordinator.set_zone_mode(self._climate_id, last_state.state, save_to_preset=False)
         else:
-            self._coordinator.set_zone_mode(self._climate_id, ZONE_MODE_PRIMARY)
+            self._coordinator.set_zone_mode(self._climate_id, ZONE_MODE_PRIMARY, save_to_preset=False)
             
         self._coordinator.register_select(f"zone_mode_{self._climate_id}", self)
 
@@ -196,4 +197,5 @@ class MultizoneZoneSelect(RestoreEntity, SelectEntity):
 
     async def async_will_remove_from_hass(self) -> None:
         """Unregister from coordinator on removal."""
-        pass
+        if hasattr(self._coordinator, "_selects"):
+            self._coordinator._selects.pop(f"zone_mode_{self._climate_id}", None)

@@ -121,7 +121,7 @@ def get_add_zone_schema() -> vol.Schema:
             vol.Schema({
                 vol.Optional(CONF_ZONE_WINDOW_SENSOR): selector.EntitySelector(selector.EntitySelectorConfig(domain=BINARY_SENSOR_DOMAIN)),
                 vol.Optional(CONF_ZONE_SENSOR_TIMEOUT, default=DEFAULT_SENSOR_TIMEOUT_MIN): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=10, max=180, step=5, mode=selector.NumberSelectorMode.BOX)
+                    selector.NumberSelectorConfig(min=10, max=720, step=5, mode=selector.NumberSelectorMode.BOX)
                 ),
                 vol.Optional(CONF_ZONE_ANTI_SEIZE, default=True): bool,
                 vol.Optional(CONF_ZONE_ALLOW_PASSIVE_HEAT, default=False): bool,
@@ -160,7 +160,9 @@ def get_weather_schema(sensor_options: dict[str, str]) -> vol.Schema:
 def get_geofencing_schema() -> vol.Schema:
     return vol.Schema({
         vol.Required(CONF_GEOFENCING_ENABLED, default=True): bool,
-        vol.Optional(CONF_PRESENCE_SENSOR, default="zone.home"): selector.EntitySelector(selector.EntitySelectorConfig(domain=["person", "group", "zone", "input_boolean"])),
+        vol.Optional(CONF_PRESENCE_SENSOR, default="zone.home"): selector.EntitySelector(
+            selector.EntitySelectorConfig(domain=["person", "group", "zone", "device_tracker", "binary_sensor", "input_boolean"])
+        ),
     })
 
 
@@ -281,7 +283,7 @@ def get_options_edit_zone_schema(zone_data: dict[str, Any], temp_desc: dict[str,
             vol.Schema({
                 vol.Optional(CONF_ZONE_WINDOW_SENSOR, **window_desc): selector.EntitySelector(selector.EntitySelectorConfig(domain=BINARY_SENSOR_DOMAIN)),
                 vol.Optional(CONF_ZONE_SENSOR_TIMEOUT, default=zone_data.get(CONF_ZONE_SENSOR_TIMEOUT, DEFAULT_SENSOR_TIMEOUT_MIN)): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=10, max=180, step=5, mode=selector.NumberSelectorMode.BOX)
+                    selector.NumberSelectorConfig(min=10, max=720, step=5, mode=selector.NumberSelectorMode.BOX)
                 ),
                 vol.Optional(CONF_ZONE_ANTI_SEIZE, default=zone_data.get(CONF_ZONE_ANTI_SEIZE, True)): bool,
                 vol.Optional(CONF_ZONE_ALLOW_PASSIVE_HEAT, default=zone_data.get(CONF_ZONE_ALLOW_PASSIVE_HEAT, False)): bool,
@@ -308,7 +310,9 @@ def get_options_trv_calibration_edit_schema(current_zone_data: dict[str, Any] | 
 def get_options_edit_geofencing_schema(geofencing_enabled: bool, presence_sensor: str | None) -> vol.Schema:
     return vol.Schema({
         vol.Required(CONF_GEOFENCING_ENABLED, default=geofencing_enabled): bool,
-        vol.Optional(CONF_PRESENCE_SENSOR, default=presence_sensor or "zone.home"): selector.EntitySelector(selector.EntitySelectorConfig(domain=["person", "group", "zone", "input_boolean"])),
+        vol.Optional(CONF_PRESENCE_SENSOR, default=presence_sensor or "zone.home"): selector.EntitySelector(
+            selector.EntitySelectorConfig(domain=["person", "group", "zone", "device_tracker", "binary_sensor", "input_boolean"])
+        ),
     })
 
 

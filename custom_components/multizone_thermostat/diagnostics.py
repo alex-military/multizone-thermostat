@@ -71,15 +71,23 @@ async def async_get_config_entry_diagnostics(
         thermal = coordinator.zone_controller.get_thermal_model(climate_id)
         pid = coordinator._pids.get(climate_id)
 
+        plant_diag = getattr(coordinator, "plant_diagnostics", None)
+        if plant_diag and hasattr(plant_diag, "get_zone_battery_level"):
+            battery_level = plant_diag.get_zone_battery_level(climate_id)
+        elif plant_diag and zone.get("temp_sensor"):
+            battery_level = plant_diag.get_battery_level(zone.get("temp_sensor"))
+        else:
+            battery_level = None
+
         zone_info: dict[str, Any] = {
             "name": z_name,
             "climate_id": climate_id,
             "mode": coordinator.get_zone_mode(climate_id),
             "demand_percent": coordinator.get_zone_demand(climate_id),
             "is_frost_emergency": coordinator.is_zone_in_frost_emergency(climate_id),
-            "battery_level": coordinator.plant_diagnostics.get_battery_level(zone.get("temp_sensor")) if getattr(coordinator, "plant_diagnostics", None) and zone.get("temp_sensor") else None,
-            "climates_configured": zone.get("climate_entities", []),
-            "switches_configured": zone.get("switch_entities", []),
+            "battery_level": battery_level,
+            "climates_configured": zone.get("climates") or zone.get("climate_entities", []),
+            "switches_configured": zone.get("switches") or zone.get("switch_entities", []),
             "autotuner": {
                 "state": tuner.state if tuner else "N/A",
                 "completed_cycles": len(tuner.completed_cycles) if tuner else 0,
@@ -101,13 +109,24 @@ async def async_get_config_entry_diagnostics(
         }
 
         if climate_entity:
+            sync_mgr = getattr(climate_entity, "_sync_manager", None)
+            pending_targets = getattr(
+                sync_mgr,
+                "_pending_trv_targets",
+                getattr(climate_entity, "_pending_trv_targets", {}),
+            )
+            last_known_targets = getattr(
+                sync_mgr,
+                "_last_known_trv_targets",
+                getattr(climate_entity, "_last_known_trv_targets", {}),
+            )
             zone_info["current_temperature"] = climate_entity.current_temperature
             zone_info["target_temperature"] = climate_entity.target_temperature
             zone_info["hvac_mode"] = str(climate_entity.hvac_mode)
             zone_info["hvac_action"] = str(climate_entity.hvac_action)
             zone_info["trv_health"] = climate_entity.get_trv_health()
-            zone_info["pending_trv_targets"] = dict(climate_entity._pending_trv_targets)
-            zone_info["last_known_trv_targets"] = dict(climate_entity._last_known_trv_targets)
+            zone_info["pending_trv_targets"] = dict(pending_targets)
+            zone_info["last_known_trv_targets"] = dict(last_known_targets)
 
         zones_diag[climate_id] = zone_info
 

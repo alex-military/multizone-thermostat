@@ -120,23 +120,25 @@ class MultizoneCoordinator:
         """Initialize the coordinator."""
         self.hass = hass
         self.entry_id = entry.entry_id
-        self.boiler_mode = entry.data.get(CONF_BOILER_MODE, MODE_RELAY)
-        self.boiler_switch = entry.data.get(CONF_BOILER_SWITCH)
-        self.opentherm_entity = entry.data.get(CONF_OPENTHERM_ENTITY)
-        self.opentherm_min_temp = entry.data.get(CONF_OPENTHERM_MIN_TEMP, 35.0)
-        self.opentherm_max_temp = entry.data.get(CONF_OPENTHERM_MAX_TEMP, 75.0)
-        self.opentherm_ch_switch = entry.data.get(CONF_OPENTHERM_CH_SWITCH)
-        self.zones = entry.data.get(CONF_ZONES, [])
-        self.presence_sensor = entry.data.get(CONF_PRESENCE_SENSOR)
-        self.weather_sensor_id = entry.data.get(CONF_WEATHER_SENSOR)
-        self.global_calendar_id = entry.data.get(CONF_GLOBAL_CALENDAR)
+        options = getattr(entry, "options", None) or {}
+        config = {**(entry.data or {}), **(options if isinstance(options, dict) else {})}
+        self.boiler_mode = config.get(CONF_BOILER_MODE, MODE_RELAY)
+        self.boiler_switch = config.get(CONF_BOILER_SWITCH)
+        self.opentherm_entity = config.get(CONF_OPENTHERM_ENTITY)
+        self.opentherm_min_temp = config.get(CONF_OPENTHERM_MIN_TEMP, 35.0)
+        self.opentherm_max_temp = config.get(CONF_OPENTHERM_MAX_TEMP, 75.0)
+        self.opentherm_ch_switch = config.get(CONF_OPENTHERM_CH_SWITCH)
+        self.zones = config.get(CONF_ZONES, [])
+        self.presence_sensor = config.get(CONF_PRESENCE_SENSOR)
+        self.weather_sensor_id = config.get(CONF_WEATHER_SENSOR)
+        self.global_calendar_id = config.get(CONF_GLOBAL_CALENDAR)
         self.master_device_id: str | None = None
         
         # Internal state tracking
         self._master_state: bool = False
-        self._min_cycle_on = float(entry.data.get(CONF_MIN_CYCLE_ON, DEFAULT_MIN_CYCLE_ON))
-        self._min_cycle_off = float(entry.data.get(CONF_MIN_CYCLE_OFF, DEFAULT_MIN_CYCLE_OFF))
-        self._valve_delay = float(entry.data.get(CONF_VALVE_DELAY, DEFAULT_VALVE_DELAY))
+        self._min_cycle_on = float(config.get(CONF_MIN_CYCLE_ON, DEFAULT_MIN_CYCLE_ON))
+        self._min_cycle_off = float(config.get(CONF_MIN_CYCLE_OFF, DEFAULT_MIN_CYCLE_OFF))
+        self._valve_delay = float(config.get(CONF_VALVE_DELAY, DEFAULT_VALVE_DELAY))
         self._climate_callbacks = {}
         self._last_active_time = time.monotonic()
 
@@ -148,6 +150,7 @@ class MultizoneCoordinator:
             zones=self.zones,
             mode_getter=lambda cid: self.get_zone_mode(cid)
         )
+        self.demand_aggregator.coordinator = self
 
         from .zone_controller import ZoneController
         self.zone_controller = ZoneController(hass, self)
@@ -155,10 +158,11 @@ class MultizoneCoordinator:
         from .storage.storage_manager import StorageManager
         self.storage = StorageManager(hass, self.entry_id)
 
-        self._store = Store(hass, WINDOW_STORAGE_VERSION, f"{DOMAIN}_{entry.entry_id}_window_states")
-        self._legacy_window_store = Store(hass, WINDOW_STORAGE_VERSION, f"{DOMAIN}.window_states")
-        self._preset_store = Store(hass, PRESET_STORAGE_VERSION, f"{DOMAIN}_{entry.entry_id}_presets")
-        self._settings_store = Store(hass, SETTINGS_STORAGE_VERSION, f"{DOMAIN}_{entry.entry_id}_settings")
+        # Share Store instances and backing dicts with StorageManager to prevent split-brain overwrites
+        self._store = self.storage._window_store
+        self._legacy_window_store = self.storage._legacy_window_store
+        self._preset_store = self.storage._preset_store
+        self._settings_store = self.storage._settings_store
 
         from .calendar_manager import CalendarManager
         self.calendar_manager = CalendarManager(self)
@@ -203,9 +207,6 @@ class MultizoneCoordinator:
                 self._valve_delay
             )
 
-
-        self._anti_seize_task: asyncio.Task | None = None
-        
         self._unsub_listeners: list = []
         self._select_entities: dict[str, Any] = {}  # key -> select object
         
@@ -215,13 +216,10 @@ class MultizoneCoordinator:
         self._autotuners = self.zone_controller.autotuners
         self._thermal_models = self.zone_controller.thermal_models
 
-        self._presets: dict[str, dict[str, dict[str, Any]]] = {}
+        self._presets: dict[str, dict[str, dict[str, Any]]] = self.storage._presets
         self._current_global_preset: str = GLOBAL_PRESET_MANUAL
         
-        self._settings: dict[str, Any] = {}
-        
-        self._last_night_trigger_date: datetime.date | None = None
-        self._last_morning_trigger_date: datetime.date | None = None
+        self._settings: dict[str, Any] = self.storage._settings
 
         # Software Diagnostics: Ring Buffer and State Reason
         self._diagnostics_history: deque[dict[str, Any]] = deque(maxlen=100)
@@ -345,47 +343,51 @@ class MultizoneCoordinator:
         if stored and isinstance(stored, dict):
             self.zone_manager._pre_window_state.clear()
             self.zone_manager._pre_window_state.update(stored)
+            self.storage._pre_window_state.clear()
+            self.storage._pre_window_state.update(stored)
             _LOGGER.debug("Loaded pre_window_state from storage: %s", self.zone_manager._pre_window_state)
             
         preset_stored = await self._preset_store.async_load()
         if preset_stored and isinstance(preset_stored, dict):
-            self._presets = preset_stored
+            self._presets.clear()
+            self._presets.update(preset_stored)
             _LOGGER.debug("Loaded presets from storage: %s", self._presets)
             
         settings_stored = await self._settings_store.async_load()
         if settings_stored and isinstance(settings_stored, dict):
-            self._settings = settings_stored
+            self._settings.clear()
+            self._settings.update(settings_stored)
             _LOGGER.debug("Loaded settings from storage: %s", self._settings)
             
-            # Load stored zone modes
-            saved_zone_modes = self._settings.get("zone_modes", {})
-            self.zone_manager.load_state(
-                self.zone_manager._pre_window_state,
-                getattr(self, "_presets", {}),
-                saved_zone_modes
-            )
-            for cid, mode in saved_zone_modes.items():
-                if cid in self._climate_callbacks:
-                    self._climate_callbacks[cid]()
-            
-            # Load autotuner states
-            autotune_data = self._settings.get("autotuners", {})
-            for climate_id, tuner in self._autotuners.items():
-                if climate_id in autotune_data:
-                    tuner.load_state(autotune_data[climate_id])
-                    # If already completed, apply the calculated PID parameters!
-                    if tuner.state == tuner.STATE_COMPLETED:
-                        self._pids[climate_id].set_pid_param(kp=tuner.kp, ki=tuner.ki, kd=tuner.kd)
-                        _LOGGER.info("Restored Smart PID for %s: Kp=%.1f, Ki=%.4f, Kd=%.1f", 
-                                     climate_id, tuner.kp, tuner.ki, tuner.kd)
+        # Always load stored state into ZoneManager (even if settings_stored is empty)
+        saved_zone_modes = self._settings.get("zone_modes", {})
+        self.zone_manager.load_state(
+            self.zone_manager._pre_window_state,
+            self._presets,
+            saved_zone_modes
+        )
+        for cid, mode in saved_zone_modes.items():
+            if cid in self._climate_callbacks:
+                self._climate_callbacks[cid]()
+        
+        # Load autotuner states
+        autotune_data = self._settings.get("autotuners", {})
+        for climate_id, tuner in self._autotuners.items():
+            if climate_id in autotune_data:
+                tuner.load_state(autotune_data[climate_id])
+                # If already completed, apply the calculated PID parameters!
+                if tuner.state == tuner.STATE_COMPLETED:
+                    self._pids[climate_id].set_pid_param(kp=tuner.kp, ki=tuner.ki, kd=tuner.kd)
+                    _LOGGER.info("Restored Smart PID for %s: Kp=%.1f, Ki=%.4f, Kd=%.1f", 
+                                 climate_id, tuner.kp, tuner.ki, tuner.kd)
 
-            # Load thermal models states
-            thermal_data = self._settings.get("thermal_models", {})
-            for climate_id, model in self._thermal_models.items():
-                if climate_id in thermal_data:
-                    model.load_state(thermal_data[climate_id])
-                    _LOGGER.info("Restored Thermal Model for %s: Heating=%.2f, Cooling=%.2f, Inertia=%.2f", 
-                                 climate_id, model.heating_rate, model.cooling_rate, model.thermal_inertia)
+        # Load thermal models states
+        thermal_data = self._settings.get("thermal_models", {})
+        for climate_id, model in self._thermal_models.items():
+            if climate_id in thermal_data:
+                model.load_state(thermal_data[climate_id])
+                _LOGGER.info("Restored Thermal Model for %s: Heating=%.2f, Cooling=%.2f, Inertia=%.2f", 
+                             climate_id, model.heating_rate, model.cooling_rate, model.thermal_inertia)
 
     async def async_save_storage(self) -> None:
         """Save window states to storage."""
@@ -436,7 +438,7 @@ class MultizoneCoordinator:
 
     def async_setup_listeners(self) -> None:
         """Set up state change listeners for all climate entities."""
-        climate_entities = [make_zone_entity_id(z[CONF_ZONE_NAME]) for z in self.zones]
+        climate_entities = [make_zone_entity_id(z[CONF_ZONE_NAME]) for z in self.zones if z.get(CONF_ZONE_NAME)]
 
         if climate_entities:
             self._unsub_listeners.append(
@@ -479,8 +481,6 @@ class MultizoneCoordinator:
 
         self.routine_manager.async_setup_listeners()
 
-
-        
         # Listen every hour for Anti-Seize check
         self._unsub_listeners.append(
             async_track_time_interval(
@@ -505,16 +505,16 @@ class MultizoneCoordinator:
 
     def async_teardown_listeners(self) -> None:
         """Remove all state change listeners."""
-        if self._anti_seize_task and not self._anti_seize_task.done():
-            self._anti_seize_task.cancel()
-            self._anti_seize_task = None
+        if hasattr(self, "routine_manager") and self.routine_manager:
+            self.routine_manager.cleanup()
+        if hasattr(self, "anti_seize_manager") and self.anti_seize_manager:
+            anti_seize_task = getattr(self.anti_seize_manager, "_task", None)
+            if anti_seize_task and not anti_seize_task.done():
+                anti_seize_task.cancel()
         backend_task = getattr(self.boiler_backend, "_pending_boiler_task", None)
         if backend_task and not backend_task.done():
             backend_task.cancel()
             self.boiler_backend._pending_boiler_task = None
-        if getattr(self, "_debounce_save_task", None) and not self._debounce_save_task.done():
-            self._debounce_save_task.cancel()
-            self._debounce_save_task = None
 
         for unsub in self._unsub_listeners:
             unsub()
@@ -528,7 +528,7 @@ class MultizoneCoordinator:
             return
         demand = await self.zone_controller.async_update_zone(entity_id, new_state)
         self.demand_aggregator.set_zone_demand(entity_id, demand)
-        # Immediatly trigger boiler update to improve UI responsiveness when lowering target
+        # Immediately trigger boiler update to improve UI responsiveness when lowering target
         if hasattr(self, "plant_orchestrator"):
             await self.plant_orchestrator._async_update_boiler()
 
@@ -536,45 +536,23 @@ class MultizoneCoordinator:
     def get_zone_mode(self, climate_id: str) -> str:
         return self.zone_manager.get_zone_mode(climate_id)
 
-    def set_zone_mode(self, climate_id: str, mode: str) -> None:
-        self.zone_manager.set_zone_mode(climate_id, mode)
+    def set_zone_mode(self, climate_id: str, mode: str, save_to_preset: bool = True) -> None:
+        self.zone_manager.set_zone_mode(climate_id, mode, save_to_preset=save_to_preset)
         
     def get_zone_demand(self, climate_id: str) -> float:
         return self.demand_aggregator.get_zone_demand(climate_id)
 
+    def set_zone_demand(self, climate_id: str, demand: float) -> None:
+        self.demand_aggregator.set_zone_demand(climate_id, demand)
+
     def get_autotuner(self, climate_id: str):
         return self.zone_controller.get_autotuner(climate_id)
+
     def is_zone_in_frost_emergency(self, climate_id: str) -> bool:
         """Return True if anti-frost is enabled and zone temperature is below the safety threshold."""
-        if not self.get_persistent_data(KEY_ANTI_FROST_ENABLED, DEFAULT_ANTI_FROST_ENABLED):
-            return False
-        # Try virtual thermostat temperature first
-        st = self.hass.states.get(climate_id)
-        current_temp = None
-        is_faulty = self.plant_diagnostics.has_critical_sensor_fault(climate_id) if hasattr(self, "plant_diagnostics") else False
-        if st and not is_faulty:
-            current_temp = st.attributes.get("current_temperature")
-
-        # WARN-02: Fallback — average TRV sensor readings if virtual thermostat has no temperature yet
-        # (e.g., right after boot before TRVs have reported back)
-        if current_temp is None:
-            zone = self.zone_manager.get_zone(climate_id)
-            if zone:
-                trv_temps = []
-                for trv in zone.get(CONF_ZONE_CLIMATES, []):
-                    trv_st = self.hass.states.get(trv)
-                    if trv_st:
-                        t = trv_st.attributes.get("current_temperature")
-                        if t is not None:
-                            trv_temps.append(float(t))
-                if trv_temps:
-                    current_temp = sum(trv_temps) / len(trv_temps)
-                    _LOGGER.debug("Frost check for %s: using avg TRV temp %.1f°C (virtual has no reading)", climate_id, current_temp)
-
-        if current_temp is None:
-            return False
-        frost_temp = float(self.get_persistent_data(KEY_FROST_PROTECTION_TEMP, DEFAULT_FROST_PROTECTION_TEMP))
-        return current_temp < frost_temp
+        if hasattr(self, "frost_manager") and self.frost_manager:
+            return self.frost_manager.is_zone_in_frost_emergency(climate_id)
+        return False
         
     async def async_apply_master_on(self) -> None:
         """Master turned ON: set heat mode for enabled zones, off for disabled."""

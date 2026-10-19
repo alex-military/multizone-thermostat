@@ -4,7 +4,11 @@ from homeassistant import config_entries
 from homeassistant.core import callback
 from .schemas import *
 from .validators import validate_opentherm_temps, validate_zone_input, validate_geofencing
-from .helpers import _remove_entity_from_registry, flatten_zone_user_input
+from .helpers import (
+    _get_temperature_sensor_entities,
+    _remove_entity_from_registry,
+    flatten_zone_user_input,
+)
 from ..const import *
 import logging
 from homeassistant.helpers import entity_registry as er
@@ -38,17 +42,18 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
     ) -> config_entries.FlowResult:
         """Options menu: choose what to edit."""
         if not self._zones:
-            self._zones = copy.deepcopy(self.config_entry.data.get(CONF_ZONES, []))
-            self._boiler_mode = self.config_entry.data.get(CONF_BOILER_MODE, MODE_RELAY)
-            self._boiler_switch = self.config_entry.data.get(CONF_BOILER_SWITCH, "")
-            self._opentherm_entity = self.config_entry.data.get(CONF_OPENTHERM_ENTITY)
-            self._opentherm_min_temp = self.config_entry.data.get(CONF_OPENTHERM_MIN_TEMP, 35.0)
-            self._opentherm_max_temp = self.config_entry.data.get(CONF_OPENTHERM_MAX_TEMP, 75.0)
-            self._opentherm_ch_switch = self.config_entry.data.get(CONF_OPENTHERM_CH_SWITCH)
-            self._geofencing_enabled = self.config_entry.data.get(CONF_GEOFENCING_ENABLED, False)
-            self._presence_sensor = self.config_entry.data.get(CONF_PRESENCE_SENSOR)
-            self._weather_sensor = self.config_entry.data.get(CONF_WEATHER_SENSOR)
-            self._global_calendar = self.config_entry.data.get(CONF_GLOBAL_CALENDAR)
+            cfg = {**self.config_entry.data, **self.config_entry.options}
+            self._zones = copy.deepcopy(cfg.get(CONF_ZONES, []))
+            self._boiler_mode = cfg.get(CONF_BOILER_MODE, MODE_RELAY)
+            self._boiler_switch = cfg.get(CONF_BOILER_SWITCH, "")
+            self._opentherm_entity = cfg.get(CONF_OPENTHERM_ENTITY)
+            self._opentherm_min_temp = cfg.get(CONF_OPENTHERM_MIN_TEMP, 35.0)
+            self._opentherm_max_temp = cfg.get(CONF_OPENTHERM_MAX_TEMP, 75.0)
+            self._opentherm_ch_switch = cfg.get(CONF_OPENTHERM_CH_SWITCH)
+            self._geofencing_enabled = cfg.get(CONF_GEOFENCING_ENABLED, False)
+            self._presence_sensor = cfg.get(CONF_PRESENCE_SENSOR)
+            self._weather_sensor = cfg.get(CONF_WEATHER_SENSOR)
+            self._global_calendar = cfg.get(CONF_GLOBAL_CALENDAR)
         if user_input is not None:
             action = user_input.get("action")
             if action == "change_boiler":
@@ -222,23 +227,30 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             vt_id = make_zone_entity_id(zone_to_remove)
             _remove_entity_from_registry(self.hass, vt_id)
             
-            # Mode select Entity
-            # NEW-WARN-06: Fix select unique_id calculation to match what select.py creates
-            climate_id_for_unique = make_zone_entity_id(zone_to_remove)
-            select_unique_id = f"{DOMAIN}_{self.config_entry.entry_id}_zone_mode_{climate_id_for_unique.replace('.', '_')}"
-            select_entity_id = ent_reg.async_get_entity_id("select", DOMAIN, select_unique_id)
-            if select_entity_id:
-                ent_reg.async_remove(select_entity_id)
-                _LOGGER.debug("Removed orphaned select entity %s from registry", select_entity_id)
-                
-            # Physical Sync Switch: Also remove the physical sync switch for the removed zone
             safe_name = zone_to_remove.lower().replace(" ", "_").replace("-", "_")
             safe_name = "".join(c for c in safe_name if c.isalnum() or c == "_")
-            sync_unique_id = f"{DOMAIN}_{self.config_entry.entry_id}_physical_sync_{safe_name}"
-            sync_entity_id = ent_reg.async_get_entity_id("switch", DOMAIN, sync_unique_id)
-            if sync_entity_id:
-                ent_reg.async_remove(sync_entity_id)
-                _LOGGER.debug("Removed orphaned physical sync switch %s from registry", sync_entity_id)
+            climate_id_for_unique = make_zone_entity_id(zone_to_remove)
+
+            zone_unique_ids = [
+                ("climate", f"{DOMAIN}_{self.config_entry.entry_id}_zone_{safe_name}"),
+                ("select", f"{DOMAIN}_{self.config_entry.entry_id}_zone_mode_{climate_id_for_unique.replace('.', '_')}"),
+                ("switch", f"{DOMAIN}_{self.config_entry.entry_id}_physical_sync_{safe_name}"),
+                ("switch", f"{DOMAIN}_{self.config_entry.entry_id}_passive_heat_{safe_name}"),
+                ("binary_sensor", f"{DOMAIN}_{self.config_entry.entry_id}_anomaly_{safe_name}"),
+                ("sensor", f"{DOMAIN}_{self.config_entry.entry_id}_demand_{safe_name}"),
+                ("sensor", f"{DOMAIN}_{self.config_entry.entry_id}_autotune_{safe_name}"),
+                ("sensor", f"{DOMAIN}_{self.config_entry.entry_id}_heating_rate_{safe_name}"),
+                ("sensor", f"{DOMAIN}_{self.config_entry.entry_id}_cooling_rate_{safe_name}"),
+                ("sensor", f"{DOMAIN}_{self.config_entry.entry_id}_thermal_inertia_{safe_name}"),
+                ("sensor", f"{DOMAIN}_{self.config_entry.entry_id}_energy_class_{safe_name}"),
+                ("sensor", f"{DOMAIN}_{self.config_entry.entry_id}_thermal_retention_{safe_name}"),
+                ("sensor", f"{DOMAIN}_{self.config_entry.entry_id}_radiator_sizing_{safe_name}"),
+            ]
+            for domain_name, unique_id in zone_unique_ids:
+                ent_id = ent_reg.async_get_entity_id(domain_name, DOMAIN, unique_id)
+                if ent_id:
+                    ent_reg.async_remove(ent_id)
+                    _LOGGER.debug("Removed orphaned %s entity %s from registry", domain_name, ent_id)
             
             return self._save_options()
 
@@ -433,8 +445,9 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             self.config_entry, data=data
         )
         
-        self.hass.async_create_task(
-            self.hass.config_entries.async_reload(self.config_entry.entry_id)
-        )
+        if not getattr(self.config_entry, "update_listeners", None):
+            self.hass.async_create_task(
+                self.hass.config_entries.async_reload(self.config_entry.entry_id)
+            )
         
         return self.async_create_entry(title="", data={})

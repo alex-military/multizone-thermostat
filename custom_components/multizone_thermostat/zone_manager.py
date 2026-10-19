@@ -68,34 +68,38 @@ class ZoneManager:
             zone_name = z.get(CONF_ZONE_NAME, "")
             safe_name = zone_name.lower().replace(" ", "_").replace("-", "_")
             safe_name = "".join(c for c in safe_name if c.isalnum() or c == "_")
-            key = f"{KEY_PASSIVE_HEAT_PREFIX,
-    CONF_ZONE_ALLOW_PASSIVE_HEAT}{safe_name}"
+            key = f"{KEY_PASSIVE_HEAT_PREFIX}{safe_name}"
             default_val = bool(z.get(CONF_ZONE_ALLOW_PASSIVE_HEAT, False))
             return bool(self.coordinator.get_persistent_data(key, default_val))
         return False
 
     def get_zone_mode(self, climate_entity: str) -> str:
-        """Get current zone mode, prioritizing calendar overrides."""
-        if climate_entity in self.coordinator.calendar_manager.mode_overrides:
+        """Get current zone mode, prioritizing window-open bypass and calendar overrides."""
+        if climate_entity in self._pre_window_state and self._zone_modes.get(climate_entity) == ZONE_MODE_BYPASS:
+            return ZONE_MODE_BYPASS
+        if hasattr(self.coordinator, "calendar_manager") and climate_entity in self.coordinator.calendar_manager.mode_overrides:
             return self.coordinator.calendar_manager.mode_overrides[climate_entity]
         return self._zone_modes.get(climate_entity, ZONE_MODE_PRIMARY)
 
-    def set_zone_mode(self, climate_entity: str, mode: str) -> None:
+    def set_zone_mode(self, climate_entity: str, mode: str, save_to_preset: bool = True) -> None:
         """Set zone mode and persist/update dependencies."""
         self._zone_modes[climate_entity] = mode
         self.coordinator.demand_aggregator.set_zone_mode(climate_entity, mode)
 
-        # Persist zone mode directly in settings
-        zone_modes = self.coordinator.get_persistent_data("zone_modes", {})
+        # Persist zone mode directly in settings (copy & update synchronously to avoid race across multiple zones)
+        existing_modes = self.coordinator.get_persistent_data("zone_modes", {})
+        zone_modes = dict(existing_modes) if isinstance(existing_modes, dict) else {}
         zone_modes[climate_entity] = mode
+        if hasattr(self.coordinator, "_settings") and isinstance(self.coordinator._settings, dict):
+            self.coordinator._settings["zone_modes"] = zone_modes
         self.hass.async_create_task(self.coordinator.async_set_persistent_data("zone_modes", zone_modes))
 
         # Notify climate entity callback so extra_state_attributes update immediately
         if climate_entity in self.coordinator._climate_callbacks:
             self.coordinator._climate_callbacks[climate_entity]()
 
-        # If a preset is active, save the mode state
-        if self._current_global_preset:
+        # If a preset is active and this is not a temporary window bypass, save the mode state
+        if save_to_preset and self._current_global_preset and climate_entity not in self._pre_window_state:
             if self._current_global_preset not in self._presets:
                 self._presets[self._current_global_preset] = {}
             if climate_entity not in self._presets[self._current_global_preset]:
@@ -213,7 +217,7 @@ class ZoneManager:
             return
             
         # Find ALL zones this sensor belongs to
-        matching_zones = [z for z in self.zones if z.get(CONF_ZONE_WINDOW_SENSOR) == sensor_id]
+        matching_zones = [z for z in self.zones if z.get(CONF_ZONE_WINDOW_SENSOR) == sensor_id and z.get(CONF_ZONE_NAME)]
         _LOGGER.debug("Window listener: matching zones: %s", matching_zones)
         if not matching_zones:
             return
@@ -232,13 +236,16 @@ class ZoneManager:
 
                 _LOGGER.debug("Window opened (%s), bypassing zone %s", sensor_id, climate_id)
                 if climate_id not in self._pre_window_state:
-                    current_mode = self.get_zone_mode(climate_id)
+                    current_mode = self._zone_modes.get(climate_id, ZONE_MODE_PRIMARY)
                     self._pre_window_state[climate_id] = current_mode
                     self.hass.async_create_task(self.coordinator.async_save_storage())
                 
-                if zone_select and self.get_zone_mode(climate_id) != ZONE_MODE_BYPASS:
+                if self._zone_modes.get(climate_id) != ZONE_MODE_BYPASS:
                     self.coordinator.record_diagnostic_event("WINDOW_OPENED_BYPASS", {"sensor": sensor_id, "zone": climate_id})
-                    self.hass.async_create_task(zone_select.async_select_option(ZONE_MODE_BYPASS))
+                    if zone_select:
+                        self.hass.async_create_task(zone_select.async_select_option(ZONE_MODE_BYPASS))
+                    else:
+                        self.set_zone_mode(climate_id, ZONE_MODE_BYPASS, save_to_preset=False)
                     
             elif new_state.state in ("off", "unavailable", "unknown"):
                 # Window CLOSED or sensor lost connection (fail-safe to restore heating)
@@ -247,9 +254,12 @@ class ZoneManager:
                     was_mode = self._pre_window_state.pop(climate_id)
                     self.hass.async_create_task(self.coordinator.async_save_storage())
                     
-                    if zone_select and self.get_zone_mode(climate_id) != was_mode:
+                    if self._zone_modes.get(climate_id) != was_mode:
                         self.coordinator.record_diagnostic_event("WINDOW_CLOSED_RESTORE", {"sensor": sensor_id, "zone": climate_id, "mode": was_mode})
-                        self.hass.async_create_task(zone_select.async_select_option(was_mode))
+                        if zone_select:
+                            self.hass.async_create_task(zone_select.async_select_option(was_mode))
+                        else:
+                            self.set_zone_mode(climate_id, was_mode, save_to_preset=False)
     def update_preset_temperature(self, preset: str, zone_id: str, temp: float) -> None:
         """Update the target temperature of a specific zone in a preset and save."""
         if preset not in self._presets:

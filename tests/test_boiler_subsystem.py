@@ -71,5 +71,82 @@ async def test_opentherm_backend():
     hass.services.async_call.assert_any_call(
         "climate", "set_temperature", {"entity_id": "climate.opentherm", "temperature": 55.0}, blocking=False
     )
+    coordinator.reset_last_active_time.assert_called()
+
+    await backend.async_update(0.0, None, False)
+    assert backend.status_reason == "OFF - No Demand"
+
+    await backend.async_emergency_off()
+    assert backend.status_reason == "OFF - Emergency/Master OFF"
+
+
+@pytest.mark.asyncio
+async def test_plant_orchestrator_calls_frost_manager():
+    from custom_components.multizone_thermostat.boiler.plant_orchestrator import PlantOrchestrator
+
+    hass = MagicMock()
+    demand_aggregator = MagicMock()
+    demand_aggregator.calculate.return_value = MagicMock(demand=100.0, peak_zone="Frost Emergency")
+    boiler_backend = MagicMock()
+    boiler_backend.async_update = AsyncMock()
+    boiler_backend.async_emergency_off = AsyncMock()
+
+    coordinator = MagicMock()
+    coordinator.get_master_state.return_value = False
+    coordinator.is_dhw_active = False
+    coordinator.frost_manager = MagicMock()
+    coordinator.frost_manager.async_handle_frost_emergencies = AsyncMock(return_value=True)
+
+    orch = PlantOrchestrator(hass, demand_aggregator, boiler_backend, coordinator)
+    await orch._async_update_boiler()
+
+    coordinator.frost_manager.async_handle_frost_emergencies.assert_awaited_once()
+    boiler_backend.async_emergency_off.assert_not_called()
+    boiler_backend.async_update.assert_awaited_once_with(100.0, "Frost Emergency", True)
+
+
+def test_pid_preserves_integral_on_minor_inertia_setpoint_shift():
+    from custom_components.multizone_thermostat.pid import PID
+
+    pid = PID(kp=20.0, ki=0.1, kd=0.0, out_min=0.0, out_max=100.0)
+    # Initial sample
+    pid.calc(input_val=19.0, set_point=20.0, input_time=100.0, last_input_time=None)
+    # Second sample after 60s builds integral
+    pid.calc(input_val=19.0, set_point=20.0, input_time=160.0, last_input_time=100.0)
+    assert pid.integral > 0.0
+    prev_integral = pid.integral
+
+    # Minor thermal-inertia effective_target shift (e.g. 20.0 -> 19.95) must NOT wipe integral
+    pid.calc(input_val=19.0, set_point=19.95, input_time=220.0, last_input_time=160.0)
+    assert pid.integral > prev_integral
+
+    # Large setpoint change (>= 1.5°C) resets integral
+    pid.calc(input_val=19.0, set_point=17.0, input_time=280.0, last_input_time=220.0)
+    assert pid.integral == 0.0
+
+
+def test_autotune_clamps_kp_before_ki_kd():
+    from custom_components.multizone_thermostat.autotune import PassiveAutotuneObserver
+
+    obs = PassiveAutotuneObserver("climate.z1", required_cycles=1)
+    obs.cycle_start_time = 0.0
+    obs.cycle_start_temp = 18.0
+    # 5 points with a gentle slope that produces raw Kp > 500 if unclamped
+    obs.history.extend([
+        (0.0, 18.0),
+        (50.0, 18.0),
+        (100.0, 18.0),
+        (250.0, 18.03),
+        (400.0, 18.06),  # slope = 0.06 / 300 = 0.0002 °C/s -> raw Kp = 120 / (0.0002 * 100) = 6000 -> clamped to 500
+    ])
+    obs._stop_heating(400.0, 18.06)
+    assert len(obs.completed_cycles) == 1
+    cycle = obs.completed_cycles[0]
+    assert cycle["Kp"] == 500.0
+    # Verify Ki = Kp / (2 * L) and Kd = Kp * (0.5 * L) use clamped Kp=500.0
+    L = cycle["L"]
+    assert abs(cycle["Ki"] - (500.0 / (2.0 * L))) < 1e-6
+    assert abs(cycle["Kd"] - (500.0 * 0.5 * L)) < 1e-6
+
 
 

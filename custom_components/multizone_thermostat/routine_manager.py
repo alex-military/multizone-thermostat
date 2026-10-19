@@ -51,6 +51,10 @@ class RoutineManager:
     def async_setup_listeners(self) -> None:
         """Initialize listeners."""
         if self.presence_sensor:
+            init_state = self.hass.states.get(self.presence_sensor) if hasattr(self.hass, "states") else None
+            if init_state and getattr(init_state, "state", None) not in (None, "unavailable", "unknown"):
+                if isinstance(init_state.state, str):
+                    self._last_known_presence = init_state.state
             self._unsub_listeners.append(
                 async_track_state_change_event(
                     self.hass,
@@ -74,6 +78,19 @@ class RoutineManager:
         for unsub in self._unsub_listeners:
             unsub()
         self._unsub_listeners.clear()
+
+    @staticmethod
+    def _is_state_away(val: str) -> bool:
+        """Determine if a presence sensor state string represents Away."""
+        val_lower = str(val).strip().lower()
+        if val_lower in ("home", "on", "true"):
+            return False
+        if val_lower in ("not_home", "away", "off", "false"):
+            return True
+        try:
+            return float(val_lower) <= 0
+        except (ValueError, TypeError):
+            return val_lower != "home"
 
     @callback
     def _async_on_presence_changed(self, event: Event) -> None:
@@ -107,8 +124,8 @@ class RoutineManager:
             
         _LOGGER.info("Presence changed: %s -> %s", old_val, new_val)
         
-        is_away = new_val != "home"
-        was_away = old_val != "home"
+        is_away = self._is_state_away(new_val)
+        was_away = self._is_state_away(old_val)
         
         if is_away and not was_away:
             _LOGGER.info("Geofencing: Everyone left. Setting to Away mode.")
@@ -125,8 +142,8 @@ class RoutineManager:
             is_night = False
             
             try:
-                n_hour, n_minute = map(int, night_time_str.split(":"))
-                m_hour, m_minute = map(int, morning_time_str.split(":"))
+                n_hour, n_minute = map(int, str(night_time_str).split(":")[:2])
+                m_hour, m_minute = map(int, str(morning_time_str).split(":")[:2])
                 now = dt_util.now().time()
                 night_time = dt_time(n_hour, n_minute)
                 morning_time = dt_time(m_hour, m_minute)
@@ -164,7 +181,7 @@ class RoutineManager:
         # Check Night Time
         night_time_str = self._get_persistent_data(KEY_NIGHT_TIME, "22:30")
         try:
-            hour, minute = map(int, night_time_str.split(":"))
+            hour, minute = map(int, str(night_time_str).split(":")[:2])
             target_dt = local_now.replace(hour=hour, minute=minute, second=0, microsecond=0)
             time_diff = (local_now - target_dt).total_seconds()
             
@@ -173,8 +190,8 @@ class RoutineManager:
                 if self._last_night_trigger_date != current_date:
                     self._last_night_trigger_date = current_date
                     current_preset = self._get_current_global_preset()
-                    if current_preset in (GLOBAL_PRESET_MANUAL, "none"):
-                        _LOGGER.info("Auto Night Mode skipped because system is in Manual mode.")
+                    if current_preset in (GLOBAL_PRESET_MANUAL, GLOBAL_PRESET_AWAY, "none"):
+                        _LOGGER.info("Auto Night Mode skipped because system is in %s mode.", current_preset)
                     elif current_preset != GLOBAL_PRESET_SLEEP:
                         _LOGGER.info("Auto Night Mode triggered. Setting Sleep mode.")
                         self.hass.async_create_task(
@@ -187,7 +204,7 @@ class RoutineManager:
         # Check Morning Time
         morning_time_str = self._get_persistent_data(KEY_MORNING_TIME, "07:00")
         try:
-            hour, minute = map(int, morning_time_str.split(":"))
+            hour, minute = map(int, str(morning_time_str).split(":")[:2])
             target_dt = local_now.replace(hour=hour, minute=minute, second=0, microsecond=0)
             time_diff = (local_now - target_dt).total_seconds()
             
@@ -195,8 +212,8 @@ class RoutineManager:
                 if self._last_morning_trigger_date != current_date:
                     self._last_morning_trigger_date = current_date
                     current_preset = self._get_current_global_preset()
-                    if current_preset in (GLOBAL_PRESET_MANUAL, "none"):
-                        _LOGGER.info("Auto Morning Mode skipped because system is in Manual mode.")
+                    if current_preset in (GLOBAL_PRESET_MANUAL, GLOBAL_PRESET_AWAY, "none"):
+                        _LOGGER.info("Auto Morning Mode skipped because system is in %s mode.", current_preset)
                     else:
                         pre_night = self._get_persistent_data(KEY_PRE_NIGHT_PRESET, GLOBAL_PRESET_COMFORT)
                         _LOGGER.info("Auto Morning Mode triggered. Restoring mode: %s", pre_night)

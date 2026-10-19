@@ -140,14 +140,13 @@ class PassiveAutotuneObserver:
             return
             
         kp_calc = 120.0 / (max_slope * L)
+        # Clamp Kp to reasonable bounds before deriving Ki and Kd so Ti/Td ratios hold
+        kp_calc = min(max(kp_calc, 10.0), 500.0)
         ti_calc = 2.0 * L
         td_calc = 0.5 * L
         
         ki_calc = kp_calc / ti_calc if ti_calc > 0 else 0
         kd_calc = kp_calc * td_calc
-        
-        # Clamp Kp to reasonable bounds to avoid insane values
-        kp_calc = min(max(kp_calc, 10.0), 500.0)
         
         _LOGGER.info("Autotune [%s]: Cycle valid! L=%.1f s, slope=%.6f °C/s. Kp=%.1f, Ki=%.4f, Kd=%.1f", 
                      self.zone_name, L, max_slope, kp_calc, ki_calc, kd_calc)

@@ -31,6 +31,7 @@ class ZoneController:
         self._pids: dict[str, MultizonePID] = {}
         self._autotuners: dict[str, PassiveAutotuneObserver] = {}
         self._thermal_models: dict[str, ThermalObserver] = {}
+        self._last_seen_temps: dict[str, float] = {}
 
         for zone in self.zones:
             name = zone.get(CONF_ZONE_NAME)
@@ -114,8 +115,20 @@ class ZoneController:
             self.coordinator.demand_aggregator.set_zone_demand(entity_id, 0.0)
             return 0.0
 
+        try:
+            current_temp = float(current_temp)
+            target_temp = float(target_temp)
+        except (ValueError, TypeError):
+            self.coordinator.demand_aggregator.set_zone_demand(entity_id, 0.0)
+            return 0.0
+
         if entity_id not in self._thermal_models or entity_id not in self._autotuners or entity_id not in self._pids:
             return 0.0
+
+        # Update PID sensor timestamp when a new or changed temperature reading arrives
+        if self._last_seen_temps.get(entity_id) != current_temp:
+            self._last_seen_temps[entity_id] = current_temp
+            self._pids[entity_id].update_sensor_timestamp()
 
         # Check mode (don't calculate if off/bypass)
         hvac_mode = new_state.state
@@ -179,7 +192,10 @@ class ZoneController:
                 demand = self._pids[entity_id].calc(current_temp, effective_target)
 
                 # Apply Weather Compensation (Feed Forward)
-                curve_val = self.coordinator.get_persistent_data(KEY_WEATHER_CURVE, 0.0)
+                try:
+                    curve_val = float(self.coordinator.get_persistent_data(KEY_WEATHER_CURVE, 0.0) or 0.0)
+                except (ValueError, TypeError):
+                    curve_val = 0.0
                 if self.coordinator.weather_sensor_id:
                     weather_state = self.hass.states.get(self.coordinator.weather_sensor_id)
                     if weather_state and weather_state.state not in ("unavailable", "unknown"):
@@ -203,11 +219,12 @@ class ZoneController:
                                     # Clamp the weather bonus to a max of +40% to avoid it dominating the PID
                                     ff_demand = min(40.0, ff_demand)
                                     
-                                    # Scale down FF if we are overheating to prevent permanent ghost heating
+                                    # Scale down FF as we approach or exceed effective_target to prevent ghost heating
                                     overheat = current_temp - effective_target
-                                    if overheat > 0:
-                                        # Decay FF to 0 over 0.5 degrees of overheating
-                                        ff_factor = max(0.0, 1.0 - (overheat / 0.5))
+                                    if overheat >= 0:
+                                        ff_demand = 0.0
+                                    elif overheat > -0.5:
+                                        ff_factor = max(0.0, -overheat / 0.5)
                                         ff_demand *= ff_factor
                                         
                                     demand = min(100.0, max(0.0, demand + ff_demand))
@@ -220,7 +237,7 @@ class ZoneController:
                                         ff_demand,
                                         demand,
                                     )
-                        except ValueError:
+                        except (ValueError, TypeError):
                             pass
         else:
             demand = 0.0
@@ -241,9 +258,6 @@ class ZoneController:
                     tuner.kd,
                 )
                 await self.async_save_autotuner_states()
-
-        # Update PID sensor timestamp to prevent dead sensor timeout
-        self._pids[entity_id].update_sensor_timestamp()
 
         # Feed Thermal Observer
         self._thermal_models[entity_id].update(current_temp, demand > 0)

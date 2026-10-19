@@ -138,6 +138,8 @@ class RelayBoilerBackend(BoilerBackend):
                     )
                 )
 
+        if hasattr(self.coordinator, "reset_last_active_time"):
+            self.coordinator.reset_last_active_time()
         self.coordinator.record_diagnostic_event("BOILER_SWITCH_ON", {"switch": self.boiler_switch, "reason": self._status_reason})
         _LOGGER.debug("Boiler forced ON")
 
@@ -201,6 +203,9 @@ class RelayBoilerBackend(BoilerBackend):
         boiler_state = self.hass.states.get(self.boiler_switch) if self.boiler_switch else None
         current_boiler_on = boiler_state is not None and boiler_state.state == STATE_ON
 
+        if current_boiler_on and hasattr(self.coordinator, "reset_last_active_time"):
+            self.coordinator.reset_last_active_time()
+
         if current_boiler_on and not self._last_known_boiler_on:
             if self._pending_command is None or self._pending_command[0] != "on":
                 self._last_boiler_change = time.monotonic()
@@ -242,7 +247,7 @@ class RelayBoilerBackend(BoilerBackend):
                 climate_id = make_zone_entity_id(zone[CONF_ZONE_NAME])
                 mode = self.coordinator.get_zone_mode(climate_id)
                 if mode == ZONE_MODE_PRIMARY and self.coordinator.get_zone_demand(climate_id) > 0:
-                    trv_list = zone.get(CONF_ZONE_CLIMATES) or zone.get("climates") or []
+                    trv_list = zone.get(CONF_ZONE_CLIMATES) or zone.get("climates") or zone.get("climate_entities") or []
                     if not trv_list:
                         # Zone has no TRVs (e.g. relay only). Heat path is fully open by default.
                         trvs_ready = True
@@ -250,7 +255,7 @@ class RelayBoilerBackend(BoilerBackend):
                     
                     for trv in trv_list:
                         trv_state = self.hass.states.get(trv)
-                        if trv_state:
+                        if trv_state and trv_state.state not in ("unavailable", "unknown"):
                             position = None
                             for attr in ["position", "valve_position", "pi_heating_demand", "heating_demand", "valve_state"]:
                                 if attr in trv_state.attributes:
@@ -271,7 +276,11 @@ class RelayBoilerBackend(BoilerBackend):
                 if trvs_ready:
                     break
 
-            if not trvs_ready and any((zone.get(CONF_ZONE_CLIMATES) or zone.get("climates") or []) for zone in self.coordinator.zones) and not frost_emergency:
+            has_any_trvs = any(
+                (zone.get(CONF_ZONE_CLIMATES) or zone.get("climates") or zone.get("climate_entities") or [])
+                for zone in self.coordinator.zones
+            )
+            if not trvs_ready and has_any_trvs and not frost_emergency and peak_zone != "Anti-Seize":
                 if self._trv_wait_start is None:
                     self._trv_wait_start = time.monotonic()
                 elapsed = time.monotonic() - self._trv_wait_start

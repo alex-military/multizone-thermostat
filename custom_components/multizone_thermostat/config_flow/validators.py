@@ -7,6 +7,8 @@ def validate_opentherm_temps(min_temp: float, max_temp: float) -> dict[str, str]
         errors["base"] = "invalid_temp_range"
     return errors
 
+from ..const import CONF_ZONE_NAME
+
 def validate_zone_input(
     zone_name: str,
     climates: list[str],
@@ -17,9 +19,9 @@ def validate_zone_input(
     """Validate user input when adding or editing a zone."""
     errors = {}
     if not zone_name:
-        errors["zone_name"] = "zone_name_required"
+        errors[CONF_ZONE_NAME] = "zone_name_required"
     elif zone_name in already_added:
-        errors["zone_name"] = "zone_name_exists"
+        errors[CONF_ZONE_NAME] = "zone_name_exists"
     elif not climates and not switches and not (valves or []):
         errors["base"] = "no_actuators_selected"
     return errors
