@@ -36,7 +36,8 @@
                         "description": "Standard smart thermostatic radiator valves with temperature control.",
                         "data": {
                             "climate_entities": "Climate Entity",
-                            "trv_preset_sync": "Enable TRV Preset Sync"
+                            "trv_preset_sync": "Enable TRV Preset Sync",
+                            "authoritative_climate_sync": "Authoritative Wall Thermostat Sync"
                         }
                     },
                     "valve_settings": {
@@ -61,7 +62,8 @@
                             "window_sensor": "Window Sensor (Optional)",
                             "sensor_timeout_min": "Sensor Watchdog Timeout (minutes)",
                             "anti_seize_zone_enable": "Enable Anti-seize (Summer Protection) for this zone",
-                            "allow_passive_heat": "Allow Passive Heat (Fancoil without valve / Mezzanine)"
+                            "allow_passive_heat": "Allow Passive Heat (Fancoil without valve / Mezzanine)",
+                            "weight": "Zone Thermal Weight (Area / Emitter Power)"
                         }
                     }
                 },
@@ -106,7 +108,7 @@
             },
             "boiler_opentherm": {
                 "title": "OpenTherm Setup",
-                "description": "Select the OpenTherm entity that controls the Central Heating water temperature. Also define the minimum and maximum water temperatures.",
+                "description": "Configure OpenTherm via Dual-Path: Option 1 (Climate Gateway): climate entity with automatic attribute telemetry; Option 2 (Decoupled): number setpoint entity plus optional CH enable switch. Define minimum and maximum water temperatures.",
                 "data": {
                     "opentherm_entity": "OpenTherm Climate/Water Heater Entity",
                     "opentherm_min_temp": "Minimum Water Temperature (°C)",
@@ -171,7 +173,8 @@
                         "description": "Standard smart thermostatic radiator valves with temperature control.",
                         "data": {
                             "climate_entities": "Climate Entity",
-                            "trv_preset_sync": "Enable TRV Preset Sync"
+                            "trv_preset_sync": "Enable TRV Preset Sync",
+                            "authoritative_climate_sync": "Authoritative Wall Thermostat Sync"
                         }
                     },
                     "valve_settings": {
@@ -196,7 +199,8 @@
                             "window_sensor": "Window Sensor (Optional)",
                             "sensor_timeout_min": "Sensor Watchdog Timeout (minutes)",
                             "anti_seize_zone_enable": "Enable Anti-seize (Summer Protection) for this zone",
-                            "allow_passive_heat": "Allow Passive Heat (Fancoil without valve / Mezzanine)"
+                            "allow_passive_heat": "Allow Passive Heat (Fancoil without valve / Mezzanine)",
+                            "weight": "Zone Thermal Weight (Area / Emitter Power)"
                         }
                     }
                 },
@@ -230,7 +234,8 @@
                         "description": "Standard smart thermostatic radiator valves with temperature control.",
                         "data": {
                             "climate_entities": "Zone TRVs / Climates",
-                            "trv_preset_sync": "Enable TRV Preset Sync"
+                            "trv_preset_sync": "Enable TRV Preset Sync",
+                            "authoritative_climate_sync": "Authoritative Wall Thermostat Sync"
                         }
                     },
                     "valve_settings": {
@@ -255,7 +260,8 @@
                             "window_sensor": "Window Sensor (Optional)",
                             "sensor_timeout_min": "Sensor Watchdog Timeout (minutes)",
                             "anti_seize_zone_enable": "Enable Anti-seize (Summer Protection) for this zone",
-                            "allow_passive_heat": "Allow Passive Heat (Fancoil without valve / Mezzanine)"
+                            "allow_passive_heat": "Allow Passive Heat (Fancoil without valve / Mezzanine)",
+                            "weight": "Zone Thermal Weight (Area / Emitter Power)"
                         }
                     }
                 }
@@ -295,7 +301,7 @@
             },
             "boiler_opentherm": {
                 "title": "OpenTherm Setup",
-                "description": "Select the OpenTherm entity that controls the Central Heating water temperature. Also define the minimum and maximum water temperatures.",
+                "description": "Configure OpenTherm via Dual-Path: Option 1 (Climate Gateway): climate entity with automatic attribute telemetry; Option 2 (Decoupled): number setpoint entity plus optional CH enable switch. Define minimum and maximum water temperatures.",
                 "data": {
                     "opentherm_entity": "OpenTherm Climate/Water Heater Entity",
                     "opentherm_min_temp": "Minimum Water Temperature (°C)",
@@ -334,6 +340,14 @@
                     "comfort": "Comfort",
                     "sleep": "Sleep",
                     "away": "Away"
+                }
+            },
+            "demand_strategy": {
+                "name": "Demand Aggregation Strategy",
+                "state": {
+                    "max": "Maximum Zone Demand (MAX)",
+                    "weighted_average": "Weighted Average",
+                    "sum_capped": "Cumulative Sum (Capped 100%)"
                 }
             }
         }

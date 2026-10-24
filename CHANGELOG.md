@@ -1,5 +1,50 @@
 # Changelog
 
+## [5.1.0] - 2026-10-24
+### Feat: Demand Aggregation Strategies, Zone Weights, Authoritative Hardware Sync & OpenTherm Weather Curve (Phases 8, 9 & 10)
+- **Demand Aggregation Strategies & Zone Weights (Phase 10)**:
+  - Added configurable plant-wide heat demand aggregation formulas in `DemandAggregator`:
+    - `MAX`: Highest-demand zone dictates boiler power (classic behavior).
+    - `WEIGHTED_AVERAGE`: Demand weighted by room emitter wattage, thermal volume, or configured zone weight.
+    - `SUM_CAPPED`: Cumulative sum of zone demands with a 100% saturation ceiling.
+  - Dynamic frontend selector entity (`select.multizone_thermostat_demand_aggregation_strategy`) allowing real-time switching between aggregation strategies without restarting Home Assistant.
+  - Per-zone weight multiplier (`CONF_ZONE_WEIGHT`, default `1.0`, range `0.1`–`10.0`) configurable in zone options flow and schemas.
+- **Authoritative Hardware Climate Sync (Phase 9)**:
+  - Opt-in authoritative mode source (`authoritative_mode_source`) for zones driven by physical wall thermostats (e.g., Vimar, Bticino).
+  - Physical `OFF` switch actions propagate cleanly to the virtual climate zone without being misinterpreted as knob setpoint adjustments to 5 °C.
+  - Preserves virtual zone preset target across physical `OFF` transitions.
+  - Filters out transient `idle` or network reconnection states to prevent state flutter.
+- **Guided Dual-Path OpenTherm Setup & Dynamic Weather Compensation (Phases 8 & 10)**:
+  - Guided dual-path OpenTherm setup in config and options flow: Climate-based OpenTherm Gateway vs Number/Sensor-based OpenTherm Gateway.
+  - Dynamic Feed-Forward Weather Curve ($T_{\text{ext}} \rightarrow T_{\text{flow}}$) in OpenTherm backend: continuously modulates boiler flow temperature setpoint according to outdoor temperature readings and building thermal retention time, proactively matching heat loss before indoor temperatures drop.
+- **Air-in-Radiator Anomaly Detection (Phase 10)**:
+  - Automated supervision (`ANOMALY_AIR_IN_RADIATOR`) identifying valves opened at 100% with abnormally slow heat-up rates compared to historic baseline, alerting users to trapped air or restricted flow.
+- **Full Localization Synchronization**:
+  - Added translations for all Phase 8, 9, and 10 config options, strategy selectors, and anomaly messages across English (`en`), Italian (`it`), German (`de`), Spanish (`es`), French (`fr`), and Russian (`ru`).
+- **Comprehensive Test Coverage**:
+  - Added full test coverage in `tests/test_phase8_9_10_features.py` and `tests/test_config_flow_phase9_10.py` (169 total tests passing).
+
+## [5.0.5] - 2026-10-24
+### Release: Critical Sensor Fail-Safe, Battery Sensor Anomaly Fixes, Anti-Seize & Unload Safety, Translations Sync
+- **Critical Sensor Fail-Safe & Plant Orchestrator Hardening**:
+  - Zero-demand fail-safe: if a zone's primary temperature sensor drops out (becomes `unavailable`, `unknown`, or exceeds timeout) without an active TRV fallback, the zone demand is immediately forced to 0% and virtual thermostat sets `current_temperature = None`, preventing heating runaway on stale readings.
+  - Guarded `PlantOrchestrator.async_tick` against unhandled inner exceptions to ensure continuous evaluation loops without freezing plant state.
+  - Plant orchestrator enforces 0% zone demand whenever critical sensor faults are diagnosed.
+- **Anti-Seize & Cycle Protection Safety**:
+  - If the boiler is in a `HOLD_ON` minimum cycle lock when summer anti-seize routine completes, forces `async_emergency_off` immediately to prevent runaway heating cycles.
+  - Full exception handling in `AntiSeizeManager.async_execute()` guarantees all zone valves and boiler demand are restored to previous states (`HVAC_MODE_OFF` / 0% demand) even if an unexpected communication fault occurs.
+  - Persists `last_active_wall_time` to storage and restores monotonic idle offset across Home Assistant restarts, avoiding spurious anti-seize triggers after reboot.
+- **Integration Unload Safety & Clean Storage Flushes**:
+  - `async_unload_entry` now triggers `boiler_backend.async_emergency_off()` immediately upon unload/reload, preventing orphaned boiler activation during integration updates.
+  - Explicitly flushes window, preset, and coordinator settings stores to disk prior to platform teardown.
+  - Guaranteed cleanup of all active event listeners on config entry unload.
+- **Diagnostics & Battery Sensor Anomaly Filtering**:
+  - Relaxed staleness checks for sleeping zigbee/z-wave battery temperature sensors (< 24h) unless the zone is actively calling for heat.
+  - Eliminated false-positive `STALE_SENSOR` warnings for rooms with steady temperatures when no heating is being requested.
+  - Properly handles OpenTherm fault sensors reporting `unknown` state to avoid false `fault_active` warnings.
+- **Full Localization Synchronization**:
+  - Synchronized translation keys across English (`en`), Italian (`it`), German (`de`), Spanish (`es`), French (`fr`), and Russian (`ru`).
+
 ## [5.0.1] - 2026-10-13
 ### Feat: Proportional & 0-10V Valve Control and Collapsible UI Sections
 - **Proportional & 0-10V Valve Support**:

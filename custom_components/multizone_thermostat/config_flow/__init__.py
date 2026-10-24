@@ -47,6 +47,10 @@ from ..const import (
     MODE_OPENTHERM,
     MODE_RELAY,
     make_zone_entity_id,
+    CONF_ZONE_WEIGHT,
+    DEFAULT_ZONE_WEIGHT,
+    CONF_ZONE_AUTHORITATIVE_SYNC,
+    DEFAULT_AUTHORITATIVE_SYNC,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -169,6 +173,8 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_ZONE_VALVES: valves,
                     CONF_VALVE_SCALE: user_input.get(CONF_VALVE_SCALE, DEFAULT_VALVE_SCALE),
                     CONF_ZONE_TRV_SYNC: user_input.get(CONF_ZONE_TRV_SYNC, DEFAULT_TRV_SYNC),
+                    CONF_ZONE_AUTHORITATIVE_SYNC: user_input.get(CONF_ZONE_AUTHORITATIVE_SYNC, DEFAULT_AUTHORITATIVE_SYNC),
+                    CONF_ZONE_WEIGHT: float(user_input.get(CONF_ZONE_WEIGHT, DEFAULT_ZONE_WEIGHT)),
                     CONF_ZONE_ANTI_SEIZE: user_input.get(CONF_ZONE_ANTI_SEIZE, True),
                     CONF_ZONE_ALLOW_PASSIVE_HEAT: user_input.get(CONF_ZONE_ALLOW_PASSIVE_HEAT, False),
                     CONF_ZONE_SENSOR_TIMEOUT: user_input.get(CONF_ZONE_SENSOR_TIMEOUT, DEFAULT_SENSOR_TIMEOUT_MIN),

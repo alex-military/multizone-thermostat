@@ -177,6 +177,10 @@ def get_opentherm_diagnostics(coordinator: Any, hass: HomeAssistant) -> dict[str
                 v = attrs[k]
                 result["flame_active"] = bool(v) if not isinstance(v, str) else v.lower() in ("true", "on", "1")
                 break
+        if result["flame_active"] is None and "hvac_action" in attrs and attrs["hvac_action"] is not None:
+            hvac_act = str(attrs["hvac_action"]).lower()
+            if hvac_act in ("heating", "idle", "off", "cooling", "drying", "fan"):
+                result["flame_active"] = (hvac_act == "heating")
 
         # Fault
         for k in ("fault", "fault_code", "oem_fault_code", "error_code", "fault_flags"):

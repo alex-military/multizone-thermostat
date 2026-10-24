@@ -30,6 +30,7 @@ class ZoneSyncManager:
         calibrations: dict[str, str],
         valves: list[str] | None = None,
         valve_scale: str = DEFAULT_VALVE_SCALE,
+        authoritative_sync: bool = False,
     ) -> None:
         """Initialize the sync manager."""
         self.hass = hass
@@ -41,6 +42,7 @@ class ZoneSyncManager:
         self._valves = valves or []
         self._valve_scale = valve_scale
         self._calibrations = calibrations
+        self._authoritative_sync = bool(authoritative_sync)
         self._last_valve_positions: dict[str, float] = {}
 
         self._sync_lock = asyncio.Lock()
@@ -138,7 +140,9 @@ class ZoneSyncManager:
                         device_target = st.attributes.get(ATTR_TEMPERATURE)
                         if device_target is not None:
                             try:
-                                self._last_known_trv_targets[trv] = float(device_target)
+                                dt_val = float(device_target)
+                                if dt_val > 7.0 and not self._authoritative_sync:
+                                    self._last_known_trv_targets[trv] = dt_val
                             except (ValueError, TypeError):
                                 pass
                         continue
@@ -409,6 +413,9 @@ class ZoneSyncManager:
             if event.context.id in (master_context_id, self._internal_context.id):
                 return None, None
 
+            if new_state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+                return None, None
+
             # 3. If still in _pending_trv_targets on an external event:
             #    If target temperature did not change in this state update (e.g. current_temperature report)
             #    and command was sent recently (<30s), keep waiting; otherwise clear pending so physical knob works.
@@ -428,18 +435,41 @@ class ZoneSyncManager:
 
             physical_sync_enabled = self._coordinator.get_persistent_data(self._sync_switch_key, True)
 
-            if physical_sync_enabled:
-                if new_state.state == HVACMode.OFF and old_state.state != HVACMode.OFF:
-                    if new_temp is not None:
-                        self._last_known_trv_targets[entity_id] = new_temp
-                    return HVACMode.OFF if master_hvac_mode != HVACMode.OFF else None, None
-
-                elif new_state.state == HVACMode.HEAT and old_state.state == HVACMode.OFF:
-                    if master_hvac_mode != HVACMode.HEAT:
+            # Filter network reconnection from unavailable/unknown
+            if old_state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+                if self._authoritative_sync and physical_sync_enabled:
+                    if new_state.state == HVACMode.OFF and master_hvac_mode != HVACMode.OFF:
+                        if new_temp is not None and new_temp > 7.0:
+                            self._last_known_trv_targets[entity_id] = new_temp
+                        return HVACMode.OFF, None
+                    if new_state.state in (HVACMode.HEAT, "idle", "auto") and master_hvac_mode == HVACMode.OFF:
+                        if new_temp is not None and new_temp > 7.0:
+                            self._last_known_trv_targets[entity_id] = new_temp
                         return HVACMode.HEAT, None
+                if new_temp is not None and new_temp > 7.0:
+                    self._last_known_trv_targets[entity_id] = new_temp
+                return None, None
 
-            if not physical_sync_enabled or master_hvac_mode == HVACMode.OFF or new_state.state == HVACMode.OFF or old_state.state == HVACMode.OFF:
-                if new_temp is not None:
+            # Normalize "idle" as active heating sub-state (equivalent to HVACMode.HEAT for mode transitions)
+            eff_new_mode = HVACMode.HEAT if new_state.state == "idle" else new_state.state
+            eff_old_mode = HVACMode.HEAT if old_state.state == "idle" else old_state.state
+
+            if eff_new_mode == HVACMode.OFF and eff_old_mode != HVACMode.OFF:
+                if new_temp is not None and new_temp > 7.0 and not self._authoritative_sync:
+                    self._last_known_trv_targets[entity_id] = new_temp
+                if physical_sync_enabled or self._authoritative_sync:
+                    return (HVACMode.OFF if master_hvac_mode != HVACMode.OFF else None), None
+                return None, None
+
+            if eff_new_mode == HVACMode.HEAT and eff_old_mode == HVACMode.OFF:
+                if new_temp is not None and new_temp > 7.0:
+                    self._last_known_trv_targets[entity_id] = new_temp
+                if (physical_sync_enabled or self._authoritative_sync) and master_hvac_mode != HVACMode.HEAT:
+                    return HVACMode.HEAT, None
+                return None, None
+
+            if not (physical_sync_enabled or self._authoritative_sync) or master_hvac_mode == HVACMode.OFF or eff_new_mode == HVACMode.OFF or eff_old_mode == HVACMode.OFF:
+                if new_temp is not None and new_temp > 7.0:
                     self._last_known_trv_targets[entity_id] = new_temp
                 return None, None
 

@@ -43,6 +43,10 @@ from .const import (
     CONF_ZONE_ALLOW_PASSIVE_HEAT,
     CONF_ZONE_SENSOR_TIMEOUT,
     DEFAULT_SENSOR_TIMEOUT_MIN,
+    CONF_ZONE_WEIGHT,
+    DEFAULT_ZONE_WEIGHT,
+    CONF_ZONE_AUTHORITATIVE_SYNC,
+    DEFAULT_AUTHORITATIVE_SYNC,
     DOMAIN,
     make_zone_entity_id,
     make_via_device_kwargs,
@@ -105,6 +109,9 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         self._valve_scale = zone_data.get(CONF_VALVE_SCALE, DEFAULT_VALVE_SCALE)
         self._calibrations = zone_data.get(CONF_ZONE_CALIBRATIONS, {})
         self._sensor_timeout_min = zone_data.get(CONF_ZONE_SENSOR_TIMEOUT, DEFAULT_SENSOR_TIMEOUT_MIN)
+        self._authoritative_sync: bool = bool(
+            zone_data.get(CONF_ZONE_AUTHORITATIVE_SYNC, DEFAULT_AUTHORITATIVE_SYNC)
+        )
         self._safety_fallback_active = False
         
         self._hvac_mode = HVACMode.OFF
@@ -141,6 +148,7 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             calibrations=self._calibrations,
             valves=self._valves,
             valve_scale=self._valve_scale,
+            authoritative_sync=self._authoritative_sync,
         )
 
     @property
@@ -185,6 +193,8 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             "local_pwm_active": self._sync_manager.local_pwm_state,
             "boiler_entity_id": self._coordinator.boiler_switch,
             "zone_mode": self._coordinator.get_zone_mode(self.entity_id),
+            "zone_weight": self._coordinator.demand_aggregator.get_zone_weight(self.entity_id),
+            "authoritative_climate_sync": self._authoritative_sync,
             "allow_passive_heat": self._coordinator.zone_manager.is_passive_heat_allowed(self.entity_id),
             "safety_fallback_active": self._safety_fallback_active,
             "sensor_timeout_min": self._sensor_timeout_min,
@@ -371,7 +381,8 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
 
     async def _async_on_trv_changed(self, event: Event) -> None:
         """Handle TRV knob changes delegating to SyncManager."""
-        ctx_id = self._context.id if self._context else None
+        ctx = getattr(self, "_context", None)
+        ctx_id = ctx.id if ctx else None
         new_mode, delta_temp = await self._sync_manager.process_trv_change(
             event=event,
             master_context_id=ctx_id,
@@ -383,10 +394,25 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         needs_sync = False
         if new_mode is not None:
             self._hvac_mode = new_mode
+            if new_mode == HVACMode.OFF:
+                self._sync_manager._local_pwm_state = False
+                self._coordinator.set_zone_demand(self.entity_id, 0.0)
+                await self._sync_manager.async_sync_switches()
+                await self._sync_manager.async_sync_proportional_valves(self._hvac_mode)
             needs_sync = True
             
-        if delta_temp is not None and self._target_temperature is not None:
+        if delta_temp is not None and self._target_temperature is not None and self._hvac_mode != HVACMode.OFF:
             self._target_temperature = max(self._attr_min_temp, min(self._attr_max_temp, self._target_temperature + delta_temp))
+            if (
+                hasattr(self._coordinator, "calendar_manager")
+                and self.entity_id in self._coordinator.calendar_manager.temp_overrides
+            ):
+                self._coordinator.calendar_manager.temp_overrides[self.entity_id] = self._target_temperature
+            current_preset = self._coordinator.get_global_preset()
+            if current_preset and current_preset != "none":
+                self._coordinator.zone_manager.update_preset_temperature(
+                    current_preset, self.entity_id, self._target_temperature
+                )
             needs_sync = True
             
         if needs_sync:

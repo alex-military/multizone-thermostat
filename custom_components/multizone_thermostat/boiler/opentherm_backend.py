@@ -46,6 +46,48 @@ class OpenThermBoilerBackend(BoilerBackend):
         wanted_on = norm_demand > 0.0
 
         target_temp = self.opentherm_min_temp + (norm_demand * (self.opentherm_max_temp - self.opentherm_min_temp))
+
+        if norm_demand > 0.0 and not frost_emergency:
+            weather_sensor_id = getattr(self.coordinator, "weather_sensor_id", None)
+            if isinstance(weather_sensor_id, str) and weather_sensor_id and hasattr(self.coordinator, "get_persistent_data"):
+                raw_curve = self.coordinator.get_persistent_data("weather_curve", 0.0)
+                try:
+                    curve_val = float(raw_curve) if isinstance(raw_curve, (int, float, str)) and raw_curve != "" else 0.0
+                except (ValueError, TypeError):
+                    curve_val = 0.0
+                if curve_val > 0.0:
+                    w_state = self.hass.states.get(weather_sensor_id)
+                    outdoor_temp = None
+                    if w_state and getattr(w_state, "state", None) not in (None, "unavailable", "unknown"):
+                        if getattr(w_state, "domain", None) == "weather" or str(weather_sensor_id).startswith("weather."):
+                            raw_t = w_state.attributes.get("temperature") if getattr(w_state, "attributes", None) else None
+                        else:
+                            raw_t = w_state.state
+                        if isinstance(raw_t, (int, float, str)):
+                            try:
+                                outdoor_temp = float(raw_t)
+                            except (ValueError, TypeError):
+                                outdoor_temp = None
+                    if outdoor_temp is not None and outdoor_temp < 15.0:
+                        delta_ext = 15.0 - outdoor_temp
+                        thermal_models = getattr(self.coordinator, "_thermal_models", {})
+                        valid_rates = []
+                        if isinstance(thermal_models, dict):
+                            for m in thermal_models.values():
+                                cr = getattr(m, "cooling_rate", None)
+                                if isinstance(cr, (int, float)) and float(cr) > 0.05:
+                                    valid_rates.append(float(cr))
+                        if valid_rates:
+                            avg_cooling_rate = sum(valid_rates) / len(valid_rates)
+                            retention_factor = min(1.5, max(0.8, 1.0 + (avg_cooling_rate - 0.2)))
+                        else:
+                            retention_factor = 1.0
+                        weather_flow_offset = min(15.0, max(0.0, delta_ext * curve_val * 0.5 * retention_factor))
+                        target_temp = max(
+                            self.opentherm_min_temp,
+                            min(self.opentherm_max_temp, target_temp + weather_flow_offset),
+                        )
+
         target_temp = round(target_temp, 1)
 
         domain = self.opentherm_entity.split(".")[0]

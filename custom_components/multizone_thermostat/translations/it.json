@@ -36,7 +36,8 @@
                         "description": "Valvole termostatiche smart tradizionali con regolazione a temperatura.",
                         "data": {
                             "climate_entities": "Entità Climate / TRV",
-                            "trv_preset_sync": "Abilita Sincronizzazione Preset TRV"
+                            "trv_preset_sync": "Abilita Sincronizzazione Preset TRV",
+                            "authoritative_climate_sync": "Sincronizzazione Autoritativa Termostato Fisico"
                         }
                     },
                     "valve_settings": {
@@ -61,7 +62,8 @@
                             "window_sensor": "Sensore Finestra (Opzionale)",
                             "sensor_timeout_min": "Timeout Watchdog Sensore (minuti)",
                             "anti_seize_zone_enable": "Abilita Antigrippaggio (Protezione Estiva) per questa zona",
-                            "allow_passive_heat": "Consenti Apporto Termico Passivo (Fancoil senza valvola / Soppalco aperto)"
+                            "allow_passive_heat": "Consenti Apporto Termico Passivo (Fancoil senza valvola / Soppalco aperto)",
+                            "weight": "Peso Termico Zona (Superficie / Potenza Radiatori)"
                         }
                     }
                 },
@@ -106,7 +108,7 @@
             },
             "boiler_opentherm": {
                 "title": "Configurazione OpenTherm",
-                "description": "Seleziona l'entità OpenTherm che controlla la temperatura dell'acqua del riscaldamento centrale. Definisci anche i limiti minimo e massimo.",
+                "description": "Configura OpenTherm tramite Dual-Path: Opzione 1 (Gateway Climate): entità climate con telemetria automatica degli attributi; Opzione 2 (Disaccoppiata): entità number per il setpoint più interruttore opzionale di abilitazione riscaldamento (CH). Definisci le temperature minima e massima dell'acqua.",
                 "data": {
                     "opentherm_entity": "Entità OpenTherm (Climate / Scaldabagno)",
                     "opentherm_min_temp": "Temperatura Minima Acqua (°C)",
@@ -171,7 +173,8 @@
                         "description": "Valvole termostatiche smart tradizionali con regolazione a temperatura.",
                         "data": {
                             "climate_entities": "Entità Climate / TRV",
-                            "trv_preset_sync": "Abilita Sincronizzazione Preset TRV"
+                            "trv_preset_sync": "Abilita Sincronizzazione Preset TRV",
+                            "authoritative_climate_sync": "Sincronizzazione Autoritativa Termostato Fisico"
                         }
                     },
                     "valve_settings": {
@@ -196,7 +199,8 @@
                             "window_sensor": "Sensore Finestra (Opzionale)",
                             "sensor_timeout_min": "Timeout Watchdog Sensore (minuti)",
                             "anti_seize_zone_enable": "Abilita Antigrippaggio (Protezione Estiva) per questa zona",
-                            "allow_passive_heat": "Consenti Apporto Termico Passivo (Fancoil senza valvola / Soppalco aperto)"
+                            "allow_passive_heat": "Consenti Apporto Termico Passivo (Fancoil senza valvola / Soppalco aperto)",
+                            "weight": "Peso Termico Zona (Superficie / Potenza Radiatori)"
                         }
                     }
                 },
@@ -230,7 +234,8 @@
                         "description": "Valvole termostatiche smart tradizionali con regolazione a temperatura.",
                         "data": {
                             "climate_entities": "Zone TRVs / Climates",
-                            "trv_preset_sync": "Sincronizza modalità Termostato (TRV) -> Centrale"
+                            "trv_preset_sync": "Sincronizza modalità Termostato (TRV) -> Centrale",
+                            "authoritative_climate_sync": "Sincronizzazione Autoritativa Termostato Fisico"
                         }
                     },
                     "valve_settings": {
@@ -255,7 +260,8 @@
                             "window_sensor": "Sensore Finestra (opzionale)",
                             "sensor_timeout_min": "Timeout Watchdog Sensore (minuti)",
                             "anti_seize_zone_enable": "Abilita Antigrippaggio (Protezione Estiva) per questa zona",
-                            "allow_passive_heat": "Consenti Apporto Termico Passivo (Fancoil senza valvola / Soppalco aperto)"
+                            "allow_passive_heat": "Consenti Apporto Termico Passivo (Fancoil senza valvola / Soppalco aperto)",
+                            "weight": "Peso Termico Zona (Superficie / Potenza Radiatori)"
                         }
                     }
                 }
@@ -295,7 +301,7 @@
             },
             "boiler_opentherm": {
                 "title": "Configurazione OpenTherm",
-                "description": "Seleziona l'entità OpenTherm che controlla la temperatura dell'acqua del riscaldamento centrale. Definisci anche i limiti minimo e massimo.",
+                "description": "Configura OpenTherm tramite Dual-Path: Opzione 1 (Gateway Climate): entità climate con telemetria automatica degli attributi; Opzione 2 (Disaccoppiata): entità number per il setpoint più interruttore opzionale di abilitazione riscaldamento (CH). Definisci le temperature minima e massima dell'acqua.",
                 "data": {
                     "opentherm_entity": "Entità OpenTherm (Climate / Scaldabagno)",
                     "opentherm_min_temp": "Temperatura Minima Acqua (°C)",
@@ -334,6 +340,14 @@
                     "comfort": "Comfort",
                     "sleep": "Notte",
                     "away": "Fuori Casa"
+                }
+            },
+            "demand_strategy": {
+                "name": "Strategia di Aggregazione della Richiesta",
+                "state": {
+                    "max": "Richiesta Massima tra le Zone (MAX)",
+                    "weighted_average": "Media Ponderata",
+                    "sum_capped": "Somma Cumulativa (Massimo 100%)"
                 }
             }
         }

@@ -36,7 +36,8 @@
                         "description": "Intelligente Standard-Heizkörperthermostate mit Temperaturregelung.",
                         "data": {
                             "climate_entities": "Climate-Entität",
-                            "trv_preset_sync": "TRV-Preset-Synchronisierung aktivieren"
+                            "trv_preset_sync": "TRV-Preset-Synchronisierung aktivieren",
+                            "authoritative_climate_sync": "Autoritative Wandthermostat-Synchronisierung"
                         }
                     },
                     "valve_settings": {
@@ -61,7 +62,8 @@
                             "window_sensor": "Fenstersensor (Optional)",
                             "sensor_timeout_min": "Sensor-Watchdog-Timeout (Minuten)",
                             "anti_seize_zone_enable": "Blockierschutz (Sommerschutz) für diese Zone aktivieren",
-                            "allow_passive_heat": "Passive Wärme zulassen (Fancoil ohne Ventil / Zwischengeschoss)"
+                            "allow_passive_heat": "Passive Wärme zulassen (Fancoil ohne Ventil / Zwischengeschoss)",
+                            "weight": "Thermisches Zonengewicht (Fläche / Heizkörperleistung)"
                         }
                     }
                 },
@@ -106,7 +108,7 @@
             },
             "boiler_opentherm": {
                 "title": "OpenTherm Einrichtung",
-                "description": "Wählen Sie die OpenTherm-Entität, die die Wassertemperatur steuert. Legen Sie auch die minimale und maximale Wassertemperatur fest.",
+                "description": "Konfigurieren Sie OpenTherm über den Dual-Pfad: Option 1 (Climate Gateway): Climate-Entität mit automatischer Attribut-Telemetrie; Option 2 (Entkoppelt): Number-Sollwert-Entität plus optionaler CH-Freigabeschalter. Definieren Sie minimale und maximale Wassertemperaturen.",
                 "data": {
                     "opentherm_entity": "OpenTherm-Entität (Climate/Water Heater)",
                     "opentherm_min_temp": "Minimale Wassertemperatur (°C)",
@@ -171,7 +173,8 @@
                         "description": "Intelligente Standard-Heizkörperthermostate mit Temperaturregelung.",
                         "data": {
                             "climate_entities": "Climate-Entität",
-                            "trv_preset_sync": "TRV-Preset-Synchronisierung aktivieren"
+                            "trv_preset_sync": "TRV-Preset-Synchronisierung aktivieren",
+                            "authoritative_climate_sync": "Autoritative Wandthermostat-Synchronisierung"
                         }
                     },
                     "valve_settings": {
@@ -196,7 +199,8 @@
                             "window_sensor": "Fenstersensor (Optional)",
                             "sensor_timeout_min": "Sensor-Watchdog-Timeout (Minuten)",
                             "anti_seize_zone_enable": "Blockierschutz (Sommerschutz) für diese Zone aktivieren",
-                            "allow_passive_heat": "Passive Wärme zulassen (Fancoil ohne Ventil / Zwischengeschoss)"
+                            "allow_passive_heat": "Passive Wärme zulassen (Fancoil ohne Ventil / Zwischengeschoss)",
+                            "weight": "Thermisches Zonengewicht (Fläche / Heizkörperleistung)"
                         }
                     }
                 },
@@ -230,7 +234,8 @@
                         "description": "Intelligente Standard-Heizkörperthermostate mit Temperaturregelung.",
                         "data": {
                             "climate_entities": "Zonen-TRVs / Climates",
-                            "trv_preset_sync": "TRV-Preset-Synchronisierung aktivieren"
+                            "trv_preset_sync": "TRV-Preset-Synchronisierung aktivieren",
+                            "authoritative_climate_sync": "Autoritative Wandthermostat-Synchronisierung"
                         }
                     },
                     "valve_settings": {
@@ -255,7 +260,8 @@
                             "window_sensor": "Fenstersensor (Optional)",
                             "sensor_timeout_min": "Sensor-Watchdog-Timeout (Minuten)",
                             "anti_seize_zone_enable": "Blockierschutz (Sommerschutz) für diese Zone aktivieren",
-                            "allow_passive_heat": "Passive Wärme zulassen (Fancoil ohne Ventil / Zwischengeschoss)"
+                            "allow_passive_heat": "Passive Wärme zulassen (Fancoil ohne Ventil / Zwischengeschoss)",
+                            "weight": "Thermisches Zonengewicht (Fläche / Heizkörperleistung)"
                         }
                     }
                 }
@@ -295,7 +301,7 @@
             },
             "boiler_opentherm": {
                 "title": "OpenTherm Einrichtung",
-                "description": "Wählen Sie die OpenTherm-Entität, die die Wassertemperatur steuert. Legen Sie auch die minimale und maximale Wassertemperatur fest.",
+                "description": "Konfigurieren Sie OpenTherm über den Dual-Pfad: Option 1 (Climate Gateway): Climate-Entität mit automatischer Attribut-Telemetrie; Option 2 (Entkoppelt): Number-Sollwert-Entität plus optionaler CH-Freigabeschalter. Definieren Sie minimale und maximale Wassertemperaturen.",
                 "data": {
                     "opentherm_entity": "OpenTherm-Entität",
                     "opentherm_min_temp": "Minimale Wassertemperatur (°C)",
@@ -334,6 +340,14 @@
                     "comfort": "Komfort",
                     "sleep": "Nacht",
                     "away": "Abwesend"
+                }
+            },
+            "demand_strategy": {
+                "name": "Bedarfsaggregationsstrategie",
+                "state": {
+                    "max": "Maximaler Zonenbedarf (MAX)",
+                    "weighted_average": "Gewichteter Durchschnitt",
+                    "sum_capped": "Kumulative Summe (Begrenzt auf 100%)"
                 }
             }
         }

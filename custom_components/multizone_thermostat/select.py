@@ -20,10 +20,12 @@ from .const import (
     ZONE_MODE_SECONDARY,
     ZONE_MODE_BYPASS,
     CONF_ZONE_NAME,
+    KEY_DEMAND_STRATEGY,
     make_zone_entity_id,
     make_via_device_kwargs,
 )
 from .coordinator import MultizoneCoordinator
+from .demand_aggregator import VALID_DEMAND_STRATEGIES, DEMAND_STRATEGY_MAX
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -36,7 +38,10 @@ async def async_setup_entry(
     """Set up the select platform."""
     coordinator: MultizoneCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
 
-    entities: list[SelectEntity] = [MultizoneGlobalPresetSelect(coordinator, entry.entry_id)]
+    entities: list[SelectEntity] = [
+        MultizoneGlobalPresetSelect(coordinator, entry.entry_id),
+        MultizoneDemandStrategySelect(coordinator, entry.entry_id),
+    ]
     
     for zone in coordinator.zones:
         zone_name = zone[CONF_ZONE_NAME]
@@ -100,6 +105,73 @@ class MultizoneGlobalPresetSelect(RestoreEntity, SelectEntity):
         """Unregister from coordinator on removal."""
         if hasattr(self._coordinator, "_selects"):
             self._coordinator._selects.pop("global_preset", None)
+
+
+class MultizoneDemandStrategySelect(RestoreEntity, SelectEntity):
+    """Demand aggregation strategy selector for the heating system."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "demand_strategy"
+    _attr_icon = "mdi:chart-bell-curve-cumulative"
+
+    def __init__(self, coordinator: MultizoneCoordinator, entry_id: str) -> None:
+        """Initialize the demand strategy selector."""
+        self._coordinator = coordinator
+        self._entry_id = entry_id
+        self._attr_unique_id = f"{DOMAIN}_{entry_id}_demand_strategy"
+        self._attr_options = list(VALID_DEMAND_STRATEGIES)
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device info."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._entry_id)},
+            name="Master Control",
+            manufacturer="Custom Integration",
+            model="Master Control",
+        )
+
+    @property
+    def options(self) -> list[str]:
+        """Return the list of available options."""
+        return self._attr_options
+
+    @property
+    def current_option(self) -> str:
+        """Return the current selected option."""
+        return self._coordinator.demand_aggregator.strategy
+
+    async def async_added_to_hass(self) -> None:
+        """Restore previous state."""
+        await super().async_added_to_hass()
+        saved = self._coordinator.get_persistent_data(KEY_DEMAND_STRATEGY)
+        if saved in self.options:
+            self._coordinator.demand_aggregator.strategy = saved
+        else:
+            last_state = await self.async_get_last_state()
+            if last_state is not None and last_state.state in self.options:
+                self._coordinator.demand_aggregator.strategy = last_state.state
+
+        self._coordinator.register_select("demand_strategy", self)
+
+    async def async_select_option(self, option: str) -> None:
+        """Change the selected option."""
+        if option not in self.options:
+            _LOGGER.warning("Invalid demand strategy: %s", option)
+            return
+
+        self._coordinator.demand_aggregator.strategy = option
+        await self._coordinator.async_set_persistent_data(KEY_DEMAND_STRATEGY, option)
+        if hasattr(self._coordinator, "plant_orchestrator") and self._coordinator.plant_orchestrator:
+            await self._coordinator.plant_orchestrator._async_update_boiler()
+        self.async_write_ha_state()
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Unregister from coordinator on removal."""
+        if hasattr(self._coordinator, "_select_entities"):
+            self._coordinator._select_entities.pop("demand_strategy", None)
+        if hasattr(self._coordinator, "_selects"):
+            self._coordinator._selects.pop("demand_strategy", None)
 
 
 class MultizoneZoneSelect(RestoreEntity, SelectEntity):

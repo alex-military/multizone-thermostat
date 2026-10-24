@@ -74,7 +74,7 @@ Multizone Thermostat transforms Home Assistant into an **autonomous, self-learni
 ### Phase 8 — Dual OpenTherm Drive Distinction
 *Derived from community feedback in [Community Post #22](https://community.home-assistant.io/t/multizone-thermostat-v3-smart-pid-pwm-geofencing-100-ui-no-yaml/1018712/22).*
 
-- [ ] **Guided Dual-Path Setup in Config Flow**:
+- [x] **Guided Dual-Path Setup in Config Flow**:
   - **Option 1 — Climate-Based OpenTherm Gateway**:
     - Direct selection of an existing boiler `climate` entity.
     - Sends target modulation via `climate.set_temperature` and mode via `climate.set_hvac_mode`.
@@ -87,7 +87,7 @@ Multizone Thermostat transforms Home Assistant into an **autonomous, self-learni
 ### Phase 9 — Authoritative Hardware Climate Sync
 *Derived from physical wall thermostat integration in [GitHub Issue #2](https://github.com/alex-military/multizone-thermostat/issues/2).*
 
-- [ ] **Per-Zone Authoritative Mode Source (Opt-in)**:
+- [x] **Per-Zone Authoritative Mode Source (Opt-in)**:
   - For zones driven by a primary physical wall thermostat (e.g., Vimar, Bticino), allow the physical device to act as an authoritative mode source.
   - Physical OFF actions propagate directly to the virtual zone without being misinterpreted as knob adjustments to 5 °C.
   - Retains the virtual preset target across OFF transitions and filters out transient `idle` or network reconnection states.
@@ -95,14 +95,14 @@ Multizone Thermostat transforms Home Assistant into an **autonomous, self-learni
 ---
 
 ### Phase 10 — Advanced Plant Regulation & Efficiency
-- [ ] **Configurable Demand Aggregator Strategies**:
+- [x] **Configurable Demand Aggregator Strategies**:
   - Choice of plant-wide heat demand aggregation formulas:
     - `MAX`: Highest-demand zone dictates boiler power.
     - `WEIGHTED_AVERAGE`: Demand weighted by radiator emitter wattage or room volume.
     - `SUM_CAPPED`: Cumulative sum of zone demands with a 100% saturation ceiling.
-- [ ] **Dynamic Feed-Forward Weather Curve ($T_{\text{ext}} \rightarrow T_{\text{flow}}$)**:
+- [x] **Dynamic Feed-Forward Weather Curve ($T_{\text{ext}} \rightarrow T_{\text{flow}}$)**:
   - Continuously adapts boiler flow temperature based on real outdoor temperature and building thermal retention time.
-- [ ] **Air-in-Radiator Anomaly Detection (`ANOMALY_AIR_IN_RADIATOR`)**:
+- [x] **Air-in-Radiator Anomaly Detection (`ANOMALY_AIR_IN_RADIATOR`)**:
   - Automated supervision identifying valves opened at 100% with abnormally slow heat-up rates compared to historic baseline, indicating trapped air or restricted flow.
 
 ---

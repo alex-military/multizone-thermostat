@@ -40,6 +40,10 @@ from ..const import (
     MODE_OPENTHERM,
     MODE_RELAY,
     CONF_ZONE_CALIBRATIONS,
+    CONF_ZONE_WEIGHT,
+    DEFAULT_ZONE_WEIGHT,
+    CONF_ZONE_AUTHORITATIVE_SYNC,
+    DEFAULT_AUTHORITATIVE_SYNC,
 )
 
 
@@ -87,6 +91,7 @@ def get_add_zone_schema() -> vol.Schema:
             vol.Schema({
                 vol.Optional(CONF_ZONE_CLIMATES, default=[]): selector.EntitySelector(selector.EntitySelectorConfig(domain=CLIMATE_DOMAIN, multiple=True)),
                 vol.Optional(CONF_ZONE_TRV_SYNC, default=DEFAULT_TRV_SYNC): bool,
+                vol.Optional(CONF_ZONE_AUTHORITATIVE_SYNC, default=DEFAULT_AUTHORITATIVE_SYNC): bool,
             }),
             {"collapsed": True},
         ),
@@ -122,6 +127,9 @@ def get_add_zone_schema() -> vol.Schema:
                 vol.Optional(CONF_ZONE_WINDOW_SENSOR): selector.EntitySelector(selector.EntitySelectorConfig(domain=BINARY_SENSOR_DOMAIN)),
                 vol.Optional(CONF_ZONE_SENSOR_TIMEOUT, default=DEFAULT_SENSOR_TIMEOUT_MIN): selector.NumberSelector(
                     selector.NumberSelectorConfig(min=10, max=720, step=5, mode=selector.NumberSelectorMode.BOX)
+                ),
+                vol.Optional(CONF_ZONE_WEIGHT, default=DEFAULT_ZONE_WEIGHT): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=0.1, max=10.0, step=0.1, mode=selector.NumberSelectorMode.BOX)
                 ),
                 vol.Optional(CONF_ZONE_ANTI_SEIZE, default=True): bool,
                 vol.Optional(CONF_ZONE_ALLOW_PASSIVE_HEAT, default=False): bool,
@@ -249,6 +257,7 @@ def get_options_edit_zone_schema(zone_data: dict[str, Any], temp_desc: dict[str,
             vol.Schema({
                 vol.Optional(CONF_ZONE_CLIMATES, default=zone_data.get(CONF_ZONE_CLIMATES, [])): selector.EntitySelector(selector.EntitySelectorConfig(domain=CLIMATE_DOMAIN, multiple=True)),
                 vol.Optional(CONF_ZONE_TRV_SYNC, default=zone_data.get(CONF_ZONE_TRV_SYNC, DEFAULT_TRV_SYNC)): bool,
+                vol.Optional(CONF_ZONE_AUTHORITATIVE_SYNC, default=zone_data.get(CONF_ZONE_AUTHORITATIVE_SYNC, DEFAULT_AUTHORITATIVE_SYNC)): bool,
             }),
             {"collapsed": True},
         ),
@@ -284,6 +293,9 @@ def get_options_edit_zone_schema(zone_data: dict[str, Any], temp_desc: dict[str,
                 vol.Optional(CONF_ZONE_WINDOW_SENSOR, **window_desc): selector.EntitySelector(selector.EntitySelectorConfig(domain=BINARY_SENSOR_DOMAIN)),
                 vol.Optional(CONF_ZONE_SENSOR_TIMEOUT, default=zone_data.get(CONF_ZONE_SENSOR_TIMEOUT, DEFAULT_SENSOR_TIMEOUT_MIN)): selector.NumberSelector(
                     selector.NumberSelectorConfig(min=10, max=720, step=5, mode=selector.NumberSelectorMode.BOX)
+                ),
+                vol.Optional(CONF_ZONE_WEIGHT, default=zone_data.get(CONF_ZONE_WEIGHT, DEFAULT_ZONE_WEIGHT)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=0.1, max=10.0, step=0.1, mode=selector.NumberSelectorMode.BOX)
                 ),
                 vol.Optional(CONF_ZONE_ANTI_SEIZE, default=zone_data.get(CONF_ZONE_ANTI_SEIZE, True)): bool,
                 vol.Optional(CONF_ZONE_ALLOW_PASSIVE_HEAT, default=zone_data.get(CONF_ZONE_ALLOW_PASSIVE_HEAT, False)): bool,

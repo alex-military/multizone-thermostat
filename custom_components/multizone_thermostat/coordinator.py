@@ -90,7 +90,9 @@ from .const import (
     CONF_ZONE_ALLOW_PASSIVE_HEAT,
     CONF_WEATHER_SENSOR,
     KEY_WEATHER_CURVE,
+    KEY_DEMAND_STRATEGY,
 )
+from .demand_aggregator import VALID_DEMAND_STRATEGIES
 from .pwm_engine import PWMEngine
 from .thermal_model import ThermalObserver
 from .calendar_parser import parse_calendar_event, CalendarOverride
@@ -360,6 +362,9 @@ class MultizoneCoordinator:
             self._settings.clear()
             self._settings.update(settings_stored)
             _LOGGER.debug("Loaded settings from storage: %s", self._settings)
+
+        if self._settings.get(KEY_DEMAND_STRATEGY) in VALID_DEMAND_STRATEGIES:
+            self.demand_aggregator.strategy = self._settings[KEY_DEMAND_STRATEGY]
             
         # Always load stored state into ZoneManager (even if settings_stored is empty)
         saved_zone_modes = self._settings.get("zone_modes", {})

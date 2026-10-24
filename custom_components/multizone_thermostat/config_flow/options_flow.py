@@ -10,6 +10,12 @@ from .helpers import (
     flatten_zone_user_input,
 )
 from ..const import *
+from ..const import (
+    CONF_ZONE_WEIGHT,
+    DEFAULT_ZONE_WEIGHT,
+    CONF_ZONE_AUTHORITATIVE_SYNC,
+    DEFAULT_AUTHORITATIVE_SYNC,
+)
 import logging
 from homeassistant.helpers import entity_registry as er
 
@@ -161,6 +167,8 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                     CONF_ZONE_VALVES: valves,
                     CONF_VALVE_SCALE: user_input.get(CONF_VALVE_SCALE, DEFAULT_VALVE_SCALE),
                     CONF_ZONE_TRV_SYNC: user_input.get(CONF_ZONE_TRV_SYNC, DEFAULT_TRV_SYNC),
+                    CONF_ZONE_AUTHORITATIVE_SYNC: user_input.get(CONF_ZONE_AUTHORITATIVE_SYNC, DEFAULT_AUTHORITATIVE_SYNC),
+                    CONF_ZONE_WEIGHT: float(user_input.get(CONF_ZONE_WEIGHT, DEFAULT_ZONE_WEIGHT)),
                     CONF_ZONE_ANTI_SEIZE: user_input.get(CONF_ZONE_ANTI_SEIZE, True),
                     CONF_ZONE_ALLOW_PASSIVE_HEAT: user_input.get(CONF_ZONE_ALLOW_PASSIVE_HEAT, False),
                     CONF_ZONE_SENSOR_TIMEOUT: user_input.get(CONF_ZONE_SENSOR_TIMEOUT, DEFAULT_SENSOR_TIMEOUT_MIN),
@@ -284,6 +292,8 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                             self._zones[i][CONF_ZONE_VALVES] = valves
                             self._zones[i][CONF_VALVE_SCALE] = user_input.get(CONF_VALVE_SCALE, DEFAULT_VALVE_SCALE)
                             self._zones[i][CONF_ZONE_TRV_SYNC] = user_input.get(CONF_ZONE_TRV_SYNC, DEFAULT_TRV_SYNC)
+                            self._zones[i][CONF_ZONE_AUTHORITATIVE_SYNC] = user_input.get(CONF_ZONE_AUTHORITATIVE_SYNC, DEFAULT_AUTHORITATIVE_SYNC)
+                            self._zones[i][CONF_ZONE_WEIGHT] = float(user_input.get(CONF_ZONE_WEIGHT, DEFAULT_ZONE_WEIGHT))
                             self._zones[i][CONF_ZONE_ANTI_SEIZE] = user_input.get(CONF_ZONE_ANTI_SEIZE, True)
                             self._zones[i][CONF_ZONE_ALLOW_PASSIVE_HEAT] = user_input.get(CONF_ZONE_ALLOW_PASSIVE_HEAT, False)
                             self._zones[i][CONF_ZONE_SENSOR_TIMEOUT] = user_input.get(CONF_ZONE_SENSOR_TIMEOUT, DEFAULT_SENSOR_TIMEOUT_MIN)

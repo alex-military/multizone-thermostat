@@ -36,7 +36,8 @@
                         "description": "Válvulas termostáticas inteligentes estándar con control de temperatura.",
                         "data": {
                             "climate_entities": "Entidad Climate",
-                            "trv_preset_sync": "Habilitar Sincronización de Preajustes TRV"
+                            "trv_preset_sync": "Habilitar Sincronización de Preajustes TRV",
+                            "authoritative_climate_sync": "Sincronización Autoritativa del Termostato de Pared"
                         }
                     },
                     "valve_settings": {
@@ -61,7 +62,8 @@
                             "window_sensor": "Sensor de Ventana (Opcional)",
                             "sensor_timeout_min": "Tiempo de espera del Watchdog del Sensor (minutos)",
                             "anti_seize_zone_enable": "Habilitar protección antiagarrotamiento (Protección de Verano) para esta zona",
-                            "allow_passive_heat": "Permitir calor pasivo (Fancoil sin válvula / Entrepiso)"
+                            "allow_passive_heat": "Permitir calor pasivo (Fancoil sin válvula / Entrepiso)",
+                            "weight": "Peso Térmico de la Zona (Superficie / Potencia del Emisor)"
                         }
                     }
                 },
@@ -106,7 +108,7 @@
             },
             "boiler_opentherm": {
                 "title": "Configuración OpenTherm",
-                "description": "Seleccione la entidad OpenTherm que controla la temperatura del agua. Defina también las temperaturas mínima y máxima del agua.",
+                "description": "Configure OpenTherm mediante Dual-Path: Opción 1 (Gateway Climate): entidad climate con telemetría automática de atributos; Opción 2 (Desacoplada): entidad number de consigna más interruptor opcional de habilitación CH. Defina las temperaturas mínima y máxima del agua.",
                 "data": {
                     "opentherm_entity": "Entidad OpenTherm (Climate/Water Heater)",
                     "opentherm_min_temp": "Temperatura Mínima del Agua (°C)",
@@ -171,7 +173,8 @@
                         "description": "Válvulas termostáticas inteligentes estándar con control de temperatura.",
                         "data": {
                             "climate_entities": "Entidad Climate",
-                            "trv_preset_sync": "Habilitar Sincronización de Preajustes TRV"
+                            "trv_preset_sync": "Habilitar Sincronización de Preajustes TRV",
+                            "authoritative_climate_sync": "Sincronización Autoritativa del Termostato de Pared"
                         }
                     },
                     "valve_settings": {
@@ -196,7 +199,8 @@
                             "window_sensor": "Sensor de Ventana (Opcional)",
                             "sensor_timeout_min": "Tiempo de espera del Watchdog del Sensor (minutos)",
                             "anti_seize_zone_enable": "Habilitar protección antiagarrotamiento (Protección de Verano) para esta zona",
-                            "allow_passive_heat": "Permitir calor pasivo (Fancoil sin válvula / Entrepiso)"
+                            "allow_passive_heat": "Permitir calor pasivo (Fancoil sin válvula / Entrepiso)",
+                            "weight": "Peso Térmico de la Zona (Superficie / Potencia del Emisor)"
                         }
                     }
                 },
@@ -230,7 +234,8 @@
                         "description": "Válvulas termostáticas inteligentes estándar con control de temperatura.",
                         "data": {
                             "climate_entities": "TRVs de Zona / Climates",
-                            "trv_preset_sync": "Habilitar Sincronización de Preajustes TRV"
+                            "trv_preset_sync": "Habilitar Sincronización de Preajustes TRV",
+                            "authoritative_climate_sync": "Sincronización Autoritativa del Termostato de Pared"
                         }
                     },
                     "valve_settings": {
@@ -255,7 +260,8 @@
                             "window_sensor": "Sensor de Ventana (Opcional)",
                             "sensor_timeout_min": "Tiempo de espera del Watchdog del Sensor (minutos)",
                             "anti_seize_zone_enable": "Habilitar protección antiagarrotamiento (Protección de Verano) para esta zona",
-                            "allow_passive_heat": "Permitir calor pasivo (Fancoil sin válvula / Entrepiso)"
+                            "allow_passive_heat": "Permitir calor pasivo (Fancoil sin válvula / Entrepiso)",
+                            "weight": "Peso Térmico de la Zona (Superficie / Potencia del Emisor)"
                         }
                     }
                 }
@@ -295,7 +301,7 @@
             },
             "boiler_opentherm": {
                 "title": "Configuración OpenTherm",
-                "description": "Seleccione la entidad OpenTherm que controla la temperatura del agua. Defina también las temperaturas mínima y máxima del agua.",
+                "description": "Configure OpenTherm mediante Dual-Path: Opción 1 (Gateway Climate): entidad climate con telemetría automática de atributos; Opción 2 (Desacoplada): entidad number de consigna más interruptor opcional de habilitación CH. Defina las temperaturas mínima y máxima del agua.",
                 "data": {
                     "opentherm_entity": "Entidad OpenTherm",
                     "opentherm_min_temp": "Temperatura Mínima del Agua (°C)",
@@ -334,6 +340,14 @@
                     "comfort": "Confort",
                     "sleep": "Noche",
                     "away": "Ausente"
+                }
+            },
+            "demand_strategy": {
+                "name": "Estrategia de Agregación de Demanda",
+                "state": {
+                    "max": "Demanda Máxima de Zona (MAX)",
+                    "weighted_average": "Promedio Ponderado",
+                    "sum_capped": "Suma Acumulativa (Limitada al 100%)"
                 }
             }
         }
