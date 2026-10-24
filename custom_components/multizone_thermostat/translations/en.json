@@ -1,362 +1,341 @@
 {
-  "config": {
-    "step": {
-      "user": {
-        "title": "Multizone Thermostat — Boiler Mode",
-        "description": "Select how you want to control your central heating system (Relay ON/OFF or OpenTherm Modulating).",
-        "data": {
-          "boiler_mode": "Boiler Control Mode"
-        }
-      },
-      "weather": {
-        "title": "Weather Compensation",
-        "description": "Select an external temperature or weather sensor to enable weather compensation. This will dynamically adjust the heating logic based on outdoor conditions.",
-        "data": {
-          "weather_sensor": "External Temperature Sensor"
-        }
-      },
-      "calendar": {
-        "title": "Global Calendar",
-        "description": "Select a local calendar entity to control the multizone system schedule.",
-        "data": {
-          "global_calendar": "Calendar Entity"
-        }
-      },
-      "add_zone": {
-        "title": "Add Heating Zone ({zone_number})",
-        "description": "Configure a heating zone. {zones_added} zone(s) already added.",
-        "data": {
-          "climate_entities": "Climate Entity",
-          "anti_seize_zone_enable": "Enable Anti-seize (Summer Protection) for this zone",
-          "allow_passive_heat": "Allow Passive Heat (Fancoil without valve / Mezzanine)",
-          "window_sensor": "Window Sensor (Optional)",
-          "name": "Zone Name",
-          "trv_preset_sync": "Enable TRV Preset Sync",
-          "switch_entities": "Zone Switches / Relays",
-          "temp_sensor": "Zone Temperature Sensor",
-          "target_temperature": "Base Target Temperature",
-          "sensor_timeout_min": "Sensor Watchdog Timeout (minutes)"
+    "config": {
+        "step": {
+            "user": {
+                "title": "Multizone Thermostat — Boiler Mode",
+                "description": "Select how you want to control your central heating system (Relay ON/OFF or OpenTherm Modulating).",
+                "data": {
+                    "boiler_mode": "Boiler Control Mode"
+                }
+            },
+            "weather": {
+                "title": "Weather Compensation",
+                "description": "Select an external temperature or weather sensor to enable weather compensation. This will dynamically adjust the heating logic based on outdoor conditions.",
+                "data": {
+                    "weather_sensor": "External Temperature Sensor"
+                }
+            },
+            "calendar": {
+                "title": "Global Calendar",
+                "description": "Select a local calendar entity to control the multizone system schedule.",
+                "data": {
+                    "global_calendar": "Calendar Entity"
+                }
+            },
+            "add_zone": {
+                "title": "Add Heating Zone ({zone_number})",
+                "description": "Configure a heating zone. {zones_added} zone(s) already added.",
+                "data": {
+                    "name": "Zone Name",
+                    "temp_sensor": "Zone Temperature Sensor",
+                    "target_temperature": "Base Target Temperature"
+                },
+                "sections": {
+                    "trv_settings": {
+                        "name": "Thermostatic Radiator Valves (TRV)",
+                        "description": "Standard smart thermostatic radiator valves with temperature control.",
+                        "data": {
+                            "climate_entities": "Climate Entity",
+                            "trv_preset_sync": "Enable TRV Preset Sync"
+                        }
+                    },
+                    "valve_settings": {
+                        "name": "Proportional & 0-10V Valves",
+                        "description": "Direct opening percentage or 0-10V analog voltage control.",
+                        "data": {
+                            "valve_entities": "Valve / Actuator Entities",
+                            "valve_scale": "Output Scale Mode"
+                        }
+                    },
+                    "relay_settings": {
+                        "name": "Relay Actuators (PWM)",
+                        "description": "ON/OFF switches and thermal actuators controlled via pulse-width modulation.",
+                        "data": {
+                            "switch_entities": "Zone Switches / Relays"
+                        }
+                    },
+                    "safety_settings": {
+                        "name": "Protections & Advanced Settings",
+                        "description": "Window bypass, safety timeouts, and summer anti-seize cycling.",
+                        "data": {
+                            "window_sensor": "Window Sensor (Optional)",
+                            "sensor_timeout_min": "Sensor Watchdog Timeout (minutes)",
+                            "anti_seize_zone_enable": "Enable Anti-seize (Summer Protection) for this zone",
+                            "allow_passive_heat": "Allow Passive Heat (Fancoil without valve / Mezzanine)"
+                        }
+                    }
+                },
+                "data_description": {
+                    "name": "A friendly name for this zone (pre-filled from climate entity name)",
+                    "temp_sensor": "Zone primary ambient temperature sensor",
+                    "target_temperature": "Default setpoint target for this zone"
+                }
+            },
+            "trv_calibration": {
+                "title": "TRV Configuration (Offset Sensor)",
+                "description": "Select the temperature offset (calibration) entities for each TRV in zone {zone_name}. These are usually `number` entities provided by your TRV integration (e.g. Better Thermostat, Z2M, ZHA). If left empty, we will use 'Target Temperature Compensation' (faking the target temp to match the external sensor)."
+            },
+            "another_zone": {
+                "title": "Add Another Zone?",
+                "description": "You have added {zones_added} zone(s): {zones_list}.",
+                "data": {
+                    "add_another": "Add another zone"
+                }
+            },
+            "geofencing": {
+                "title": "Geofencing & Smart Schedule",
+                "description": "Do you want to enable Geofencing and Auto-Night mode? If enabled, select a presence sensor (e.g. zone.home or a person entity).",
+                "data": {
+                    "geofencing_enabled": "Enable Geofencing & Auto-Night",
+                    "presence_sensor": "Presence Sensor"
+                }
+            },
+            "confirm": {
+                "title": "Confirm Configuration",
+                "description": "Ready to set up Multizone Thermostat.\n\n**Zones ({zones_count}):**\n{zones_list}\n\nClick Submit to create the integration."
+            },
+            "boiler_relay": {
+                "title": "Boiler Relay Setup",
+                "description": "Select the switch entity that controls your boiler relay (circulator).",
+                "data": {
+                    "boiler_switch": "Boiler Switch"
+                },
+                "data_description": {
+                    "boiler_switch": "The switch/relay that controls the boiler circulator pump"
+                }
+            },
+            "boiler_opentherm": {
+                "title": "OpenTherm Setup",
+                "description": "Select the OpenTherm entity that controls the Central Heating water temperature. Also define the minimum and maximum water temperatures.",
+                "data": {
+                    "opentherm_entity": "OpenTherm Climate/Water Heater Entity",
+                    "opentherm_min_temp": "Minimum Water Temperature (°C)",
+                    "opentherm_max_temp": "Maximum Water Temperature (°C)",
+                    "opentherm_ch_switch": "CH enable switch (optional)"
+                }
+            }
         },
-        "sections": {
-          "trv_settings": {
-            "name": "Thermostatic Radiator Valves (TRV)",
-            "description": "Standard smart thermostatic radiator valves with temperature control.",
-            "data": {
-              "climate_entities": "Climate Entity",
-              "trv_preset_sync": "Enable TRV Preset Sync"
-            }
-          },
-          "valve_settings": {
-            "name": "Proportional & 0-10V Valves",
-            "description": "Direct opening percentage or 0-10V analog voltage control.",
-            "data": {
-              "valve_entities": "Valve / Actuator Entities",
-              "valve_scale": "Output Scale Mode"
-            }
-          },
-          "relay_settings": {
-            "name": "Relay Actuators (PWM)",
-            "description": "ON/OFF switches and thermal actuators controlled via pulse-width modulation.",
-            "data": {
-              "switch_entities": "Zone Switches / Relays"
-            }
-          },
-          "safety_settings": {
-            "name": "Protections & Advanced Settings",
-            "description": "Window bypass, safety timeouts, and summer anti-seize cycling.",
-            "data": {
-              "window_sensor": "Window Sensor (Optional)",
-              "sensor_timeout_min": "Sensor Watchdog Timeout (minutes)",
-              "anti_seize_zone_enable": "Enable Anti-seize (Summer Protection) for this zone",
-              "allow_passive_heat": "Allow Passive Heat (Fancoil without valve / Mezzanine)"
-            }
-          }
+        "abort": {
+            "already_configured": "Multizone Thermostat is already configured. Use the Options flow to modify zones.",
+            "no_switches_found": "No switch entities found in Home Assistant. Please add a switch/relay entity first.",
+            "no_zones_configured": "No zones were configured. Please add at least one zone.",
+            "no_temp_sensors_found": "No temperature sensors found in Home Assistant."
         },
-        "data_description": {
-          "climate_entities": "The climate entity for this room/zone",
-          "allow_passive_heat": "Disables ghost heating anomaly detection if this zone naturally absorbs heat while idle (e.g. open loft/mezzanine or fancoil without a zone valve).",
-          "window_sensor": "Automatically bypass the zone when this sensor is open",
-          "sensor_timeout_min": "Max duration without updates before falling back to onboard TRV sensors / safety mode",
-          "name": "A friendly name for this zone (pre-filled from climate entity name)",
-          "trv_preset_sync": "Automatically sync preset mode when HVAC mode changes (for physical TRV valves)"
+        "error": {
+            "zone_name_required": "Zone name cannot be empty.",
+            "presence_sensor_required": "A presence sensor is required when geofencing is enabled.",
+            "invalid_temp_range": "Minimum temperature must be lower than maximum temperature.",
+            "no_actuators_selected": "You must select at least one climate entity or switch for the zone.",
+            "zone_name_exists": "A zone with this name already exists."
         }
-      },
-      "trv_calibration": {
-        "title": "TRV Configuration (Offset Sensor)",
-        "description": "Select the temperature offset (calibration) entities for each TRV in zone {zone_name}. These are usually `number` entities provided by your TRV integration (e.g. Better Thermostat, Z2M, ZHA). If left empty, we will use 'Target Temperature Compensation' (faking the target temp to match the external sensor).",
-        "data": {}
-      },
-      "another_zone": {
-        "title": "Add Another Zone?",
-        "description": "You have added {zones_added} zone(s): {zones_list}.",
-        "data": {
-          "add_another": "Add another zone"
-        }
-      },
-      "geofencing": {
-        "title": "Geofencing & Smart Schedule",
-        "description": "Do you want to enable Geofencing and Auto-Night mode? If enabled, select a presence sensor (e.g. zone.home or a person entity).",
-        "data": {
-          "geofencing_enabled": "Enable Geofencing & Auto-Night",
-          "presence_sensor": "Presence Sensor"
-        }
-      },
-      "confirm": {
-        "title": "Confirm Configuration",
-        "description": "Ready to set up Multizone Thermostat.\n\n**Zones ({zones_count}):**\n{zones_list}\n\nClick Submit to create the integration.",
-        "data": {}
-      },
-      "boiler_relay": {
-        "title": "Boiler Relay Setup",
-        "description": "Select the switch entity that controls your boiler relay (circulator).",
-        "data": {
-          "boiler_switch": "Boiler Switch"
-        },
-        "data_description": {
-          "boiler_switch": "The switch/relay that controls the boiler circulator pump"
-        }
-      },
-      "boiler_opentherm": {
-        "title": "OpenTherm Setup",
-        "description": "Select the OpenTherm entity that controls the Central Heating water temperature. Also define the minimum and maximum water temperatures.",
-        "data": {
-          "opentherm_entity": "OpenTherm Climate/Water Heater Entity",
-          "opentherm_min_temp": "Minimum Water Temperature (°C)",
-          "opentherm_max_temp": "Maximum Water Temperature (°C)",
-          "opentherm_ch_switch": "CH enable switch (optional)"
-        }
-      }
     },
-    "abort": {
-      "already_configured": "Multizone Thermostat is already configured. Use the Options flow to modify zones.",
-      "no_switches_found": "No switch entities found in Home Assistant. Please add a switch/relay entity first.",
-      "no_zones_configured": "No zones were configured. Please add at least one zone.",
-      "no_temp_sensors_found": "No temperature sensors found in Home Assistant."
+    "options": {
+        "step": {
+            "init": {
+                "title": "Multizone Thermostat Options",
+                "description": "Configured zones: **{zones_count}**\n\nWhat would you like to change?",
+                "data": {
+                    "action": "Action"
+                }
+            },
+            "change_boiler": {
+                "title": "Change Boiler Mode",
+                "data": {
+                    "boiler_mode": "Boiler Control Mode"
+                }
+            },
+            "edit_calendar": {
+                "title": "Global Calendar",
+                "description": "Select a local calendar entity to control the multizone system schedule.",
+                "data": {
+                    "global_calendar": "Calendar Entity"
+                }
+            },
+            "add_zone": {
+                "title": "Add New Zone",
+                "data": {
+                    "climate_entities": "Climate Entity",
+                    "anti_seize_zone_enable": "Enable Anti-seize (Summer Protection) for this zone",
+                    "allow_passive_heat": "Allow Passive Heat (Fancoil without valve / Mezzanine)",
+                    "window_sensor": "Window Sensor (Optional)",
+                    "name": "Zone Name",
+                    "trv_preset_sync": "Enable TRV Preset Sync",
+                    "switch_entities": "Zone Switches / Relays",
+                    "temp_sensor": "Zone Temperature Sensor",
+                    "target_temperature": "Base Target Temperature",
+                    "sensor_timeout_min": "Sensor Watchdog Timeout (minutes)"
+                },
+                "sections": {
+                    "trv_settings": {
+                        "name": "Thermostatic Radiator Valves (TRV)",
+                        "description": "Standard smart thermostatic radiator valves with temperature control.",
+                        "data": {
+                            "climate_entities": "Climate Entity",
+                            "trv_preset_sync": "Enable TRV Preset Sync"
+                        }
+                    },
+                    "valve_settings": {
+                        "name": "Proportional & 0-10V Valves",
+                        "description": "Direct opening percentage or 0-10V analog voltage control.",
+                        "data": {
+                            "valve_entities": "Valve / Actuator Entities",
+                            "valve_scale": "Output Scale Mode"
+                        }
+                    },
+                    "relay_settings": {
+                        "name": "Relay Actuators (PWM)",
+                        "description": "ON/OFF switches and thermal actuators controlled via pulse-width modulation.",
+                        "data": {
+                            "switch_entities": "Zone Switches / Relays"
+                        }
+                    },
+                    "safety_settings": {
+                        "name": "Protections & Advanced Settings",
+                        "description": "Window bypass, safety timeouts, and summer anti-seize cycling.",
+                        "data": {
+                            "window_sensor": "Window Sensor (Optional)",
+                            "sensor_timeout_min": "Sensor Watchdog Timeout (minutes)",
+                            "anti_seize_zone_enable": "Enable Anti-seize (Summer Protection) for this zone",
+                            "allow_passive_heat": "Allow Passive Heat (Fancoil without valve / Mezzanine)"
+                        }
+                    }
+                },
+                "data_description": {
+                    "climate_entities": "The climate entity for this room/zone",
+                    "allow_passive_heat": "Disables ghost heating anomaly detection if this zone naturally absorbs heat while idle (e.g. open loft/mezzanine or fancoil without a zone valve).",
+                    "window_sensor": "Automatically bypass the zone when this sensor is open",
+                    "sensor_timeout_min": "Max duration without updates before falling back to onboard TRV sensors / safety mode",
+                    "name": "A friendly name for this zone (pre-filled from climate entity name)",
+                    "trv_preset_sync": "Automatically sync preset mode when HVAC mode changes (for physical TRV valves)"
+                }
+            },
+            "remove_zone": {
+                "title": "Remove a Zone",
+                "description": "Select the zone to remove. The switch entity for this zone will also be removed.",
+                "data": {
+                    "zone_name": "Zone to Remove"
+                }
+            },
+            "edit_zone": {
+                "title": "Edit Zone Settings",
+                "description": "Edit settings for a zone.",
+                "data": {
+                    "zone_name": "Zone",
+                    "temp_sensor": "Zone Temperature Sensor",
+                    "target_temperature": "Base Target Temperature"
+                },
+                "sections": {
+                    "trv_settings": {
+                        "name": "Thermostatic Radiator Valves (TRV)",
+                        "description": "Standard smart thermostatic radiator valves with temperature control.",
+                        "data": {
+                            "climate_entities": "Zone TRVs / Climates",
+                            "trv_preset_sync": "Enable TRV Preset Sync"
+                        }
+                    },
+                    "valve_settings": {
+                        "name": "Proportional & 0-10V Valves",
+                        "description": "Direct opening percentage or 0-10V analog voltage control.",
+                        "data": {
+                            "valve_entities": "Valve / Actuator Entities",
+                            "valve_scale": "Output Scale Mode"
+                        }
+                    },
+                    "relay_settings": {
+                        "name": "Relay Actuators (PWM)",
+                        "description": "ON/OFF switches and thermal actuators controlled via pulse-width modulation.",
+                        "data": {
+                            "switch_entities": "Zone Switches / Relays"
+                        }
+                    },
+                    "safety_settings": {
+                        "name": "Protections & Advanced Settings",
+                        "description": "Window bypass, safety timeouts, and summer anti-seize cycling.",
+                        "data": {
+                            "window_sensor": "Window Sensor (Optional)",
+                            "sensor_timeout_min": "Sensor Watchdog Timeout (minutes)",
+                            "anti_seize_zone_enable": "Enable Anti-seize (Summer Protection) for this zone",
+                            "allow_passive_heat": "Allow Passive Heat (Fancoil without valve / Mezzanine)"
+                        }
+                    }
+                }
+            },
+            "edit_geofencing": {
+                "title": "Geofencing & Smart Schedule",
+                "description": "Enable or disable Geofencing and select the presence sensor.",
+                "data": {
+                    "geofencing_enabled": "Enable Geofencing & Auto-Night",
+                    "presence_sensor": "Presence Sensor"
+                }
+            },
+            "trv_calibration_add": {
+                "title": "TRV Configuration (Offset Sensor) (Add)",
+                "description": "Select the temperature offset (calibration) entities for each TRV in zone {zone_name}. These are usually `number` entities provided by your TRV integration (e.g. Better Thermostat, Z2M, ZHA). If left empty, we will use 'Target Temperature Compensation' (faking the target temp to match the external sensor)."
+            },
+            "trv_calibration_edit": {
+                "title": "TRV Configuration (Offset Sensor) (Edit)",
+                "description": "Select the temperature offset (calibration) entities for each TRV in zone {zone_name}. These are usually `number` entities provided by your TRV integration (e.g. Better Thermostat, Z2M, ZHA). If left empty, we will use 'Target Temperature Compensation' (faking the target temp to match the external sensor)."
+            },
+            "edit_weather_comp": {
+                "title": "Edit Weather Compensation",
+                "description": "Select an outdoor temperature sensor to enable automatic weather compensation.",
+                "data": {
+                    "weather_sensor": "Outdoor Temperature Sensor"
+                }
+            },
+            "boiler_relay": {
+                "title": "Boiler Relay Setup",
+                "description": "Select the switch entity that controls your boiler relay (circulator).",
+                "data": {
+                    "boiler_switch": "Boiler Switch"
+                },
+                "data_description": {
+                    "boiler_switch": "The switch/relay that controls the boiler circulator pump"
+                }
+            },
+            "boiler_opentherm": {
+                "title": "OpenTherm Setup",
+                "description": "Select the OpenTherm entity that controls the Central Heating water temperature. Also define the minimum and maximum water temperatures.",
+                "data": {
+                    "opentherm_entity": "OpenTherm Climate/Water Heater Entity",
+                    "opentherm_min_temp": "Minimum Water Temperature (°C)",
+                    "opentherm_max_temp": "Maximum Water Temperature (°C)",
+                    "opentherm_ch_switch": "CH enable switch (optional)"
+                }
+            }
+        },
+        "abort": {
+            "no_zones_configured": "No zones configured.",
+            "no_climates_available": "All available climate entities are already configured as zones.",
+            "no_temp_sensors_found": "No temperature sensors found in Home Assistant.",
+            "no_switches_found": "No switch entities found in Home Assistant.",
+            "no_virtual_thermostats": "No virtual thermostats configured."
+        },
+        "error": {
+            "zone_name_required": "Zone name cannot be empty.",
+            "presence_sensor_required": "A presence sensor is required when geofencing is enabled.",
+            "invalid_temp_range": "Minimum temperature must be lower than maximum temperature.",
+            "no_actuators_selected": "You must select at least one climate entity or switch for the zone.",
+            "zone_name_exists": "A zone with this name already exists."
+        }
     },
-    "error": {
-      "zone_name_required": "Zone name cannot be empty.",
-      "presence_sensor_required": "A presence sensor is required when geofencing is enabled.",
-      "invalid_temp_range": "Minimum temperature must be lower than maximum temperature.",
-      "no_actuators_selected": "You must select at least one climate entity or switch for the zone.",
-      "zone_name_exists": "A zone with this name already exists."
+    "entity": {
+        "switch": {
+            "master": {
+                "name": "Heating Master"
+            }
+        },
+        "select": {
+            "global_preset": {
+                "name": "Global Preset",
+                "state": {
+                    "manual": "Manual",
+                    "eco": "Eco",
+                    "comfort": "Comfort",
+                    "sleep": "Sleep",
+                    "away": "Away"
+                }
+            }
+        }
     }
-  },
-  "options": {
-    "step": {
-      "init": {
-        "title": "Multizone Thermostat Options",
-        "description": "Configured zones: **{zones_count}**\n\nWhat would you like to change?",
-        "data": {
-          "action": "Action"
-        }
-      },
-      "change_boiler": {
-        "title": "Change Boiler Mode",
-        "data": {
-          "boiler_mode": "Boiler Control Mode"
-        }
-      },
-      "edit_calendar": {
-        "title": "Global Calendar",
-        "description": "Select a local calendar entity to control the multizone system schedule.",
-        "data": {
-          "global_calendar": "Calendar Entity"
-        }
-      },
-      "add_zone": {
-        "title": "Add New Zone",
-        "data": {
-          "climate_entities": "Climate Entity",
-          "anti_seize_zone_enable": "Enable Anti-seize (Summer Protection) for this zone",
-          "allow_passive_heat": "Allow Passive Heat (Fancoil without valve / Mezzanine)",
-          "window_sensor": "Window Sensor (Optional)",
-          "name": "Zone Name",
-          "trv_preset_sync": "Enable TRV Preset Sync",
-          "switch_entities": "Zone Switches / Relays",
-          "temp_sensor": "Zone Temperature Sensor",
-          "target_temperature": "Base Target Temperature",
-          "sensor_timeout_min": "Sensor Watchdog Timeout (minutes)"
-        },
-        "sections": {
-          "trv_settings": {
-            "name": "Thermostatic Radiator Valves (TRV)",
-            "description": "Standard smart thermostatic radiator valves with temperature control.",
-            "data": {
-              "climate_entities": "Climate Entity",
-              "trv_preset_sync": "Enable TRV Preset Sync"
-            }
-          },
-          "valve_settings": {
-            "name": "Proportional & 0-10V Valves",
-            "description": "Direct opening percentage or 0-10V analog voltage control.",
-            "data": {
-              "valve_entities": "Valve / Actuator Entities",
-              "valve_scale": "Output Scale Mode"
-            }
-          },
-          "relay_settings": {
-            "name": "Relay Actuators (PWM)",
-            "description": "ON/OFF switches and thermal actuators controlled via pulse-width modulation.",
-            "data": {
-              "switch_entities": "Zone Switches / Relays"
-            }
-          },
-          "safety_settings": {
-            "name": "Protections & Advanced Settings",
-            "description": "Window bypass, safety timeouts, and summer anti-seize cycling.",
-            "data": {
-              "window_sensor": "Window Sensor (Optional)",
-              "sensor_timeout_min": "Sensor Watchdog Timeout (minutes)",
-              "anti_seize_zone_enable": "Enable Anti-seize (Summer Protection) for this zone",
-              "allow_passive_heat": "Allow Passive Heat (Fancoil without valve / Mezzanine)"
-            }
-          }
-        },
-        "data_description": {
-          "climate_entities": "The climate entity for this room/zone",
-          "allow_passive_heat": "Disables ghost heating anomaly detection if this zone naturally absorbs heat while idle (e.g. open loft/mezzanine or fancoil without a zone valve).",
-          "window_sensor": "Automatically bypass the zone when this sensor is open",
-          "sensor_timeout_min": "Max duration without updates before falling back to onboard TRV sensors / safety mode",
-          "name": "A friendly name for this zone (pre-filled from climate entity name)",
-          "trv_preset_sync": "Automatically sync preset mode when HVAC mode changes (for physical TRV valves)"
-        }
-      },
-      "remove_zone": {
-        "title": "Remove a Zone",
-        "description": "Select the zone to remove. The switch entity for this zone will also be removed.",
-        "data": {
-          "zone_name": "Zone to Remove"
-        }
-      },
-      "edit_zone": {
-        "title": "Edit Zone Settings",
-        "description": "Edit settings for a zone.",
-        "data": {
-          "anti_seize_zone_enable": "Enable Anti-seize (Summer Protection) for this zone",
-          "allow_passive_heat": "Allow Passive Heat (Fancoil without valve / Mezzanine)",
-          "window_sensor": "Window Sensor (Optional)",
-          "trv_preset_sync": "Enable TRV Preset Sync",
-          "zone_name": "Zone",
-          "switch_entities": "Zone Switches / Relays",
-          "climate_entities": "Zone TRVs / Climates",
-          "temp_sensor": "Zone Temperature Sensor",
-          "target_temperature": "Base Target Temperature",
-          "sensor_timeout_min": "Sensor Watchdog Timeout (minutes)"
-        },
-        "sections": {
-          "trv_settings": {
-            "name": "Thermostatic Radiator Valves (TRV)",
-            "description": "Standard smart thermostatic radiator valves with temperature control.",
-            "data": {
-              "climate_entities": "Zone TRVs / Climates",
-              "trv_preset_sync": "Enable TRV Preset Sync"
-            }
-          },
-          "valve_settings": {
-            "name": "Proportional & 0-10V Valves",
-            "description": "Direct opening percentage or 0-10V analog voltage control.",
-            "data": {
-              "valve_entities": "Valve / Actuator Entities",
-              "valve_scale": "Output Scale Mode"
-            }
-          },
-          "relay_settings": {
-            "name": "Relay Actuators (PWM)",
-            "description": "ON/OFF switches and thermal actuators controlled via pulse-width modulation.",
-            "data": {
-              "switch_entities": "Zone Switches / Relays"
-            }
-          },
-          "safety_settings": {
-            "name": "Protections & Advanced Settings",
-            "description": "Window bypass, safety timeouts, and summer anti-seize cycling.",
-            "data": {
-              "window_sensor": "Window Sensor (Optional)",
-              "sensor_timeout_min": "Sensor Watchdog Timeout (minutes)",
-              "anti_seize_zone_enable": "Enable Anti-seize (Summer Protection) for this zone",
-              "allow_passive_heat": "Allow Passive Heat (Fancoil without valve / Mezzanine)"
-            }
-          }
-        }
-      },
-      "edit_geofencing": {
-        "title": "Geofencing & Smart Schedule",
-        "description": "Enable or disable Geofencing and select the presence sensor.",
-        "data": {
-          "geofencing_enabled": "Enable Geofencing & Auto-Night",
-          "presence_sensor": "Presence Sensor"
-        }
-      },
-      "trv_calibration_add": {
-        "title": "TRV Configuration (Offset Sensor) (Add)",
-        "description": "Select the temperature offset (calibration) entities for each TRV in zone {zone_name}. These are usually `number` entities provided by your TRV integration (e.g. Better Thermostat, Z2M, ZHA). If left empty, we will use 'Target Temperature Compensation' (faking the target temp to match the external sensor).",
-        "data": {}
-      },
-      "trv_calibration_edit": {
-        "title": "TRV Configuration (Offset Sensor) (Edit)",
-        "description": "Select the temperature offset (calibration) entities for each TRV in zone {zone_name}. These are usually `number` entities provided by your TRV integration (e.g. Better Thermostat, Z2M, ZHA). If left empty, we will use 'Target Temperature Compensation' (faking the target temp to match the external sensor).",
-        "data": {}
-      },
-      "edit_weather_comp": {
-        "title": "Edit Weather Compensation",
-        "description": "Select an outdoor temperature sensor to enable automatic weather compensation.",
-        "data": {
-          "weather_sensor": "Outdoor Temperature Sensor"
-        }
-      },
-      "boiler_relay": {
-        "title": "Boiler Relay Setup",
-        "description": "Select the switch entity that controls your boiler relay (circulator).",
-        "data": {
-          "boiler_switch": "Boiler Switch"
-        },
-        "data_description": {
-          "boiler_switch": "The switch/relay that controls the boiler circulator pump"
-        }
-      },
-      "boiler_opentherm": {
-        "title": "OpenTherm Setup",
-        "description": "Select the OpenTherm entity that controls the Central Heating water temperature. Also define the minimum and maximum water temperatures.",
-        "data": {
-          "opentherm_entity": "OpenTherm Climate/Water Heater Entity",
-          "opentherm_min_temp": "Minimum Water Temperature (°C)",
-          "opentherm_max_temp": "Maximum Water Temperature (°C)",
-          "opentherm_ch_switch": "CH enable switch (optional)"
-        }
-      }
-    },
-    "abort": {
-      "no_zones_configured": "No zones configured.",
-      "no_climates_available": "All available climate entities are already configured as zones.",
-      "no_temp_sensors_found": "No temperature sensors found in Home Assistant.",
-      "no_switches_found": "No switch entities found in Home Assistant.",
-      "no_virtual_thermostats": "No virtual thermostats configured."
-    },
-    "error": {
-      "zone_name_required": "Zone name cannot be empty.",
-      "presence_sensor_required": "A presence sensor is required when geofencing is enabled.",
-      "invalid_temp_range": "Minimum temperature must be lower than maximum temperature.",
-      "no_actuators_selected": "You must select at least one climate entity or switch for the zone.",
-      "zone_name_exists": "A zone with this name already exists."
-    }
-  },
-  "entity": {
-    "switch": {
-      "master": {
-        "name": "Heating Master"
-      }
-    },
-    "select": {
-      "global_preset": {
-        "name": "Global Preset",
-        "state": {
-          "manual": "Manual",
-          "eco": "Eco",
-          "comfort": "Comfort",
-          "sleep": "Sleep",
-          "away": "Away"
-        }
-      }
-    }
-  }
 }

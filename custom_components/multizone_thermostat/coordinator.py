@@ -275,6 +275,8 @@ class MultizoneCoordinator:
     def reset_last_active_time(self) -> None:
         """Reset the last active time timestamp to now."""
         self._last_active_time = time.monotonic()
+        if hasattr(self, "_settings") and isinstance(self._settings, dict):
+            self._settings["last_active_wall_time"] = time.time()
 
     @property
     def is_dhw_active(self) -> bool:
@@ -389,9 +391,18 @@ class MultizoneCoordinator:
                 _LOGGER.info("Restored Thermal Model for %s: Heating=%.2f, Cooling=%.2f, Inertia=%.2f", 
                              climate_id, model.heating_rate, model.cooling_rate, model.thermal_inertia)
 
+        saved_wall_time = self._settings.get("last_active_wall_time")
+        if saved_wall_time is not None:
+            try:
+                self._last_active_time = time.monotonic() - max(0.0, time.time() - float(saved_wall_time))
+            except (ValueError, TypeError):
+                pass
+
     async def async_save_storage(self) -> None:
-        """Save window states to storage."""
+        """Save window states, presets and settings to storage."""
         await self._store.async_save(self.zone_manager._pre_window_state)
+        await self._preset_store.async_save(self.zone_manager._presets)
+        await self._settings_store.async_save(self._settings)
 
     async def _async_save_autotuner_states(self) -> None:
         """Save autotuner learning progress to storage."""

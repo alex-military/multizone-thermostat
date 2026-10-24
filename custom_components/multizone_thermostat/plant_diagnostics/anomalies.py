@@ -31,13 +31,14 @@ def get_battery_level(hass: HomeAssistant, entity_id: str) -> int | None:
         return None
         
     # 1. Check direct attributes on the entity
-    for attr in ("battery", "battery_level", "battery_percent"):
-        val = st.attributes.get(attr)
-        if val is not None:
-            try:
-                return int(round(float(val)))
-            except (ValueError, TypeError):
-                pass
+    if isinstance(getattr(st, "attributes", None), dict):
+        for attr in ("battery", "battery_level", "battery_percent"):
+            val = st.attributes.get(attr)
+            if val is not None and isinstance(val, (int, float, str)):
+                try:
+                    return int(round(float(val)))
+                except (ValueError, TypeError):
+                    pass
                 
     # 2. Lookup related battery sensor by device_id in entity registry
     ent_reg = None
@@ -236,7 +237,7 @@ def get_opentherm_diagnostics(coordinator: Any, hass: HomeAssistant) -> dict[str
 
                     # Fault / Error
                     if ("fault" in eid or "error" in eid):
-                        if s_st.state.lower() not in ("off", "none", "0", "ok", "false", "unavailable"):
+                        if s_st.state.lower() not in ("off", "none", "0", "ok", "false", "unavailable", "unknown"):
                             result["fault_active"] = True
                             result["fault_code"] = str(s_st.state)
 
@@ -312,33 +313,39 @@ def evaluate_zone_anomalies(
             s_state = hass.states.get(sensor_entity)
             if s_state:
                 is_disconnected = s_state.state in ("unavailable", "unknown")
-                s_reported = s_state.last_reported if hasattr(s_state, "last_reported") else s_state.last_updated
-                if s_reported:
-                    elapsed_sec = now_wall - s_reported.timestamp()
-                    # Check for TRV fallback
-                    trvs = (zone.get("climates") or zone.get("climate_entities") or [])
-                    for trv in trvs:
-                        trv_st = hass.states.get(trv)
-                        if trv_st and trv_st.attributes.get("current_temperature") is not None:
-                            state["fallback_ok"] = True
-                            break
+                s_reported = s_state.last_reported if hasattr(s_state, "last_reported") else getattr(s_state, "last_updated", None)
+                ts = s_reported.timestamp() if (s_reported and hasattr(s_reported, "timestamp")) else None
+                elapsed_sec = (now_wall - ts) if isinstance(ts, (int, float)) else 0.0
 
-                    if is_disconnected or elapsed_sec > (timeout_min * 60):
-                        # If the sensor is online with a valid reading, it's just a sleeping battery device
-                        if not is_disconnected:
-                            try:
-                                _ = float(s_state.state)
-                                state["fallback_ok"] = True
-                            except (ValueError, TypeError):
-                                pass
+                # Check for TRV fallback
+                trvs = (zone.get("climates") or zone.get("climate_entities") or [])
+                for trv in trvs:
+                    trv_st = hass.states.get(trv)
+                    if trv_st and trv_st.attributes.get("current_temperature") is not None:
+                        state["fallback_ok"] = True
+                        break
 
-                        state["active_anomaly"] = ANOMALY_SENSOR_TIMEOUT
-                        suffix = " - active fallback" if state["fallback_ok"] else ""
-                        if is_disconnected:
-                            state["anomaly_details"] = f"Sensor {sensor_entity} offline/unavailable ({s_state.state}){suffix}"
-                        else:
-                            state["anomaly_details"] = f"Sensor {sensor_entity} quiet: no updates for {int(elapsed_sec / 60)} min (limit: {timeout_min} min){suffix}"
-                        return ANOMALY_SENSOR_TIMEOUT, state["anomaly_details"]
+                valid_float = False
+                if not is_disconnected:
+                    try:
+                        _ = float(s_state.state)
+                        valid_float = True
+                        state["fallback_ok"] = True
+                    except (ValueError, TypeError):
+                        valid_float = False
+
+                should_flag_timeout = is_disconnected or (
+                    elapsed_sec > (timeout_min * 60)
+                    and (not valid_float or elapsed_sec > 86400 or timeout_min < 240)
+                )
+                if should_flag_timeout:
+                    state["active_anomaly"] = ANOMALY_SENSOR_TIMEOUT
+                    suffix = " - active fallback" if state["fallback_ok"] else ""
+                    if is_disconnected:
+                        state["anomaly_details"] = f"Sensor {sensor_entity} offline/unavailable ({s_state.state}){suffix}"
+                    else:
+                        state["anomaly_details"] = f"Sensor {sensor_entity} quiet: no updates for {int(elapsed_sec / 60)} min (limit: {timeout_min} min){suffix}"
+                    return ANOMALY_SENSOR_TIMEOUT, state["anomaly_details"]
 
         # If the zone is Bypassed, it is intentionally excluded from heating
         zone_mode = coordinator.get_zone_mode(climate_id)
@@ -347,13 +354,17 @@ def evaluate_zone_anomalies(
             state["anomaly_details"] = "Zone bypassed (Excluded from heating)"
             return ANOMALY_NONE, state["anomaly_details"]
 
-        # 1. Staleness Check: Has the temperature sensor not changed in > 6 hours?
+        # 1. Staleness Check: Has the temperature sensor not changed in > 6 hours while heating?
         if state["last_temp_seen"] is None or state["last_temp_seen"] != current_temp:
             state["last_temp_seen"] = current_temp
             state["last_temp_time"] = now_mono
             
-        if state["last_temp_time"] is not None and (now_mono - state["last_temp_time"]) > 21600:
-            # Same exact float value for > 6 hours
+        if (
+            (boiler_on and demand > 0.0)
+            and state["last_temp_time"] is not None
+            and (now_mono - state["last_temp_time"]) > 21600
+        ):
+            # Same exact float value for > 6 hours while heating is active
             state["active_anomaly"] = ANOMALY_STALE_SENSOR
             state["anomaly_details"] = ANOMALY_LABELS[ANOMALY_STALE_SENSOR]
             return ANOMALY_STALE_SENSOR, state["anomaly_details"]

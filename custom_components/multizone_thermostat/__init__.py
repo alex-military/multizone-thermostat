@@ -7,6 +7,11 @@ from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
+try:
+    from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
+except ImportError:
+    EVENT_HOMEASSISTANT_STARTED = "homeassistant_started"
+
 from .const import (
     CONF_BOILER_SWITCH,
     CONF_BOILER_MODE,
@@ -37,19 +42,51 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if boiler_mode == MODE_RELAY and boiler_switch:
         boiler_state = hass.states.get(boiler_switch)
         if boiler_state is None:
-            _LOGGER.warning(
-                "Boiler switch '%s' not found. The integration will load but boiler "
-                "control may not work until the entity is available.",
-                boiler_switch,
-            )
+            if getattr(hass, "is_running", True):
+                _LOGGER.warning(
+                    "Boiler switch '%s' not found. The integration will load but boiler "
+                    "control may not work until the entity is available.",
+                    boiler_switch,
+                )
+            else:
+                _LOGGER.debug(
+                    "Boiler switch '%s' not yet available during Home Assistant startup; "
+                    "will recheck once Home Assistant starts.",
+                    boiler_switch,
+                )
+                if hasattr(hass, "bus") and hasattr(hass.bus, "async_listen_once"):
+                    async def _check_boiler_started(_event) -> None:
+                        if hass.states.get(boiler_switch) is None:
+                            _LOGGER.warning(
+                                "Boiler switch '%s' not found. The integration will load but boiler "
+                                "control may not work until the entity is available.",
+                                boiler_switch,
+                            )
+                    hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, _check_boiler_started)
     elif boiler_mode == MODE_OPENTHERM and opentherm_entity:
         ot_state = hass.states.get(opentherm_entity)
         if ot_state is None:
-            _LOGGER.warning(
-                "OpenTherm entity '%s' not found. The integration will load but modulating "
-                "control may not work until the entity is available.",
-                opentherm_entity,
-            )
+            if getattr(hass, "is_running", True):
+                _LOGGER.warning(
+                    "OpenTherm entity '%s' not found. The integration will load but modulating "
+                    "control may not work until the entity is available.",
+                    opentherm_entity,
+                )
+            else:
+                _LOGGER.debug(
+                    "OpenTherm entity '%s' not yet available during Home Assistant startup; "
+                    "will recheck once Home Assistant starts.",
+                    opentherm_entity,
+                )
+                if hasattr(hass, "bus") and hasattr(hass.bus, "async_listen_once"):
+                    async def _check_ot_started(_event) -> None:
+                        if hass.states.get(opentherm_entity) is None:
+                            _LOGGER.warning(
+                                "OpenTherm entity '%s' not found. The integration will load but modulating "
+                                "control may not work until the entity is available.",
+                                opentherm_entity,
+                            )
+                    hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, _check_ot_started)
 
     # Migrate old config format to new Hybrid Zones format
     migrated = False
@@ -196,6 +233,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             await coordinator.async_save_storage()
         except Exception as err:
             _LOGGER.warning("Could not save storage on unload: %s", err)
+        try:
+            if hasattr(coordinator, "boiler_backend") and coordinator.boiler_backend:
+                await coordinator.boiler_backend.async_emergency_off()
+        except Exception as err:
+            _LOGGER.warning("Could not turn off boiler on unload: %s", err)
         coordinator.async_teardown_listeners()
         hass.data[DOMAIN].pop(entry.entry_id)
         _LOGGER.info("Multizone Thermostat unloaded.")

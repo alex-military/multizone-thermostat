@@ -294,10 +294,25 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
 
         try:
             self._current_temperature = float(new_state.state)
+            if self._safety_fallback_active:
+                _LOGGER.info("Zone %s: External temp sensor recovered. Exiting safety fallback.", self._name)
+                self._safety_fallback_active = False
             self.async_write_ha_state()
             self.hass.async_create_task(self._trigger_trv_sync())
         except ValueError:
             _LOGGER.error("Unable to parse temperature: %s", new_state.state)
+
+    def check_sensor_staleness(self) -> bool:
+        """Re-evaluate current temperature for sensor timeout or recovery."""
+        if not self._temp_sensor:
+            return False
+        prev_temp = self._current_temperature
+        prev_fallback = self._safety_fallback_active
+        self._update_current_temp()
+        if self._current_temperature != prev_temp or self._safety_fallback_active != prev_fallback:
+            self.async_write_ha_state()
+            return True
+        return False
 
     def _update_current_temp(self) -> None:
         """Fetch current temperature, falling back to internal TRV readings if sensor is offline/timed out."""
@@ -307,8 +322,9 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             if state and state.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN):
                 try:
                     now = time.time()
-                    reported = state.last_reported if hasattr(state, "last_reported") else state.last_updated
-                    elapsed = (now - reported.timestamp()) if reported else 0
+                    reported = state.last_reported if hasattr(state, "last_reported") else getattr(state, "last_updated", None)
+                    ts = reported.timestamp() if (reported and hasattr(reported, "timestamp")) else None
+                    elapsed = (now - ts) if isinstance(ts, (int, float)) else 0.0
                     
                     if self._sensor_timeout_min == 0 or elapsed <= (self._sensor_timeout_min * 60):
                         self._current_temperature = float(state.state)
@@ -335,13 +351,8 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
                 if self._temp_sensor and not self._safety_fallback_active:
                     self._safety_fallback_active = True
                     _LOGGER.warning("Zone %s: Safety fallback active, using onboard TRV average: %.1f°C", self._name, self._current_temperature)
-            elif self._temp_sensor:
-                st = self.hass.states.get(self._temp_sensor)
-                if st and st.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN):
-                    try:
-                        self._current_temperature = float(st.state)
-                    except (ValueError, TypeError):
-                        pass
+            else:
+                self._current_temperature = None
 
     @callback
     def _on_trv_changed_wrapper(self, event: Event) -> None:

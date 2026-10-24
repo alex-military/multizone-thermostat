@@ -120,7 +120,7 @@ async def async_setup_entry(
             min_value=0.0,
             max_value=3.0,
             step=0.1,
-            unit_of_measurement="",
+            unit_of_measurement=None,
             icon="mdi:chart-bell-curve-cumulative",
             default_val=0.0,
             device_info=device_info,
@@ -158,7 +158,7 @@ class MultizoneProtectionNumber(RestoreNumber):
         min_value: float,
         max_value: float,
         step: float,
-        unit_of_measurement: str,
+        unit_of_measurement: str | None,
         icon: str,
         default_val: float,
         device_info: DeviceInfo,
@@ -212,6 +212,7 @@ class MultizoneProtectionNumber(RestoreNumber):
         elif self._key == CONF_VALVE_DELAY:
             self._coordinator.set_valve_delay(value)
 
+
 class MultizonePersistentNumber(NumberEntity):
     """Generic Number entity that saves its state to the coordinator persistent storage."""
 
@@ -227,7 +228,7 @@ class MultizonePersistentNumber(NumberEntity):
         min_value: float,
         max_value: float,
         step: float,
-        unit_of_measurement: str,
+        unit_of_measurement: str | None,
         icon: str,
         default_val: float,
         device_info: DeviceInfo,

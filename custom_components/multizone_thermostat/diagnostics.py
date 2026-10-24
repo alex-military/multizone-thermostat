@@ -17,6 +17,9 @@ TO_REDACT = {
     "api_key",
     "latitude",
     "longitude",
+    "global_calendar",
+    "presence_sensor",
+    "weather_sensor",
 }
 
 
@@ -57,6 +60,9 @@ async def async_get_config_entry_diagnostics(
         "anti_seize_running": hasattr(coordinator, "anti_seize_manager") and coordinator.anti_seize_manager.is_running,
         "last_active_time_uptime": round(coordinator._last_active_time, 1),
     }
+    coordinator_info = async_redact_data(
+        coordinator_info, {"calendar_entity_id", "weather_sensor_id"}
+    )
 
     # 3. Zones Diagnostic Details
     zones_diag: dict[str, Any] = {}

@@ -85,6 +85,12 @@ class AntiSeizeManager:
         """Turn off boiler after anti-seize."""
         if hasattr(self.coordinator, "boiler_backend") and self.coordinator.boiler_backend:
             await self.coordinator.boiler_backend.async_update(0.0, None, False)
+            status_reason = getattr(self.coordinator.boiler_backend, "_status_reason", None) or getattr(
+                self.coordinator.boiler_backend, "status_reason", ""
+            )
+            if isinstance(status_reason, str) and status_reason.startswith("HOLD_ON"):
+                if hasattr(self.coordinator.boiler_backend, "async_emergency_off"):
+                    await self.coordinator.boiler_backend.async_emergency_off()
         elif getattr(self.coordinator, "boiler_switch", None):
             await self.hass.services.async_call(
                 "switch",
@@ -181,6 +187,14 @@ class AntiSeizeManager:
             raise
         except Exception as e:
             _LOGGER.error("Error during anti-seize routine: %s", e)
+            try:
+                await self._turn_boiler_off()
+                for climate_id, old_state in self._pre_anti_seize_state.items():
+                    if hasattr(self.coordinator, "set_zone_demand") and climate_id in self._pre_anti_seize_demand:
+                        self.coordinator.set_zone_demand(climate_id, self._pre_anti_seize_demand[climate_id])
+                    await self.coordinator._async_set_hvac_mode(climate_id, old_state)
+            except Exception as cleanup_err:
+                _LOGGER.error("Error during anti-seize emergency cleanup: %s", cleanup_err)
         finally:
             self._running = False
 

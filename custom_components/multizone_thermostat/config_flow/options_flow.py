@@ -237,6 +237,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                 ("switch", f"{DOMAIN}_{self.config_entry.entry_id}_physical_sync_{safe_name}"),
                 ("switch", f"{DOMAIN}_{self.config_entry.entry_id}_passive_heat_{safe_name}"),
                 ("binary_sensor", f"{DOMAIN}_{self.config_entry.entry_id}_anomaly_{safe_name}"),
+                ("binary_sensor", f"{DOMAIN}_{self.config_entry.entry_id}_anomaly_{climate_id_for_unique}"),
                 ("sensor", f"{DOMAIN}_{self.config_entry.entry_id}_demand_{safe_name}"),
                 ("sensor", f"{DOMAIN}_{self.config_entry.entry_id}_autotune_{safe_name}"),
                 ("sensor", f"{DOMAIN}_{self.config_entry.entry_id}_heating_rate_{safe_name}"),
