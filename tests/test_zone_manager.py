@@ -27,7 +27,8 @@ class HomeAssistantMockFinder(importlib.abc.MetaPathFinder):
             if fullname == 'homeassistant.const':
                 mock_module.ATTR_ENTITY_ID = 'entity_id'
             if fullname == 'homeassistant.util':
-                mock_module.slugify = lambda s: s.lower().replace(' ', '_')
+                from tests.dummy_ha.homeassistant.util import slugify as dummy_slugify
+                mock_module.slugify = dummy_slugify
             return importlib.machinery.ModuleSpec(fullname, HomeAssistantMockLoader(mock_module))
         return None
 

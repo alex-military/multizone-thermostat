@@ -109,7 +109,18 @@ const TRANSLATIONS = {
     target: "target",
     optimal: "OTTIMALE",
     warning: "ATTENZIONE",
-    critical: "CRITICO"
+    critical: "CRITICO",
+    ot_telemetry: "Telemetria OpenTherm",
+    ot_dhw_active: "🚿 Acqua Calda (ACS)",
+    ot_pressure: "Pressione",
+    ot_flow_temp: "Mandata Acqua",
+    ot_return_temp: "Ritorno Acqua",
+    ot_modulation: "Modulazione",
+    ot_flame_status: "Stato Fiamma",
+    ot_flame_on: "🔥 Accesa",
+    ot_flame_off: "Spenta",
+    ot_condensing_ok: "Condensazione OK",
+    ot_return_hot: "Ritorno caldo (>54°C)"
   },
   en: {
     enabled: "Enabled",
@@ -182,7 +193,18 @@ const TRANSLATIONS = {
     passive_heat_active_tooltip: "Passive Heat ACTIVE (Click to disable)",
     passive_heat_inactive_tooltip: "Passive Heat inactive (Click to enable)",
     anomaly_detected: "Anomaly Detected",
-    card_error_title: "Multizone Thermostat Card Error"
+    card_error_title: "Multizone Thermostat Card Error",
+    ot_telemetry: "OpenTherm Telemetry",
+    ot_dhw_active: "🚿 Hot Water (DHW)",
+    ot_pressure: "Pressure",
+    ot_flow_temp: "Supply Temp",
+    ot_return_temp: "Return Temp",
+    ot_modulation: "Modulation",
+    ot_flame_status: "Flame Status",
+    ot_flame_on: "🔥 Active",
+    ot_flame_off: "Off",
+    ot_condensing_ok: "Condensing OK",
+    ot_return_hot: "High return (>54°C)"
   },
   ru: {
     enabled: "Включено",
@@ -255,7 +277,18 @@ const TRANSLATIONS = {
     passive_heat_active_tooltip: "Пассивный нагрев АКТИВЕН (Нажмите для отключения)",
     passive_heat_inactive_tooltip: "Пассивный нагрев неактивен (Нажмите для включения)",
     anomaly_detected: "Обнаружена аномалия",
-    card_error_title: "Ошибка карточки Multizone Thermostat"
+    card_error_title: "Ошибка карточки Multizone Thermostat",
+    ot_telemetry: "Телеметрия OpenTherm",
+    ot_dhw_active: "🚿 Горячая вода (ГВС)",
+    ot_pressure: "Давление",
+    ot_flow_temp: "Подача воды",
+    ot_return_temp: "Обратка воды",
+    ot_modulation: "Модуляция",
+    ot_flame_status: "Состояние пламени",
+    ot_flame_on: "🔥 Горит",
+    ot_flame_off: "Выкл",
+    ot_condensing_ok: "Конденсация в норме",
+    ot_return_hot: "Горячая обратка (>54°C)"
   },
   fr: {
     enabled: "Activé",
@@ -327,7 +360,18 @@ const TRANSLATIONS = {
     passive_heat_active_tooltip: "Chaleur passive ACTIVE (Cliquez pour désactiver)",
     passive_heat_inactive_tooltip: "Chaleur passive inactive (Cliquez pour activer)",
     anomaly_detected: "Anomalie Détectée",
-    card_error_title: "Erreur de carte Multizone Thermostat"
+    card_error_title: "Erreur de carte Multizone Thermostat",
+    ot_telemetry: "Télémétrie OpenTherm",
+    ot_dhw_active: "🚿 Eau Chaude (ECS)",
+    ot_pressure: "Pression",
+    ot_flow_temp: "Départ eau",
+    ot_return_temp: "Retour eau",
+    ot_modulation: "Modulation",
+    ot_flame_status: "État flamme",
+    ot_flame_on: "🔥 Allumée",
+    ot_flame_off: "Éteinte",
+    ot_condensing_ok: "Condensation OK",
+    ot_return_hot: "Retour chaud (>54°C)"
   },
   de: {
     enabled: "Aktiviert",
@@ -399,7 +443,18 @@ const TRANSLATIONS = {
     passive_heat_active_tooltip: "Passive Heizung AKTIV (Klicken zum Deaktivieren)",
     passive_heat_inactive_tooltip: "Passive Heizung inaktiv (Klicken zum Aktivieren)",
     anomaly_detected: "Anomalie Erkannt",
-    card_error_title: "Multizone Thermostat Karte Fehler"
+    card_error_title: "Multizone Thermostat Karte Fehler",
+    ot_telemetry: "OpenTherm-Telemetrie",
+    ot_dhw_active: "🚿 Warmwasser (WW)",
+    ot_pressure: "Druck",
+    ot_flow_temp: "Vorlauftemp.",
+    ot_return_temp: "Rücklauftemp.",
+    ot_modulation: "Modulation",
+    ot_flame_status: "Flammenstatus",
+    ot_flame_on: "🔥 An",
+    ot_flame_off: "Aus",
+    ot_condensing_ok: "Brennwert OK",
+    ot_return_hot: "Hoher Rücklauf (>54°C)"
   },
   es: {
     enabled: "Activado",
@@ -471,7 +526,18 @@ const TRANSLATIONS = {
     passive_heat_active_tooltip: "Calor Pasivo ACTIVO (Clic para desactivar)",
     passive_heat_inactive_tooltip: "Calor Pasivo inactivo (Clic para activar)",
     anomaly_detected: "Anomalía Detectada",
-    card_error_title: "Error en tarjeta Multizone Thermostat"
+    card_error_title: "Error en tarjeta Multizone Thermostat",
+    ot_telemetry: "Telemetría OpenTherm",
+    ot_dhw_active: "🚿 Agua Caliente (ACS)",
+    ot_pressure: "Presión",
+    ot_flow_temp: "Impulsión agua",
+    ot_return_temp: "Retorno agua",
+    ot_modulation: "Modulación",
+    ot_flame_status: "Estado llama",
+    ot_flame_on: "🔥 Encendida",
+    ot_flame_off: "Apagada",
+    ot_condensing_ok: "Condensación OK",
+    ot_return_hot: "Retorno caliente (>54°C)"
   }
 };
 
@@ -677,7 +743,14 @@ class MultizoneThermostatButtonCard extends HTMLElement {
       const curStr = currentTemp !== undefined ? `${currentTemp}°C` : '--°C';
       tempCurrentEl.innerHTML = `<span class="temp-current-val">${curStr}</span>`;
     }
-    this.shadowRoot.querySelector('.temp-target-val').textContent = targetTemp !== undefined ? `${targetTemp}°C` : '--°C';
+    const step = this.getStep(climateState);
+    const decimals = step.toString().includes('.') ? (step.toString().split('.')[1] || '').length : 0;
+    let targetDisplay = '--';
+    if (targetTemp !== undefined && targetTemp !== null) {
+      const num = parseFloat(targetTemp);
+      targetDisplay = !isNaN(num) ? (decimals > 0 && !Number.isInteger(num) ? num.toFixed(decimals) : num) : targetTemp;
+    }
+    this.shadowRoot.querySelector('.temp-target-val').textContent = `${targetDisplay}°C`;
     
     const tempTargetEl = this.shadowRoot.querySelector('.temp-target');
     if (tempTargetEl) {
@@ -948,8 +1021,8 @@ class MultizoneThermostatButtonCard extends HTMLElement {
     card.querySelector('#seg-secondary').addEventListener('click', () => this.setZoneMode("secondary"));
     card.querySelector('#seg-bypass').addEventListener('click', () => this.setZoneMode("bypass"));
 
-    card.querySelector('#temp-down').addEventListener('click', () => this.changeTemp(-0.5));
-    card.querySelector('#temp-up').addEventListener('click', () => this.changeTemp(0.5));
+    card.querySelector('#temp-down').addEventListener('click', () => this.changeTemp(-1));
+    card.querySelector('#temp-up').addEventListener('click', () => this.changeTemp(1));
 
 
 
@@ -986,19 +1059,54 @@ class MultizoneThermostatButtonCard extends HTMLElement {
     }, 1000);
   }
 
-  changeTemp(step) {
+  getStep(climateState) {
+    if (this._config && (this._config.step !== undefined || this._config.target_temp_step !== undefined)) {
+      const cfgStep = parseFloat(this._config.step ?? this._config.target_temp_step);
+      if (!isNaN(cfgStep) && cfgStep > 0) return cfgStep;
+    }
+    const state = climateState || (this._hass && this._config && this._config.entity ? this._hass.states[this._config.entity] : null);
+    if (state && state.attributes && state.attributes.target_temp_step !== undefined && state.attributes.target_temp_step !== null) {
+      const attrStep = parseFloat(state.attributes.target_temp_step);
+      if (!isNaN(attrStep) && attrStep > 0) return attrStep;
+    }
+    return 0.5;
+  }
+
+  changeTemp(stepOrDirection) {
     const climateEntity = this._config.entity;
     const state = this._hass.states[climateEntity];
     if (!state) return;
 
     const currentTarget = state.attributes.temperature;
-    if (currentTarget === undefined) return;
+    if (currentTarget === undefined || currentTarget === null) return;
 
-    const newTarget = Math.round((currentTarget + step) * 2) / 2;
+    const step = this.getStep(state);
+
+    let delta = 0;
+    if (typeof stepOrDirection === 'number') {
+      if (stepOrDirection > 0) {
+        delta = step;
+      } else if (stepOrDirection < 0) {
+        delta = -step;
+      }
+    } else {
+      delta = step;
+    }
+
+    const stepStr = step.toString();
+    const decimals = stepStr.includes('.') ? (stepStr.split('.')[1] || '').length : 0;
+    const rawTarget = Math.round((currentTarget + delta) / step) * step;
+    const newTarget = parseFloat(rawTarget.toFixed(decimals));
+
+    const minTemp = state.attributes.min_temp !== undefined ? parseFloat(state.attributes.min_temp) : undefined;
+    const maxTemp = state.attributes.max_temp !== undefined ? parseFloat(state.attributes.max_temp) : undefined;
+    let clampedTarget = newTarget;
+    if (minTemp !== undefined && !isNaN(minTemp)) clampedTarget = Math.max(clampedTarget, minTemp);
+    if (maxTemp !== undefined && !isNaN(maxTemp)) clampedTarget = Math.min(clampedTarget, maxTemp);
 
     this._hass.callService("climate", "set_temperature", {
       entity_id: climateEntity,
-      temperature: newTarget
+      temperature: clampedTarget
     });
   }
 
@@ -2529,29 +2637,33 @@ class MultizoneThermostatPlantCard extends HTMLElement {
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
           <div style="font-weight: 700; font-size: 13px; color: #38bdf8; display: flex; align-items: center; gap: 6px;">
             <ha-icon icon="mdi:pipe-valve" style="--mdc-icon-size: 16px;"></ha-icon>
-            <span>Telemetria OpenTherm</span>
+            <span id="ot-telemetry-title">${t('ot_telemetry')}</span>
           </div>
           <div id="ot-dhw-badge" style="display:none; font-size: 11px; font-weight: 700; background: rgba(59, 130, 246, 0.2); color: #60a5fa; border-radius: 6px; padding: 2px 8px; border: 1px solid rgba(59, 130, 246, 0.3);">
-            🚿 Acqua Calda (ACS)
+            ${t('ot_dhw_active')}
           </div>
         </div>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(85px, 1fr)); gap: 10px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(75px, 1fr)); gap: 10px;">
           <div>
-            <div style="font-size: 11px; color: var(--secondary-text-color, #94a3b8);">Pressione</div>
+            <div style="font-size: 11px; color: var(--secondary-text-color, #94a3b8);">${t('ot_pressure')}</div>
             <div style="font-size: 16px; font-weight: 800;" id="ot-pressure-val">-- bar</div>
           </div>
           <div>
-            <div style="font-size: 11px; color: var(--secondary-text-color, #94a3b8);">Ritorno Acqua</div>
+            <div style="font-size: 11px; color: var(--secondary-text-color, #94a3b8);">${t('ot_flow_temp')}</div>
+            <div style="font-size: 16px; font-weight: 800;" id="ot-flow-val">--°C</div>
+          </div>
+          <div>
+            <div style="font-size: 11px; color: var(--secondary-text-color, #94a3b8);">${t('ot_return_temp')}</div>
             <div style="font-size: 16px; font-weight: 800;" id="ot-return-val">--°C</div>
             <div style="font-size: 10px; font-weight: 600;" id="ot-condense-eval"></div>
           </div>
           <div>
-            <div style="font-size: 11px; color: var(--secondary-text-color, #94a3b8);">Modulazione</div>
+            <div style="font-size: 11px; color: var(--secondary-text-color, #94a3b8);">${t('ot_modulation')}</div>
             <div style="font-size: 16px; font-weight: 800;" id="ot-mod-val">--%</div>
           </div>
           <div>
-            <div style="font-size: 11px; color: var(--secondary-text-color, #94a3b8);">Stato Fiamma</div>
-            <div style="font-size: 14px; font-weight: 700;" id="ot-flame-val">Spenta</div>
+            <div style="font-size: 11px; color: var(--secondary-text-color, #94a3b8);">${t('ot_flame_status')}</div>
+            <div style="font-size: 14px; font-weight: 700;" id="ot-flame-val">${t('ot_flame_off')}</div>
           </div>
         </div>
       </div>
@@ -2670,6 +2782,7 @@ class MultizoneThermostatPlantCard extends HTMLElement {
       // OpenTherm Telemetry Update
       const otGrid = this.shadowRoot.getElementById('ot-grid');
       const otPressure = this.shadowRoot.getElementById('ot-pressure-val');
+      const otFlow = this.shadowRoot.getElementById('ot-flow-val');
       const otReturn = this.shadowRoot.getElementById('ot-return-val');
       const otCondense = this.shadowRoot.getElementById('ot-condense-eval');
       const otMod = this.shadowRoot.getElementById('ot-mod-val');
@@ -2690,15 +2803,27 @@ class MultizoneThermostatPlantCard extends HTMLElement {
           }
         }
 
+        if (otFlow) {
+          const flowVal = ot.flow_temperature !== undefined && ot.flow_temperature !== null ? ot.flow_temperature :
+                          (ot.flow_temp !== undefined && ot.flow_temp !== null ? ot.flow_temp : ot.water_flow_temperature);
+          if (flowVal !== null && flowVal !== undefined && flowVal !== "") {
+            const num = parseFloat(flowVal);
+            const displayVal = !isNaN(num) ? (Number.isInteger(num) ? num : num.toFixed(1)) : flowVal;
+            otFlow.innerText = `${displayVal}°C`;
+          } else {
+            otFlow.innerText = '--°C';
+          }
+        }
+
         if (otReturn) {
           if (ot.return_temperature !== null && ot.return_temperature !== undefined) {
             otReturn.innerText = `${ot.return_temperature}°C`;
             if (otCondense) {
               if (ot.condensing_optimal) {
-                otCondense.innerText = 'Condensazione OK';
+                otCondense.innerText = t('ot_condensing_ok');
                 otCondense.style.color = '#34d399';
               } else {
-                otCondense.innerText = 'Ritorno caldo (>54°C)';
+                otCondense.innerText = t('ot_return_hot');
                 otCondense.style.color = '#fbbf24';
               }
             }
@@ -2718,14 +2843,15 @@ class MultizoneThermostatPlantCard extends HTMLElement {
 
         if (otFlame) {
           if (ot.flame_active) {
-            otFlame.innerHTML = '<span style="color: #f59e0b;">🔥 Accesa</span>';
+            otFlame.innerHTML = `<span style="color: #f59e0b;">${t('ot_flame_on')}</span>`;
           } else {
-            otFlame.innerHTML = '<span style="color: #94a3b8;">Spenta</span>';
+            otFlame.innerHTML = `<span style="color: #94a3b8;">${t('ot_flame_off')}</span>`;
           }
         }
 
         if (otDhw) {
           otDhw.style.display = ot.dhw_active ? 'inline-block' : 'none';
+          otDhw.innerText = t('ot_dhw_active');
         }
       } else if (otGrid) {
         otGrid.style.display = 'none';

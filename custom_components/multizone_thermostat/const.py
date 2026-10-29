@@ -2,6 +2,11 @@
 from __future__ import annotations
 from typing import Any
 
+try:
+    from homeassistant.util import slugify
+except ImportError:
+    slugify = None  # type: ignore[assignment]
+
 DOMAIN = "multizone_thermostat"
 
 # Config keys
@@ -134,8 +139,18 @@ KEY_PASSIVE_HEAT_PREFIX = "passive_heat_"
 
 def make_zone_entity_id(name: str) -> str:
     """Generate a predictable entity_id for a zone master thermostat."""
-    safe = name.lower().replace(" ", "_").replace("-", "_")
-    safe = "".join(c for c in safe if c.isalnum() or c == "_")
+    safe = ""
+    if slugify is not None:
+        try:
+            safe = slugify(name or "")
+        except Exception:
+            safe = ""
+    if not safe:
+        # Fallback if slugify fails, is unavailable, or returns empty string
+        raw = (name or "").lower().replace(" ", "_").replace("-", "_")
+        safe = "".join(c for c in raw if (c.isalnum() and c.isascii()) or c == "_").strip("_")
+        if not safe:
+            safe = "zone"
     return f"climate.{DOMAIN}_{safe}"
 
 

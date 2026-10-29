@@ -123,6 +123,10 @@ class ZoneController:
             return 0.0
 
         if entity_id not in self._thermal_models or entity_id not in self._autotuners or entity_id not in self._pids:
+            _LOGGER.warning(
+                "Unknown zone entity '%s' not registered in thermal models, autotuners, or PIDs. Unable to calculate demand.",
+                entity_id,
+            )
             return 0.0
 
         # Update PID sensor timestamp when a new or changed temperature reading arrives

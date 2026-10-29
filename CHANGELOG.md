@@ -1,5 +1,14 @@
 # Changelog
 
+## [5.1.1] - 2026-10-29
+### Fix: Non-ASCII Zone Entity ID Transliteration (Issue #7), OpenTherm Flow Temperature & Full Lovelace Localization
+- **Fix (Core / Issue #7)**:
+  - Risolto bug critico per zone con nomi non-ASCII (cirillico, accenti). Integrazione di `slugify` in `make_zone_entity_id()` per allineare le chiavi interne con l'Entity Registry di Home Assistant, prevenendo il blocco del riscaldamento e garantendo la piena attivazione di autotuning, sensori demand e supervisioni di sicurezza. Aggiunto log di warning esplicito in caso di entità non censite.
+- **Fix (Frontend Lovelace Card)**:
+  - Aggiunta della visualizzazione della **Temperatura di Mandata (Supply / Flow Temp)** nella griglia telemetrica OpenTherm.
+  - Localizzazione multilingua completa per tutte le etichette e badge OpenTherm (`ru`, `en`, `it`, `de`, `fr`, `es`), eliminando tutte le stringhe fisse in italiano.
+  - Supporto dinamico per precisione setpoint `0.1°C` / `0.5°C`.
+
 ## [5.1.0] - 2026-10-24
 ### Feat: Demand Aggregation Strategies, Zone Weights, Authoritative Hardware Sync & OpenTherm Weather Curve (Phases 8, 9 & 10)
 - **Demand Aggregation Strategies & Zone Weights (Phase 10)**:
