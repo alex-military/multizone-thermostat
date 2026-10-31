@@ -161,7 +161,7 @@ class ZoneManager:
         climates = zone.get(CONF_ZONE_CLIMATES, [])
         for trv in climates:
             trv_state = self.hass.states.get(trv)
-            if not trv_state:
+            if not trv_state or trv_state.state in ("unavailable", "unknown"):
                 continue
                 
             # 1. Sync HVAC Mode (Base hardware compatibility)

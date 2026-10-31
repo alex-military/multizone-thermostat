@@ -303,7 +303,9 @@ class ZoneSyncManager:
         
         for switch in self._switches:
             st = self.hass.states.get(switch)
-            if st and st.state != (STATE_ON if self._local_pwm_state else "off"):
+            if not st or st.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+                continue
+            if st.state != (STATE_ON if self._local_pwm_state else "off"):
                 await self.hass.services.async_call(
                     "switch",
                     service,
@@ -325,6 +327,9 @@ class ZoneSyncManager:
         target_pct = max(0.0, min(100.0, target_pct))
 
         for valve_entity in self._valves:
+            st = self.hass.states.get(valve_entity)
+            if not st or st.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+                continue
             target_val = round(target_pct / 10.0, 1) if self._valve_scale == VALVE_SCALE_VOLT else round(target_pct, 1)
             last_val = self._last_valve_positions.get(valve_entity)
 

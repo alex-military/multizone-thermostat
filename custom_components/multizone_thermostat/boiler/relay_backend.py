@@ -4,7 +4,15 @@ import time
 import asyncio
 
 from homeassistant.core import HomeAssistant
-from homeassistant.const import ATTR_ENTITY_ID, SERVICE_TURN_ON, SERVICE_TURN_OFF, STATE_ON, STATE_OFF
+from homeassistant.const import (
+    ATTR_ENTITY_ID,
+    SERVICE_TURN_ON,
+    SERVICE_TURN_OFF,
+    STATE_ON,
+    STATE_OFF,
+    STATE_UNAVAILABLE,
+    STATE_UNKNOWN,
+)
 
 from .base import BoilerBackend
 from ..pwm_engine import PWMEngine
@@ -105,7 +113,16 @@ class RelayBoilerBackend(BoilerBackend):
             return
 
         boiler_state = self.hass.states.get(self.boiler_switch)
-        was_off = boiler_state is None or boiler_state.state != STATE_ON
+        if boiler_state is None or boiler_state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+            _LOGGER.debug("Boiler switch %s is not available yet, skipping command", self.boiler_switch)
+            return
+
+        was_off = boiler_state.state != STATE_ON
+        has_pending_off = self._pending_command is not None and self._pending_command[0] == "off"
+
+        if not was_off and not has_pending_off:
+            _LOGGER.debug("Boiler switch %s is already ON, skipping redundant turn_on command", self.boiler_switch)
+            return
 
         kwargs = {"blocking": False}
         from unittest.mock import MagicMock
@@ -119,7 +136,7 @@ class RelayBoilerBackend(BoilerBackend):
             {ATTR_ENTITY_ID: self.boiler_switch},
             **kwargs,
         )
-        if was_off:
+        if was_off or has_pending_off:
             self._last_boiler_change = time.monotonic()
             self._pending_command = ("on", time.monotonic())
 
@@ -138,10 +155,10 @@ class RelayBoilerBackend(BoilerBackend):
                     )
                 )
 
-        if hasattr(self.coordinator, "reset_last_active_time"):
-            self.coordinator.reset_last_active_time()
-        self.coordinator.record_diagnostic_event("BOILER_SWITCH_ON", {"switch": self.boiler_switch, "reason": self._status_reason})
-        _LOGGER.debug("Boiler forced ON")
+            if hasattr(self.coordinator, "reset_last_active_time"):
+                self.coordinator.reset_last_active_time()
+            self.coordinator.record_diagnostic_event("BOILER_SWITCH_ON", {"switch": self.boiler_switch, "reason": self._status_reason})
+            _LOGGER.debug("Boiler forced ON")
 
     async def _force_boiler_off(self) -> None:
         """Actually turn the boiler off and set locks."""
@@ -149,7 +166,16 @@ class RelayBoilerBackend(BoilerBackend):
             return
 
         boiler_state = self.hass.states.get(self.boiler_switch)
-        was_on = boiler_state is not None and boiler_state.state == STATE_ON
+        if boiler_state is None or boiler_state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+            _LOGGER.debug("Boiler switch %s is not available yet, skipping command", self.boiler_switch)
+            return
+
+        was_on = boiler_state.state == STATE_ON
+        has_pending_on = self._pending_command is not None and self._pending_command[0] == "on"
+
+        if not was_on and not has_pending_on:
+            _LOGGER.debug("Boiler switch %s is already OFF, skipping redundant turn_off command", self.boiler_switch)
+            return
 
         kwargs = {"blocking": False}
         from unittest.mock import MagicMock
@@ -163,7 +189,7 @@ class RelayBoilerBackend(BoilerBackend):
             {ATTR_ENTITY_ID: self.boiler_switch},
             **kwargs,
         )
-        if was_on:
+        if was_on or has_pending_on:
             self._last_boiler_change = time.monotonic()
             self._pending_command = ("off", time.monotonic())
 
@@ -182,8 +208,8 @@ class RelayBoilerBackend(BoilerBackend):
                     )
                 )
 
-        self.coordinator.record_diagnostic_event("BOILER_SWITCH_OFF", {"switch": self.boiler_switch, "reason": self._status_reason})
-        _LOGGER.debug("Boiler forced OFF")
+            self.coordinator.record_diagnostic_event("BOILER_SWITCH_OFF", {"switch": self.boiler_switch, "reason": self._status_reason})
+            _LOGGER.debug("Boiler forced OFF")
 
     async def async_emergency_off(self) -> None:
         """Fallback for emergency off and anti-seize."""
@@ -192,7 +218,13 @@ class RelayBoilerBackend(BoilerBackend):
             self._pending_boiler_task = None
         self._trv_wait_start = None
         self._status_reason = "OFF - Emergency/Master OFF"
-        await self._force_boiler_off()
+        boiler_state = self.hass.states.get(self.boiler_switch) if self.boiler_switch else None
+        if boiler_state is None or boiler_state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+            _LOGGER.debug("Boiler switch %s is not available yet, skipping emergency off", self.boiler_switch)
+            return
+        has_pending_on = self._pending_command is not None and self._pending_command[0] == "on"
+        if boiler_state.state == STATE_ON or has_pending_on:
+            await self._force_boiler_off()
 
     async def async_update(self, demand: float, peak_zone: str | None, frost_emergency: bool) -> None:
         """Feed Peak Load to PWM Engine and control the relay."""

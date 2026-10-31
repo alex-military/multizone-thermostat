@@ -41,6 +41,11 @@ class OpenThermBoilerBackend(BoilerBackend):
         if not self.opentherm_entity:
             return
 
+        st = self.hass.states.get(self.opentherm_entity)
+        if st is None or st.state in ("unavailable", "unknown"):
+            _LOGGER.debug("OpenTherm entity %s is not available yet, skipping update", self.opentherm_entity)
+            return
+
         # Normalize demand from 0-100 to 0.0-1.0 and clamp
         norm_demand = max(0.0, min(1.0, demand / 100.0))
         wanted_on = norm_demand > 0.0
@@ -228,6 +233,9 @@ class OpenThermBoilerBackend(BoilerBackend):
         if not self.ch_switch:
             return
         st = self.hass.states.get(self.ch_switch)
+        if st is None or st.state in ("unavailable", "unknown"):
+            _LOGGER.debug("CH switch %s is not available yet, skipping command", self.ch_switch)
+            return
         current_on = st.state == "on" if st else None
         if current_on == enabled:
             return

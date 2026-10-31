@@ -312,7 +312,8 @@ async def test_e2e_master_off_and_frost_protection():
     await coord.async_set_persistent_data(KEY_ANTI_FROST_ENABLED, True)
     await coord.async_set_persistent_data(KEY_FROST_PROTECTION_TEMP, 5.0)
 
-    # Normal room temp (18 °C) with Master OFF: boiler stays emergency OFF
+    # Active boiler with Master OFF: turns emergency OFF
+    states_db["switch.boiler_relay"] = MagicMock(state="on")
     states_db[cid_living] = MagicMock(state="off", attributes={"current_temperature": 18.0})
     await coord.plant_orchestrator._async_update_boiler()
     hass.services.async_call.assert_called_with(
@@ -322,6 +323,12 @@ async def test_e2e_master_off_and_frost_protection():
         blocking=False,
     )
     hass.services.async_call.reset_mock()
+
+    # Redundant tick when already OFF: skips redundant turn_off call
+    states_db["switch.boiler_relay"] = MagicMock(state="off")
+    coord.boiler_backend._pending_command = None
+    await coord.plant_orchestrator._async_update_boiler()
+    hass.services.async_call.assert_not_called()
 
     # Freezing temperature detected (3.5 °C < 5.0 °C)
     states_db[cid_living] = MagicMock(state="off", attributes={"current_temperature": 3.5})
