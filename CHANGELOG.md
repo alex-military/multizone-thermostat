@@ -1,5 +1,49 @@
 # Changelog
 
+## [6.0.0] - 2026-10-31
+### Release: Phase 6 & 7 — Multi-Profile Weekly Scheduling, Per-Zone Presets, Predictive Smart Start, Smart Return Thermal Radar & Modern Lovelace UI
+
+- **Multi-Profile Weekly Scheduling Engine (Phase 6 / Issue #5)**:
+  - Native multi-profile weekly scheduler built directly into Multizone Thermostat (`ScheduleProfileManager`).
+  - Pre-configured standard profiles: **Standard**, **Smart Working**, **Festivo (Holiday)**, plus unlimited custom profiles.
+  - Profile duplication, background editing of inactive profiles without disrupting live heating, and temporary profile activation with automated expiry and fallback to baseline profile.
+  - Fully persistent across Home Assistant restarts and reboots via native `.storage`.
+
+- **Per-Zone Presets & Unified Time Slot Modal (Phase 7 / Issue #5)**:
+  - Resolves target temperatures dynamically from Multizone's existing preset matrix (`comfort`, `eco`, `sleep`, `away`) per zone without disk pollution or preset table duplication.
+  - Unified **Add / Edit Time Slot Modal** (`openSlotModal`):
+    - Synchronized Start Time, Duration, and End Time inputs with instant two-way calculation.
+    - Quick duration selection pills (`30m`, `1h`, `2h`, `3h`, `4h`, `6h`).
+    - Multi-day selector (`L`, `M`, `M`, `G`, `V`, `S`, `D`) for batch day assignments.
+    - Baseline preset selection + per-zone exception overrides with dynamic temperature preview badges.
+    - Robust interval splitting and merging (`_applySlotToZone`) preventing invalid time overlaps.
+  - Compact read-only preset summary (`preset-summary-card`) displaying real-time target temperature badges per room.
+
+- **Predictive Smart Start (Thermal Model Driven)**:
+  - Continuous forward-looking thermal horizon (12 hours) inspecting upcoming target increases.
+  - Calculates exact lead-time required per room using the learned thermal model `heating_rate` (°C/h):
+    $$\text{Lead Time} = \min\left(4\text{h}, \frac{T_{\text{target}} - T_{\text{current}}}{\text{heating\_rate}}\right)$$
+  - Staggers pre-heating automatically so each room reaches its target comfort temperature at the exact start of the scheduled block.
+
+- **Pianifica Rientro (Smart Return) with Thermal Radar & Plant Auto-Wake**:
+  - One-shot arrival planner calculating staggered per-zone ignition times based on thermal inertia.
+  - **Auto-Wake Feature**: If the heating system was off (`master_enabled == False` or zone in `HVACMode.OFF`), Smart Return automatically turns the Master heating switch ON and wakes participating zones to `HVACMode.HEAT` when ignition time arrives, guaranteeing you return to a warm home.
+  - Real-time thermal radar breakdown in the UI showing minutes needed, ignition time, and live status.
+
+- **Smart Manual Overrides vs. Explicit OFF**:
+  - Manual adjustments via physical TRV knobs, wall thermostats, or UI apply temporary overrides valid strictly until the current slot transitions, automatically restoring scheduled programming without polluting permanent preset configuration.
+  - **Explicit OFF Protection**: Manually turning a zone to `HVACMode.OFF` (Spento Esplicito) is honored as an intentional priority (e.g. open window, vacant room); normal weekly schedules will never force it back on until explicitly turned on by the user.
+
+- **Lovelace Card & Dynamic Browser Cache-Busting**:
+  - Dynamic cache busting in `__init__.py` appending file modification timestamp (`?v={version}.{mtime}`) to Lovelace resource registration, eliminating persistent browser and Service Worker caching issues.
+  - Automated detection and cleanup of duplicate/legacy Lovelace resources from HA storage.
+  - Real-time UI reactivity listening to state changes via raw JSON evaluation without requiring page refreshes.
+  - Complete multilingual localization across English (`en`), Italian (`it`), Russian (`ru`), French (`fr`), German (`de`), and Spanish (`es`).
+
+- **Services & Full Test Suite**:
+  - Exposes HA services in `services.yaml`: `save_schedule_profile`, `activate_schedule_profile`, `delete_schedule_profile`, `set_smart_return`, `cancel_smart_return`, `set_zone_override`, `clear_zone_override`.
+  - Comprehensive automated test suite in `tests/test_phase6_schedule_engine.py`: **191 passed in 1.77s (100% pass rate)**.
+
 ## [5.1.2] - 2026-10-31
 ### Fix: Boot Availability Check for Boiler Switch (Fix A) & Elimination of Redundant 10s OFF Commands (Fix B)
 - **Fix A (Startup Entity Availability Guard)**:

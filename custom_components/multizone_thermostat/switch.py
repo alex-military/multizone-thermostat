@@ -6,7 +6,16 @@ from typing import Any
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import EntityCategory
+try:
+    from homeassistant.const import EntityCategory
+except ImportError:
+    try:
+        from homeassistant.helpers.entity import EntityCategory
+    except ImportError:
+        from enum import StrEnum
+        class EntityCategory(StrEnum):
+            CONFIG = "config"
+            DIAGNOSTIC = "diagnostic"
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -45,6 +54,10 @@ async def async_setup_entry(
     # Master switch
     master_switch = MultizoneMasterSwitch(coordinator, config_entry.entry_id)
     entities.append(master_switch)
+
+    # Weekly Scheduler Switch
+    scheduler_switch = MultizoneSchedulerSwitch(coordinator, config_entry.entry_id)
+    entities.append(scheduler_switch)
 
     # (Zone switches are now Select entities in select.py)
 
@@ -125,12 +138,15 @@ class MultizoneMasterSwitch(RestoreEntity, SwitchEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return extra state attributes."""
-        return {
+        attrs = {
             "multizone_type": "master",
             "boiler_switch": self._coordinator.boiler_switch,
             "boiler_status_reason": self._coordinator.boiler_status_reason,
             "boiler_mode": self._coordinator.boiler_mode,
         }
+        if hasattr(self._coordinator, "schedule_manager") and hasattr(self._coordinator.schedule_manager, "get_state_summary"):
+            attrs["schedule_status"] = self._coordinator.schedule_manager.get_state_summary()
+        return attrs
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn master on."""
@@ -358,3 +374,46 @@ class MultizonePassiveHeatSwitch(SwitchEntity):
 
 
 
+
+
+class MultizoneSchedulerSwitch(RestoreEntity, SwitchEntity):
+    """Switch to enable or disable the weekly multi-profile scheduler."""
+
+    _attr_has_entity_name = True
+    _attr_name = "Weekly Scheduler"
+    _attr_icon = "mdi:calendar-clock"
+
+    def __init__(self, coordinator: Any, entry_id: str) -> None:
+        """Initialize scheduler switch."""
+        self._coordinator = coordinator
+        self._entry_id = entry_id
+        self._attr_unique_id = f"{DOMAIN}_{entry_id}_weekly_scheduler"
+        self._attr_device_info = _make_device_info(entry_id, getattr(coordinator, "master_device_id", None))
+        coordinator._scheduler_switch = self
+
+    @property
+    def is_on(self) -> bool:
+        """Return true if scheduler is enabled."""
+        if hasattr(self._coordinator, "schedule_manager"):
+            return bool(self._coordinator.schedule_manager.scheduler_enabled)
+        return False
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return extra state attributes."""
+        attrs: dict[str, Any] = {}
+        if hasattr(self._coordinator, "schedule_manager") and hasattr(self._coordinator.schedule_manager, "get_state_summary"):
+            attrs["schedule_status"] = self._coordinator.schedule_manager.get_state_summary()
+        return attrs
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Turn on weekly scheduler."""
+        if hasattr(self._coordinator, "schedule_manager"):
+            await self._coordinator.schedule_manager.async_set_scheduler_enabled(True)
+        self.async_write_ha_state()
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Turn off weekly scheduler."""
+        if hasattr(self._coordinator, "schedule_manager"):
+            await self._coordinator.schedule_manager.async_set_scheduler_enabled(False)
+        self.async_write_ha_state()

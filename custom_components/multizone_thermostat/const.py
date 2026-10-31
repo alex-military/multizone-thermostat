@@ -136,6 +136,21 @@ KEY_PHYSICAL_SYNC_PREFIX = "physical_sync_"
 # Persistent State Keys (Passive Heat Switch per Zone)
 KEY_PASSIVE_HEAT_PREFIX = "passive_heat_"
 
+# Scheduler Multi-Profile (Phase 6)
+KEY_SCHEDULER_ENABLED = "scheduler_enabled"
+KEY_ACTIVE_PROFILE = "active_schedule_profile"
+KEY_PROFILE_EXPIRES_AT = "schedule_profile_expires_at"
+KEY_FALLBACK_PROFILE = "schedule_fallback_profile"
+KEY_SCHEDULE_PROFILES = "schedule_profiles"
+KEY_MANUAL_OVERRIDES = "schedule_manual_overrides"
+DEFAULT_BASELINE_PRESET = "eco"
+DEFAULT_SCHEDULE_PROFILE = "standard"
+SCHEDULE_DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+DEFAULT_PRESET_TEMPS = {"comfort": 20.5, "eco": 18.0, "sleep": 17.5, "away": 16.0}
+KEY_SMART_RETURN = "smart_return_state"
+DEFAULT_SMART_START_HEATING_RATE = 1.5
+MAX_SMART_START_HOURS = 6.0
+
 
 def make_zone_entity_id(name: str) -> str:
     """Generate a predictable entity_id for a zone master thermostat."""

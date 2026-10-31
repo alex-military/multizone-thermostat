@@ -189,14 +189,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 integration = await async_get_integration(hass, DOMAIN)
                 version = integration.version if integration else "unknown"
                 
+                js_path = os.path.join(www_path, "multizone-thermostat-card-v24.js")
+                mtime = int(os.path.getmtime(js_path)) if os.path.exists(js_path) else 0
                 base_url = "/multizone_thermostat_card/multizone-thermostat-card-v24.js"
-                url = f"{base_url}?v={version}"
+                url = f"{base_url}?v={version}.{mtime}"
                 
                 existing_item = None
-                for item in resources.async_items():
-                    if item.get("url", "").startswith(base_url):
-                        existing_item = item
-                        break
+                for item in list(resources.async_items()):
+                    item_url = item.get("url", "")
+                    if "multizone-thermostat-card" in item_url:
+                        if existing_item is None and item_url.startswith(base_url):
+                            existing_item = item
+                        else:
+                            # Remove duplicate or legacy resources
+                            if hasattr(resources, "async_delete_item"):
+                                await resources.async_delete_item(item.get("id"))
                         
                 if not existing_item:
                     await resources.async_create_item({
@@ -213,6 +220,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Register update listener for options changes
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
 
+    # Register integration services
+    await _async_register_services(hass)
+
     _LOGGER.info(
         "Multizone Thermostat loaded: mode=%s, entity=%s, zones=%d",
         boiler_mode,
@@ -220,6 +230,110 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         len(zones),
     )
     return True
+
+
+def _get_active_coordinators(hass: HomeAssistant) -> list[MultizoneCoordinator]:
+    """Retrieve all active Multizone coordinator instances."""
+    domain_data = hass.data.get(DOMAIN, {})
+    coordinators: list[MultizoneCoordinator] = []
+    if isinstance(domain_data, dict):
+        for val in domain_data.values():
+            if isinstance(val, dict) and "coordinator" in val:
+                coordinators.append(val["coordinator"])
+    return coordinators
+
+
+async def _async_register_services(hass: HomeAssistant) -> None:
+    """Register all Phase 6 schedule and profile services."""
+    if hass.data[DOMAIN].get("_services_registered"):
+        return
+
+    from homeassistant.core import ServiceCall
+
+    async def handle_save_schedule_profile(call: ServiceCall) -> None:
+        profile_id = call.data["profile_id"]
+        profile_data = {
+            "name": call.data.get("name", profile_id.capitalize()),
+            "baseline_preset": call.data.get("baseline_preset", "eco"),
+            "days": call.data.get("days", {}),
+        }
+        for coord in _get_active_coordinators(hass):
+            if hasattr(coord, "schedule_manager"):
+                await coord.schedule_manager.async_save_profile(profile_id, profile_data)
+
+    async def handle_activate_schedule_profile(call: ServiceCall) -> None:
+        profile_id = call.data["profile_id"]
+        expires_at = call.data.get("expires_at")
+        fallback_profile = call.data.get("fallback_profile", "standard")
+        for coord in _get_active_coordinators(hass):
+            if hasattr(coord, "schedule_manager"):
+                await coord.schedule_manager.async_activate_profile(
+                    profile_id=profile_id,
+                    expires_at=expires_at,
+                    fallback_profile=fallback_profile,
+                )
+
+    async def handle_duplicate_schedule_profile(call: ServiceCall) -> None:
+        source_id = call.data["source_profile_id"]
+        target_id = call.data["target_profile_id"]
+        target_name = call.data.get("target_name")
+        for coord in _get_active_coordinators(hass):
+            if hasattr(coord, "schedule_manager"):
+                await coord.schedule_manager.async_duplicate_profile(
+                    source_id=source_id,
+                    target_id=target_id,
+                    target_name=target_name,
+                )
+
+    async def handle_set_smart_return(call: ServiceCall) -> None:
+        arrival_time = call.data["arrival_time"]
+        preset = call.data.get("preset", "comfort")
+        zones = call.data.get("zones")
+        for coord in _get_active_coordinators(hass):
+            if hasattr(coord, "schedule_manager"):
+                await coord.schedule_manager.async_set_smart_return(
+                    arrival_time=arrival_time,
+                    preset=preset,
+                    zones=zones,
+                )
+
+    async def handle_cancel_smart_return(call: ServiceCall) -> None:
+        for coord in _get_active_coordinators(hass):
+            if hasattr(coord, "schedule_manager"):
+                await coord.schedule_manager.async_cancel_smart_return()
+
+    async def handle_clear_zone_override(call: ServiceCall) -> None:
+        entity_id = call.data.get("entity_id")
+        for coord in _get_active_coordinators(hass):
+            if hasattr(coord, "schedule_manager"):
+                await coord.schedule_manager.async_clear_manual_override(entity_id)
+
+    async def handle_set_preset_temperature(call: ServiceCall) -> None:
+        preset = call.data["preset"]
+        entity_id = call.data["entity_id"]
+        temperature = float(call.data["temperature"])
+        for coord in _get_active_coordinators(hass):
+            if hasattr(coord, "zone_manager"):
+                coord.zone_manager.update_preset_temperature(preset, entity_id, temperature)
+            if hasattr(coord, "schedule_manager"):
+                await coord.schedule_manager.async_evaluate_schedule()
+
+    services = {
+        "save_schedule_profile": handle_save_schedule_profile,
+        "activate_schedule_profile": handle_activate_schedule_profile,
+        "duplicate_schedule_profile": handle_duplicate_schedule_profile,
+        "set_smart_return": handle_set_smart_return,
+        "cancel_smart_return": handle_cancel_smart_return,
+        "clear_zone_override": handle_clear_zone_override,
+        "set_preset_temperature": handle_set_preset_temperature,
+    }
+
+    if hasattr(hass, "services") and hasattr(hass.services, "async_register"):
+        for svc_name, handler in services.items():
+            hass.services.async_register(DOMAIN, svc_name, handler)
+
+    hass.data[DOMAIN]["_services_registered"] = True
+
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

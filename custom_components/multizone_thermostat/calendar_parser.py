@@ -7,13 +7,14 @@ from .const import GLOBAL_PRESETS, ZONE_MODE_BYPASS, ZONE_MODE_PRIMARY, ZONE_MOD
 _LOGGER = logging.getLogger(__name__)
 
 class CalendarOverride:
-    def __init__(self, is_permanent: bool = False, temperature: float | None = None, mode: str | None = None):
+    def __init__(self, is_permanent: bool = False, temperature: float | None = None, mode: str | None = None, preset: str | None = None):
         self.is_permanent = is_permanent
         self.temperature = temperature
         self.mode = mode
+        self.preset = preset
 
     def __repr__(self):
-        return f"Override(perm={self.is_permanent}, temp={self.temperature}, mode={self.mode})"
+        return f"Override(perm={self.is_permanent}, temp={self.temperature}, mode={self.mode}, preset={self.preset})"
 
 
 def parse_calendar_event(title: str) -> dict[str, Any]:
@@ -73,6 +74,8 @@ def parse_calendar_event(title: str) -> dict[str, Any]:
                 override.is_permanent = True
             elif cmd in valid_modes:
                 override.mode = cmd
+            elif cmd in GLOBAL_PRESETS:
+                override.preset = cmd
             elif cmd == "off":
                 override.mode = ZONE_MODE_BYPASS
             elif cmd == "standalone":

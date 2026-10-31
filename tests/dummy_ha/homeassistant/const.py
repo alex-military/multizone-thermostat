@@ -33,3 +33,8 @@ class Platform(StrEnum):
 class UnitOfTemperature(StrEnum):
     CELSIUS = "°C"
     FAHRENHEIT = "°F"
+
+class EntityCategory(StrEnum):
+    CONFIG = "config"
+    DIAGNOSTIC = "diagnostic"
+

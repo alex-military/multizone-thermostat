@@ -175,9 +175,18 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
 
     @property
     def target_temperature(self) -> float | None:
-        override_temp = self._coordinator.calendar_manager.temp_overrides.get(self.entity_id)
-        if override_temp is not None:
-            return override_temp
+        if hasattr(self._coordinator, "calendar_manager"):
+            override_temp = self._coordinator.calendar_manager.temp_overrides.get(self.entity_id)
+            if override_temp is not None and isinstance(override_temp, (int, float)):
+                return float(override_temp)
+        sched_manager = getattr(self._coordinator, "schedule_manager", None)
+        if sched_manager:
+            is_enabled = getattr(sched_manager, "scheduler_enabled", False) is True
+            has_smart_return = isinstance(getattr(sched_manager, "smart_return", None), dict)
+            if is_enabled or has_smart_return:
+                sched_temp = sched_manager.get_effective_target(self.entity_id)
+                if sched_temp is not None and isinstance(sched_temp, (int, float)):
+                    return float(sched_temp)
         return self._target_temperature
 
     @property
@@ -203,6 +212,19 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             bat = self._coordinator.plant_diagnostics.get_zone_battery_level(self.entity_id)
             if bat is not None:
                 attrs["battery_level"] = bat
+        sched_manager = getattr(self._coordinator, "schedule_manager", None)
+        if sched_manager and hasattr(sched_manager, "manual_overrides") and isinstance(getattr(sched_manager, "manual_overrides", None), dict):
+            manual_ovs = sched_manager.manual_overrides
+            attrs["schedule_manual_override"] = self.entity_id in manual_ovs
+            attrs["schedule_override_until"] = manual_ovs.get(self.entity_id, {}).get("until")
+            smart_info = getattr(sched_manager, "smart_start_info", None)
+            if isinstance(smart_info, dict):
+                attrs["smart_start_active"] = self.entity_id in smart_info
+                attrs["smart_start_detail"] = smart_info.get(self.entity_id)
+            if hasattr(sched_manager, "_get_zone_heating_rate"):
+                hr = sched_manager._get_zone_heating_rate(self.entity_id)
+                if isinstance(hr, (int, float)):
+                    attrs["heating_rate"] = hr
         return attrs
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
@@ -228,12 +250,20 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             and self.entity_id in self._coordinator.calendar_manager.temp_overrides
         ):
             self._coordinator.calendar_manager.temp_overrides[self.entity_id] = temperature
+
+        sched_manager = getattr(self._coordinator, "schedule_manager", None)
+        sched_enabled = bool(sched_manager and getattr(sched_manager, "scheduler_enabled", False) is True)
+        if sched_enabled:
+            sched_manager.record_manual_override(self.entity_id, temperature)
+            if hasattr(self.hass, "async_create_task"):
+                self.hass.async_create_task(sched_manager.async_save_to_storage())
+        else:
+            current_preset = self._coordinator.get_global_preset()
+            if current_preset and current_preset != "none":
+                self._coordinator.zone_manager.update_preset_temperature(current_preset, self.entity_id, temperature)
+
         self.async_write_ha_state()
         await self._trigger_trv_sync()
-        
-        current_preset = self._coordinator.get_global_preset()
-        if current_preset and current_preset != "none":
-            self._coordinator.zone_manager.update_preset_temperature(current_preset, self.entity_id, temperature)
 
     async def async_added_to_hass(self) -> None:
         """Run when entity about to be added."""
@@ -402,17 +432,32 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             needs_sync = True
             
         if delta_temp is not None and self._target_temperature is not None and self._hvac_mode != HVACMode.OFF:
-            self._target_temperature = max(self._attr_min_temp, min(self._attr_max_temp, self._target_temperature + delta_temp))
-            if (
-                hasattr(self._coordinator, "calendar_manager")
-                and self.entity_id in self._coordinator.calendar_manager.temp_overrides
-            ):
-                self._coordinator.calendar_manager.temp_overrides[self.entity_id] = self._target_temperature
-            current_preset = self._coordinator.get_global_preset()
-            if current_preset and current_preset != "none":
-                self._coordinator.zone_manager.update_preset_temperature(
-                    current_preset, self.entity_id, self._target_temperature
-                )
+            sched_manager = getattr(self._coordinator, "schedule_manager", None)
+            sched_enabled = bool(sched_manager and getattr(sched_manager, "scheduler_enabled", False) is True)
+            if sched_enabled:
+                base_temp = self.target_temperature if self.target_temperature is not None else self._target_temperature
+                new_temp = max(self._attr_min_temp, min(self._attr_max_temp, base_temp + delta_temp))
+                self._target_temperature = new_temp
+                if (
+                    hasattr(self._coordinator, "calendar_manager")
+                    and self.entity_id in self._coordinator.calendar_manager.temp_overrides
+                ):
+                    self._coordinator.calendar_manager.temp_overrides[self.entity_id] = self._target_temperature
+                sched_manager.record_manual_override(self.entity_id, new_temp)
+                if hasattr(self.hass, "async_create_task"):
+                    self.hass.async_create_task(sched_manager.async_save_to_storage())
+            else:
+                self._target_temperature = max(self._attr_min_temp, min(self._attr_max_temp, self._target_temperature + delta_temp))
+                if (
+                    hasattr(self._coordinator, "calendar_manager")
+                    and self.entity_id in self._coordinator.calendar_manager.temp_overrides
+                ):
+                    self._coordinator.calendar_manager.temp_overrides[self.entity_id] = self._target_temperature
+                current_preset = self._coordinator.get_global_preset()
+                if current_preset and current_preset != "none":
+                    self._coordinator.zone_manager.update_preset_temperature(
+                        current_preset, self.entity_id, self._target_temperature
+                    )
             needs_sync = True
             
         if needs_sync:

@@ -16,7 +16,9 @@ from .const import (
     GLOBAL_PRESET_MANUAL,
     make_zone_entity_id,
     KEY_PASSIVE_HEAT_PREFIX,
-    CONF_ZONE_ALLOW_PASSIVE_HEAT
+    CONF_ZONE_ALLOW_PASSIVE_HEAT,
+    CONF_ZONE_TARGET_TEMP,
+    DEFAULT_PRESET_TEMPS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -260,6 +262,7 @@ class ZoneManager:
                             self.hass.async_create_task(zone_select.async_select_option(was_mode))
                         else:
                             self.set_zone_mode(climate_id, was_mode, save_to_preset=False)
+
     def update_preset_temperature(self, preset: str, zone_id: str, temp: float) -> None:
         """Update the target temperature of a specific zone in a preset and save."""
         if preset not in self._presets:
@@ -269,3 +272,23 @@ class ZoneManager:
             
         self._presets[preset][zone_id]["target_temp"] = temp
         self.hass.async_create_task(self.coordinator._async_save_presets_storage())
+
+    def get_preset_temperature(self, preset: str, climate_id: str) -> float | None:
+        """Resolve preset temperature for a given zone dynamically."""
+        val = self._presets.get(preset, {}).get(climate_id, {}).get("target_temp")
+        if val is not None:
+            try:
+                return float(val)
+            except (ValueError, TypeError):
+                pass
+        if preset in DEFAULT_PRESET_TEMPS:
+            if preset == "comfort":
+                z = self.get_zone(climate_id)
+                if z and z.get(CONF_ZONE_TARGET_TEMP) is not None:
+                    try:
+                        return float(z[CONF_ZONE_TARGET_TEMP])
+                    except (ValueError, TypeError):
+                        pass
+                return float(DEFAULT_PRESET_TEMPS.get("comfort", 20.5))
+            return float(DEFAULT_PRESET_TEMPS[preset])
+        return None

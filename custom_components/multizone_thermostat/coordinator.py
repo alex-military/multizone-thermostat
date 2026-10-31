@@ -138,6 +138,7 @@ class MultizoneCoordinator:
         
         # Internal state tracking
         self._master_state: bool = False
+        self._master_switch: Any = None
         self._min_cycle_on = float(config.get(CONF_MIN_CYCLE_ON, DEFAULT_MIN_CYCLE_ON))
         self._min_cycle_off = float(config.get(CONF_MIN_CYCLE_OFF, DEFAULT_MIN_CYCLE_OFF))
         self._valve_delay = float(config.get(CONF_VALVE_DELAY, DEFAULT_VALVE_DELAY))
@@ -168,6 +169,9 @@ class MultizoneCoordinator:
 
         from .calendar_manager import CalendarManager
         self.calendar_manager = CalendarManager(self)
+
+        from .schedule_manager import ScheduleProfileManager
+        self.schedule_manager = ScheduleProfileManager(self)
 
         from .routine_manager import RoutineManager
         self.routine_manager = RoutineManager(
@@ -403,6 +407,11 @@ class MultizoneCoordinator:
             except (ValueError, TypeError):
                 pass
 
+        if hasattr(self, "schedule_manager"):
+            self.schedule_manager.load_from_storage()
+            if self.schedule_manager.scheduler_enabled or self.schedule_manager.profile_expires_at:
+                await self.schedule_manager.async_evaluate_schedule(dt_util.now())
+
     async def async_save_storage(self) -> None:
         """Save window states, presets and settings to storage."""
         await self._store.async_save(self.zone_manager._pre_window_state)
@@ -443,6 +452,16 @@ class MultizoneCoordinator:
         self._valve_delay = value
         if hasattr(self, "boiler_backend") and hasattr(self.boiler_backend, "set_valve_delay"):
             self.boiler_backend.set_valve_delay(int(value))
+
+    @property
+    def master_enabled(self) -> bool:
+        """Return master switch state."""
+        return self._master_state
+
+    @master_enabled.setter
+    def master_enabled(self, state: bool) -> None:
+        """Set master switch state."""
+        self._master_state = bool(state)
 
     def set_master_state(self, state: bool) -> None:
         """Set master state (called by master switch entity)."""
@@ -496,6 +515,16 @@ class MultizoneCoordinator:
         )
 
         self.routine_manager.async_setup_listeners()
+
+        # Listen every minute for Schedule Profile evaluation
+        if hasattr(self, "schedule_manager"):
+            self._unsub_listeners.append(
+                async_track_time_interval(
+                    self.hass,
+                    self.schedule_manager.async_evaluate_schedule,
+                    timedelta(minutes=1),
+                )
+            )
 
         # Listen every hour for Anti-Seize check
         self._unsub_listeners.append(

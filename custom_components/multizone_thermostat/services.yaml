@@ -1,0 +1,175 @@
+save_schedule_profile:
+  name: Save Schedule Profile
+  description: Save or update a weekly schedule profile.
+  fields:
+    profile_id:
+      name: Profile ID
+      description: Identifier of the schedule profile (e.g. standard, smart_working, holiday, custom).
+      required: true
+      example: smart_working
+      selector:
+        text:
+    name:
+      name: Friendly Name
+      description: Human-readable name for Lovelace UI.
+      required: false
+      example: Smart Working
+      selector:
+        text:
+    baseline_preset:
+      name: Baseline Preset
+      description: Default preset used outside scheduled time blocks (defaults to eco).
+      required: false
+      default: eco
+      example: eco
+      selector:
+        select:
+          options:
+            - comfort
+            - eco
+            - sleep
+            - away
+    days:
+      name: Days and Zone Blocks
+      description: Dictionary mapping days of week (mon-sun) to zone blocks.
+      required: true
+      example: '{"mon": {"climate.multizone_thermostat_living": [{"start": "06:30", "end": "08:30", "preset": "comfort"}]}}'
+      selector:
+        object:
+
+activate_schedule_profile:
+  name: Activate Schedule Profile
+  description: Activate a schedule profile immediately, with optional temporary duration.
+  fields:
+    profile_id:
+      name: Profile ID
+      description: Identifier of the profile to activate.
+      required: true
+      example: holiday
+      selector:
+        text:
+    expires_at:
+      name: Expires At
+      description: Optional ISO datetime or time string when this profile should revert to fallback.
+      required: false
+      example: "2026-11-02T18:00:00"
+      selector:
+        text:
+    fallback_profile:
+      name: Fallback Profile
+      description: Profile to restore once expired (defaults to standard).
+      required: false
+      default: standard
+      example: standard
+      selector:
+        text:
+
+duplicate_schedule_profile:
+  name: Duplicate Schedule Profile
+  description: Create a deep copy of an existing profile.
+  fields:
+    source_profile_id:
+      name: Source Profile ID
+      description: Existing profile ID to copy from.
+      required: true
+      example: standard
+      selector:
+        text:
+    target_profile_id:
+      name: Target Profile ID
+      description: New profile ID to create.
+      required: true
+      example: standard_spring
+      selector:
+        text:
+    target_name:
+      name: Target Friendly Name
+      description: Optional friendly name for the duplicated profile.
+      required: false
+      example: Standard Primavera
+      selector:
+        text:
+
+set_smart_return:
+  name: Set Smart Return
+  description: Schedule an intelligent arrival time with staggered preheating based on thermal inertia.
+  fields:
+    arrival_time:
+      name: Arrival Time
+      description: Expected arrival time ("HH:MM" e.g. "18:30" or ISO datetime string).
+      required: true
+      example: "18:30"
+      selector:
+        text:
+    preset:
+      name: Target Preset
+      description: Target preset mode to achieve by arrival time (defaults to comfort).
+      required: false
+      default: comfort
+      example: comfort
+      selector:
+        select:
+          options:
+            - comfort
+            - eco
+            - sleep
+            - away
+    zones:
+      name: Target Zones
+      description: Optional list of specific zone entity IDs or names to preheat. If omitted, applies to all zones.
+      required: false
+      example: '["climate.multizone_thermostat_living"]'
+      selector:
+        object:
+
+cancel_smart_return:
+  name: Cancel Smart Return
+  description: Cancel any active Smart Return preheating schedule.
+
+clear_zone_override:
+  name: Clear Zone Override
+  description: Clear temporary manual override for a specific zone (or all zones if omitted).
+  fields:
+    entity_id:
+      name: Zone Entity ID
+      description: Entity ID of the zone to clear. If omitted, clears all manual overrides.
+      required: false
+      example: climate.multizone_thermostat_living
+      selector:
+        entity:
+          domain: climate
+
+set_preset_temperature:
+  name: Set Preset Temperature
+  description: Update the temperature setpoint for a specific preset in a specific zone.
+  fields:
+    preset:
+      name: Preset Mode
+      description: Preset name (e.g. comfort, eco, sleep, away).
+      required: true
+      example: comfort
+      selector:
+        select:
+          options:
+            - comfort
+            - eco
+            - sleep
+            - away
+    entity_id:
+      name: Zone Entity ID
+      description: Entity ID of the zone to update.
+      required: true
+      example: climate.multizone_thermostat_living
+      selector:
+        entity:
+          domain: climate
+    temperature:
+      name: Target Temperature
+      description: New temperature setpoint.
+      required: true
+      example: 21.5
+      selector:
+        number:
+          min: 5.0
+          max: 35.0
+          step: 0.5

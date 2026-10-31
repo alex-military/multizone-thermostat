@@ -186,18 +186,25 @@ class CalendarManager:
                                 self.mode_overrides[climate_id] = override.mode
                                 
                         # Temperatures
-                        if override.temperature is not None:
+                        target_temp = override.temperature
+                        if target_temp is None and getattr(override, "preset", None):
+                            if hasattr(self.coordinator.zone_manager, "get_preset_temperature"):
+                                target_temp = self.coordinator.zone_manager.get_preset_temperature(override.preset, climate_id)
+                            else:
+                                target_temp = self.coordinator.zone_manager._presets.get(override.preset, {}).get(climate_id, {}).get("target_temp")
+
+                        if target_temp is not None:
                             if override.is_permanent:
                                 # Save permanently to current preset (Demeter violation fixed)
                                 if self.coordinator.zone_manager.current_global_preset:
                                     self.coordinator.zone_manager.update_preset_temperature(
                                         self.coordinator.zone_manager.current_global_preset, 
                                         climate_id, 
-                                        override.temperature
+                                        target_temp
                                     )
                             else:
                                 # Save temporarily
-                                self.current_event_overrides[climate_id] = override.temperature
+                                self.current_event_overrides[climate_id] = target_temp
                                 
                 # Trigger a refresh of climate entities and sync TRVs
                 self._notify_climates_and_sync_trvs()
@@ -240,14 +247,23 @@ class CalendarManager:
                 # Does this future event have specific temp override for this zone?
                 zone_name_lower = zone[CONF_ZONE_NAME].lower()
                 if zone_name_lower in parsed_next["overrides"]:
-                    target = parsed_next["overrides"][zone_name_lower].temperature
+                    fut_override = parsed_next["overrides"][zone_name_lower]
+                    target = fut_override.temperature
+                    if target is None and getattr(fut_override, "preset", None):
+                        if hasattr(self.coordinator.zone_manager, "get_preset_temperature"):
+                            target = self.coordinator.zone_manager.get_preset_temperature(fut_override.preset, climate_id)
+                        else:
+                            target = self.coordinator.zone_manager._presets.get(fut_override.preset, {}).get(climate_id, {}).get("target_temp")
                     
                 if target is None and parsed_next["global_temperature"] is not None:
                     target = parsed_next["global_temperature"]
                     
                 if target is None and parsed_next["global_preset"]:
                     # Look up base preset temp for this zone
-                    target = self.coordinator.zone_manager._presets.get(parsed_next["global_preset"], {}).get(climate_id, {}).get("target_temp")
+                    if hasattr(self.coordinator.zone_manager, "get_preset_temperature"):
+                        target = self.coordinator.zone_manager.get_preset_temperature(parsed_next["global_preset"], climate_id)
+                    else:
+                        target = self.coordinator.zone_manager._presets.get(parsed_next["global_preset"], {}).get(climate_id, {}).get("target_temp")
                     
                 if target is not None:
                     evaluated_zones.add(climate_id)

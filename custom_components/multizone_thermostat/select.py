@@ -41,6 +41,7 @@ async def async_setup_entry(
     entities: list[SelectEntity] = [
         MultizoneGlobalPresetSelect(coordinator, entry.entry_id),
         MultizoneDemandStrategySelect(coordinator, entry.entry_id),
+        MultizoneScheduleProfileSelect(coordinator, entry.entry_id),
     ]
     
     for zone in coordinator.zones:
@@ -271,3 +272,64 @@ class MultizoneZoneSelect(RestoreEntity, SelectEntity):
         """Unregister from coordinator on removal."""
         if hasattr(self._coordinator, "_selects"):
             self._coordinator._selects.pop(f"zone_mode_{self._climate_id}", None)
+
+
+class MultizoneScheduleProfileSelect(RestoreEntity, SelectEntity):
+    """Schedule profile selector for multi-profile scheduler."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "schedule_profile"
+    _attr_name = "Schedule Profile"
+    _attr_icon = "mdi:calendar-multiselect"
+
+    def __init__(self, coordinator: MultizoneCoordinator, entry_id: str) -> None:
+        """Initialize schedule profile select entity."""
+        self._coordinator = coordinator
+        self._entry_id = entry_id
+        self._attr_unique_id = f"{DOMAIN}_{entry_id}_schedule_profile"
+        coordinator._profile_select = self
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device info."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._entry_id)},
+            name="Master Control",
+            manufacturer="Custom Integration",
+            model="Master Control",
+        )
+
+    @property
+    def options(self) -> list[str]:
+        """Return list of available schedule profiles."""
+        if hasattr(self._coordinator, "schedule_manager") and hasattr(
+            self._coordinator.schedule_manager, "profiles"
+        ):
+            return list(self._coordinator.schedule_manager.profiles.keys())
+        return ["standard", "smart_working", "holiday"]
+
+    @property
+    def current_option(self) -> str | None:
+        """Return active schedule profile."""
+        if hasattr(self._coordinator, "schedule_manager"):
+            return self._coordinator.schedule_manager.active_profile
+        return "standard"
+
+    async def async_added_to_hass(self) -> None:
+        """Register entity when added to HA."""
+        await super().async_added_to_hass()
+        self._coordinator.register_select("schedule_profile", self)
+
+    async def async_select_option(self, option: str) -> None:
+        """Select a schedule profile."""
+        if hasattr(self._coordinator, "schedule_manager"):
+            await self._coordinator.schedule_manager.async_activate_profile(option)
+        self.async_write_ha_state()
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Unregister from coordinator on removal."""
+        if getattr(self._coordinator, "_profile_select", None) is self:
+            self._coordinator._profile_select = None
+        if hasattr(self._coordinator, "_select_entities") and isinstance(self._coordinator._select_entities, dict):
+            self._coordinator._select_entities.pop("schedule_profile", None)
+
