@@ -1,5 +1,18 @@
 # Changelog
 
+## [5.1.2] - 2026-10-31
+### Fix: Boot Availability Check for Boiler Switch (Fix A) & Elimination of Redundant 10s OFF Commands (Fix B)
+- **Fix A (Startup Entity Availability Guard)**:
+  - In `boiler/relay_backend.py`, `_force_boiler_on()`, `_force_boiler_off()`, and `async_emergency_off()` now check if the boiler switch entity exists and is not `unavailable` or `unknown` before invoking `hass.services.async_call`.
+  - Eliminates the `Referenced entities switch.caldaia are missing or not currently available` warnings logged by Home Assistant during startup when Zigbee2MQTT / Z2M takes longer to discover devices than HA core initialization.
+  - Extended entity availability guards to `boiler/opentherm_backend.py` (OpenTherm climate/number entity and optional CH switch), `sync_manager.py` (zone relays and proportional valves), and `zone_manager.py` (TRVs).
+- **Fix B (Redundant 10s OFF Command Suppression & Diagnostic Noise Elimination)**:
+  - In `boiler/relay_backend.py`, `async_emergency_off()` and `_force_boiler_off()` verify if the boiler switch is already `STATE_OFF` (and no pending `"on"` command exists). If already OFF, redundant `switch.turn_off` service calls to Home Assistant and Zigbee2MQTT are skipped.
+  - Completely eliminates continuous 10-second MQTT `OFF` publish spam to Zigbee2MQTT (`zigbee2mqtt/Caldaia`) when the Master heating switch is off.
+  - Moved diagnostic event logging (`BOILER_SWITCH_OFF`, `BOILER_SWITCH_ON`) and `reset_last_active_time()` inside the state-change condition, preventing the diagnostics history ring buffer from filling up with duplicate events every 10 seconds.
+- **Tests**:
+  - Added dedicated regression test cases in `tests/test_boiler_subsystem.py` verifying unavailable/unknown state handling and duplicate command suppression. All 178 tests pass.
+
 ## [5.1.1] - 2026-10-29
 ### Fix: Non-ASCII Zone Entity ID Transliteration (Issue #7), OpenTherm Flow Temperature & Full Lovelace Localization
 - **Fix (Core / Issue #7)**:
