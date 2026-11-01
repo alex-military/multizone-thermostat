@@ -2504,21 +2504,168 @@ if (!customElements.get("multizone-thermostat-spacer")) {
 /* ==================== HEALTH SUMMARY CARD ==================== */
 /* ==================== SCHEDULE SUMMARY NAVIGATION BUTTON CARD ==================== */
 
+function findLovelaceConfig(el) {
+  let node = el;
+  while (node) {
+    if (node.lovelace && node.lovelace.config && Array.isArray(node.lovelace.config.views)) {
+      return node.lovelace.config;
+    }
+    if (node.config && Array.isArray(node.config.views)) {
+      return node.config;
+    }
+    node = node.parentNode || node.host || null;
+  }
+  return null;
+}
+
+function navigateOrFallbackModal(hostEl, targetPath, onFallback) {
+  const llConfig = findLovelaceConfig(hostEl);
+  let viewSlug = targetPath;
+
+  if (llConfig && Array.isArray(llConfig.views)) {
+    let matchedIdx = -1;
+    const matchedView = llConfig.views.find((v, idx) => {
+      const p = (v.path !== undefined && v.path !== null && v.path !== '') ? String(v.path) : String(idx);
+      if (p.toLowerCase() === targetPath.toLowerCase()) {
+        matchedIdx = idx;
+        return true;
+      }
+      const stratType = (v.strategy && v.strategy.type) ? String(v.strategy.type) : '';
+      if (targetPath === 'programmazione' && stratType.includes('multizone-thermostat-scheduler')) {
+        matchedIdx = idx;
+        return true;
+      }
+      if (targetPath === 'diagnostica' && stratType.includes('multizone-thermostat-diagnostics')) {
+        matchedIdx = idx;
+        return true;
+      }
+      if (Array.isArray(v.cards)) {
+        const hasCard = JSON.stringify(v.cards).includes(
+          targetPath === 'programmazione' ? 'multizone-thermostat-scheduler-card' : 'multizone-thermostat-plant-card'
+        );
+        if (hasCard) {
+          matchedIdx = idx;
+          return true;
+        }
+      }
+      return false;
+    });
+
+    if (!matchedView) {
+      if (typeof onFallback === 'function') {
+        onFallback();
+        return;
+      }
+    } else {
+      viewSlug = (matchedView.path !== undefined && matchedView.path !== null && matchedView.path !== '')
+        ? String(matchedView.path)
+        : String(matchedIdx);
+    }
+  }
+
+  const parts = window.location.pathname.split('/').filter(Boolean);
+  const dashboardBase = parts.length > 0 ? `/${parts[0]}` : '/lovelace';
+  const fullPath = `${dashboardBase}/${viewSlug}`;
+
+  window.history.pushState(null, '', fullPath);
+  window.dispatchEvent(new CustomEvent('location-changed', {
+    bubbles: true,
+    composed: true,
+    detail: { replace: false }
+  }));
+}
+
 class MultizoneThermostatScheduleSummaryCard extends HTMLElement {
   getCardSize() { return 3; }
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
+    this._standaloneSchedCard = null;
   }
 
   set hass(hass) {
     this._hass = hass;
     this.updateCard();
+    if (this._standaloneSchedCard) {
+      this._standaloneSchedCard.hass = hass;
+    }
+  }
+
+  disconnectedCallback() {
+    this._closeStandaloneModal();
   }
 
   setConfig(config) {
     this._config = config || {};
     if (!this._rendered) this.renderStructure();
+  }
+
+  _openStandaloneModal() {
+    this._closeStandaloneModal();
+    const overlay = document.createElement('div');
+    overlay.id = 'mz-standalone-scheduler-overlay';
+    overlay.style.cssText = [
+      'position: fixed',
+      'inset: 0',
+      'z-index: 9999',
+      'background: rgba(15, 23, 42, 0.88)',
+      'backdrop-filter: blur(8px)',
+      '-webkit-backdrop-filter: blur(8px)',
+      'overflow-y: auto',
+      'padding: 16px',
+      'box-sizing: border-box',
+      'display: flex',
+      'flex-direction: column',
+      'align-items: center'
+    ].join(';');
+
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'width: 100%; max-width: 1360px; margin: 0 auto;';
+
+    const topBar = document.createElement('div');
+    topBar.style.cssText = 'display: flex; justify-content: flex-end; margin-bottom: 12px;';
+
+    const closeBtn = document.createElement('button');
+    closeBtn.innerHTML = '✕ Chiudi Programmazione';
+    closeBtn.style.cssText = [
+      'background: rgba(255, 255, 255, 0.12)',
+      'color: #f8fafc',
+      'border: 1px solid rgba(255, 255, 255, 0.2)',
+      'border-radius: 10px',
+      'padding: 8px 16px',
+      'font-size: 0.9rem',
+      'font-weight: 600',
+      'cursor: pointer'
+    ].join(';');
+    closeBtn.addEventListener('click', () => this._closeStandaloneModal());
+
+    topBar.appendChild(closeBtn);
+    wrapper.appendChild(topBar);
+
+    const schedCard = document.createElement('multizone-thermostat-scheduler-card');
+    if (typeof schedCard.setConfig === 'function') {
+      schedCard.setConfig({});
+    }
+    if (this._hass) {
+      schedCard.hass = this._hass;
+    }
+    this._standaloneSchedCard = schedCard;
+    wrapper.appendChild(schedCard);
+    overlay.appendChild(wrapper);
+
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) this._closeStandaloneModal();
+    });
+
+    document.body.appendChild(overlay);
+  }
+
+  _closeStandaloneModal() {
+    this._standaloneSchedCard = null;
+    const existing = document.getElementById('mz-standalone-scheduler-overlay');
+    if (existing && existing.parentNode) {
+      existing.parentNode.removeChild(existing);
+    }
   }
 
   renderStructure() {
@@ -2566,12 +2713,8 @@ class MultizoneThermostatScheduleSummaryCard extends HTMLElement {
     `;
 
     this.shadowRoot.querySelector('#sched-card').addEventListener('click', () => {
-      const event = new Event('hass-action', { bubbles: true, composed: true });
-      event.detail = {
-        config: { tap_action: { action: 'navigate', navigation_path: 'programmazione' } },
-        action: 'tap'
-      };
-      this.dispatchEvent(event);
+      const targetPath = (this._config && this._config.navigation_path) ? this._config.navigation_path : 'programmazione';
+      navigateOrFallbackModal(this, targetPath, () => this._openStandaloneModal());
     });
     this._rendered = true;
   }
@@ -2724,12 +2867,8 @@ class MultizoneThermostatHealthSummaryCard extends HTMLElement {
     `;
 
     this.shadowRoot.querySelector('#health-card').addEventListener('click', () => {
-      const event = new Event('hass-action', { bubbles: true, composed: true });
-      event.detail = {
-          config: { tap_action: { action: 'navigate', navigation_path: 'diagnostica' } },
-          action: 'tap'
-      };
-      this.dispatchEvent(event);
+      const targetPath = (this._config && this._config.navigation_path) ? this._config.navigation_path : 'diagnostica';
+      navigateOrFallbackModal(this, targetPath);
     });
     this._rendered = true;
   }
@@ -4029,6 +4168,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
         .header-title-box {
           display: flex;
           align-items: center;
+          flex-wrap: wrap;
           gap: 12px;
         }
         .header-title-box ha-icon {
@@ -4123,7 +4263,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
         
         .live-zones-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+          grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
           gap: 14px;
           margin-bottom: 24px;
         }
@@ -4143,19 +4283,20 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
           align-items: center;
           justify-content: space-between;
           gap: 8px;
+          flex-wrap: wrap;
         }
         .zone-card-title {
           font-weight: 700;
-          font-size: 1.05rem;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
+          font-size: 1.02rem;
+          line-height: 1.25;
+          word-break: break-word;
         }
         .zone-card-mid {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 12px;
+          gap: 10px;
+          flex-wrap: wrap;
         }
         .temp-display {
           display: flex;
@@ -4188,10 +4329,19 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          font-size: 0.8rem;
-          opacity: 0.85;
-          border-top: 1px solid rgba(255, 255, 255, 0.06);
-          padding-top: 6px;
+          font-size: 0.75rem;
+          opacity: 0.75;
+          border-top: 1px solid rgba(255, 255, 255, 0.08);
+          padding-top: 8px;
+          margin-top: 4px;
+          gap: 8px;
+          line-height: 1.4;
+          overflow: hidden;
+        }
+        .zone-card-bottom span {
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
         .editor-box {
@@ -4294,7 +4444,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
         }
         .time-ruler {
           display: flex;
-          margin-left: 140px;
+          margin-left: 180px;
           border-bottom: 1px solid rgba(255, 255, 255, 0.1);
           padding-bottom: 4px;
           margin-bottom: 8px;
@@ -4313,7 +4463,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
           gap: 10px;
         }
         .room-label-box {
-          width: 130px;
+          width: 170px;
           flex-shrink: 0;
           display: flex;
           align-items: center;
@@ -4911,8 +5061,8 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
                 </div>
               </div>
               <div class="zone-card-bottom">
-                <span>Inerzia: ${z.heating_rate.toFixed(1)} °C/h</span>
-                <span>${z.climate}</span>
+                <span>⚡ Inerzia: ${z.heating_rate.toFixed(1)} °C/h</span>
+                <span title="${z.climate}">${z.climate.replace('climate.', '')}</span>
               </div>
             </div>
           `;

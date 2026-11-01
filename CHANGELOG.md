@@ -1,5 +1,16 @@
 # Changelog
 
+## [6.0.1] - 2026-11-01
+### Fix: UI Layout Polishing & Scheduler Navigation Robustness
+- **UI Overflow & Overlap Polishing**:
+  - Prevented zone name truncation by expanding label boxes and enabling responsive text wrapping.
+  - Increased live zone grid minimum width to 320px with flexible item wrapping to eliminate vertical text collisions between target controls, status badges, and entity footers.
+  - Widened 24h timeline room label tracks from 130px to 170px for full visibility of multi-word zone names.
+  - Stripped `climate.` prefix and added clean status indicators in the zone card footer.
+- **Robust Navigation & Standalone Fallback**:
+  - Replaced relative navigation paths with absolute Lovelace URL resolution (`history.pushState` + `location-changed`), fixing the summary button when accessing dashboards without explicit sub-paths.
+  - Added standalone modal overlay fallback: if a user clicks "Programmazione" on a dashboard without the scheduler view declared in YAML, the full scheduler opens cleanly in an overlay with a close button.
+
 ## [6.0.0] - 2026-10-31
 ### Release: Phase 6 & 7 — Multi-Profile Weekly Scheduling, Per-Zone Presets, Predictive Smart Start, Smart Return Thermal Radar & Modern Lovelace UI
 
