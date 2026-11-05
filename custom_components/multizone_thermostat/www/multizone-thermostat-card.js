@@ -6388,7 +6388,7 @@ class MultizoneThermostatDashboardStrategy extends HTMLElement {
   static async generateDiagnosticView(info) {
     const hass = info.hass;
     if (!hass || !hass.states) return { cards: [] };
-    const strategyConfig = info.config?.strategy || info.strategy || info.config || {};
+    const strategyConfig = info.view?.strategy || info.config?.strategy || info.strategy || info.config || {};
     
     // Find all zones
     const zones = [];
@@ -6458,7 +6458,7 @@ class MultizoneThermostatDashboardStrategy extends HTMLElement {
     const hass = info.hass;
     if (!hass || !hass.states) return { cards: [] };
     // In view strategies, config is usually in info.config.strategy or info.strategy
-    const strategyConfig = info.config?.strategy || info.strategy || info.config || {};
+    const strategyConfig = info.view?.strategy || info.config?.strategy || info.strategy || info.config || {};
     
     // Find master switch
     const masterEntity = findMasterEntity(hass);
@@ -6523,19 +6523,20 @@ class MultizoneThermostatDashboardStrategy extends HTMLElement {
       border_radius: "20px",
     });
 
-    // Fill the rest of the top row with spacers so it's aligned with columns if needed
-    while (topRowCards.length < columns && columns <= 4) {
-      topRowCards.push({
-        type: "custom:multizone-thermostat-spacer"
+    // Wrap the top cards by the configured column count, so 1 column stacks them vertically
+    const stackCards = [];
+    for (let i = 0; i < topRowCards.length; i += columns) {
+      const chunk = topRowCards.slice(i, i + columns);
+      while (chunk.length < columns && columns <= 4) {
+        chunk.push({
+          type: "custom:multizone-thermostat-spacer"
+        });
+      }
+      stackCards.push({
+        type: "horizontal-stack",
+        cards: chunk
       });
     }
-
-    const stackCards = [
-      {
-        type: "horizontal-stack",
-        cards: topRowCards
-      }
-    ];
 
     for (let i = 0; i < zones.length; i += columns) {
       const chunk = zones.slice(i, i + columns);
