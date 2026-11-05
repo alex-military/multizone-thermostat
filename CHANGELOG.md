@@ -1,5 +1,14 @@
 # Changelog
 
+## [6.0.2] - 2026-11-05
+### Fix: Dashboard Columns Wrapping & Strategy View Compatibility
+- **Lovelace Dashboard Strategy Config Resolution**:
+  - Added support for loading strategy configuration from `info.view?.strategy` when defined directly inside Lovelace views, preventing strategy initialization failures.
+- **Top Row Responsive Column Wrapping**:
+  - Dynamically wrapped header cards (`topRowCards` such as Global Presets and Master Switch) according to the configured `columns` parameter.
+  - Stacks top cards vertically on mobile and single-column views (`columns: 1`) instead of spilling over horizontally into other elements.
+- *Special thanks to contributor @AlkisTsapanidis for submitting this fix (PR #8).*
+
 ## [6.0.1] - 2026-11-01
 ### Fix: UI Layout Polishing & Scheduler Navigation Robustness
 - **UI Overflow & Overlap Polishing**:
