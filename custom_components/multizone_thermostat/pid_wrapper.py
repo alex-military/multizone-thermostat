@@ -11,7 +11,7 @@ _LOGGER = logging.getLogger(__name__)
 class MultizonePID:
     """A wrapper around the mathematical PID controller."""
     
-    def __init__(self, kp: float, ki: float, kd: float, out_min: float = 0.0, out_max: float = 100.0, sensor_timeout: float = 7200.0):
+    def __init__(self, kp: float, ki: float, kd: float, out_min: float = 0.0, out_max: float = 100.0, sensor_timeout: float = 7200.0, zone_id: str = ''):
         """Initialize the PID wrapper.
         
         Args:
@@ -24,6 +24,7 @@ class MultizonePID:
         """
         self._pid = PID(kp, ki, kd, out_min=out_min, out_max=out_max, sampling_period=0)
         self.sensor_timeout = sensor_timeout
+        self.zone_id = zone_id
         self.update_sensor_timestamp()
         self.last_sensor_update = time.monotonic()
         self._last_input_time: float | None = None
@@ -57,7 +58,8 @@ class MultizonePID:
         
         # Dead Sensor Timeout Check
         if self.sensor_timeout > 0 and (now - self.last_sensor_update) > self.sensor_timeout:
-            _LOGGER.warning("PID: Dead Sensor Timeout reached (%.1f seconds). Forcing demand to 0%%.", (now - self.last_sensor_update))
+            zone_desc = f" for zone '{self.zone_id}'" if self.zone_id else ""
+            _LOGGER.warning("PID: Dead Sensor Timeout reached (%.1f seconds)%s. Forcing demand to 0%%.", (now - self.last_sensor_update), zone_desc)
             self._last_demand = 0.0
             return self._last_demand
             

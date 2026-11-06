@@ -67,12 +67,45 @@ class ScheduleProfileManager:
         self.manual_overrides: dict[str, dict[str, Any]] = {}
         self.schedule_overrides: dict[str, float] = {}
         self.smart_start_info: dict[str, dict[str, Any]] = {}
+        self._active_smart_starts: dict[str, dict[str, Any]] = {}
         self.smart_return: dict[str, Any] | None = None
 
     @property
     def hass(self):
         """Get Home Assistant instance from coordinator."""
         return self.coordinator.hass
+
+    def _as_local(self, dt: datetime | None) -> datetime:
+        """Convert datetime to configured local timezone."""
+        if dt is None:
+            dt = dt_util.now()
+        tz_name = getattr(getattr(self.hass, "config", None), "time_zone", None)
+        if tz_name:
+            import zoneinfo
+            try:
+                tz = zoneinfo.ZoneInfo(tz_name)
+                if dt.tzinfo is None:
+                    return dt.replace(tzinfo=tz)
+                return dt.astimezone(tz)
+            except Exception:
+                if hasattr(dt_util, "get_time_zone"):
+                    try:
+                        tz = dt_util.get_time_zone(tz_name)
+                        if tz is not None:
+                            if dt.tzinfo is None:
+                                return dt.replace(tzinfo=tz)
+                            return dt.astimezone(tz)
+                    except Exception:
+                        pass
+                if "Rome" in str(tz_name) or "CET" in str(tz_name):
+                    tz = timezone(timedelta(hours=1))
+                    if dt.tzinfo is None:
+                        return dt.replace(tzinfo=tz)
+                    return dt.astimezone(tz)
+        try:
+            return dt_util.as_local(dt)
+        except Exception:
+            return dt
 
     def load_from_storage(self) -> None:
         """Load schedule state from coordinator persistent settings."""
@@ -151,6 +184,7 @@ class ScheduleProfileManager:
             self.schedule_overrides.clear()
             self.manual_overrides.clear()
             self.smart_start_info.clear()
+            self._active_smart_starts.clear()
             await self.async_save_to_storage()
             self._notify_climates()
         else:
@@ -193,6 +227,9 @@ class ScheduleProfileManager:
             "days": normalized_days,
         }
 
+        if profile_id == self.active_profile:
+            self._active_smart_starts.clear()
+
         await self.async_save_to_storage()
 
         if profile_id == self.active_profile and self.scheduler_enabled:
@@ -231,6 +268,7 @@ class ScheduleProfileManager:
             }
 
         self.active_profile = profile_id
+        self._active_smart_starts.clear()
         if isinstance(expires_at, datetime):
             self.profile_expires_at = expires_at.isoformat()
         elif isinstance(expires_at, str) and expires_at.strip():
@@ -267,6 +305,7 @@ class ScheduleProfileManager:
             old_profile = self.active_profile
             self.active_profile = self.fallback_profile or DEFAULT_SCHEDULE_PROFILE
             self.profile_expires_at = None
+            self._active_smart_starts.clear()
             if hasattr(self.coordinator, "record_diagnostic_event"):
                 self.coordinator.record_diagnostic_event(
                     "SCHEDULE_PROFILE_EXPIRED",
@@ -342,8 +381,7 @@ class ScheduleProfileManager:
         now: datetime | None = None,
     ) -> dict[str, dict[str, Any]]:
         """Calculate the Thermal Radar plan with staggered preheating start times."""
-        if now is None:
-            now = dt_util.now()
+        now = self._as_local(now)
         arrival_dt = self._parse_arrival_time(arrival_time, now)
 
         norm_filter = None
@@ -471,6 +509,7 @@ class ScheduleProfileManager:
 
     def evaluate_zone_slot(self, climate_id: str, now: datetime) -> dict[str, Any]:
         """Evaluate active schedule profile for a specific zone at time now."""
+        now = self._as_local(now)
         profile = self.profiles.get(self.active_profile, {})
         days_dict = profile.get("days", {})
         baseline_preset = profile.get("baseline_preset", DEFAULT_BASELINE_PRESET)
@@ -553,6 +592,7 @@ class ScheduleProfileManager:
         self, climate_id: str, now: datetime, horizon_hours: int = 24
     ) -> list[dict[str, Any]]:
         """Return chronological list of upcoming scheduled blocks within horizon_hours."""
+        now = self._as_local(now)
         profile = self.profiles.get(self.active_profile, {})
         days_dict = profile.get("days", {})
         horizon_end = now + timedelta(hours=horizon_hours)
@@ -582,8 +622,7 @@ class ScheduleProfileManager:
         self, climate_id: str, target_temp: float, now: datetime | None = None
     ) -> None:
         """Record manual override for zone lasting until current slot changes/expires."""
-        if now is None:
-            now = dt_util.now()
+        now = self._as_local(now)
         slot = self.evaluate_zone_slot(climate_id, now)
         until_dt = slot["until"]
         until_str = until_dt.isoformat() if isinstance(until_dt, datetime) else str(until_dt)
@@ -670,8 +709,7 @@ class ScheduleProfileManager:
 
     async def async_evaluate_schedule(self, now: datetime | None = None) -> None:
         """Evaluate active schedule profile, smart start, and smart return across all zones."""
-        if now is None:
-            now = dt_util.now()
+        now = self._as_local(now)
 
         profile_expired = self.check_profile_expiry(now)
         if profile_expired:
@@ -815,6 +853,7 @@ class ScheduleProfileManager:
             if is_off:
                 self.manual_overrides.pop(climate_id, None)
                 self.schedule_overrides.pop(climate_id, None)
+                self._active_smart_starts.pop(climate_id, None)
                 continue
 
             # 3. Manual override check (only when scheduler is enabled)
@@ -849,6 +888,7 @@ class ScheduleProfileManager:
                     has_valid_manual_override = True
 
             if has_valid_manual_override:
+                self._active_smart_starts.pop(climate_id, None)
                 continue
 
             # 4. Smart Return waiting check:
@@ -867,7 +907,19 @@ class ScheduleProfileManager:
                 future_blocks = [b for b in upcoming if b["start_dt"] > now]
                 if future_blocks:
                     next_b = future_blocks[0]
-                    if next_b["target_temp"] > slot["target_temp"]:
+                    block_start_iso = next_b["start_dt"].isoformat()
+
+                    active_ss = self._active_smart_starts.get(climate_id)
+                    is_already_preheating = (
+                        active_ss is not None
+                        and active_ss.get("block_start") == block_start_iso
+                        and now < next_b["start_dt"]
+                    )
+
+                    if is_already_preheating:
+                        self.schedule_overrides[climate_id] = float(next_b["target_temp"])
+                        self.smart_start_info[climate_id] = active_ss
+                    elif next_b["target_temp"] > slot["target_temp"]:
                         curr_temp = self._get_zone_current_temp(climate_id)
                         if curr_temp is not None and curr_temp < next_b["target_temp"]:
                             heating_rate = self._get_zone_heating_rate(climate_id)
@@ -883,15 +935,25 @@ class ScheduleProfileManager:
                                 preheat_dt = preheat_dt.replace(tzinfo=check_now.tzinfo)
 
                             if check_now >= preheat_dt:
-                                self.schedule_overrides[climate_id] = float(next_b["target_temp"])
-                                self.smart_start_info[climate_id] = {
+                                ss_info = {
                                     "target_temp": float(next_b["target_temp"]),
                                     "preset": next_b["preset"],
-                                    "block_start": next_b["start_dt"].isoformat(),
+                                    "block_start": block_start_iso,
                                     "preheat_start": preheat_dt.isoformat(),
                                     "heating_rate": round(heating_rate, 2),
                                     "source": "schedule",
                                 }
+                                self.schedule_overrides[climate_id] = float(next_b["target_temp"])
+                                self.smart_start_info[climate_id] = ss_info
+                                self._active_smart_starts[climate_id] = ss_info
+                            else:
+                                self._active_smart_starts.pop(climate_id, None)
+                        else:
+                            self._active_smart_starts.pop(climate_id, None)
+                    else:
+                        self._active_smart_starts.pop(climate_id, None)
+                else:
+                    self._active_smart_starts.pop(climate_id, None)
 
         target_changed = old_overrides != self.schedule_overrides
         smart_start_changed = old_smart_start != self.smart_start_info

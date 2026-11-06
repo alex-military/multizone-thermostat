@@ -31,86 +31,60 @@ Multizone Thermostat transforms Home Assistant into an **autonomous, self-learni
 - [x] **Preset Manual Memory & Cooldown Hardening (v5.0.2)**: Dynamic retention of manual setpoint modifications and relay protection.
 - [x] **Config Flow Robustness (v5.0.3)**: Fully resilient entity discovery and validation on Home Assistant's `EntityRegistry`.
 
+### Plant Regulation, Climate Sync & Dual OpenTherm (v5.1.0 → v5.1.2)
+- [x] **Guided Dual-Path Setup in Config Flow (Phase 8)**: Option 1 for climate-based OpenTherm gateways (auto attribute telemetry extraction); Option 2 for decoupled discrete gateways (`number` + `switch`).
+- [x] **Authoritative Hardware Climate Sync (Phase 9)**: Opt-in authoritative mode source for physical wall thermostats (e.g., Vimar, Bticino) propagating manual OFF states without setpoint corruption.
+- [x] **Configurable Demand Aggregator Strategies & Zone Weights (Phase 10)**: Selection of plant formulas (`MAX`, `WEIGHTED_AVERAGE`, `SUM_CAPPED`) with live entity selector and zone weight multipliers.
+- [x] **Dynamic Feed-Forward Weather Curve ($T_{\text{ext}} \rightarrow T_{\text{flow}}$) (Phase 10)**: Continuously adapts boiler flow temperature based on real outdoor temperature and building thermal retention time.
+- [x] **Air-in-Radiator Anomaly Detection (`ANOMALY_AIR_IN_RADIATOR`) (Phase 10)**: Automated supervision identifying valves opened at 100% with abnormally slow heat-up rates.
+- [x] **Startup Availability Guards & Command De-Duplication (v5.1.2)**: Entity readiness verification during late Zigbee2MQTT startup and suppression of duplicate 10s OFF MQTT spam.
+
+### Advanced Weekly Scheduling & Next-Gen Lovelace UI (v6.0.0 → v6.0.2)
+- [x] **Independent Per-Zone Presets per Time Block (Phase 6)**: Ability to assign distinct presets to different rooms within the same scheduled block without duplicated temperature matrices.
+- [x] **Deterministic Baseline Preset for Schedule Gaps (Phase 6)**: Configurable default preset (e.g. `Eco`) automatically applied outside scheduled time blocks.
+- [x] **Multi-Profile Management (Phase 6)**: Native storage-backed engine supporting *Standard*, *Holiday/Festivo*, *Smart Working*, and custom profiles with background editing.
+- [x] **Temporary Profile Activation with Auto-Reversion (Phase 6)**: Activate alternate profiles with expiration timestamps and automated fallback to baseline.
+- [x] **Predictive Smart Start Schedule Synchronization (Phase 6)**: 12h thermal horizon calculating staggered pre-heating times per room to reach target comfort at the exact scheduled minute.
+- [x] **Smart Override vs. Explicit OFF Rules (Phase 6)**: Temporary overrides expire at next slot transition, while intentional manual OFF (`HVACMode.OFF`) is permanently protected from unwanted re-activation.
+- [x] **Dedicated Mobile-Optimized Weekly Timeline Card (Phase 7)**: Synchronized 24h matrix view, quick duration pills, batch multi-day slot modal, and full multi-language localization.
+- [x] **"Smart Return" (Pianifica Rientro) Arrival Planner & Auto-Wake (Phase 7)**: Arrival planner with thermal radar and automatic plant wake-up from master OFF.
+- [x] **UI Polish, Single-Column Wrapping & Strategy View Compatibility (v6.0.1 / v6.0.2 - PR #8)**: Responsive layout stacking for top header cards, robust navigation fallback, and seamless support for Lovelace strategy views.
+
 ---
 
 ## 🚀 Active Roadmap & Upcoming Features
 
-### Phase 6 — Advanced Weekly Scheduling & Multi-Profile Engine
-*Derived from community collaboration in [GitHub Issue #5](https://github.com/alex-military/multizone-thermostat/issues/5).*
+### Phase 11 — Hybrid Multi-Generator, Room Split Climate & Solar Self-Consumption (Next Target)
+*Complete architectural design and technical specifications available in [`PHASE_11_SPECIFICATION.md`](PHASE_11_SPECIFICATION.md).*
 
-- [ ] **Independent Per-Zone Presets per Time Block**:
-  - Ability to assign distinct presets to different rooms within the same scheduled block (e.g., 18:00–22:00: *Living Room at Comfort*, *Bedrooms at Eco*, *Bathroom at Comfort 19:00–20:00*).
-  - Schedule blocks reference existing zone preset temperature matrices, avoiding duplicated temperature settings.
-- [ ] **Deterministic Baseline Preset for Schedule Gaps**:
-  - Configurable default preset (e.g., `Eco`) automatically applied to all zones outside scheduled time blocks, eliminating unpredictable fallback states.
-- [ ] **Multi-Profile Management (*Standard*, *Holiday/Festivo*, *Smart Working*)**:
-  - Define and save distinct weekly schedules.
-  - Edit and prepare inactive profiles in the background without disturbing the currently active schedule.
-- [ ] **Temporary Profile Activation with Auto-Reversion**:
-  - Activate an alternate profile with an expiration timestamp (e.g., activate *Holiday* until Sunday 23:59).
-  - Automatically reverts to *Standard* upon expiry, with persistent storage across Home Assistant restarts.
-- [ ] **Predictive Smart Start Schedule Synchronization**:
-  - Dedicated scheduler-to-engine interface passing upcoming target temperatures and scheduled arrival times.
-  - Multizone's thermal model calculates early staggered heating start times per room, guaranteeing target comfort at the exact scheduled minute.
-- [ ] **Smart Override vs. Deliberate OFF Rules**:
-  - *Temperature adjustments (knob or card)*: Temporary override active until the next scheduled block transition or manual reset.
-  - *Explicit Zone OFF*: High-priority manual shutdown preserved across schedule transitions without unwanted re-activation.
-
----
-
-### Phase 7 — Next-Gen Scheduler UI & "Smart Return" Arrival Planner
-*Visual and mobile user experience enhancements.*
-
-- [ ] **Dedicated Mobile-Optimized Weekly Timeline Card**:
-  - Whole-house synchronized 24-hour matrix view displaying thermal schedules for all zones on a single screen.
-  - Fast *"Preset Brush"* interaction to apply presets with one tap, minimizing nested dialogs.
-  - Visual badges for zones running temporary manual overrides with one-click *"Resume Schedule"* reset.
-- [ ] **"Smart Return" (Pianifica Rientro) Arrival Planner**:
-  - Quick action card/panel to set an estimated arrival time (e.g., *"Arriving home at 18:30"*).
-  - Automatic calculation of staggered zone ignition times based on individual room thermal inertia (slower rooms start earlier, fast rooms later) to reach target comfort simultaneously at arrival while minimizing fuel consumption.
+- [ ] **Dual-Level Heating Architecture (Central Hydronic + Room Air Splits)**:
+  - **Central Hydronic Drive**: Coordinated bivalent staging between primary Heat Pump (PDC) and auxiliary/peak Gas Boiler on the shared water loop.
+  - **Room Direct Expansion Actuators**: Integration of room-level AC/heat pump split units (`climate.*` entities) as secondary/auxiliary climate actuators.
+- [ ] **Configurable Split Operational Roles & Runtime Master Controls**:
+  - Per-zone role configuration: *Heating Only*, *Cooling Only*, or *Both (Heat & Cool)*.
+  - Global Dashboard Master Switches for immediate runtime control without re-configuration:
+    - `switch.multizone_master_allow_split_heating` (Toggle Split Heating ON/OFF globally).
+    - `switch.multizone_master_allow_split_cooling` (Toggle Split Cooling ON/OFF globally).
+  - Per-zone toggle options for 3 independent runtime behaviors: *Solar Priority*, *Thermal Shock / Quick Heat Boost*, and *Real Room Sensor Injection* (bypassing the ceiling probe).
+- [ ] **Optional Solar Self-Consumption & Inverter Clipping Engine**:
+  - Fully optional and bypassable for installations without solar; provides a runtime source selector (`select.multizone_heat_source_priority`: *Gas Priority*, *Electric Priority*, *Gas Only*, *Electric Only*).
+  - Multiple solar detection methods:
+    - **Inverter Clipping / Curtailment detection**: Native evaluation ($SOC \ge 98\%$, battery `idle`, $|P_{PV} - P_{Load}| < 80\text{ W}$, $P_{PV} > 300\text{ W}$) or custom template sensor state (`Limitazione`).
+    - **Grid Export**: Configurable export power threshold ($P_{export} > X\text{ W}$).
+    - **Predictive Optimizer**: Signal input from EMHASS or Predbat for pre-scheduled solar thermal charging.
+  - Two operational modes during solar surplus:
+    - *Global Hybrid Mode*: Gas boiler fires only for rooms without splits, while rooms with splits bypass radiators and heat for free via splits.
+    - *Solar Self-Consumption Only (Zero Gas)*: Gas boiler strictly locked OFF; only splits engage to dump surplus energy into thermal mass.
+  - Battery Protection Guard & Anti-Chatter: Minimum continuous run time (10–15 min) and automatic shutoff if battery discharges past threshold.
+- [ ] **Foundations for Summer Cooling Mode**:
+  - Seasonal Master Mode Switch (`HVACMode.HEAT` / `HVACMode.COOL`).
+  - Active cooling management for AC splits and dew-point controlled hydronic cooling manifolds.
 
 ---
 
-### Phase 8 — Dual OpenTherm Drive Distinction
-*Derived from community feedback in [Community Post #22](https://community.home-assistant.io/t/multizone-thermostat-v3-smart-pid-pwm-geofencing-100-ui-no-yaml/1018712/22).*
-
-- [x] **Guided Dual-Path Setup in Config Flow**:
-  - **Option 1 — Climate-Based OpenTherm Gateway**:
-    - Direct selection of an existing boiler `climate` entity.
-    - Sends target modulation via `climate.set_temperature` and mode via `climate.set_hvac_mode`.
-    - Automatically extracts telemetry (flame active, DHW production status, modulation %, return temp) directly from climate entity attributes, requiring zero manual auxiliary sensor configuration.
-  - **Option 2 — Standard Decoupled OpenTherm Gateway**:
-    - Tailored for DIY/ESPHome gateways exposing discrete entities (`number` flow setpoint, `switch` central heating enable, and independent diagnostic sensors).
-
----
-
-### Phase 9 — Authoritative Hardware Climate Sync
-*Derived from physical wall thermostat integration in [GitHub Issue #2](https://github.com/alex-military/multizone-thermostat/issues/2).*
-
-- [x] **Per-Zone Authoritative Mode Source (Opt-in)**:
-  - For zones driven by a primary physical wall thermostat (e.g., Vimar, Bticino), allow the physical device to act as an authoritative mode source.
-  - Physical OFF actions propagate directly to the virtual zone without being misinterpreted as knob adjustments to 5 °C.
-  - Retains the virtual preset target across OFF transitions and filters out transient `idle` or network reconnection states.
-
----
-
-### Phase 10 — Advanced Plant Regulation & Efficiency
-- [x] **Configurable Demand Aggregator Strategies**:
-  - Choice of plant-wide heat demand aggregation formulas:
-    - `MAX`: Highest-demand zone dictates boiler power.
-    - `WEIGHTED_AVERAGE`: Demand weighted by radiator emitter wattage or room volume.
-    - `SUM_CAPPED`: Cumulative sum of zone demands with a 100% saturation ceiling.
-- [x] **Dynamic Feed-Forward Weather Curve ($T_{\text{ext}} \rightarrow T_{\text{flow}}$)**:
-  - Continuously adapts boiler flow temperature based on real outdoor temperature and building thermal retention time.
-- [x] **Air-in-Radiator Anomaly Detection (`ANOMALY_AIR_IN_RADIATOR`)**:
-  - Automated supervision identifying valves opened at 100% with abnormally slow heat-up rates compared to historic baseline, indicating trapped air or restricted flow.
-
----
-
-### Phase 11 — Long-Term Research & System Evolutions
-- [ ] **Hydraulic Zone Clustering**: Grouping zones by physical manifolds/floors to maintain minimum loop flow and prevent overpressure.
-- [ ] **Hybrid Multi-Generator Management**: Coordinated staging between primary Heat Pumps and auxiliary/peak Gas Boilers.
-- [ ] **Dynamic Energy Tariff & Solar Preheating**: Integration with hourly electricity pricing (Nord Pool, PUN) and PV solar excess to dynamically pre-heat zones during low-cost or high-production windows.
+### Phase 12 — Long-Term Research & System Evolutions
+- [ ] **Hydraulic Zone Clustering**: Grouping zones by physical manifolds/floors to maintain minimum loop flow and prevent overpressure on circuits without differential bypass.
+- [ ] **Dynamic Hourly Energy Tariffs (Nord Pool / PUN)**: Automated thermal storage shifting based on variable day-ahead electricity prices.
 
 ---
 

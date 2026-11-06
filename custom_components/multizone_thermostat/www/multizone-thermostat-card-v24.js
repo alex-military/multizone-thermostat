@@ -989,6 +989,9 @@ class MultizoneThermostatButtonCard extends HTMLElement {
         padding: 16px;
         position: relative;
         overflow: hidden;
+        border-radius: var(--ha-card-border-radius, 20px);
+        border: 1px solid var(--ha-card-border-color, rgba(255, 255, 255, 0.08));
+        box-shadow: var(--ha-card-box-shadow, 0 4px 12px rgba(0, 0, 0, 0.15));
       }
       .wrapper {
         position: relative;
@@ -1525,6 +1528,9 @@ class MultizoneThermostatDialCard extends HTMLElement {
         padding: 16px;
         position: relative;
         overflow: hidden;
+        border-radius: var(--ha-card-border-radius, 20px);
+        border: 1px solid var(--ha-card-border-color, rgba(255, 255, 255, 0.08));
+        box-shadow: var(--ha-card-box-shadow, 0 4px 12px rgba(0, 0, 0, 0.15));
       }
       .wrapper {
         position: relative;
@@ -1937,7 +1943,7 @@ class MultizoneThermostatStatusCard extends HTMLElement {
     style.textContent = `
       ha-card {
         padding: 16px;
-        border-radius: var(--ha-card-border-radius, 12px);
+        border-radius: var(--ha-card-border-radius, 20px);
         color: white;
         transition: background-color 0.5s ease, transform 0.2s ease, box-shadow 0.2s ease;
         cursor: pointer;
@@ -1946,11 +1952,12 @@ class MultizoneThermostatStatusCard extends HTMLElement {
         min-height: 90px;
         position: relative;
         overflow: hidden;
-        border: none;
+        border: 1px solid var(--ha-card-border-color, rgba(255, 255, 255, 0.08));
+        box-shadow: var(--ha-card-box-shadow, 0 4px 12px rgba(0, 0, 0, 0.15));
       }
       ha-card:hover {
         transform: translateY(-2px);
-        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.25);
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
       }
       ha-card:active {
         transform: translateY(0);
@@ -2222,16 +2229,19 @@ class MultizoneThermostatPresetCard extends HTMLElement {
       <style>
         ha-card {
           padding: 16px;
-          border-radius: 12px;
+          border-radius: var(--ha-card-border-radius, 20px);
           display: flex;
           flex-direction: column;
           gap: 12px;
-          background: var(--ha-card-background, var(--card-background-color, white));
+          background: var(--ha-card-background, var(--card-background-color, #181c20));
+          border: 1px solid var(--ha-card-border-color, rgba(255, 255, 255, 0.08));
+          box-shadow: var(--ha-card-box-shadow, 0 4px 12px rgba(0, 0, 0, 0.15));
         }
         .header {
-          font-weight: 500;
-          font-size: 16px;
-          color: var(--primary-text-color);
+          font-weight: 600;
+          font-size: 14px;
+          color: var(--primary-text-color, #ffffff);
+          margin-bottom: 2px;
         }
         .buttons-row {
           display: flex;
@@ -2245,22 +2255,24 @@ class MultizoneThermostatPresetCard extends HTMLElement {
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          background: var(--secondary-background-color);
-          color: var(--secondary-text-color);
+          background: var(--secondary-background-color, rgba(255, 255, 255, 0.04));
+          color: var(--secondary-text-color, #94a3b8);
           border-radius: 12px;
           padding: 12px 4px;
           cursor: pointer;
-          transition: all 0.3s ease;
-          border: 2px solid transparent;
+          transition: all 0.25s ease;
+          border: 1.5px solid transparent;
           gap: 6px;
         }
         .preset-btn:hover {
-          background: rgba(var(--rgb-primary-color), 0.1);
+          background: rgba(255, 255, 255, 0.08);
+          transform: translateY(-1px);
         }
         .preset-btn.active {
-          background: rgba(var(--rgb-primary-color), 0.15);
-          color: var(--primary-color);
-          border-color: var(--primary-color);
+          background: rgba(3, 169, 244, 0.15);
+          color: #03a9f4;
+          border-color: #03a9f4;
+          box-shadow: 0 0 12px rgba(3, 169, 244, 0.25);
         }
         .preset-btn ha-icon {
           --mdc-icon-size: 28px;
@@ -2672,22 +2684,25 @@ class MultizoneThermostatScheduleSummaryCard extends HTMLElement {
     this.shadowRoot.innerHTML = `
       <style>
         ha-card {
-          padding: 16px;
+          padding: 16px 12px;
           border-radius: var(--ha-card-border-radius, 20px);
           background-color: var(--card-background-color, #1c1c1c);
+          border: 1px solid var(--ha-card-border-color, rgba(255, 255, 255, 0.08));
+          box-shadow: var(--ha-card-box-shadow, 0 4px 12px rgba(0, 0, 0, 0.15));
           color: white;
           display: flex;
           align-items: center;
           justify-content: center;
           height: 100%;
-          min-height: 80px;
+          min-height: 90px;
           cursor: pointer;
-          transition: background-color 0.2s, transform 0.2s;
+          transition: background-color 0.2s, transform 0.2s, box-shadow 0.2s;
           box-sizing: border-box;
         }
         ha-card:hover {
-          background-color: var(--secondary-background-color, #2c2c2c);
+          background-color: var(--secondary-background-color, #242a30);
           transform: translateY(-2px);
+          box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
         }
         .container {
           display: flex;
@@ -2696,16 +2711,33 @@ class MultizoneThermostatScheduleSummaryCard extends HTMLElement {
           gap: 4px;
           text-align: center;
         }
+        .icon-circle {
+          width: 44px;
+          height: 44px;
+          border-radius: 50%;
+          background: rgba(3, 169, 244, 0.12);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-bottom: 4px;
+          transition: transform 0.2s ease, background 0.3s ease;
+        }
+        ha-card:hover .icon-circle {
+          transform: scale(1.08);
+        }
         ha-icon {
-          --mdc-icon-size: 32px;
+          --mdc-icon-size: 24px;
+          color: #03a9f4;
           transition: color 0.3s ease;
         }
-        .title { font-weight: bold; font-size: 1.1em; }
-        .subtitle { font-size: 0.9em; opacity: 0.9; }
+        .title { font-weight: 600; font-size: 0.95em; letter-spacing: -0.2px; }
+        .subtitle { font-size: 0.8em; opacity: 0.8; }
       </style>
       <ha-card id="sched-card">
         <div class="container">
-          <ha-icon id="sched-icon" icon="mdi:calendar-clock"></ha-icon>
+          <div class="icon-circle" id="sched-circle">
+            <ha-icon id="sched-icon" icon="mdi:calendar-clock"></ha-icon>
+          </div>
           <div class="title" id="sched-title">Programmazione</div>
           <div class="subtitle" id="sched-subtitle">In Pausa</div>
         </div>
@@ -2750,6 +2782,7 @@ class MultizoneThermostatScheduleSummaryCard extends HTMLElement {
     const titleEl = this.shadowRoot.querySelector('#sched-title');
     const subtitleEl = this.shadowRoot.querySelector('#sched-subtitle');
     const iconEl = this.shadowRoot.querySelector('#sched-icon');
+    const circleEl = this.shadowRoot.querySelector('#sched-circle');
 
     if (titleEl) {
       titleEl.textContent = getTranslation(this._hass, 'sched_nav_title');
@@ -2761,6 +2794,7 @@ class MultizoneThermostatScheduleSummaryCard extends HTMLElement {
         iconEl.icon = "mdi:calendar-clock";
         iconEl.style.color = "#94a3b8";
       }
+      if (circleEl) circleEl.style.background = "rgba(148, 163, 184, 0.12)";
       return;
     }
 
@@ -2827,39 +2861,60 @@ class MultizoneThermostatHealthSummaryCard extends HTMLElement {
     this.shadowRoot.innerHTML = `
       <style>
         ha-card {
-          padding: 16px;
+          padding: 16px 12px;
           border-radius: var(--ha-card-border-radius, 20px);
           background-color: var(--card-background-color, #1c1c1c);
+          border: 1px solid var(--ha-card-border-color, rgba(255, 255, 255, 0.08));
+          box-shadow: var(--ha-card-box-shadow, 0 4px 12px rgba(0, 0, 0, 0.15));
           color: white;
           display: flex;
           align-items: center;
           justify-content: center;
           height: 100%;
-          min-height: 80px;
+          min-height: 90px;
           cursor: pointer;
-          transition: background-color 0.2s;
+          transition: background-color 0.2s, transform 0.2s, box-shadow 0.2s;
           box-sizing: border-box;
         }
         ha-card:hover {
-          background-color: var(--secondary-background-color, #2c2c2c);
+          background-color: var(--secondary-background-color, #242a30);
+          transform: translateY(-2px);
+          box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
         }
         .container {
           display: flex;
           flex-direction: column;
           align-items: center;
           gap: 4px;
+          text-align: center;
+        }
+        .icon-circle {
+          width: 44px;
+          height: 44px;
+          border-radius: 50%;
+          background: rgba(76, 175, 80, 0.12);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-bottom: 4px;
+          transition: transform 0.2s ease, background 0.3s ease;
+        }
+        ha-card:hover .icon-circle {
+          transform: scale(1.08);
         }
         ha-icon {
-          --mdc-icon-size: 32px;
+          --mdc-icon-size: 24px;
         }
         .healthy { color: #4CAF50; }
         .warning { color: #FF9800; }
-        .title { font-weight: bold; font-size: 1.1em; }
-        .subtitle { font-size: 0.9em; opacity: 0.8; }
+        .title { font-weight: 600; font-size: 0.95em; letter-spacing: -0.2px; }
+        .subtitle { font-size: 0.8em; opacity: 0.8; }
       </style>
       <ha-card id="health-card">
         <div class="container">
-          <ha-icon id="health-icon" icon="mdi:shield-check" class="healthy"></ha-icon>
+          <div class="icon-circle" id="health-circle">
+            <ha-icon id="health-icon" icon="mdi:shield-check" class="healthy"></ha-icon>
+          </div>
           <div class="title" id="health-title">Diagnostica</div>
           <div class="subtitle" id="health-subtitle">Sistema Ok</div>
         </div>
@@ -2889,6 +2944,7 @@ class MultizoneThermostatHealthSummaryCard extends HTMLElement {
 
     const iconEl = this.shadowRoot.querySelector('#health-icon');
     const subtitleEl = this.shadowRoot.querySelector('#health-subtitle');
+    const circleEl = this.shadowRoot.querySelector('#health-circle');
 
     if (!healthEntity) {
       subtitleEl.textContent = "Non trovato";
@@ -2904,16 +2960,210 @@ class MultizoneThermostatHealthSummaryCard extends HTMLElement {
       subtitleEl.textContent = "Sistema Ok";
       iconEl.icon = "mdi:shield-check";
       iconEl.className = "healthy";
+      if (circleEl) circleEl.style.background = "rgba(76, 175, 80, 0.12)";
     } else {
       subtitleEl.textContent = anomalies.length + (anomalies.length === 1 ? " Anomalia" : " Anomalie");
       iconEl.icon = "mdi:alert";
       iconEl.className = "warning";
+      if (circleEl) circleEl.style.background = "rgba(255, 152, 0, 0.15)";
     }
   }
 }
 
 if (!customElements.get("multizone-thermostat-health-summary-card")) {
   customElements.define("multizone-thermostat-health-summary-card", MultizoneThermostatHealthSummaryCard);
+}
+
+/* ==================== COMBINED NAV COLUMN CARD ==================== */
+class MultizoneThermostatNavCard extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: 'open' });
+    this._schedCard = null;
+    this._healthCard = null;
+    this._rendered = false;
+  }
+
+  setConfig(config) {
+    this._config = Object.assign({}, config || {});
+    if (!this._rendered) {
+      this.render();
+    }
+  }
+
+  getCardSize() {
+    return 3;
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    if (this._schedCard) {
+      this._schedCard.hass = hass;
+    }
+    if (this._healthCard) {
+      this._healthCard.hass = hass;
+    }
+  }
+
+  render() {
+    const radius = (this._config && this._config.border_radius) ? this._config.border_radius : '20px';
+    this.shadowRoot.innerHTML = `
+      <style>
+        :host {
+          display: block;
+          height: 100%;
+          box-sizing: border-box;
+        }
+        .nav-container {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
+          height: 100%;
+          box-sizing: border-box;
+        }
+        .nav-container > * {
+          min-width: 0;
+          height: 100%;
+        }
+      </style>
+      <div class="nav-container" id="nav-container"></div>
+    `;
+
+    const container = this.shadowRoot.getElementById('nav-container');
+
+    this._schedCard = document.createElement('multizone-thermostat-schedule-summary-card');
+    if (typeof this._schedCard.setConfig === 'function') {
+      this._schedCard.setConfig({ border_radius: radius });
+    }
+    if (this._hass) this._schedCard.hass = this._hass;
+    container.appendChild(this._schedCard);
+
+    this._healthCard = document.createElement('multizone-thermostat-health-summary-card');
+    if (typeof this._healthCard.setConfig === 'function') {
+      this._healthCard.setConfig({ border_radius: radius });
+    }
+    if (this._hass) this._healthCard.hass = this._hass;
+    container.appendChild(this._healthCard);
+
+    this._rendered = true;
+  }
+}
+
+if (!customElements.get("multizone-thermostat-nav-card")) {
+  customElements.define("multizone-thermostat-nav-card", MultizoneThermostatNavCard);
+}
+
+/* ==================== RESPONSIVE GRID CARD ==================== */
+class MultizoneThermostatResponsiveGrid extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: 'open' });
+    this._cardElements = [];
+    this._rendered = false;
+  }
+
+  setConfig(config) {
+    this._config = Object.assign({}, config || {});
+    this.render();
+  }
+
+  getCardSize() {
+    return 6;
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    if (this._cardElements && this._cardElements.length > 0) {
+      for (const el of this._cardElements) {
+        try {
+          el.hass = hass;
+        } catch (e) {}
+      }
+    }
+  }
+
+  async render() {
+    const columns = parseInt(this._config.columns, 10) || 3;
+    const cards = this._config.cards || [];
+
+    this.shadowRoot.innerHTML = `
+      <style>
+        :host {
+          display: block;
+          width: 100%;
+          box-sizing: border-box;
+        }
+        .responsive-grid {
+          display: grid;
+          grid-template-columns: repeat(${columns}, minmax(0, 1fr));
+          gap: 12px;
+          width: 100%;
+          box-sizing: border-box;
+          margin-bottom: 12px;
+        }
+        @media (max-width: 1024px) and (min-width: 769px) {
+          .responsive-grid {
+            grid-template-columns: repeat(${Math.min(columns, 2)}, minmax(0, 1fr));
+          }
+        }
+        @media (max-width: 768px) {
+          .responsive-grid {
+            grid-template-columns: 1fr !important;
+            gap: 12px;
+          }
+        }
+      </style>
+      <div class="responsive-grid" id="grid"></div>
+    `;
+
+    const grid = this.shadowRoot.getElementById('grid');
+    this._cardElements = [];
+
+    let helpers = window.cardHelpers;
+    if (!helpers && window.loadCardHelpers) {
+      try {
+        helpers = await window.loadCardHelpers();
+        window.cardHelpers = helpers;
+      } catch (e) {
+        console.warn("Could not load Lovelace card helpers:", e);
+      }
+    }
+
+    for (const cardConfig of cards) {
+      if (!cardConfig) continue;
+      let cardEl = null;
+      if (helpers && typeof helpers.createCardElement === 'function') {
+        try {
+          cardEl = helpers.createCardElement(cardConfig);
+        } catch (e) {
+          console.warn("Error creating card element with helpers:", e);
+        }
+      }
+      if (!cardEl) {
+        const type = cardConfig.type || '';
+        const tag = type.startsWith('custom:') ? type.replace('custom:', '') : `hui-${type}-card`;
+        cardEl = document.createElement(tag);
+        if (typeof cardEl.setConfig === 'function') {
+          try {
+            cardEl.setConfig(cardConfig);
+          } catch (e) {}
+        }
+      }
+      if (this._hass) {
+        try {
+          cardEl.hass = this._hass;
+        } catch (e) {}
+      }
+      this._cardElements.push(cardEl);
+      grid.appendChild(cardEl);
+    }
+
+    this._rendered = true;
+  }
+}
+
+if (!customElements.get("multizone-thermostat-responsive-grid")) {
+  customElements.define("multizone-thermostat-responsive-grid", MultizoneThermostatResponsiveGrid);
 }
 
 /* ==================== PLANT DIAGNOSTIC CARD ==================== */
@@ -6416,39 +6666,28 @@ class MultizoneThermostatDashboardStrategy extends HTMLElement {
       columns = 3;
     }
 
-    const stackCards = [
-      {
-        type: "custom:multizone-thermostat-plant-card",
-        border_radius: "20px",
-      }
-    ];
-
-    for (let i = 0; i < zones.length; i += columns) {
-      const chunk = zones.slice(i, i + columns);
-      const rowCards = chunk.map(zone => ({
-        type: "custom:multizone-thermostat-zone-energy-card",
-        entity: zone.climate,
-        title: zone.title,
-        border_radius: "20px",
-      }));
-      
-      while (rowCards.length < columns && columns <= 3) {
-        rowCards.push({
-          type: "custom:multizone-thermostat-spacer"
-        });
-      }
-
-      stackCards.push({
-        type: "horizontal-stack",
-        cards: rowCards
-      });
-    }
+    const zoneCards = zones.map(zone => ({
+      type: "custom:multizone-thermostat-zone-energy-card",
+      entity: zone.climate,
+      title: zone.title,
+      border_radius: "20px",
+    }));
 
     return {
       cards: [
         {
           type: "vertical-stack",
-          cards: stackCards
+          cards: [
+            {
+              type: "custom:multizone-thermostat-plant-card",
+              border_radius: "20px",
+            },
+            {
+              type: "custom:multizone-thermostat-responsive-grid",
+              columns: columns,
+              cards: zoneCards,
+            }
+          ]
         }
       ]
     };
@@ -6511,57 +6750,51 @@ class MultizoneThermostatDashboardStrategy extends HTMLElement {
       border_radius: "20px",
     });
 
-    // Schedule summary card: posizionato esattamente tra Master Control e Diagnostica!
-    topRowCards.push({
-      type: "custom:multizone-thermostat-schedule-summary-card",
-      border_radius: "20px",
-    });
-
-    // Health summary card: Diagnostica
-    topRowCards.push({
-      type: "custom:multizone-thermostat-health-summary-card",
-      border_radius: "20px",
-    });
-
-    // Wrap the top cards by the configured column count, so 1 column stacks them vertically
-    const stackCards = [];
-    for (let i = 0; i < topRowCards.length; i += columns) {
-      const chunk = topRowCards.slice(i, i + columns);
-      while (chunk.length < columns && columns <= 4) {
-        chunk.push({
-          type: "custom:multizone-thermostat-spacer"
-        });
-      }
-      stackCards.push({
-        type: "horizontal-stack",
-        cards: chunk
+    if (columns >= 4) {
+      topRowCards.push({
+        type: "custom:multizone-thermostat-schedule-summary-card",
+        border_radius: "20px",
+      });
+      topRowCards.push({
+        type: "custom:multizone-thermostat-health-summary-card",
+        border_radius: "20px",
+      });
+    } else {
+      // In standard 3-column layout, combine scheduler & diagnostica into the 3rd column
+      topRowCards.push({
+        type: "custom:multizone-thermostat-nav-card",
+        border_radius: "20px",
       });
     }
 
-    for (let i = 0; i < zones.length; i += columns) {
-      const chunk = zones.slice(i, i + columns);
-      const rowCards = chunk.map(zone => ({
-        type: "custom:multizone-thermostat-dial-card",
-        entity: zone.climate,
-        switch: zone.switch,
-        title: zone.title,
-        min_height: "300px",
-        max_height: "400px",
-        padding: "1px",
-        border_radius: "20px",
-      }));
-      
-      stackCards.push({
-        type: "horizontal-stack",
-        cards: rowCards
-      });
+    const zoneCards = zones.map(zone => ({
+      type: "custom:multizone-thermostat-dial-card",
+      entity: zone.climate,
+      switch: zone.switch,
+      title: zone.title,
+      min_height: "300px",
+      max_height: "400px",
+      padding: "1px",
+      border_radius: "20px",
+    }));
+
+    if (columns === 1) {
+      return {
+        cards: [
+          {
+            type: "vertical-stack",
+            cards: topRowCards.concat(zoneCards),
+          }
+        ]
+      };
     }
 
     return {
       cards: [
         {
-          type: "vertical-stack",
-          cards: stackCards
+          type: "custom:multizone-thermostat-responsive-grid",
+          columns: columns,
+          cards: topRowCards.concat(zoneCards),
         }
       ]
     };

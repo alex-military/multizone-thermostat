@@ -46,7 +46,6 @@ class PWMEngine:
         time_passed = now - self.cycle_start_time
         
         # Calculate raw times
-        # If demand is 0 or 100, we skip dilatation
         if demand <= 0.0:
             self.time_on = 0.0
             self.time_off = self.pwm_interval
@@ -59,12 +58,10 @@ class PWMEngine:
             
             # Proportional Dilatation (HASmartThermostat logic)
             if 0 < self.time_on < self.min_on:
-                # time_on is too short, increase time_off proportionally
                 self.time_off *= self.min_on / self.time_on
                 self.time_on = self.min_on
             
             if 0 < self.time_off < self.min_off:
-                # time_off is too short, increase time_on proportionally
                 self.time_on *= self.min_off / self.time_off
                 self.time_off = self.min_off
 
@@ -86,15 +83,11 @@ class PWMEngine:
             time_passed = 0.0
             
         # Determine state
-        # In a PWM cycle, we start with ON, then go OFF
         if demand <= 0.0:
             self.current_state = False
         elif demand >= 100.0:
             self.current_state = True
         else:
-            if time_passed < self.time_on:
-                self.current_state = True
-            else:
-                self.current_state = False
+            self.current_state = time_passed < self.time_on
                 
         return self.current_state

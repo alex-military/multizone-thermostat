@@ -5,8 +5,12 @@ import logging
 from typing import Any
 
 from homeassistant.core import HomeAssistant
+from datetime import timezone
+import homeassistant.util.dt as dt_util
+from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from .const import (
     CONF_ZONE_NAME,
+    CONF_ZONE_TEMP_SENSOR,
     make_zone_entity_id,
     HVAC_MODE_HEAT,
     ZONE_MODE_BYPASS,
@@ -32,6 +36,7 @@ class ZoneController:
         self._autotuners: dict[str, PassiveAutotuneObserver] = {}
         self._thermal_models: dict[str, ThermalObserver] = {}
         self._last_seen_temps: dict[str, float] = {}
+        self._last_sensor_reports: dict[str, Any] = {}
 
         for zone in self.zones:
             name = zone.get(CONF_ZONE_NAME)
@@ -40,7 +45,7 @@ class ZoneController:
             climate_id = make_zone_entity_id(name)
             # Default Kp=100, Ki=0, Kd=0 (will be overridden by Autolearning later)
             self._pids[climate_id] = MultizonePID(
-                kp=100.0, ki=0.0, kd=0.0, out_min=0.0, out_max=100.0, sensor_timeout=7200.0
+                kp=100.0, ki=0.0, kd=0.0, out_min=0.0, out_max=100.0, sensor_timeout=7200.0, zone_id=climate_id
             )
             self._autotuners[climate_id] = PassiveAutotuneObserver(climate_id, required_cycles=3)
             self._thermal_models[climate_id] = ThermalObserver(climate_id)
@@ -129,9 +134,44 @@ class ZoneController:
             )
             return 0.0
 
-        # Update PID sensor timestamp when a new or changed temperature reading arrives
+        # Update PID sensor timestamp when a new or fresh reading arrives
+        sensor_fresh = False
         if self._last_seen_temps.get(entity_id) != current_temp:
             self._last_seen_temps[entity_id] = current_temp
+            sensor_fresh = True
+        else:
+            # Numeric temperature unchanged: check actual report freshness
+            zone_conf = next(
+                (z for z in self.zones if (z.get("climate_id") == entity_id or make_zone_entity_id(z.get(CONF_ZONE_NAME, "")) == entity_id)),
+                None,
+            )
+            sensor_id = zone_conf.get(CONF_ZONE_TEMP_SENSOR) if zone_conf else None
+            climate_ent = getattr(self.coordinator, "_climate_entities", {}).get(entity_id)
+            if climate_ent and getattr(climate_ent, "_safety_fallback_active", False):
+                sensor_fresh = True
+            elif sensor_id and sensor_id != "none" and hasattr(self.hass, "states") and self.hass.states:
+                s_state = self.hass.states.get(sensor_id)
+                if s_state and s_state.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN, "unavailable", "unknown"):
+                    reported = getattr(s_state, "last_reported", None) or getattr(s_state, "last_updated", None)
+                    if reported is not None:
+                        if self._last_sensor_reports.get(entity_id) != reported:
+                            self._last_sensor_reports[entity_id] = reported
+                            sensor_fresh = True
+                        else:
+                            try:
+                                now_dt = dt_util.utcnow()
+                                rep_utc = reported if reported.tzinfo else reported.replace(tzinfo=timezone.utc)
+                                if (now_dt - rep_utc).total_seconds() < 7200:
+                                    sensor_fresh = True
+                            except Exception:
+                                pass
+            else:
+                reported = getattr(new_state, "last_reported", None) or getattr(new_state, "last_updated", None)
+                if reported is not None and self._last_sensor_reports.get(entity_id) != reported:
+                    self._last_sensor_reports[entity_id] = reported
+                    sensor_fresh = True
+
+        if sensor_fresh:
             self._pids[entity_id].update_sensor_timestamp()
 
         # Check mode (don't calculate if off/bypass)

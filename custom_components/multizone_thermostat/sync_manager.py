@@ -12,7 +12,7 @@ from homeassistant.const import ATTR_ENTITY_ID, ATTR_TEMPERATURE, SERVICE_TURN_O
 from homeassistant.core import HomeAssistant, Context, State, Event
 
 from .pwm_engine import PWMEngine
-from .const import KEY_PHYSICAL_SYNC_PREFIX, VALVE_SCALE_VOLT, DEFAULT_VALVE_SCALE
+from .const import KEY_PHYSICAL_SYNC_PREFIX, VALVE_SCALE_VOLT, DEFAULT_VALVE_SCALE, DEFAULT_MIN_CYCLE_ON, DEFAULT_MIN_CYCLE_OFF
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -52,8 +52,11 @@ class ZoneSyncManager:
         self._pending_calib: dict[str, tuple[float, float, float]] = {}
         self._internal_context = Context()
 
-        self._local_pwm = PWMEngine(pwm_interval=900.0, min_on=0.0, min_off=0.0)
+        min_on_s = float(getattr(coordinator, "_min_cycle_on", DEFAULT_MIN_CYCLE_ON)) * 60.0
+        min_off_s = float(getattr(coordinator, "_min_cycle_off", DEFAULT_MIN_CYCLE_OFF)) * 60.0
+        self._local_pwm = PWMEngine(pwm_interval=900.0, min_on=min_on_s, min_off=min_off_s)
         self._local_pwm_state = False
+        self._last_pwm_change: float = time.monotonic()
 
         self.trv_health: dict[str, dict[str, Any]] = {
             trv: {
@@ -282,14 +285,31 @@ class ZoneSyncManager:
         if not self._switches:
             return False
 
+        min_on_s = float(getattr(self._coordinator, "_min_cycle_on", DEFAULT_MIN_CYCLE_ON)) * 60.0
+        min_off_s = float(getattr(self._coordinator, "_min_cycle_off", DEFAULT_MIN_CYCLE_OFF)) * 60.0
+        self._local_pwm.set_params(min_on=min_on_s, min_off=min_off_s)
+
+        now = time.monotonic()
         if master_hvac_mode == HVACMode.OFF:
             new_pwm_state = False
         else:
             demand = self._coordinator.get_zone_demand(self._entity_id)
-            new_pwm_state = self._local_pwm.calculate(demand)
+            wanted_state = self._local_pwm.calculate(demand)
+            new_pwm_state = wanted_state
+
+            # Protect direct valve switches against short cycling across fluctuating demand
+            if wanted_state != self._local_pwm_state:
+                elapsed = now - self._last_pwm_change
+                if self._local_pwm_state is True and not wanted_state:
+                    if demand > 0.0 and min_on_s > 0.0 and elapsed < min_on_s:
+                        new_pwm_state = True
+                elif self._local_pwm_state is False and wanted_state:
+                    if demand < 99.0 and min_off_s > 0.0 and elapsed < min_off_s:
+                        new_pwm_state = False
 
         if new_pwm_state != self._local_pwm_state:
             self._local_pwm_state = new_pwm_state
+            self._last_pwm_change = now
             await self.async_sync_switches()
             return True
         return False
