@@ -1338,11 +1338,20 @@ class MultizoneThermostatButtonCard extends HTMLElement {
 
 
 /* ==================== DIAL (NATIVE WRAPPER) CARD CLASS ==================== */
+/* ==================== DIAL CARD (BESPOKE VECTOR ARC & DRAG SLIDER) ==================== */
 class MultizoneThermostatDialCard extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
     this._rendered = false;
+    this._isDragging = false;
+    this._dragTargetTemp = undefined;
+    this._minTemp = 10;
+    this._maxTemp = 30;
+    this._targetTemp = 20;
+    this._currentTemp = 20;
+    this._isHeating = false;
+    this._switchEntity = null;
   }
 
   set hass(hass) {
@@ -1390,38 +1399,38 @@ class MultizoneThermostatDialCard extends HTMLElement {
         box-sizing: border-box;
       }
       ha-card {
-        padding: 16px 14px;
+        padding: 18px 16px 14px 16px;
         position: relative;
         overflow: hidden !important;
         border-radius: ${radius} !important;
-        background: var(--ha-card-background, var(--card-background-color, rgba(20, 27, 41, 0.72)));
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-        border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.08));
-        box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        background: linear-gradient(135deg, rgba(20, 27, 41, 0.88) 0%, rgba(15, 23, 42, 0.94) 100%) !important;
+        backdrop-filter: blur(20px) !important;
+        -webkit-backdrop-filter: blur(20px) !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
         transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
         display: flex;
         flex-direction: column;
         justify-content: space-between;
-        min-height: 290px;
         box-sizing: border-box;
+        user-select: none;
       }
       ha-card:hover {
-        border-color: rgba(255, 255, 255, 0.16);
+        border-color: rgba(255, 255, 255, 0.16) !important;
         transform: translateY(-2px);
-        box-shadow: 0 16px 40px -10px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+        box-shadow: 0 16px 40px -10px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
       }
       .heating-aura {
-        background: radial-gradient(circle at 50% 120%, rgba(249, 115, 22, 0.18) 0%, rgba(239, 68, 68, 0.05) 45%, rgba(20, 27, 41, 0.75) 75%) !important;
+        background: radial-gradient(circle at 50% 120%, rgba(249, 115, 22, 0.22) 0%, rgba(239, 68, 68, 0.06) 45%, rgba(20, 27, 41, 0.92) 75%) !important;
       }
       .idle-aura {
-        background: radial-gradient(circle at 50% 120%, rgba(14, 165, 233, 0.12) 0%, rgba(16, 185, 129, 0.04) 45%, rgba(20, 27, 41, 0.75) 75%) !important;
+        background: radial-gradient(circle at 50% 120%, rgba(14, 165, 233, 0.14) 0%, rgba(16, 185, 129, 0.04) 45%, rgba(20, 27, 41, 0.92) 75%) !important;
       }
       .header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 4px;
+        margin-bottom: 2px;
         position: relative;
         z-index: 20;
       }
@@ -1434,7 +1443,7 @@ class MultizoneThermostatDialCard extends HTMLElement {
       .title {
         font-size: 16px;
         font-weight: 800;
-        color: var(--primary-text-color, #ffffff);
+        color: #ffffff;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -1473,7 +1482,7 @@ class MultizoneThermostatDialCard extends HTMLElement {
       .segmented-control {
         display: flex;
         align-items: center;
-        background: rgba(15, 23, 42, 0.8);
+        background: rgba(15, 23, 42, 0.85);
         border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 12px;
         padding: 2px;
@@ -1505,35 +1514,55 @@ class MultizoneThermostatDialCard extends HTMLElement {
       .seg-btn ha-icon {
         --mdc-icon-size: 16px;
       }
-      /* Dial Gauge */
+      
+      /* Circular Dial Gauge */
       .gauge-container {
         position: relative;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        margin: 6px 0 10px 0;
+        margin: 6px auto;
+        width: 100%;
+        max-width: 270px;
+        user-select: none;
+        touch-action: none;
       }
       .dial-svg {
-        width: 175px;
-        height: 175px;
-        transform: rotate(-90deg);
-        transform-origin: 50% 50%;
+        width: 250px;
+        height: 250px;
+        max-width: 100%;
+        cursor: pointer;
+        touch-action: none;
+        overflow: visible;
       }
       .dial-track {
-        stroke: rgba(255, 255, 255, 0.06);
-        stroke-width: 9;
+        stroke: rgba(255, 255, 255, 0.07);
+        stroke-width: 12;
+        stroke-linecap: round;
         fill: none;
       }
       .dial-meter {
-        stroke-width: 9;
+        stroke-width: 12;
         stroke-linecap: round;
         fill: none;
-        transition: stroke-dashoffset 0.6s cubic-bezier(0.16, 1, 0.3, 1), stroke 0.4s ease;
+        transition: stroke-dashoffset 0.1s ease, stroke 0.3s ease;
+      }
+      .dial-knob {
+        fill: #ffffff;
+        cursor: grab;
+        filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.6));
+        transition: transform 0.1s ease;
+      }
+      .dial-knob:active {
+        cursor: grabbing;
       }
       .gauge-center {
         position: absolute;
-        inset: 0;
+        top: 15px;
+        left: 0;
+        right: 0;
+        bottom: 25px;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -1541,81 +1570,65 @@ class MultizoneThermostatDialCard extends HTMLElement {
         pointer-events: none;
       }
       .target-label {
-        font-size: 10px;
+        font-size: 11px;
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 1.5px;
         color: #94a3b8;
-        margin-bottom: -2px;
+        margin-bottom: 2px;
       }
       .target-temp-val {
-        font-size: 34px;
+        font-size: 40px;
         font-weight: 900;
         color: #ffffff;
         display: flex;
         align-items: baseline;
         line-height: 1;
         margin: 2px 0;
+        letter-spacing: -1px;
       }
       .unit {
-        font-size: 17px;
+        font-size: 19px;
         font-weight: 700;
+        color: #94a3b8;
         margin-left: 2px;
       }
       .current-temp-badge {
-        font-size: 11px;
-        font-weight: 600;
+        font-size: 12px;
+        font-weight: 700;
         color: #cbd5e1;
-        background: rgba(15, 23, 42, 0.7);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        padding: 2px 8px;
+        background: rgba(15, 23, 42, 0.85);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        padding: 3px 10px;
         border-radius: 9999px;
-        margin-top: 4px;
+        margin-top: 6px;
         display: flex;
         align-items: center;
-        gap: 4px;
+        gap: 5px;
       }
-      /* Footer Controls */
+      .dial-sub-text {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.4px;
+        text-transform: uppercase;
+        margin-top: 8px;
+      }
+      .heating-text {
+        color: #fb923c;
+      }
+      .idle-text {
+        color: #94a3b8;
+      }
+
+      /* Card Footer Metrics */
       .bottom-bar {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding-top: 10px;
+        padding-top: 8px;
         border-top: 1px solid rgba(255, 255, 255, 0.06);
         position: relative;
         z-index: 20;
-      }
-      .stepper-group {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
-      .btn-stepper {
-        width: 36px;
-        height: 36px;
-        border-radius: 12px;
-        background: rgba(255, 255, 255, 0.06);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        color: white;
-        font-size: 18px;
-        font-weight: 700;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        transition: all 0.2s ease;
-      }
-      .btn-stepper:hover {
-        background: rgba(255, 255, 255, 0.14);
-        transform: translateY(-1px);
-      }
-      .btn-stepper:active {
-        transform: scale(0.95);
-      }
-      .metrics-box {
-        display: flex;
-        align-items: center;
-        gap: 10px;
         font-size: 11px;
         font-weight: 600;
         color: #94a3b8;
@@ -1658,140 +1671,270 @@ class MultizoneThermostatDialCard extends HTMLElement {
 
         <div class="segmented-control">
           <button class="seg-btn active" id="seg-primary" title="Prioritaria">
-            <ha-icon icon="mdi:star-outline"></ha-icon>
+            <ha-icon icon="mdi:target"></ha-icon>
           </button>
           <button class="seg-btn" id="seg-secondary" title="Secondaria">
             <ha-icon icon="mdi:link-variant"></ha-icon>
           </button>
           <button class="seg-btn" id="seg-bypass" title="Bypass">
-            <ha-icon icon="mdi:close"></ha-icon>
+            <ha-icon icon="mdi:close-circle-outline"></ha-icon>
           </button>
         </div>
       </div>
 
-      <div class="gauge-container">
-        <svg class="dial-svg" viewBox="0 0 200 200">
-          <circle cx="100" cy="100" r="76" class="dial-track" />
-          <circle id="dial-meter" cx="100" cy="100" r="76" class="dial-meter" stroke="#0ea5e9"
-                  stroke-dasharray="477" stroke-dashoffset="200" />
+      <!-- Center Radial Arc Gauge with Drag Support -->
+      <div class="gauge-container" id="gauge-container">
+        <svg class="dial-svg" id="dial-svg" viewBox="0 0 260 260">
+          <defs>
+            <filter id="heating-glow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#f97316" flood-opacity="0.7"/>
+            </filter>
+            <filter id="idle-glow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#38bdf8" flood-opacity="0.6"/>
+            </filter>
+          </defs>
+          <!-- 270deg background track from bottom-left (-135deg) to bottom-right (+135deg) -->
+          <path class="dial-track" id="dial-track" d="M 62.82 197.18 A 95 95 0 1 1 197.18 197.18"></path>
+          <!-- Active heating arc -->
+          <path class="dial-meter" id="dial-meter" d="M 62.82 197.18 A 95 95 0 0 1 130 35"></path>
+          <!-- Current temperature marker dot on track -->
+          <circle id="curr-temp-dot" cx="130" cy="35" r="3.5" fill="#cbd5e1" opacity="0.9"></circle>
+          <!-- Interactive Drag Knob -->
+          <circle class="dial-knob" id="dial-knob" cx="130" cy="35" r="11" stroke="#38bdf8" stroke-width="4"></circle>
         </svg>
 
         <div class="gauge-center">
-          <span class="target-label" id="state-label">Target</span>
+          <span class="target-label">Target</span>
           <div class="target-temp-val">
-            <span id="target-temp">20.0</span>
-            <span class="unit" id="temp-unit">°C</span>
+            <span id="target-temp">20.0</span><span class="unit">°C</span>
           </div>
-          <div class="current-temp-badge" id="current-badge">
-            <span style="color:#38bdf8;">🌡️</span>
-            <span id="current-temp">19.5°C</span>
+          <div class="current-temp-badge">
+            <ha-icon icon="mdi:thermometer" style="--mdc-icon-size: 15px; color: #38bdf8;"></ha-icon>
+            <span id="current-temp">20.0°C</span>
           </div>
+          <div class="dial-sub-text idle-text" id="dial-sub-text">● Standby</div>
         </div>
       </div>
 
+      <!-- Bottom Bar Telemetry -->
       <div class="bottom-bar">
-        <div class="stepper-group">
-          <button class="btn-stepper" id="btn-minus">-</button>
-          <button class="btn-stepper" id="btn-plus">+</button>
+        <div id="humidity-metric" style="display: none; align-items: center; gap: 4px;">
+          <ha-icon icon="mdi:water-percent" style="--mdc-icon-size: 16px; color: #38bdf8;"></ha-icon>
+          <span id="humidity-val">--%</span>
         </div>
-
-        <div class="metrics-box">
-          <span id="humidity-metric" style="display:none;">💧 <span id="humidity-val">50%</span></span>
-          <span id="valve-metric" style="color:#38bdf8;">⚡ <span id="valve-val">Valvola OK</span></span>
+        <div style="margin-left: auto; display: flex; align-items: center; gap: 6px;">
+          <span id="valve-val">Standby</span>
         </div>
       </div>
     `;
 
-    // Hook click listeners
-    card.querySelector('#seg-primary').addEventListener('click', (e) => { e.stopPropagation(); this.setZoneMode("primary"); });
-    card.querySelector('#seg-secondary').addEventListener('click', (e) => { e.stopPropagation(); this.setZoneMode("secondary"); });
-    card.querySelector('#seg-bypass').addEventListener('click', (e) => { e.stopPropagation(); this.setZoneMode("bypass"); });
-    card.querySelector('#re-enable-btn').addEventListener('click', (e) => { e.stopPropagation(); this.setZoneMode("primary"); });
-
-    card.querySelector('#btn-minus').addEventListener('click', (e) => { e.stopPropagation(); this.changeTemp(-1); });
-    card.querySelector('#btn-plus').addEventListener('click', (e) => { e.stopPropagation(); this.changeTemp(1); });
-
     this.shadowRoot.appendChild(style);
     this.shadowRoot.appendChild(card);
+    this.setupEventListeners();
     this._rendered = true;
   }
 
-  setZoneMode(mode) {
-    let switchEntity = this._config.switch;
-    if (switchEntity && switchEntity.endsWith('_zone_enable')) switchEntity = null;
-    if (!switchEntity && this._config.entity) {
-      const parts = this._config.entity.split('.');
-      const candidateSelect = "select." + parts[1] + "_zone_mode";
-      if (this._hass && this._hass.states && this._hass.states[candidateSelect]) {
-        switchEntity = candidateSelect;
-      }
+  setupEventListeners() {
+    const card = this.shadowRoot.querySelector('ha-card');
+    const segPrimary = this.shadowRoot.querySelector('#seg-primary');
+    const segSecondary = this.shadowRoot.querySelector('#seg-secondary');
+    const segBypass = this.shadowRoot.querySelector('#seg-bypass');
+    const reEnableBtn = this.shadowRoot.querySelector('#re-enable-btn');
+    const svg = this.shadowRoot.querySelector('#dial-svg');
+
+    if (segPrimary) segPrimary.addEventListener('click', (e) => { e.stopPropagation(); this.setZoneMode('primary'); });
+    if (segSecondary) segSecondary.addEventListener('click', (e) => { e.stopPropagation(); this.setZoneMode('secondary'); });
+    if (segBypass) segBypass.addEventListener('click', (e) => { e.stopPropagation(); this.setZoneMode('bypass'); });
+    if (reEnableBtn) reEnableBtn.addEventListener('click', (e) => { e.stopPropagation(); this.setZoneMode('primary'); });
+
+    // Interactive Drag on Arc Gauge
+    if (svg) {
+      const onPointerDown = (e) => {
+        e.preventDefault();
+        this._isDragging = true;
+        try { svg.setPointerCapture(e.pointerId); } catch(err) {}
+        this.handlePointerDrag(e);
+      };
+
+      const onPointerMove = (e) => {
+        if (!this._isDragging) return;
+        e.preventDefault();
+        this.handlePointerDrag(e);
+      };
+
+      const onPointerUp = (e) => {
+        if (!this._isDragging) return;
+        this._isDragging = false;
+        try { svg.releasePointerCapture(e.pointerId); } catch(err) {}
+        if (this._dragTargetTemp !== undefined && this._hass && this._config.entity) {
+          this._hass.callService("climate", "set_temperature", {
+            entity_id: this._config.entity,
+            temperature: this._dragTargetTemp
+          });
+        }
+      };
+
+      svg.addEventListener('pointerdown', onPointerDown);
+      svg.addEventListener('pointermove', onPointerMove);
+      svg.addEventListener('pointerup', onPointerUp);
+      svg.addEventListener('pointercancel', onPointerUp);
     }
-    if (!switchEntity) return;
+  }
+
+  handlePointerDrag(e) {
+    const svg = this.shadowRoot.querySelector('#dial-svg');
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const dx = e.clientX - cx;
+    const dy = e.clientY - cy;
+
+    // Clockwise angle where 0 = 12 o'clock (dy < 0)
+    let angle = Math.atan2(dx, -dy) * (180 / Math.PI);
+
+    // Bottom gap is from +135 to +180 and -180 to -135
+    if (angle > 135) {
+      if (angle > 157.5) angle = -135;
+      else angle = 135;
+    } else if (angle < -135) {
+      if (angle < -157.5) angle = 135;
+      else angle = -135;
+    }
+
+    const minTemp = this._minTemp || 10;
+    const maxTemp = this._maxTemp || 30;
+    const pct = Math.max(0, Math.min(1, (angle + 135) / 270));
+    let temp = minTemp + pct * (maxTemp - minTemp);
+    temp = Math.round(temp * 2) / 2; // Step 0.5
+    temp = Math.max(minTemp, Math.min(maxTemp, temp));
+
+    this._dragTargetTemp = temp;
+    this.renderDialArc(temp, this._isHeating);
+
+    const targetEl = this.shadowRoot.querySelector('#target-temp');
+    if (targetEl) targetEl.textContent = temp.toFixed(1);
+  }
+
+  renderDialArc(targetTemp, isHeating) {
+    const minTemp = this._minTemp || 10;
+    const maxTemp = this._maxTemp || 30;
+    const range = Math.max(maxTemp - minTemp, 1);
+    const pct = Math.max(0, Math.min(1, (targetTemp - minTemp) / range));
+    const delta = pct * 270.0;
+    const alpha = -135.0 + delta;
+    const rad = alpha * (Math.PI / 180);
+
+    const cx = 130.0;
+    const cy = 130.0;
+    const r = 95.0;
+
+    const xt = cx + r * Math.sin(rad);
+    const yt = cy - r * Math.cos(rad);
+
+    const meter = this.shadowRoot.querySelector('#dial-meter');
+    const knob = this.shadowRoot.querySelector('#dial-knob');
+
+    const activeColor = isHeating ? '#f97316' : '#38bdf8';
+    const filterId = isHeating ? 'url(#heating-glow)' : 'url(#idle-glow)';
+
+    if (meter) {
+      if (delta <= 0.5) {
+        meter.setAttribute('d', '');
+      } else {
+        const largeArc = delta > 180 ? 1 : 0;
+        meter.setAttribute('d', `M 62.82 197.18 A 95 95 0 ${largeArc} 1 ${xt.toFixed(2)} ${yt.toFixed(2)}`);
+      }
+      meter.setAttribute('stroke', activeColor);
+      meter.style.filter = filterId;
+    }
+
+    if (knob) {
+      knob.setAttribute('cx', xt.toFixed(2));
+      knob.setAttribute('cy', yt.toFixed(2));
+      knob.setAttribute('stroke', activeColor);
+    }
+  }
+
+  renderCurrentTempMarker(currentTemp) {
+    const minTemp = this._minTemp || 10;
+    const maxTemp = this._maxTemp || 30;
+    const range = Math.max(maxTemp - minTemp, 1);
+    const pct = Math.max(0, Math.min(1, (currentTemp - minTemp) / range));
+    const delta = pct * 270.0;
+    const alpha = -135.0 + delta;
+    const rad = alpha * (Math.PI / 180);
+
+    const cx = 130.0;
+    const cy = 130.0;
+    const r = 95.0;
+
+    const xc = cx + r * Math.sin(rad);
+    const yc = cy - r * Math.cos(rad);
+
+    const dot = this.shadowRoot.querySelector('#curr-temp-dot');
+    if (dot) {
+      dot.setAttribute('cx', xc.toFixed(2));
+      dot.setAttribute('cy', yc.toFixed(2));
+    }
+  }
+
+  setZoneMode(mode) {
+    if (!this._hass) return;
+    const climateEntity = this._config.entity;
+    let switchEntity = this._config.switch;
+    if (!switchEntity || !this._hass.states[switchEntity]) {
+      const discovered = autoDiscoverSwitch(this._hass, climateEntity);
+      if (discovered) switchEntity = discovered;
+    }
+    if (!switchEntity || !this._hass.states[switchEntity]) return;
 
     this._tempSwitchState = mode;
     this.updateCard();
-    
-    if (switchEntity.startsWith("switch.")) {
-      const enable = mode !== "bypass";
-      this._hass.callService("switch", enable ? "turn_on" : "turn_off", {
-        entity_id: switchEntity
-      });
-    } else {
+
+    if (switchEntity.startsWith('select.')) {
       this._hass.callService("select", "select_option", {
         entity_id: switchEntity,
         option: mode
       });
+    } else if (switchEntity.startsWith('switch.')) {
+      if (mode === "bypass" || mode === "off") {
+        this._hass.callService("switch", "turn_off", { entity_id: switchEntity });
+      } else {
+        this._hass.callService("switch", "turn_on", { entity_id: switchEntity });
+      }
     }
-
-    if (this._tempTimer) clearTimeout(this._tempTimer);
-    this._tempTimer = setTimeout(() => {
-      this._tempSwitchState = undefined;
-      this.updateCard();
-    }, 1200);
-  }
-
-  getStep(climateState) {
-    if (this._config && (this._config.step !== undefined || this._config.target_temp_step !== undefined)) {
-      const cfgStep = parseFloat(this._config.step ?? this._config.target_temp_step);
-      if (!isNaN(cfgStep) && cfgStep > 0) return cfgStep;
-    }
-    const state = climateState || (this._hass && this._config && this._config.entity ? this._hass.states[this._config.entity] : null);
-    if (state && state.attributes && state.attributes.target_temp_step !== undefined && state.attributes.target_temp_step !== null) {
-      const attrStep = parseFloat(state.attributes.target_temp_step);
-      if (!isNaN(attrStep) && attrStep > 0) return attrStep;
-    }
-    return 0.5;
-  }
-
-  changeTemp(stepOrDirection) {
-    const climateEntity = this._config.entity;
-    const state = this._hass && this._hass.states ? this._hass.states[climateEntity] : null;
-    if (!state) return;
-
-    const currentTarget = state.attributes.temperature;
-    if (currentTarget === undefined || currentTarget === null) return;
-
-    const step = this.getStep(state);
-    let delta = (stepOrDirection > 0) ? step : -step;
-    let newTemp = Math.round((currentTarget + delta) * 10) / 10;
-
-    const minTemp = state.attributes.min_temp !== undefined ? state.attributes.min_temp : 7;
-    const maxTemp = state.attributes.max_temp !== undefined ? state.attributes.max_temp : 35;
-    if (newTemp < minTemp) newTemp = minTemp;
-    if (newTemp > maxTemp) newTemp = maxTemp;
-
-    this._hass.callService("climate", "set_temperature", {
-      entity_id: climateEntity,
-      temperature: newTemp
-    });
   }
 
   updateCard() {
-    if (!this._hass || !this._hass.states || !this._rendered) return;
+    if (!this._hass || !this._hass.states) return;
+    if (!this._config) return;
 
     const climateEntity = this._config.entity;
+    let switchEntity = this._config.switch;
+
+    if (switchEntity && switchEntity.endsWith('_zone_enable')) {
+      switchEntity = null;
+    }
+
+    if (!switchEntity || !this._hass.states[switchEntity]) {
+      const discovered = autoDiscoverSwitch(this._hass, climateEntity);
+      if (discovered) switchEntity = discovered;
+      if (discovered && this._config.switch !== discovered) {
+        this._config = {...this._config, switch: discovered};
+      }
+    }
+
     const climateState = this._hass.states[climateEntity];
-    if (!climateState) return;
+    const switchState = switchEntity ? this._hass.states[switchEntity] : null;
+
+    if (!climateState) {
+      return;
+    }
+
+    if (!this._rendered) {
+      this.renderStructure();
+    }
 
     let displayTitle = this._config.title || climateState.attributes.friendly_name || climateEntity;
     if (displayTitle) {
@@ -1799,16 +1942,9 @@ class MultizoneThermostatDialCard extends HTMLElement {
     }
 
     const titleEl = this.shadowRoot.querySelector('#zone-title');
-    if (titleEl) titleEl.textContent = displayTitle;
-
-    let switchEntity = this._config.switch;
-    if (switchEntity && switchEntity.endsWith('_zone_enable')) switchEntity = null;
-    if (!switchEntity) {
-      const parts = climateEntity.split('.');
-      const candidateSelect = "select." + parts[1] + "_zone_mode";
-      if (this._hass.states[candidateSelect]) switchEntity = candidateSelect;
+    if (titleEl) {
+      titleEl.textContent = displayTitle;
     }
-    const switchState = switchEntity ? this._hass.states[switchEntity] : null;
 
     let actualSwitchState = "primary";
     if (this._tempSwitchState !== undefined) {
@@ -1851,37 +1987,30 @@ class MultizoneThermostatDialCard extends HTMLElement {
 
     // Temperatures & Gauge
     const isHeating = climateState.attributes.hvac_action === "heating";
+    this._isHeating = isHeating;
+
+    this._minTemp = climateState.attributes.min_temp !== undefined ? climateState.attributes.min_temp : 10;
+    this._maxTemp = climateState.attributes.max_temp !== undefined ? climateState.attributes.max_temp : 30;
+
     const targetTemp = typeof climateState.attributes.temperature === 'number' ? climateState.attributes.temperature : 20.0;
     const currentTemp = typeof climateState.attributes.current_temperature === 'number' ? climateState.attributes.current_temperature : targetTemp;
 
-    const targetEl = this.shadowRoot.querySelector('#target-temp');
-    if (targetEl) targetEl.textContent = targetTemp.toFixed(1);
+    this._targetTemp = targetTemp;
+    this._currentTemp = currentTemp;
+
+    // Only update dial visually from HA state if user is NOT currently dragging
+    if (!this._isDragging) {
+      const targetEl = this.shadowRoot.querySelector('#target-temp');
+      if (targetEl) targetEl.textContent = targetTemp.toFixed(1);
+      this.renderDialArc(targetTemp, isHeating);
+    }
 
     const currentEl = this.shadowRoot.querySelector('#current-temp');
     if (currentEl) currentEl.textContent = currentTemp.toFixed(1) + "°C";
 
-    // Gauge Arc calculation
-    const minTemp = climateState.attributes.min_temp !== undefined ? climateState.attributes.min_temp : 10;
-    const maxTemp = climateState.attributes.max_temp !== undefined ? climateState.attributes.max_temp : 30;
-    const range = Math.max(maxTemp - minTemp, 1);
-    const pct = Math.max(0, Math.min(1, (targetTemp - minTemp) / range));
-    const circ = 477.5;
-    const offset = circ - (pct * circ * 0.75);
+    this.renderCurrentTempMarker(currentTemp);
 
-    const meter = this.shadowRoot.querySelector('#dial-meter');
     const card = this.shadowRoot.querySelector('#zone-card');
-
-    if (meter) {
-      meter.style.strokeDashoffset = offset;
-      if (isHeating) {
-        meter.setAttribute('stroke', '#f97316');
-        meter.style.filter = "drop-shadow(0 0 8px rgba(249, 115, 22, 0.6))";
-      } else {
-        meter.setAttribute('stroke', '#38bdf8');
-        meter.style.filter = "drop-shadow(0 0 8px rgba(56, 189, 248, 0.5))";
-      }
-    }
-
     if (card) {
       if (isHeating) {
         card.classList.add('heating-aura');
@@ -1892,12 +2021,23 @@ class MultizoneThermostatDialCard extends HTMLElement {
       }
     }
 
+    const subText = this.shadowRoot.querySelector('#dial-sub-text');
+    if (subText) {
+      if (isHeating) {
+        subText.className = "dial-sub-text heating-text";
+        subText.textContent = "🔥 " + getTranslation(this._hass, 'heating_active');
+      } else {
+        subText.className = "dial-sub-text idle-text";
+        subText.textContent = "● " + getTranslation(this._hass, 'idle');
+      }
+    }
+
     // Humidity
     const humEl = this.shadowRoot.querySelector('#humidity-val');
     const humBox = this.shadowRoot.querySelector('#humidity-metric');
     if (typeof climateState.attributes.current_humidity === 'number') {
       if (humEl) humEl.textContent = climateState.attributes.current_humidity + "%";
-      if (humBox) humBox.style.display = "inline";
+      if (humBox) humBox.style.display = "inline-flex";
     }
 
     // Valve Telemetry
@@ -1905,8 +2045,9 @@ class MultizoneThermostatDialCard extends HTMLElement {
     if (valveEl) {
       if (typeof climateState.attributes.valve_position === 'number') {
         valveEl.textContent = "Valvola " + Math.round(climateState.attributes.valve_position) + "%";
+        valveEl.style.color = "#38bdf8";
       } else if (isHeating) {
-        valveEl.textContent = "Riscaldamento ON";
+        valveEl.textContent = "Attivo";
         valveEl.style.color = "#f97316";
       } else {
         valveEl.textContent = "Standby";
@@ -2072,6 +2213,7 @@ class MultizoneThermostatCardEditor extends HTMLElement {
 }
 
 /* ==================== STATUS (BUTTON-STYLE MASTER SWITCH) CARD CLASS ==================== */
+/* ==================== MULTIZONE STATUS CARD ==================== */
 class MultizoneThermostatStatusCard extends HTMLElement {
   constructor() {
     super();
@@ -2103,16 +2245,16 @@ class MultizoneThermostatStatusCard extends HTMLElement {
 
     style.textContent = `
       ha-card {
-        padding: 16px;
+        padding: 18px 20px;
         border-radius: ${radius} !important;
         overflow: hidden !important;
         color: white;
-        background: var(--ha-card-background, var(--card-background-color, rgba(30, 41, 59, 0.7)));
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.08));
-        box-shadow: var(--ha-card-box-shadow, 0 4px 16px rgba(0, 0, 0, 0.15));
-        transition: background-color 0.4s ease, transform 0.2s ease, box-shadow 0.2s ease;
+        background: linear-gradient(135deg, rgba(20, 27, 41, 0.88) 0%, rgba(15, 23, 42, 0.94) 100%) !important;
+        backdrop-filter: blur(20px) !important;
+        -webkit-backdrop-filter: blur(20px) !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
         cursor: pointer;
         display: flex;
         align-items: center;
@@ -2122,7 +2264,8 @@ class MultizoneThermostatStatusCard extends HTMLElement {
       }
       ha-card:hover {
         transform: translateY(-2px);
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+        border-color: rgba(255, 255, 255, 0.16) !important;
+        box-shadow: 0 16px 40px -10px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
       }
       ha-card:active {
         transform: translateY(0);
@@ -2138,10 +2281,10 @@ class MultizoneThermostatStatusCard extends HTMLElement {
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 52px;
-        height: 52px;
-        border-radius: 16px;
-        background: rgba(255, 255, 255, 0.08);
+        width: 58px;
+        height: 58px;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.06);
         border: 1px solid rgba(255, 255, 255, 0.1);
         flex-shrink: 0;
         transition: transform 0.2s ease, background 0.3s ease, box-shadow 0.3s ease;
@@ -2150,7 +2293,7 @@ class MultizoneThermostatStatusCard extends HTMLElement {
         transform: scale(1.08);
       }
       .icon-wrap ha-icon {
-        --mdc-icon-size: 28px;
+        --mdc-icon-size: 30px;
         color: inherit;
       }
       .info-container {
@@ -2159,17 +2302,24 @@ class MultizoneThermostatStatusCard extends HTMLElement {
         justify-content: center;
         flex-grow: 1;
         overflow: hidden;
-        gap: 4px;
+        gap: 3px;
+      }
+      .sub-title {
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        color: #94a3b8;
       }
       .name {
-        font-size: 16px;
-        font-weight: 700;
+        font-size: 17px;
+        font-weight: 800;
         margin: 0;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        color: #f8fafc;
-        letter-spacing: -0.2px;
+        color: #ffffff;
+        letter-spacing: -0.3px;
       }
       .status-pill {
         display: inline-flex;
@@ -2179,71 +2329,75 @@ class MultizoneThermostatStatusCard extends HTMLElement {
         border-radius: 9999px;
         font-size: 11px;
         font-weight: 700;
+        letter-spacing: 0.3px;
         text-transform: uppercase;
-        letter-spacing: 0.4px;
-        background: rgba(148, 163, 184, 0.12);
-        color: #94a3b8;
-        border: 1px solid rgba(148, 163, 184, 0.25);
         align-self: flex-start;
+        margin-top: 2px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
       }
       .status-dot {
         width: 6px;
         height: 6px;
         border-radius: 50%;
         background: currentColor;
-        flex-shrink: 0;
+        box-shadow: 0 0 6px currentColor;
       }
-      .temp-row {
-        font-size: 12px;
+      .telemetry {
+        font-size: 11px;
         color: #94a3b8;
+        font-weight: 600;
         margin-top: 2px;
       }
-      .glow-flame {
-        animation: pulse-flame 1.5s infinite alternate;
+      .heating-aura {
+        background: radial-gradient(circle at 30% 50%, rgba(249, 115, 22, 0.25) 0%, rgba(239, 68, 68, 0.08) 50%, rgba(20, 27, 41, 0.92) 80%) !important;
       }
-      @keyframes pulse-flame {
-        0% { transform: scale(1); filter: drop-shadow(0 0 1px rgba(255,255,255,0.4)); }
-        100% { transform: scale(1.1); filter: drop-shadow(0 0 6px rgba(255,255,255,0.7)); }
+      .idle-aura {
+        background: radial-gradient(circle at 30% 50%, rgba(245, 158, 11, 0.18) 0%, rgba(20, 27, 41, 0.92) 80%) !important;
       }
     `;
 
+    card.id = 'status-card';
     card.innerHTML = `
       <div class="card-content">
         <div class="icon-wrap" id="master-icon-wrap">
           <ha-icon id="master-icon" icon="mdi:power"></ha-icon>
         </div>
         <div class="info-container">
+          <div class="sub-title">Impianto Centrale</div>
           <div class="name" id="master-name">Riscaldamento</div>
-          <div class="status-pill" id="master-pill">
-            <span class="status-dot"></span>
-            <span id="master-state-text">Ricerca...</span>
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <div class="status-pill" id="master-pill">
+              <span class="status-dot"></span>
+              <span id="master-state-text">Caricamento...</span>
+            </div>
+            <div class="telemetry" id="master-telemetry">Caldaia: OFF</div>
           </div>
-          <div class="temp-row" id="master-telemetry">Caldaia/Circolatore: --</div>
         </div>
       </div>
     `;
 
-    // Hook tap event to toggle the master entity
-    card.addEventListener('click', () => this.handleTap());
+    card.addEventListener('click', () => {
+      this.toggleMaster();
+    });
 
     this.shadowRoot.appendChild(style);
     this.shadowRoot.appendChild(card);
     this._rendered = true;
   }
 
-  handleTap() {
+  toggleMaster() {
+    if (!this._hass) return;
     const masterEntity = findMasterEntity(this._hass);
     if (!masterEntity) return;
 
-    const domain = masterEntity.split('.')[0];
-    this._hass.callService(domain, "toggle", {
+    this._hass.callService("switch", "toggle", {
       entity_id: masterEntity
     });
   }
 
   updateCard() {
     if (!this._hass || !this._hass.states) return;
-    if (!this._hass || !this._rendered) return;
+    if (!this._rendered) return;
 
     const masterEntity = findMasterEntity(this._hass);
     let isMasterOn = false;
@@ -2292,19 +2446,6 @@ class MultizoneThermostatStatusCard extends HTMLElement {
     }
 
     const card = this.shadowRoot.querySelector('ha-card');
-    const radius = (this._config && this._config.border_radius) ? this._config.border_radius : '20px';
-    if (card) {
-      card.style.borderRadius = radius;
-      card.style.overflow = 'hidden';
-      if (this._config.height) card.style.height = this._config.height;
-      if (this._config.width) card.style.width = this._config.width;
-    }
-
-    const nameEl = this.shadowRoot.querySelector('#master-name');
-    if (nameEl) {
-      nameEl.textContent = this._config.title || getTranslation(this._hass, 'heating');
-    }
-
     const wrapEl = this.shadowRoot.querySelector('#master-icon-wrap');
     const iconEl = this.shadowRoot.querySelector('#master-icon');
     const pillEl = this.shadowRoot.querySelector('#master-pill');
@@ -2312,15 +2453,17 @@ class MultizoneThermostatStatusCard extends HTMLElement {
     const telemetryEl = this.shadowRoot.querySelector('#master-telemetry');
 
     if (!isMasterOn) {
+      if (card) {
+        card.classList.remove('heating-aura', 'idle-aura');
+      }
       if (wrapEl) {
-        wrapEl.style.background = "rgba(255, 255, 255, 0.08)";
-        wrapEl.style.color = "#94a3b8";
-        wrapEl.style.borderColor = "rgba(255, 255, 255, 0.12)";
+        wrapEl.style.background = "rgba(255, 255, 255, 0.05)";
+        wrapEl.style.color = "#64748b";
+        wrapEl.style.borderColor = "rgba(255, 255, 255, 0.1)";
         wrapEl.style.boxShadow = "none";
       }
       if (iconEl) {
-        iconEl.setAttribute('icon', this._config.icon || "mdi:power");
-        iconEl.classList.remove('glow-flame');
+        iconEl.setAttribute('icon', "mdi:power");
       }
       if (pillEl) {
         pillEl.style.background = "rgba(148, 163, 184, 0.12)";
@@ -2331,38 +2474,44 @@ class MultizoneThermostatStatusCard extends HTMLElement {
       if (telemetryEl) telemetryEl.textContent = `${getTranslation(this._hass, 'caldaia_circ')}: OFF`;
     } else {
       if (isBoilerOn) {
+        if (card) {
+          card.classList.add('heating-aura');
+          card.classList.remove('idle-aura');
+        }
         if (wrapEl) {
-          wrapEl.style.background = "rgba(239, 68, 68, 0.2)";
-          wrapEl.style.color = "#f87171";
-          wrapEl.style.borderColor = "rgba(239, 68, 68, 0.4)";
-          wrapEl.style.boxShadow = "0 0 16px rgba(239, 68, 68, 0.35)";
+          wrapEl.style.background = "linear-gradient(135deg, #f97316, #ef4444)";
+          wrapEl.style.color = "#ffffff";
+          wrapEl.style.borderColor = "#f97316";
+          wrapEl.style.boxShadow = "0 0 25px rgba(239, 68, 68, 0.45)";
         }
         if (iconEl) {
-          iconEl.setAttribute('icon', this._config.icon || "mdi:fire");
-          iconEl.classList.add('glow-flame');
+          iconEl.setAttribute('icon', "mdi:fire");
         }
         if (pillEl) {
-          pillEl.style.background = "rgba(239, 68, 68, 0.15)";
-          pillEl.style.color = "#f87171";
-          pillEl.style.borderColor = "rgba(239, 68, 68, 0.35)";
+          pillEl.style.background = "rgba(249, 115, 22, 0.18)";
+          pillEl.style.color = "#fb923c";
+          pillEl.style.borderColor = "rgba(249, 115, 22, 0.4)";
         }
         if (stateTextEl) stateTextEl.textContent = getTranslation(this._hass, 'heating_active');
-        if (telemetryEl) telemetryEl.textContent = `${getTranslation(this._hass, 'caldaia_circ')}: ON`;
+        if (telemetryEl) telemetryEl.textContent = `${getTranslation(this._hass, 'caldaia_circ')}: ATTIVO`;
       } else {
+        if (card) {
+          card.classList.add('idle-aura');
+          card.classList.remove('heating-aura');
+        }
         if (wrapEl) {
-          wrapEl.style.background = "rgba(245, 158, 11, 0.2)";
-          wrapEl.style.color = "#fbbf24";
-          wrapEl.style.borderColor = "rgba(245, 158, 11, 0.4)";
-          wrapEl.style.boxShadow = "0 0 16px rgba(245, 158, 11, 0.25)";
+          wrapEl.style.background = "linear-gradient(135deg, #f59e0b, #d97706)";
+          wrapEl.style.color = "#ffffff";
+          wrapEl.style.borderColor = "#f59e0b";
+          wrapEl.style.boxShadow = "0 0 20px rgba(245, 158, 11, 0.35)";
         }
         if (iconEl) {
-          iconEl.setAttribute('icon', this._config.icon || "mdi:radiator-off");
-          iconEl.classList.remove('glow-flame');
+          iconEl.setAttribute('icon', "mdi:power");
         }
         if (pillEl) {
-          pillEl.style.background = "rgba(245, 158, 11, 0.15)";
+          pillEl.style.background = "rgba(245, 158, 11, 0.18)";
           pillEl.style.color = "#fbbf24";
-          pillEl.style.borderColor = "rgba(245, 158, 11, 0.35)";
+          pillEl.style.borderColor = "rgba(245, 158, 11, 0.4)";
         }
         if (stateTextEl) stateTextEl.textContent = getTranslation(this._hass, 'idle');
         if (telemetryEl) telemetryEl.textContent = `${getTranslation(this._hass, 'caldaia_circ')}: STANDBY`;
@@ -2371,6 +2520,7 @@ class MultizoneThermostatStatusCard extends HTMLElement {
   }
 }
 
+/* ==================== MULTIZONE PRESET CARD ==================== */
 class MultizoneThermostatPresetCard extends HTMLElement {
   constructor() {
     super();
@@ -2410,73 +2560,124 @@ class MultizoneThermostatPresetCard extends HTMLElement {
   }
 
   renderStructure() {
+    const radius = (this._config && this._config.border_radius) ? this._config.border_radius : '20px';
     this.shadowRoot.innerHTML = `
       <style>
         ha-card {
-          padding: 16px 14px;
-          border-radius: var(--ha-card-border-radius, 20px) !important;
+          padding: 18px 16px;
+          border-radius: ${radius} !important;
           overflow: hidden !important;
           display: flex;
           flex-direction: column;
           gap: 12px;
-          background: var(--ha-card-background, var(--card-background-color, rgba(30, 41, 59, 0.7)));
-          backdrop-filter: blur(12px);
-          -webkit-backdrop-filter: blur(12px);
-          border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.08));
-          box-shadow: var(--ha-card-box-shadow, 0 4px 16px rgba(0, 0, 0, 0.15));
+          background: linear-gradient(135deg, rgba(20, 27, 41, 0.88) 0%, rgba(15, 23, 42, 0.94) 100%) !important;
+          backdrop-filter: blur(20px) !important;
+          -webkit-backdrop-filter: blur(20px) !important;
+          border: 1px solid rgba(255, 255, 255, 0.08) !important;
+          box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+          box-sizing: border-box;
+          min-height: 90px;
         }
         .header {
-          font-weight: 700;
-          font-size: 13px;
-          color: var(--primary-text-color, #ffffff);
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
           margin-bottom: 2px;
         }
-        .buttons-row {
+        .header-left {
           display: flex;
-          flex-direction: row;
-          justify-content: space-between;
+          align-items: center;
+          gap: 6px;
+          font-weight: 800;
+          font-size: 12px;
+          color: #cbd5e1;
+          text-transform: uppercase;
+          letter-spacing: 0.8px;
+        }
+        .active-badge {
+          font-size: 10px;
+          font-weight: 700;
+          padding: 2px 8px;
+          border-radius: 9999px;
+          background: rgba(14, 165, 233, 0.15);
+          color: #38bdf8;
+          border: 1px solid rgba(14, 165, 233, 0.3);
+          text-transform: uppercase;
+          letter-spacing: 0.3px;
+        }
+        .buttons-row {
+          display: grid;
+          grid-template-columns: repeat(5, 1fr);
           gap: 8px;
         }
         .preset-btn {
-          flex: 1;
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          background: rgba(255, 255, 255, 0.04);
-          color: var(--secondary-text-color, #94a3b8);
+          background: rgba(255, 255, 255, 0.03);
+          color: #94a3b8;
           border-radius: 14px;
           padding: 12px 4px;
           cursor: pointer;
           transition: all 0.25s ease;
-          border: 1px solid rgba(255, 255, 255, 0.06);
+          border: 1px solid rgba(255, 255, 255, 0.07);
           gap: 6px;
         }
         .preset-btn:hover {
           background: rgba(255, 255, 255, 0.08);
           transform: translateY(-2px);
-          border-color: rgba(255, 255, 255, 0.15);
+          border-color: rgba(255, 255, 255, 0.16);
+          color: #ffffff;
         }
-        .preset-btn.active {
-          background: rgba(14, 165, 233, 0.18);
+        .preset-btn.active.manual {
+          background: linear-gradient(135deg, rgba(14, 165, 233, 0.25), rgba(56, 189, 248, 0.12));
           color: #38bdf8;
-          border-color: #38bdf8;
-          box-shadow: 0 0 16px rgba(14, 165, 233, 0.25);
+          border: 1.5px solid #38bdf8;
+          box-shadow: 0 0 16px rgba(56, 189, 248, 0.35);
+        }
+        .preset-btn.active.eco {
+          background: linear-gradient(135deg, rgba(16, 185, 129, 0.25), rgba(52, 211, 153, 0.12));
+          color: #34d399;
+          border: 1.5px solid #10b981;
+          box-shadow: 0 0 16px rgba(16, 185, 129, 0.35);
+        }
+        .preset-btn.active.comfort {
+          background: linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(251, 191, 36, 0.12));
+          color: #fbbf24;
+          border: 1.5px solid #f59e0b;
+          box-shadow: 0 0 16px rgba(245, 158, 11, 0.35);
+        }
+        .preset-btn.active.sleep {
+          background: linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(129, 140, 248, 0.12));
+          color: #818cf8;
+          border: 1.5px solid #6366f1;
+          box-shadow: 0 0 16px rgba(99, 102, 241, 0.35);
+        }
+        .preset-btn.active.away {
+          background: linear-gradient(135deg, rgba(239, 68, 68, 0.25), rgba(248, 113, 113, 0.12));
+          color: #f87171;
+          border: 1.5px solid #ef4444;
+          box-shadow: 0 0 16px rgba(239, 68, 68, 0.35);
         }
         .preset-btn ha-icon {
-          --mdc-icon-size: 28px;
+          --mdc-icon-size: 24px;
         }
         .preset-label {
           font-size: 11px;
-          font-weight: 500;
+          font-weight: 700;
           text-align: center;
           word-break: break-word;
         }
       </style>
       <ha-card>
-        <div class="header" id="card-title">Preset Globale</div>
+        <div class="header">
+          <div class="header-left">
+            <span style="color: #38bdf8; font-size: 14px;">⚡</span>
+            <span id="card-title">Preset Globale</span>
+          </div>
+          <span class="active-badge" id="active-preset-badge">Manuale</span>
+        </div>
         <div class="buttons-row">
           <div class="preset-btn" data-preset="manual" id="btn-manual">
             <ha-icon icon="mdi:power"></ha-icon>
@@ -2502,67 +2703,66 @@ class MultizoneThermostatPresetCard extends HTMLElement {
       </ha-card>
     `;
 
-    // Add click listeners
     const buttons = this.shadowRoot.querySelectorAll('.preset-btn');
     buttons.forEach(btn => {
       btn.addEventListener('click', (e) => {
-        const preset = e.currentTarget.getAttribute('data-preset');
-        this.setPreset(preset);
+        const preset = btn.getAttribute('data-preset');
+        this.selectPreset(preset);
       });
     });
   }
 
-  setPreset(preset) {
-    if (!this._hass || !this.presetEntity) return;
-    this._hass.callService('select', 'select_option', {
-      entity_id: this.presetEntity,
+  selectPreset(preset) {
+    if (!this._hass) return;
+    const entityId = this.presetEntity;
+    if (!entityId) return;
+
+    this._hass.callService("select", "select_option", {
+      entity_id: entityId,
       option: preset
     });
   }
 
   updateCard() {
     if (!this._hass || !this._hass.states) return;
-    if (!this._hass) return;
-
-    // Apply custom styling from config
-    const card = this.shadowRoot.querySelector('ha-card');
-    if (card && this._config) {
-      if (this._config.height) card.style.height = this._config.height;
-      if (this._config.width) card.style.width = this._config.width;
-      if (this._config.border_radius) card.style.borderRadius = this._config.border_radius;
-    }
-
-    // Title
-    const titleEl = this.shadowRoot.getElementById('card-title');
-    titleEl.textContent = (this._config && this._config.title) || getTranslation(this._hass, 'preset_card_title');
-
-    // Labels
-    this.shadowRoot.getElementById('lbl-manual').textContent = getTranslation(this._hass, 'preset_manual');
-    this.shadowRoot.getElementById('lbl-eco').textContent = getTranslation(this._hass, 'preset_eco');
-    this.shadowRoot.getElementById('lbl-comfort').textContent = getTranslation(this._hass, 'preset_comfort');
-    this.shadowRoot.getElementById('lbl-sleep').textContent = getTranslation(this._hass, 'preset_sleep');
-    this.shadowRoot.getElementById('lbl-away').textContent = getTranslation(this._hass, 'preset_away');
-
     const entityId = this.presetEntity;
-    if (!entityId || !this._hass.states[entityId]) {
-      return; // Not found yet
-    }
+    if (!entityId || !this._hass.states[entityId]) return;
 
     const state = this._hass.states[entityId].state;
 
-    // Update active class
+    // Localize labels
+    const titleEl = this.shadowRoot.querySelector('#card-title');
+    if (titleEl) {
+      titleEl.textContent = this._config?.title || getTranslation(this._hass, 'preset_card_title');
+    }
+    const lblManual = this.shadowRoot.querySelector('#lbl-manual');
+    if (lblManual) lblManual.textContent = getTranslation(this._hass, 'preset_manual');
+    const lblEco = this.shadowRoot.querySelector('#lbl-eco');
+    if (lblEco) lblEco.textContent = getTranslation(this._hass, 'preset_eco');
+    const lblComfort = this.shadowRoot.querySelector('#lbl-comfort');
+    if (lblComfort) lblComfort.textContent = getTranslation(this._hass, 'preset_comfort');
+    const lblSleep = this.shadowRoot.querySelector('#lbl-sleep');
+    if (lblSleep) lblSleep.textContent = getTranslation(this._hass, 'preset_sleep');
+    const lblAway = this.shadowRoot.querySelector('#lbl-away');
+    if (lblAway) lblAway.textContent = getTranslation(this._hass, 'preset_away');
+
+    const activeBadge = this.shadowRoot.querySelector('#active-preset-badge');
+    if (activeBadge) {
+      activeBadge.textContent = state.toUpperCase();
+    }
+
     const buttons = this.shadowRoot.querySelectorAll('.preset-btn');
     buttons.forEach(btn => {
-      if (btn.getAttribute('data-preset') === state) {
-        btn.classList.add('active');
+      const p = btn.getAttribute('data-preset');
+      if (p === state) {
+        btn.className = `preset-btn active ${p}`;
       } else {
-        btn.classList.remove('active');
+        btn.className = 'preset-btn';
       }
     });
   }
 }
 
-/* ==================== PRESET CARD EDITOR CLASS ==================== */
 class MultizoneThermostatPresetCardEditor extends HTMLElement {
   constructor() {
     super();
@@ -2778,94 +2978,23 @@ function navigateOrFallbackModal(hostEl, targetPath, onFallback) {
   }));
 }
 
+/* ==================== SUMMARY NAVIGATION CARDS ==================== */
 class MultizoneThermostatScheduleSummaryCard extends HTMLElement {
   getCardSize() { return 3; }
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
-    this._standaloneSchedCard = null;
   }
 
   set hass(hass) {
     this._hass = hass;
     this.updateCard();
-    if (this._standaloneSchedCard) {
-      this._standaloneSchedCard.hass = hass;
-    }
-  }
-
-  disconnectedCallback() {
-    this._closeStandaloneModal();
   }
 
   setConfig(config) {
     this._config = config || {};
     if (!this._rendered) this.renderStructure();
     this.updateCard();
-  }
-
-  _openStandaloneModal() {
-    this._closeStandaloneModal();
-    const overlay = document.createElement('div');
-    overlay.id = 'mz-standalone-scheduler-overlay';
-    overlay.style.cssText = [
-      'position: fixed',
-      'inset: 0',
-      'z-index: 9999',
-      'background: rgba(15, 23, 42, 0.88)',
-      'backdrop-filter: blur(8px)',
-      '-webkit-backdrop-filter: blur(8px)',
-      'overflow-y: auto',
-      'padding: 16px',
-      'box-sizing: border-box',
-      'display: flex',
-      'flex-direction: column',
-      'align-items: center'
-    ].join(';');
-
-    const wrapper = document.createElement('div');
-    wrapper.style.cssText = 'width: 100%; max-width: 1360px; margin: 0 auto;';
-
-    const topBar = document.createElement('div');
-    topBar.style.cssText = 'display: flex; justify-content: flex-end; margin-bottom: 12px;';
-
-    const closeBtn = document.createElement('button');
-    closeBtn.innerHTML = '✕ Chiudi Programmazione';
-    closeBtn.style.cssText = [
-      'background: rgba(255, 255, 255, 0.12)',
-      'color: #f8fafc',
-      'border: 1px solid rgba(255, 255, 255, 0.2)',
-      'border-radius: 10px',
-      'padding: 8px 16px',
-      'font-size: 0.9rem',
-      'font-weight: 600',
-      'cursor: pointer'
-    ].join(';');
-    closeBtn.addEventListener('click', () => this._closeStandaloneModal());
-
-    topBar.appendChild(closeBtn);
-    wrapper.appendChild(topBar);
-
-    const schedCard = document.createElement('multizone-thermostat-scheduler-card');
-    if (typeof schedCard.setConfig === 'function') {
-      schedCard.setConfig({});
-    }
-    if (this._hass) {
-      schedCard.hass = this._hass;
-    }
-    wrapper.appendChild(schedCard);
-
-    overlay.appendChild(wrapper);
-    this._standaloneSchedCard = schedCard;
-    document.body.appendChild(overlay);
-  }
-
-  _closeStandaloneModal() {
-    this._standaloneSchedCard = null;
-    const existing = document.getElementById('mz-standalone-scheduler-overlay');
-    if (existing && existing.parentNode) {
-      existing.parentNode.removeChild(existing);
-    }
   }
 
   renderStructure() {
@@ -2876,11 +3005,11 @@ class MultizoneThermostatScheduleSummaryCard extends HTMLElement {
           padding: 14px 10px;
           border-radius: ${radius} !important;
           overflow: hidden !important;
-          background: var(--ha-card-background, var(--card-background-color, rgba(30, 41, 59, 0.7)));
-          backdrop-filter: blur(12px);
-          -webkit-backdrop-filter: blur(12px);
-          border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.08));
-          box-shadow: var(--ha-card-box-shadow, 0 4px 16px rgba(0, 0, 0, 0.15));
+          background: linear-gradient(135deg, rgba(20, 27, 41, 0.88) 0%, rgba(15, 23, 42, 0.94) 100%) !important;
+          backdrop-filter: blur(20px) !important;
+          -webkit-backdrop-filter: blur(20px) !important;
+          border: 1px solid rgba(255, 255, 255, 0.08) !important;
+          box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
           color: white;
           display: flex;
           align-items: center;
@@ -2888,13 +3017,13 @@ class MultizoneThermostatScheduleSummaryCard extends HTMLElement {
           height: 100%;
           min-height: 90px;
           cursor: pointer;
-          transition: background-color 0.2s, transform 0.2s, box-shadow 0.2s;
+          transition: all 0.25s ease;
           box-sizing: border-box;
         }
         ha-card:hover {
-          background: rgba(30, 41, 59, 0.9);
           transform: translateY(-2px);
-          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+          border-color: rgba(56, 189, 248, 0.4) !important;
+          box-shadow: 0 16px 40px -10px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
         }
         .container {
           display: flex;
@@ -2914,6 +3043,8 @@ class MultizoneThermostatScheduleSummaryCard extends HTMLElement {
           align-items: center;
           justify-content: center;
           transition: transform 0.2s ease, background 0.3s ease;
+          border: 1px solid rgba(14, 165, 233, 0.25);
+          box-shadow: 0 0 15px rgba(14, 165, 233, 0.2);
         }
         ha-card:hover .icon-wrap {
           transform: scale(1.08);
@@ -2926,7 +3057,7 @@ class MultizoneThermostatScheduleSummaryCard extends HTMLElement {
           font-weight: 700;
           font-size: 0.95rem;
           letter-spacing: -0.2px;
-          color: var(--primary-text-color, #ffffff);
+          color: #ffffff;
         }
         .status-pill {
           display: inline-flex;
@@ -2937,9 +3068,9 @@ class MultizoneThermostatScheduleSummaryCard extends HTMLElement {
           font-size: 11px;
           font-weight: 700;
           letter-spacing: 0.3px;
-          background: rgba(148, 163, 184, 0.12);
-          color: #94a3b8;
-          border: 1px solid rgba(148, 163, 184, 0.25);
+          background: rgba(14, 165, 233, 0.15);
+          color: #38bdf8;
+          border: 1px solid rgba(14, 165, 233, 0.35);
           max-width: 95%;
           white-space: nowrap;
           overflow: hidden;
@@ -2969,127 +3100,48 @@ class MultizoneThermostatScheduleSummaryCard extends HTMLElement {
 
     const card = this.shadowRoot.querySelector('#sched-card');
     if (card) {
-      card.style.borderRadius = radius;
-      card.style.overflow = 'hidden';
       card.addEventListener('click', () => {
         const targetPath = (this._config && this._config.navigation_path) ? this._config.navigation_path : 'programmazione';
-        navigateOrFallbackModal(this, targetPath, () => this._openStandaloneModal());
+        navigateOrFallbackModal(this, targetPath);
       });
     }
     this._rendered = true;
   }
 
   updateCard() {
-    if (!this._hass || !this._hass.states || !this._rendered) return;
+    if (!this._hass || !this._hass.states) return;
+    if (!this._rendered) return;
 
-    const radius = (this._config && this._config.border_radius) ? this._config.border_radius : '20px';
-    const card = this.shadowRoot.querySelector('#sched-card');
-    if (card) {
-      card.style.borderRadius = radius;
-      card.style.overflow = 'hidden';
-    }
-
-    let schedStatus = null;
+    let schedEntity = null;
     for (const eid of Object.keys(this._hass.states)) {
-      const s = this._hass.states[eid];
-      if (s.attributes && s.attributes.multizone_type === "scheduler" && s.attributes.schedule_status) {
-        schedStatus = s.attributes.schedule_status;
+      if (eid.startsWith("select.") && eid.includes("schedule_profile")) {
+        schedEntity = eid;
         break;
       }
     }
 
-    if (!schedStatus) {
-      const masterEid = findMasterEntity(this._hass);
-      if (masterEid && this._hass.states[masterEid]?.attributes?.schedule_status) {
-        schedStatus = this._hass.states[masterEid].attributes.schedule_status;
-      }
-    }
-
-    if (!schedStatus) {
-      for (const eid of Object.keys(this._hass.states)) {
-        if (this._hass.states[eid]?.attributes?.schedule_status) {
-          schedStatus = this._hass.states[eid].attributes.schedule_status;
-          break;
-        }
-      }
-    }
-
-    const titleEl = this.shadowRoot.querySelector('#sched-title');
     const subtitleEl = this.shadowRoot.querySelector('#sched-subtitle');
-    const iconEl = this.shadowRoot.querySelector('#sched-icon');
     const wrapEl = this.shadowRoot.querySelector('#sched-icon-wrap');
     const pillEl = this.shadowRoot.querySelector('#sched-pill');
 
-    if (titleEl) {
-      titleEl.textContent = getTranslation(this._hass, 'sched_nav_title');
-    }
-
-    if (!schedStatus) {
-      if (subtitleEl) subtitleEl.textContent = getTranslation(this._hass, 'sched_paused');
-      if (iconEl) iconEl.icon = "mdi:calendar-clock";
-      if (wrapEl) {
-        wrapEl.style.background = "rgba(148, 163, 184, 0.15)";
-        wrapEl.style.color = "#94a3b8";
-      }
-      if (pillEl) {
-        pillEl.style.background = "rgba(148, 163, 184, 0.12)";
-        pillEl.style.color = "#94a3b8";
-        pillEl.style.borderColor = "rgba(148, 163, 184, 0.25)";
-      }
+    if (!schedEntity) {
+      if (subtitleEl) subtitleEl.textContent = "In Pausa";
       return;
     }
 
-    const sr = schedStatus.smart_return;
-    if (sr && sr.active) {
-      const arrival = sr.arrival_time ? sr.arrival_time.substring(0, 5) : "";
-      if (subtitleEl) subtitleEl.textContent = "🚗 Rientro " + arrival;
-      if (iconEl) iconEl.icon = "mdi:car-clock";
-      if (wrapEl) {
-        wrapEl.style.background = "rgba(245, 158, 11, 0.2)";
-        wrapEl.style.color = "#fcd34d";
-      }
-      if (pillEl) {
-        pillEl.style.background = "rgba(245, 158, 11, 0.15)";
-        pillEl.style.color = "#fbbf24";
-        pillEl.style.borderColor = "rgba(245, 158, 11, 0.35)";
-      }
-      return;
-    }
+    const stateObj = this._hass.states[schedEntity];
+    const profile = stateObj.state || "In Pausa";
+    if (subtitleEl) subtitleEl.textContent = profile;
 
-    if (schedStatus.scheduler_enabled) {
-      let pId = schedStatus.active_profile || 'standard';
-      let pName = (schedStatus.profiles && schedStatus.profiles[pId] && schedStatus.profiles[pId].name) || pId;
-      
-      let prefix = "🟢";
-      if (pId === 'smart_working') prefix = "💼";
-      else if (pId === 'holiday') prefix = "🎉";
-      
-      let text = prefix + " " + pName;
-      if (schedStatus.profile_expires_at) {
-        text += " ⏳";
-      }
-      if (subtitleEl) subtitleEl.textContent = text;
-      if (iconEl) iconEl.icon = "mdi:calendar-clock";
+    if (profile.toLowerCase() !== "off" && profile.toLowerCase() !== "in pausa" && profile.toLowerCase() !== "pause") {
       if (wrapEl) {
-        wrapEl.style.background = "rgba(16, 185, 129, 0.2)";
-        wrapEl.style.color = "#34d399";
+        wrapEl.style.background = "rgba(14, 165, 233, 0.25)";
+        wrapEl.style.color = "#38bdf8";
       }
       if (pillEl) {
-        pillEl.style.background = "rgba(16, 185, 129, 0.15)";
-        pillEl.style.color = "#34d399";
-        pillEl.style.borderColor = "rgba(16, 185, 129, 0.35)";
-      }
-    } else {
-      if (subtitleEl) subtitleEl.textContent = getTranslation(this._hass, 'sched_paused');
-      if (iconEl) iconEl.icon = "mdi:calendar-clock";
-      if (wrapEl) {
-        wrapEl.style.background = "rgba(148, 163, 184, 0.15)";
-        wrapEl.style.color = "#94a3b8";
-      }
-      if (pillEl) {
-        pillEl.style.background = "rgba(148, 163, 184, 0.12)";
-        pillEl.style.color = "#94a3b8";
-        pillEl.style.borderColor = "rgba(148, 163, 184, 0.25)";
+        pillEl.style.background = "rgba(14, 165, 233, 0.2)";
+        pillEl.style.color = "#38bdf8";
+        pillEl.style.borderColor = "rgba(14, 165, 233, 0.4)";
       }
     }
   }
@@ -3125,11 +3177,11 @@ class MultizoneThermostatHealthSummaryCard extends HTMLElement {
           padding: 14px 10px;
           border-radius: ${radius} !important;
           overflow: hidden !important;
-          background: var(--ha-card-background, var(--card-background-color, rgba(30, 41, 59, 0.7)));
-          backdrop-filter: blur(12px);
-          -webkit-backdrop-filter: blur(12px);
-          border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.08));
-          box-shadow: var(--ha-card-box-shadow, 0 4px 16px rgba(0, 0, 0, 0.15));
+          background: linear-gradient(135deg, rgba(20, 27, 41, 0.88) 0%, rgba(15, 23, 42, 0.94) 100%) !important;
+          backdrop-filter: blur(20px) !important;
+          -webkit-backdrop-filter: blur(20px) !important;
+          border: 1px solid rgba(255, 255, 255, 0.08) !important;
+          box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
           color: white;
           display: flex;
           align-items: center;
@@ -3137,13 +3189,13 @@ class MultizoneThermostatHealthSummaryCard extends HTMLElement {
           height: 100%;
           min-height: 90px;
           cursor: pointer;
-          transition: background-color 0.2s, transform 0.2s, box-shadow 0.2s;
+          transition: all 0.25s ease;
           box-sizing: border-box;
         }
         ha-card:hover {
-          background: rgba(30, 41, 59, 0.9);
           transform: translateY(-2px);
-          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+          border-color: rgba(16, 185, 129, 0.4) !important;
+          box-shadow: 0 16px 40px -10px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
         }
         .container {
           display: flex;
@@ -3163,6 +3215,8 @@ class MultizoneThermostatHealthSummaryCard extends HTMLElement {
           align-items: center;
           justify-content: center;
           transition: transform 0.2s ease, background 0.3s ease;
+          border: 1px solid rgba(16, 185, 129, 0.25);
+          box-shadow: 0 0 15px rgba(16, 185, 129, 0.2);
         }
         ha-card:hover .icon-wrap {
           transform: scale(1.08);
@@ -3175,7 +3229,7 @@ class MultizoneThermostatHealthSummaryCard extends HTMLElement {
           font-weight: 700;
           font-size: 0.95rem;
           letter-spacing: -0.2px;
-          color: var(--primary-text-color, #ffffff);
+          color: #ffffff;
         }
         .status-pill {
           display: inline-flex;
@@ -3218,8 +3272,6 @@ class MultizoneThermostatHealthSummaryCard extends HTMLElement {
 
     const card = this.shadowRoot.querySelector('#health-card');
     if (card) {
-      card.style.borderRadius = radius;
-      card.style.overflow = 'hidden';
       card.addEventListener('click', () => {
         const targetPath = (this._config && this._config.navigation_path) ? this._config.navigation_path : 'diagnostica';
         navigateOrFallbackModal(this, targetPath);
@@ -3230,15 +3282,8 @@ class MultizoneThermostatHealthSummaryCard extends HTMLElement {
 
   updateCard() {
     if (!this._hass || !this._hass.states) return;
-    if (!this._hass || !this._rendered) return;
+    if (!this._rendered) return;
 
-    const radius = (this._config && this._config.border_radius) ? this._config.border_radius : '20px';
-    const card = this.shadowRoot.querySelector('#health-card');
-    if (card) {
-      card.style.borderRadius = radius;
-      card.style.overflow = 'hidden';
-    }
-    
     let healthEntity = null;
     for (const eid of Object.keys(this._hass.states)) {
       if (eid.startsWith("sensor.") && 
@@ -3257,15 +3302,6 @@ class MultizoneThermostatHealthSummaryCard extends HTMLElement {
     if (!healthEntity) {
       if (subtitleEl) subtitleEl.textContent = "Non trovato";
       if (iconEl) iconEl.icon = "mdi:shield-off";
-      if (wrapEl) {
-        wrapEl.style.background = "rgba(148, 163, 184, 0.15)";
-        wrapEl.style.color = "#94a3b8";
-      }
-      if (pillEl) {
-        pillEl.style.background = "rgba(148, 163, 184, 0.12)";
-        pillEl.style.color = "#94a3b8";
-        pillEl.style.borderColor = "rgba(148, 163, 184, 0.25)";
-      }
       return;
     }
 
@@ -7229,9 +7265,6 @@ class MultizoneThermostatDashboardStrategy extends HTMLElement {
       entity: zone.climate,
       switch: zone.switch,
       title: zone.title,
-      min_height: "300px",
-      max_height: "400px",
-      padding: "1px",
       border_radius: "20px",
     }));
 
