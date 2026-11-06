@@ -2610,6 +2610,7 @@ class MultizoneThermostatScheduleSummaryCard extends HTMLElement {
   setConfig(config) {
     this._config = config || {};
     if (!this._rendered) this.renderStructure();
+    this.updateCard();
   }
 
   _openStandaloneModal() {
@@ -2661,14 +2662,10 @@ class MultizoneThermostatScheduleSummaryCard extends HTMLElement {
     if (this._hass) {
       schedCard.hass = this._hass;
     }
-    this._standaloneSchedCard = schedCard;
     wrapper.appendChild(schedCard);
+
     overlay.appendChild(wrapper);
-
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) this._closeStandaloneModal();
-    });
-
+    this._standaloneSchedCard = schedCard;
     document.body.appendChild(overlay);
   }
 
@@ -2681,14 +2678,18 @@ class MultizoneThermostatScheduleSummaryCard extends HTMLElement {
   }
 
   renderStructure() {
+    const radius = (this._config && this._config.border_radius) ? this._config.border_radius : '20px';
     this.shadowRoot.innerHTML = `
       <style>
         ha-card {
-          padding: 16px 12px;
-          border-radius: var(--ha-card-border-radius, 20px);
-          background-color: var(--card-background-color, #1c1c1c);
-          border: 1px solid var(--ha-card-border-color, rgba(255, 255, 255, 0.08));
-          box-shadow: var(--ha-card-box-shadow, 0 4px 12px rgba(0, 0, 0, 0.15));
+          padding: 14px 10px;
+          border-radius: ${radius} !important;
+          overflow: hidden !important;
+          background: var(--ha-card-background, var(--card-background-color, rgba(30, 41, 59, 0.7)));
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.08));
+          box-shadow: var(--ha-card-box-shadow, 0 4px 16px rgba(0, 0, 0, 0.15));
           color: white;
           display: flex;
           align-items: center;
@@ -2700,59 +2701,102 @@ class MultizoneThermostatScheduleSummaryCard extends HTMLElement {
           box-sizing: border-box;
         }
         ha-card:hover {
-          background-color: var(--secondary-background-color, #242a30);
+          background: rgba(30, 41, 59, 0.9);
           transform: translateY(-2px);
-          box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
         }
         .container {
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 4px;
+          gap: 6px;
           text-align: center;
+          width: 100%;
         }
-        .icon-circle {
+        .icon-wrap {
           width: 44px;
           height: 44px;
-          border-radius: 50%;
-          background: rgba(3, 169, 244, 0.12);
+          border-radius: 14px;
+          background: rgba(14, 165, 233, 0.15);
+          color: #38bdf8;
           display: flex;
           align-items: center;
           justify-content: center;
-          margin-bottom: 4px;
           transition: transform 0.2s ease, background 0.3s ease;
         }
-        ha-card:hover .icon-circle {
+        ha-card:hover .icon-wrap {
           transform: scale(1.08);
         }
         ha-icon {
-          --mdc-icon-size: 24px;
-          color: #03a9f4;
-          transition: color 0.3s ease;
+          --mdc-icon-size: 26px;
+          color: inherit;
         }
-        .title { font-weight: 600; font-size: 0.95em; letter-spacing: -0.2px; }
-        .subtitle { font-size: 0.8em; opacity: 0.8; }
+        .title {
+          font-weight: 700;
+          font-size: 0.95rem;
+          letter-spacing: -0.2px;
+          color: var(--primary-text-color, #ffffff);
+        }
+        .status-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          padding: 3px 9px;
+          border-radius: 9999px;
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.3px;
+          background: rgba(148, 163, 184, 0.12);
+          color: #94a3b8;
+          border: 1px solid rgba(148, 163, 184, 0.25);
+          max-width: 95%;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .status-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: currentColor;
+          flex-shrink: 0;
+        }
       </style>
       <ha-card id="sched-card">
         <div class="container">
-          <div class="icon-circle" id="sched-circle">
+          <div class="icon-wrap" id="sched-icon-wrap">
             <ha-icon id="sched-icon" icon="mdi:calendar-clock"></ha-icon>
           </div>
           <div class="title" id="sched-title">Programmazione</div>
-          <div class="subtitle" id="sched-subtitle">In Pausa</div>
+          <div class="status-pill" id="sched-pill">
+            <span class="status-dot"></span>
+            <span id="sched-subtitle">In Pausa</span>
+          </div>
         </div>
       </ha-card>
     `;
 
-    this.shadowRoot.querySelector('#sched-card').addEventListener('click', () => {
-      const targetPath = (this._config && this._config.navigation_path) ? this._config.navigation_path : 'programmazione';
-      navigateOrFallbackModal(this, targetPath, () => this._openStandaloneModal());
-    });
+    const card = this.shadowRoot.querySelector('#sched-card');
+    if (card) {
+      card.style.borderRadius = radius;
+      card.style.overflow = 'hidden';
+      card.addEventListener('click', () => {
+        const targetPath = (this._config && this._config.navigation_path) ? this._config.navigation_path : 'programmazione';
+        navigateOrFallbackModal(this, targetPath, () => this._openStandaloneModal());
+      });
+    }
     this._rendered = true;
   }
 
   updateCard() {
     if (!this._hass || !this._hass.states || !this._rendered) return;
+
+    const radius = (this._config && this._config.border_radius) ? this._config.border_radius : '20px';
+    const card = this.shadowRoot.querySelector('#sched-card');
+    if (card) {
+      card.style.borderRadius = radius;
+      card.style.overflow = 'hidden';
+    }
 
     let schedStatus = null;
     for (const eid of Object.keys(this._hass.states)) {
@@ -2782,7 +2826,8 @@ class MultizoneThermostatScheduleSummaryCard extends HTMLElement {
     const titleEl = this.shadowRoot.querySelector('#sched-title');
     const subtitleEl = this.shadowRoot.querySelector('#sched-subtitle');
     const iconEl = this.shadowRoot.querySelector('#sched-icon');
-    const circleEl = this.shadowRoot.querySelector('#sched-circle');
+    const wrapEl = this.shadowRoot.querySelector('#sched-icon-wrap');
+    const pillEl = this.shadowRoot.querySelector('#sched-pill');
 
     if (titleEl) {
       titleEl.textContent = getTranslation(this._hass, 'sched_nav_title');
@@ -2790,11 +2835,16 @@ class MultizoneThermostatScheduleSummaryCard extends HTMLElement {
 
     if (!schedStatus) {
       if (subtitleEl) subtitleEl.textContent = getTranslation(this._hass, 'sched_paused');
-      if (iconEl) {
-        iconEl.icon = "mdi:calendar-clock";
-        iconEl.style.color = "#94a3b8";
+      if (iconEl) iconEl.icon = "mdi:calendar-clock";
+      if (wrapEl) {
+        wrapEl.style.background = "rgba(148, 163, 184, 0.15)";
+        wrapEl.style.color = "#94a3b8";
       }
-      if (circleEl) circleEl.style.background = "rgba(148, 163, 184, 0.12)";
+      if (pillEl) {
+        pillEl.style.background = "rgba(148, 163, 184, 0.12)";
+        pillEl.style.color = "#94a3b8";
+        pillEl.style.borderColor = "rgba(148, 163, 184, 0.25)";
+      }
       return;
     }
 
@@ -2802,9 +2852,15 @@ class MultizoneThermostatScheduleSummaryCard extends HTMLElement {
     if (sr && sr.active) {
       const arrival = sr.arrival_time ? sr.arrival_time.substring(0, 5) : "";
       if (subtitleEl) subtitleEl.textContent = "🚗 Rientro " + arrival;
-      if (iconEl) {
-        iconEl.icon = "mdi:car-clock";
-        iconEl.style.color = "#f59e0b";
+      if (iconEl) iconEl.icon = "mdi:car-clock";
+      if (wrapEl) {
+        wrapEl.style.background = "rgba(245, 158, 11, 0.2)";
+        wrapEl.style.color = "#fcd34d";
+      }
+      if (pillEl) {
+        pillEl.style.background = "rgba(245, 158, 11, 0.15)";
+        pillEl.style.color = "#fbbf24";
+        pillEl.style.borderColor = "rgba(245, 158, 11, 0.35)";
       }
       return;
     }
@@ -2822,22 +2878,30 @@ class MultizoneThermostatScheduleSummaryCard extends HTMLElement {
         text += " ⏳";
       }
       if (subtitleEl) subtitleEl.textContent = text;
-      if (iconEl) {
-        iconEl.icon = "mdi:calendar-clock";
-        iconEl.style.color = "#10b981";
+      if (iconEl) iconEl.icon = "mdi:calendar-clock";
+      if (wrapEl) {
+        wrapEl.style.background = "rgba(16, 185, 129, 0.2)";
+        wrapEl.style.color = "#34d399";
+      }
+      if (pillEl) {
+        pillEl.style.background = "rgba(16, 185, 129, 0.15)";
+        pillEl.style.color = "#34d399";
+        pillEl.style.borderColor = "rgba(16, 185, 129, 0.35)";
       }
     } else {
       if (subtitleEl) subtitleEl.textContent = getTranslation(this._hass, 'sched_paused');
-      if (iconEl) {
-        iconEl.icon = "mdi:calendar-clock";
-        iconEl.style.color = "#94a3b8";
+      if (iconEl) iconEl.icon = "mdi:calendar-clock";
+      if (wrapEl) {
+        wrapEl.style.background = "rgba(148, 163, 184, 0.15)";
+        wrapEl.style.color = "#94a3b8";
+      }
+      if (pillEl) {
+        pillEl.style.background = "rgba(148, 163, 184, 0.12)";
+        pillEl.style.color = "#94a3b8";
+        pillEl.style.borderColor = "rgba(148, 163, 184, 0.25)";
       }
     }
   }
-}
-
-if (!customElements.get("multizone-thermostat-schedule-summary-card")) {
-  customElements.define("multizone-thermostat-schedule-summary-card", MultizoneThermostatScheduleSummaryCard);
 }
 
 class MultizoneThermostatHealthSummaryCard extends HTMLElement {
@@ -2855,17 +2919,22 @@ class MultizoneThermostatHealthSummaryCard extends HTMLElement {
   setConfig(config) {
     this._config = config || {};
     if (!this._rendered) this.renderStructure();
+    this.updateCard();
   }
 
   renderStructure() {
+    const radius = (this._config && this._config.border_radius) ? this._config.border_radius : '20px';
     this.shadowRoot.innerHTML = `
       <style>
         ha-card {
-          padding: 16px 12px;
-          border-radius: var(--ha-card-border-radius, 20px);
-          background-color: var(--card-background-color, #1c1c1c);
-          border: 1px solid var(--ha-card-border-color, rgba(255, 255, 255, 0.08));
-          box-shadow: var(--ha-card-box-shadow, 0 4px 12px rgba(0, 0, 0, 0.15));
+          padding: 14px 10px;
+          border-radius: ${radius} !important;
+          overflow: hidden !important;
+          background: var(--ha-card-background, var(--card-background-color, rgba(30, 41, 59, 0.7)));
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.08));
+          box-shadow: var(--ha-card-box-shadow, 0 4px 16px rgba(0, 0, 0, 0.15));
           color: white;
           display: flex;
           align-items: center;
@@ -2877,60 +2946,103 @@ class MultizoneThermostatHealthSummaryCard extends HTMLElement {
           box-sizing: border-box;
         }
         ha-card:hover {
-          background-color: var(--secondary-background-color, #242a30);
+          background: rgba(30, 41, 59, 0.9);
           transform: translateY(-2px);
-          box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
         }
         .container {
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 4px;
+          gap: 6px;
           text-align: center;
+          width: 100%;
         }
-        .icon-circle {
+        .icon-wrap {
           width: 44px;
           height: 44px;
-          border-radius: 50%;
-          background: rgba(76, 175, 80, 0.12);
+          border-radius: 14px;
+          background: rgba(16, 185, 129, 0.15);
+          color: #34d399;
           display: flex;
           align-items: center;
           justify-content: center;
-          margin-bottom: 4px;
           transition: transform 0.2s ease, background 0.3s ease;
         }
-        ha-card:hover .icon-circle {
+        ha-card:hover .icon-wrap {
           transform: scale(1.08);
         }
         ha-icon {
-          --mdc-icon-size: 24px;
+          --mdc-icon-size: 26px;
+          color: inherit;
         }
-        .healthy { color: #4CAF50; }
-        .warning { color: #FF9800; }
-        .title { font-weight: 600; font-size: 0.95em; letter-spacing: -0.2px; }
-        .subtitle { font-size: 0.8em; opacity: 0.8; }
+        .title {
+          font-weight: 700;
+          font-size: 0.95rem;
+          letter-spacing: -0.2px;
+          color: var(--primary-text-color, #ffffff);
+        }
+        .status-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          padding: 3px 9px;
+          border-radius: 9999px;
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.3px;
+          background: rgba(16, 185, 129, 0.15);
+          color: #34d399;
+          border: 1px solid rgba(16, 185, 129, 0.35);
+          max-width: 95%;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .status-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: currentColor;
+          flex-shrink: 0;
+        }
       </style>
       <ha-card id="health-card">
         <div class="container">
-          <div class="icon-circle" id="health-circle">
-            <ha-icon id="health-icon" icon="mdi:shield-check" class="healthy"></ha-icon>
+          <div class="icon-wrap" id="health-icon-wrap">
+            <ha-icon id="health-icon" icon="mdi:shield-check"></ha-icon>
           </div>
           <div class="title" id="health-title">Diagnostica</div>
-          <div class="subtitle" id="health-subtitle">Sistema Ok</div>
+          <div class="status-pill" id="health-pill">
+            <span class="status-dot"></span>
+            <span id="health-subtitle">Sistema Ok</span>
+          </div>
         </div>
       </ha-card>
     `;
 
-    this.shadowRoot.querySelector('#health-card').addEventListener('click', () => {
-      const targetPath = (this._config && this._config.navigation_path) ? this._config.navigation_path : 'diagnostica';
-      navigateOrFallbackModal(this, targetPath);
-    });
+    const card = this.shadowRoot.querySelector('#health-card');
+    if (card) {
+      card.style.borderRadius = radius;
+      card.style.overflow = 'hidden';
+      card.addEventListener('click', () => {
+        const targetPath = (this._config && this._config.navigation_path) ? this._config.navigation_path : 'diagnostica';
+        navigateOrFallbackModal(this, targetPath);
+      });
+    }
     this._rendered = true;
   }
 
   updateCard() {
     if (!this._hass || !this._hass.states) return;
     if (!this._hass || !this._rendered) return;
+
+    const radius = (this._config && this._config.border_radius) ? this._config.border_radius : '20px';
+    const card = this.shadowRoot.querySelector('#health-card');
+    if (card) {
+      card.style.borderRadius = radius;
+      card.style.overflow = 'hidden';
+    }
     
     let healthEntity = null;
     for (const eid of Object.keys(this._hass.states)) {
@@ -2944,12 +3056,21 @@ class MultizoneThermostatHealthSummaryCard extends HTMLElement {
 
     const iconEl = this.shadowRoot.querySelector('#health-icon');
     const subtitleEl = this.shadowRoot.querySelector('#health-subtitle');
-    const circleEl = this.shadowRoot.querySelector('#health-circle');
+    const wrapEl = this.shadowRoot.querySelector('#health-icon-wrap');
+    const pillEl = this.shadowRoot.querySelector('#health-pill');
 
     if (!healthEntity) {
-      subtitleEl.textContent = "Non trovato";
-      iconEl.icon = "mdi:shield-off";
-      iconEl.className = "";
+      if (subtitleEl) subtitleEl.textContent = "Non trovato";
+      if (iconEl) iconEl.icon = "mdi:shield-off";
+      if (wrapEl) {
+        wrapEl.style.background = "rgba(148, 163, 184, 0.15)";
+        wrapEl.style.color = "#94a3b8";
+      }
+      if (pillEl) {
+        pillEl.style.background = "rgba(148, 163, 184, 0.12)";
+        pillEl.style.color = "#94a3b8";
+        pillEl.style.borderColor = "rgba(148, 163, 184, 0.25)";
+      }
       return;
     }
 
@@ -2957,15 +3078,29 @@ class MultizoneThermostatHealthSummaryCard extends HTMLElement {
     const anomalies = stateObj.attributes.anomalies || [];
     
     if (anomalies.length === 0) {
-      subtitleEl.textContent = "Sistema Ok";
-      iconEl.icon = "mdi:shield-check";
-      iconEl.className = "healthy";
-      if (circleEl) circleEl.style.background = "rgba(76, 175, 80, 0.12)";
+      if (subtitleEl) subtitleEl.textContent = "Sistema Ok";
+      if (iconEl) iconEl.icon = "mdi:shield-check";
+      if (wrapEl) {
+        wrapEl.style.background = "rgba(16, 185, 129, 0.2)";
+        wrapEl.style.color = "#34d399";
+      }
+      if (pillEl) {
+        pillEl.style.background = "rgba(16, 185, 129, 0.15)";
+        pillEl.style.color = "#34d399";
+        pillEl.style.borderColor = "rgba(16, 185, 129, 0.35)";
+      }
     } else {
-      subtitleEl.textContent = anomalies.length + (anomalies.length === 1 ? " Anomalia" : " Anomalie");
-      iconEl.icon = "mdi:alert";
-      iconEl.className = "warning";
-      if (circleEl) circleEl.style.background = "rgba(255, 152, 0, 0.15)";
+      if (subtitleEl) subtitleEl.textContent = anomalies.length + (anomalies.length === 1 ? " Anomalia" : " Anomalie");
+      if (iconEl) iconEl.icon = "mdi:alert";
+      if (wrapEl) {
+        wrapEl.style.background = "rgba(245, 158, 11, 0.2)";
+        wrapEl.style.color = "#fbbf24";
+      }
+      if (pillEl) {
+        pillEl.style.background = "rgba(245, 158, 11, 0.15)";
+        pillEl.style.color = "#fbbf24";
+        pillEl.style.borderColor = "rgba(245, 158, 11, 0.35)";
+      }
     }
   }
 }
@@ -3282,8 +3417,29 @@ class MultizoneThermostatPlantCard extends HTMLElement {
         gap: 14px;
         margin-bottom: 14px;
       }
-      @media (max-width: 480px) {
-        .kpi-grid { grid-template-columns: 1fr; }
+      @media (max-width: 640px) {
+        ha-card {
+          padding: 16px 14px;
+        }
+        .header-row {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 12px;
+        }
+        .title-text {
+          font-size: 18px;
+        }
+        .kpi-grid {
+          grid-template-columns: 1fr;
+          gap: 10px;
+        }
+        .ot-grid {
+          padding: 10px 12px !important;
+        }
+        .ot-grid > div:last-child {
+          grid-template-columns: repeat(2, 1fr) !important;
+          gap: 8px !important;
+        }
       }
       .kpi-card {
         background: rgba(255, 255, 255, 0.03);
@@ -3754,6 +3910,23 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
         grid-template-columns: 1fr 1fr;
         gap: 12px;
         margin-bottom: 14px;
+      }
+      @media (max-width: 640px) {
+        ha-card {
+          padding: 16px 14px;
+        }
+        .top-row {
+          flex-wrap: wrap;
+          gap: 10px;
+        }
+        .zone-name {
+          font-size: 17px;
+          flex-wrap: wrap;
+        }
+        .stats-grid {
+          grid-template-columns: 1fr;
+          gap: 10px;
+        }
       }
       .stat-box {
         background: rgba(255, 255, 255, 0.03);
@@ -4881,6 +5054,95 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
           background: rgba(148, 163, 184, 0.15);
           color: #cbd5e1;
           border: 1px solid rgba(148, 163, 184, 0.3);
+        }
+
+        /* Responsive Mobile Layout Fixes for Scheduler Panel */
+        @media (max-width: 768px) {
+          ha-card {
+            padding: 14px 10px;
+          }
+          .header-bar {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 12px;
+          }
+          .header-title-box {
+            width: 100%;
+            justify-content: space-between;
+          }
+          .header-title {
+            font-size: 1.15rem;
+          }
+          .header-badges {
+            width: 100%;
+          }
+          .header-actions {
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+          }
+          .header-actions .btn {
+            width: 100%;
+            text-align: center;
+            padding: 10px;
+          }
+          .live-zones-grid {
+            grid-template-columns: 1fr;
+            gap: 10px;
+          }
+          .editor-header-bar {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 10px;
+          }
+          .profile-tabs {
+            display: flex;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            width: 100%;
+            padding-bottom: 4px;
+          }
+          .editor-controls {
+            justify-content: space-between;
+            width: 100%;
+          }
+          .toolbar-bar {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 10px;
+            padding: 10px 8px;
+          }
+          .day-pills {
+            display: flex;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            padding-bottom: 4px;
+            width: 100%;
+          }
+          .day-pills::-webkit-scrollbar { display: none; }
+          .matrix-container {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            width: 100%;
+          }
+          .time-ruler, .matrix-row {
+            min-width: 680px;
+          }
+          .room-label-box {
+            position: sticky;
+            left: 0;
+            background: #1e293b;
+            z-index: 10;
+            padding-right: 6px;
+          }
+          .matrix-table-container table {
+            min-width: 520px;
+          }
+          .preset-summary-grid {
+            grid-template-columns: 1fr;
+          }
         }
 
         /* Slot modal enhancements */
