@@ -1501,11 +1501,9 @@ class MultizoneThermostatDialCard extends HTMLElement {
       if (actualSwitchState === "bypass" || actualSwitchState === "off") {
         badge.innerHTML = "";
       } else if (actualSwitchState === "secondary") {
-        badge.style.color = '#607d8b';
-        badge.innerHTML = `<ha-icon icon="mdi:link-variant" style="margin-right: 4px; --mdc-icon-size: 16px;"></ha-icon>${getTranslation(this._hass, 'secondary')}`;
+        badge.innerHTML = `<span class="status-pill status-secondary"><span class="status-dot"></span>${getTranslation(this._hass, 'secondary')}</span>`;
       } else {
-        badge.style.color = 'var(--primary-color, #03a9f4)';
-        badge.innerHTML = `<ha-icon icon="mdi:star-circle-outline" style="margin-right: 4px; --mdc-icon-size: 16px;"></ha-icon>${getTranslation(this._hass, 'primary')}`;
+        badge.innerHTML = `<span class="status-pill"><span class="status-dot"></span>${getTranslation(this._hass, 'primary')}</span>`;
       }
     }
 
@@ -1525,12 +1523,26 @@ class MultizoneThermostatDialCard extends HTMLElement {
 
     style.textContent = `
       ha-card {
-        padding: 16px;
+        padding: 16px 14px;
         position: relative;
-        overflow: hidden;
-        border-radius: var(--ha-card-border-radius, 20px);
-        border: 1px solid var(--ha-card-border-color, rgba(255, 255, 255, 0.08));
-        box-shadow: var(--ha-card-box-shadow, 0 4px 12px rgba(0, 0, 0, 0.15));
+        overflow: hidden !important;
+        border-radius: var(--ha-card-border-radius, 20px) !important;
+        background: var(--ha-card-background, var(--card-background-color, rgba(30, 41, 59, 0.7)));
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.08));
+        box-shadow: var(--ha-card-box-shadow, 0 4px 16px rgba(0, 0, 0, 0.15));
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+      ha-card:hover {
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+      }
+      /* Remove nested HA card borders & backgrounds to make thermostat dial float cleanly */
+      ha-card hui-thermostat-card,
+      ha-card ha-card {
+        background: transparent !important;
+        box-shadow: none !important;
+        border: none !important;
       }
       .wrapper {
         position: relative;
@@ -1540,24 +1552,25 @@ class MultizoneThermostatDialCard extends HTMLElement {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 4px;
+        margin-bottom: 6px;
         padding-bottom: 4px;
-        padding-left: 8px;
+        padding-left: 4px;
         position: relative;
         z-index: 20;
       }
       .title {
-        font-size: 16px;
-        font-weight: 500;
-        color: var(--primary-text-color);
+        font-size: 17px;
+        font-weight: 700;
+        color: var(--primary-text-color, #f8fafc);
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        max-width: 60%;
+        max-width: 65%;
+        letter-spacing: -0.2px;
       }
       .status-bar {
         position: absolute;
-        top: 100px;
+        top: 98px;
         left: 0;
         right: 0;
         display: flex;
@@ -1568,13 +1581,33 @@ class MultizoneThermostatDialCard extends HTMLElement {
       .status-badge {
         display: inline-flex;
         align-items: center;
-        font-size: 14px;
-        font-weight: 400;
-        color: var(--secondary-text-color);
+        font-size: 12px;
+        font-weight: 700;
       }
-      .status-badge.heating { color: rgb(255, 111, 0); }
-      .status-badge.idle { color: rgb(0, 150, 136); }
-      .status-badge.disabled { color: rgb(244, 67, 54); }
+      .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 3px 10px;
+        border-radius: 9999px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+        background: rgba(14, 165, 233, 0.15);
+        color: #38bdf8;
+        border: 1px solid rgba(14, 165, 233, 0.3);
+      }
+      .status-pill.status-secondary {
+        background: rgba(148, 163, 184, 0.15);
+        color: #94a3b8;
+        border-color: rgba(148, 163, 184, 0.3);
+      }
+      .status-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: currentColor;
+      }
 
       .glow-flame {
         animation: pulse-flame 1.5s infinite alternate;
@@ -1588,28 +1621,34 @@ class MultizoneThermostatDialCard extends HTMLElement {
       .segmented-control {
         display: flex;
         align-items: center;
-        background-color: var(--secondary-background-color, #e0e0e0);
-        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 10px;
         padding: 2px;
         position: relative;
         z-index: 21;
+        gap: 2px;
       }
       .seg-btn {
         background: transparent;
         border: none;
-        color: var(--secondary-text-color);
-        padding: 6px 12px;
+        color: var(--secondary-text-color, #94a3b8);
+        padding: 5px 10px;
         cursor: pointer;
-        border-radius: 6px;
+        border-radius: 8px;
         display: flex;
         align-items: center;
         justify-content: center;
-        transition: background 0.3s, color 0.3s;
+        transition: all 0.2s ease;
+      }
+      .seg-btn:hover {
+        background: rgba(255, 255, 255, 0.08);
+        color: white;
       }
       .seg-btn.active {
-        background-color: var(--primary-color, #03a9f4);
+        background-color: #0284c7;
         color: white;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
       }
       .seg-btn ha-icon {
         --mdc-icon-size: 18px;
@@ -1926,10 +1965,11 @@ class MultizoneThermostatStatusCard extends HTMLElement {
   }
 
   setConfig(config) {
-    this._config = config || {};
+    this._config = Object.assign({}, config);
     if (!this._rendered) {
       this.renderStructure();
     }
+    this.updateCard();
   }
 
   getCardSize() {
@@ -1940,24 +1980,30 @@ class MultizoneThermostatStatusCard extends HTMLElement {
     const card = document.createElement('ha-card');
     const style = document.createElement('style');
 
+    const radius = (this._config && this._config.border_radius) ? this._config.border_radius : '20px';
+
     style.textContent = `
       ha-card {
         padding: 16px;
-        border-radius: var(--ha-card-border-radius, 20px);
+        border-radius: ${radius} !important;
+        overflow: hidden !important;
         color: white;
-        transition: background-color 0.5s ease, transform 0.2s ease, box-shadow 0.2s ease;
+        background: var(--ha-card-background, var(--card-background-color, rgba(30, 41, 59, 0.7)));
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.08));
+        box-shadow: var(--ha-card-box-shadow, 0 4px 16px rgba(0, 0, 0, 0.15));
+        transition: background-color 0.4s ease, transform 0.2s ease, box-shadow 0.2s ease;
         cursor: pointer;
         display: flex;
         align-items: center;
         min-height: 90px;
         position: relative;
-        overflow: hidden;
-        border: 1px solid var(--ha-card-border-color, rgba(255, 255, 255, 0.08));
-        box-shadow: var(--ha-card-box-shadow, 0 4px 12px rgba(0, 0, 0, 0.15));
+        box-sizing: border-box;
       }
       ha-card:hover {
         transform: translateY(-2px);
-        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
       }
       ha-card:active {
         transform: translateY(0);
@@ -1969,19 +2015,24 @@ class MultizoneThermostatStatusCard extends HTMLElement {
         gap: 16px;
         pointer-events: none;
       }
-      .icon-container {
+      .icon-wrap {
         display: flex;
         align-items: center;
         justify-content: center;
         width: 52px;
         height: 52px;
-        border-radius: 50%;
-        background: rgba(255, 255, 255, 0.15);
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.1);
         flex-shrink: 0;
+        transition: transform 0.2s ease, background 0.3s ease, box-shadow 0.3s ease;
       }
-      .icon-container ha-icon {
+      ha-card:hover .icon-wrap {
+        transform: scale(1.08);
+      }
+      .icon-wrap ha-icon {
         --mdc-icon-size: 28px;
-        color: white;
+        color: inherit;
       }
       .info-container {
         display: flex;
@@ -1989,28 +2040,44 @@ class MultizoneThermostatStatusCard extends HTMLElement {
         justify-content: center;
         flex-grow: 1;
         overflow: hidden;
+        gap: 4px;
       }
       .name {
-        font-size: 18px;
-        font-weight: 600;
+        font-size: 16px;
+        font-weight: 700;
         margin: 0;
-        text-shadow: 0 1px 2px rgba(0,0,0,0.15);
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        color: #f8fafc;
+        letter-spacing: -0.2px;
       }
-      .state {
-        font-size: 13px;
-        font-weight: 500;
+      .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 3px 10px;
+        border-radius: 9999px;
+        font-size: 11px;
+        font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
-        margin: 4px 0;
-        opacity: 0.9;
-        text-shadow: 0 1px 1px rgba(0,0,0,0.1);
+        letter-spacing: 0.4px;
+        background: rgba(148, 163, 184, 0.12);
+        color: #94a3b8;
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        align-self: flex-start;
+      }
+      .status-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: currentColor;
+        flex-shrink: 0;
       }
       .temp-row {
         font-size: 12px;
-        opacity: 0.85;
+        color: #94a3b8;
+        margin-top: 2px;
       }
       .glow-flame {
         animation: pulse-flame 1.5s infinite alternate;
@@ -2023,13 +2090,16 @@ class MultizoneThermostatStatusCard extends HTMLElement {
 
     card.innerHTML = `
       <div class="card-content">
-        <div class="icon-container">
-          <ha-icon icon="mdi:power"></ha-icon>
+        <div class="icon-wrap" id="master-icon-wrap">
+          <ha-icon id="master-icon" icon="mdi:power"></ha-icon>
         </div>
         <div class="info-container">
-          <div class="name">Riscaldamento Centrale</div>
-          <div class="state">Ricerca...</div>
-          <div class="temp-row">Caldaia: --</div>
+          <div class="name" id="master-name">Riscaldamento</div>
+          <div class="status-pill" id="master-pill">
+            <span class="status-dot"></span>
+            <span id="master-state-text">Ricerca...</span>
+          </div>
+          <div class="temp-row" id="master-telemetry">Caldaia/Circolatore: --</div>
         </div>
       </div>
     `;
@@ -2056,7 +2126,6 @@ class MultizoneThermostatStatusCard extends HTMLElement {
     if (!this._hass || !this._hass.states) return;
     if (!this._hass || !this._rendered) return;
 
-    // Use the actual master switch entity to determine if system is ON
     const masterEntity = findMasterEntity(this._hass);
     let isMasterOn = false;
     let boilerEntity = null;
@@ -2068,10 +2137,8 @@ class MultizoneThermostatStatusCard extends HTMLElement {
       }
     }
 
-    // Try to find the boiler switch directly or through climate attributes
     boilerEntity = this._config.entity || this._config.boiler_entity;
     if (!boilerEntity) {
-      // First try to find a climate entity that has the boiler_entity_id attribute
       const zoneClimate = Object.values(this._hass.states).find(s => 
         s.entity_id.startsWith('climate.') && s.attributes && s.attributes.hybrid_zone === true && s.attributes.boiler_entity_id
       );
@@ -2079,7 +2146,6 @@ class MultizoneThermostatStatusCard extends HTMLElement {
       if (zoneClimate) {
         boilerEntity = zoneClimate.attributes.boiler_entity_id;
       } else {
-        // Fallback to name heuristic
         const boilerFound = this._hass && this._hass.states && Object.keys(this._hass.states).find(key => {
           return key.startsWith('switch.') && (key.includes('boiler') || key.includes('caldaia'));
         });
@@ -2092,10 +2158,8 @@ class MultizoneThermostatStatusCard extends HTMLElement {
     let isBoilerOn = false;
 
     if (boilerEntity && boilerState) {
-      // In relay mode, strictly reflect the physical state of the configured boiler relay
       isBoilerOn = boilerState.state === "on";
     } else {
-      // Fallback only if no boiler switch entity exists (e.g. OpenTherm): check active PRIMARY zones
       const isAnyPrimaryHeating = Object.values(this._hass.states).some(s => 
         s.entity_id.startsWith('climate.') && 
         s.attributes && 
@@ -2108,84 +2172,86 @@ class MultizoneThermostatStatusCard extends HTMLElement {
       }
     }
 
-    let bgColor = "#37474f"; // grigio quando spento
-    let stateText = getTranslation(this._hass, 'off');
-    let iconName = this._config.icon || "mdi:power";
-    let glowClass = false;
-
-    if (!isMasterOn) {
-      bgColor = "#37474f"; // grigio quando spento
-      stateText = getTranslation(this._hass, 'off');
-      iconName = this._config.icon || "mdi:power";
-    } else {
-      // Master acceso
-      if (isBoilerOn) {
-        bgColor = "#f57c00"; // arancione quando caldaia/circolatore acceso
-        stateText = getTranslation(this._hass, 'heating_active');
-        iconName = this._config.icon || "mdi:fire";
-        glowClass = true;
-      } else {
-        bgColor = "#fbc02d"; // giallo quando caldaia/circolatore spento
-        stateText = getTranslation(this._hass, 'idle');
-        iconName = this._config.icon || "mdi:radiator-off";
-      }
-    }
-
-    // Update the ha-card element's background color and custom styles
     const card = this.shadowRoot.querySelector('ha-card');
+    const radius = (this._config && this._config.border_radius) ? this._config.border_radius : '20px';
     if (card) {
-      card.style.backgroundColor = bgColor;
+      card.style.borderRadius = radius;
+      card.style.overflow = 'hidden';
       if (this._config.height) card.style.height = this._config.height;
       if (this._config.width) card.style.width = this._config.width;
-      if (this._config.border_radius) card.style.borderRadius = this._config.border_radius;
     }
 
-    // Update title / name
-    const nameEl = this.shadowRoot.querySelector('.name');
+    const nameEl = this.shadowRoot.querySelector('#master-name');
     if (nameEl) {
       nameEl.textContent = this._config.title || getTranslation(this._hass, 'heating');
     }
 
-    // Update state text
-    const stateEl = this.shadowRoot.querySelector('.state');
-    if (stateEl) {
-      stateEl.textContent = stateText;
-    }
+    const wrapEl = this.shadowRoot.querySelector('#master-icon-wrap');
+    const iconEl = this.shadowRoot.querySelector('#master-icon');
+    const pillEl = this.shadowRoot.querySelector('#master-pill');
+    const stateTextEl = this.shadowRoot.querySelector('#master-state-text');
+    const telemetryEl = this.shadowRoot.querySelector('#master-telemetry');
 
-    // Update icon
-    const iconEl = this.shadowRoot.querySelector('ha-icon');
-    if (iconEl) {
-      iconEl.setAttribute('icon', iconName);
-      if (glowClass) {
-        iconEl.classList.add('glow-flame');
-      } else {
+    if (!isMasterOn) {
+      if (wrapEl) {
+        wrapEl.style.background = "rgba(255, 255, 255, 0.08)";
+        wrapEl.style.color = "#94a3b8";
+        wrapEl.style.borderColor = "rgba(255, 255, 255, 0.12)";
+        wrapEl.style.boxShadow = "none";
+      }
+      if (iconEl) {
+        iconEl.setAttribute('icon', this._config.icon || "mdi:power");
         iconEl.classList.remove('glow-flame');
       }
-    }
-
-    // Update subtext info
-    const infoEl = this.shadowRoot.querySelector('.temp-row');
-    if (infoEl) {
-      if (boilerEntity && boilerState) {
-        infoEl.textContent = `${getTranslation(this._hass, 'caldaia_circ')}: ${isBoilerOn ? 'ON' : 'OFF'}`;
+      if (pillEl) {
+        pillEl.style.background = "rgba(148, 163, 184, 0.12)";
+        pillEl.style.color = "#94a3b8";
+        pillEl.style.borderColor = "rgba(148, 163, 184, 0.25)";
+      }
+      if (stateTextEl) stateTextEl.textContent = getTranslation(this._hass, 'off');
+      if (telemetryEl) telemetryEl.textContent = `${getTranslation(this._hass, 'caldaia_circ')}: OFF`;
+    } else {
+      if (isBoilerOn) {
+        if (wrapEl) {
+          wrapEl.style.background = "rgba(239, 68, 68, 0.2)";
+          wrapEl.style.color = "#f87171";
+          wrapEl.style.borderColor = "rgba(239, 68, 68, 0.4)";
+          wrapEl.style.boxShadow = "0 0 16px rgba(239, 68, 68, 0.35)";
+        }
+        if (iconEl) {
+          iconEl.setAttribute('icon', this._config.icon || "mdi:fire");
+          iconEl.classList.add('glow-flame');
+        }
+        if (pillEl) {
+          pillEl.style.background = "rgba(239, 68, 68, 0.15)";
+          pillEl.style.color = "#f87171";
+          pillEl.style.borderColor = "rgba(239, 68, 68, 0.35)";
+        }
+        if (stateTextEl) stateTextEl.textContent = getTranslation(this._hass, 'heating_active');
+        if (telemetryEl) telemetryEl.textContent = `${getTranslation(this._hass, 'caldaia_circ')}: ON`;
       } else {
-        infoEl.textContent = isMasterOn ? getTranslation(this._hass, 'system_active') : getTranslation(this._hass, 'system_off');
+        if (wrapEl) {
+          wrapEl.style.background = "rgba(245, 158, 11, 0.2)";
+          wrapEl.style.color = "#fbbf24";
+          wrapEl.style.borderColor = "rgba(245, 158, 11, 0.4)";
+          wrapEl.style.boxShadow = "0 0 16px rgba(245, 158, 11, 0.25)";
+        }
+        if (iconEl) {
+          iconEl.setAttribute('icon', this._config.icon || "mdi:radiator-off");
+          iconEl.classList.remove('glow-flame');
+        }
+        if (pillEl) {
+          pillEl.style.background = "rgba(245, 158, 11, 0.15)";
+          pillEl.style.color = "#fbbf24";
+          pillEl.style.borderColor = "rgba(245, 158, 11, 0.35)";
+        }
+        if (stateTextEl) stateTextEl.textContent = getTranslation(this._hass, 'idle');
+        if (telemetryEl) telemetryEl.textContent = `${getTranslation(this._hass, 'caldaia_circ')}: STANDBY`;
       }
     }
-  }
-
-  renderError(msg) {
-    this.shadowRoot.innerHTML = `
-      <ha-card style="padding: 16px; color: red; background-color: rgba(255,0,0,0.15);">
-        <h3>${this._hass ? getTranslation(this._hass, 'card_error_title') : 'Multizone Thermostat Card Error'}</h3>
-        <p>${msg}</p>
-      </ha-card>
-    `;
-    this._rendered = false;
   }
 }
 
-/* ==================== PRESET CARD CLASS ==================== */
 class MultizoneThermostatPresetCard extends HTMLElement {
   constructor() {
     super();
@@ -2228,19 +2294,24 @@ class MultizoneThermostatPresetCard extends HTMLElement {
     this.shadowRoot.innerHTML = `
       <style>
         ha-card {
-          padding: 16px;
-          border-radius: var(--ha-card-border-radius, 20px);
+          padding: 16px 14px;
+          border-radius: var(--ha-card-border-radius, 20px) !important;
+          overflow: hidden !important;
           display: flex;
           flex-direction: column;
           gap: 12px;
-          background: var(--ha-card-background, var(--card-background-color, #181c20));
-          border: 1px solid var(--ha-card-border-color, rgba(255, 255, 255, 0.08));
-          box-shadow: var(--ha-card-box-shadow, 0 4px 12px rgba(0, 0, 0, 0.15));
+          background: var(--ha-card-background, var(--card-background-color, rgba(30, 41, 59, 0.7)));
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.08));
+          box-shadow: var(--ha-card-box-shadow, 0 4px 16px rgba(0, 0, 0, 0.15));
         }
         .header {
-          font-weight: 600;
-          font-size: 14px;
+          font-weight: 700;
+          font-size: 13px;
           color: var(--primary-text-color, #ffffff);
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
           margin-bottom: 2px;
         }
         .buttons-row {
@@ -2255,24 +2326,25 @@ class MultizoneThermostatPresetCard extends HTMLElement {
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          background: var(--secondary-background-color, rgba(255, 255, 255, 0.04));
+          background: rgba(255, 255, 255, 0.04);
           color: var(--secondary-text-color, #94a3b8);
-          border-radius: 12px;
+          border-radius: 14px;
           padding: 12px 4px;
           cursor: pointer;
           transition: all 0.25s ease;
-          border: 1.5px solid transparent;
+          border: 1px solid rgba(255, 255, 255, 0.06);
           gap: 6px;
         }
         .preset-btn:hover {
           background: rgba(255, 255, 255, 0.08);
-          transform: translateY(-1px);
+          transform: translateY(-2px);
+          border-color: rgba(255, 255, 255, 0.15);
         }
         .preset-btn.active {
-          background: rgba(3, 169, 244, 0.15);
-          color: #03a9f4;
-          border-color: #03a9f4;
-          box-shadow: 0 0 12px rgba(3, 169, 244, 0.25);
+          background: rgba(14, 165, 233, 0.18);
+          color: #38bdf8;
+          border-color: #38bdf8;
+          box-shadow: 0 0 16px rgba(14, 165, 233, 0.25);
         }
         .preset-btn ha-icon {
           --mdc-icon-size: 28px;
@@ -2902,6 +2974,10 @@ class MultizoneThermostatScheduleSummaryCard extends HTMLElement {
       }
     }
   }
+}
+
+if (!customElements.get("multizone-thermostat-schedule-summary-card")) {
+  customElements.define("multizone-thermostat-schedule-summary-card", MultizoneThermostatScheduleSummaryCard);
 }
 
 class MultizoneThermostatHealthSummaryCard extends HTMLElement {
