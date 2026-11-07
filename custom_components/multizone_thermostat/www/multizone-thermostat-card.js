@@ -7367,6 +7367,30 @@ if (!customElements.get("multizone-thermostat-scheduler-card")) {
 }
 
 /* ==================== FLOATING STYLE SWITCHER WITH POPUP MODAL ==================== */
+function applyHeaderVisibility(hide) {
+  let styleTag = document.getElementById('mz-hide-header-style');
+  if (hide) {
+    if (!styleTag) {
+      styleTag = document.createElement('style');
+      styleTag.id = 'mz-hide-header-style';
+      styleTag.textContent = `
+        app-header, .header, ha-top-app-bar {
+          display: none !important;
+        }
+        hui-root, #view, #columns {
+          padding-top: 0 !important;
+          margin-top: 0 !important;
+        }
+      `;
+      document.head.appendChild(styleTag);
+    }
+  } else {
+    if (styleTag && styleTag.parentNode) {
+      styleTag.parentNode.removeChild(styleTag);
+    }
+  }
+}
+
 class MultizoneThermostatStyleSwitcher extends HTMLElement {
   constructor() {
     super();
@@ -7384,17 +7408,41 @@ class MultizoneThermostatStyleSwitcher extends HTMLElement {
   }
 
   connectedCallback() {
+    // Apply header visibility on connect
+    const shouldHide = localStorage.getItem('mz_hide_header') === 'true';
+    applyHeaderVisibility(shouldHide);
+
+    this._styleListener = (e) => {
+      this.render();
+    };
+    window.addEventListener('mz-style-changed', this._styleListener);
     this.render();
+  }
+
+  disconnectedCallback() {
+    if (this._styleListener) {
+      window.removeEventListener('mz-style-changed', this._styleListener);
+    }
   }
 
   getCurrentStyle() {
     return localStorage.getItem('mz_card_style') || 'luxury';
   }
 
+  isHeaderHidden() {
+    return localStorage.getItem('mz_hide_header') === 'true';
+  }
+
   setStyle(style) {
     localStorage.setItem('mz_card_style', style);
     window.dispatchEvent(new CustomEvent('mz-style-changed', { detail: { style } }));
-    this.closeModal();
+    this.render();
+  }
+
+  toggleHeader(hide) {
+    localStorage.setItem('mz_hide_header', hide ? 'true' : 'false');
+    applyHeaderVisibility(hide);
+    this.render();
   }
 
   openModal() {
@@ -7409,6 +7457,8 @@ class MultizoneThermostatStyleSwitcher extends HTMLElement {
 
   render() {
     const currentStyle = this.getCurrentStyle();
+    const isClassic = currentStyle === 'classic';
+    const hideHeader = this.isHeaderHidden();
     const bottom = this._config?.bottom || '2.5vh';
     const right = this._config?.right || '2.5vh';
     const icon = this._config?.icon || 'mdi:palette-outline';
@@ -7425,25 +7475,42 @@ class MultizoneThermostatStyleSwitcher extends HTMLElement {
           width: 52px !important;
           height: 52px !important;
           border-radius: 50% !important;
-          background: rgba(20, 27, 41, 0.85) !important;
-          backdrop-filter: blur(16px) !important;
-          -webkit-backdrop-filter: blur(16px) !important;
-          border: 1px solid rgba(255, 255, 255, 0.18) !important;
-          box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6), 0 0 15px rgba(56, 189, 248, 0.25) !important;
           z-index: 9999 !important;
           display: flex !important;
           justify-content: center !important;
           align-items: center !important;
           cursor: pointer !important;
           transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        }
+        
+        /* Responsive FAB button style based on active mode */
+        .fab-luxury {
+          background: rgba(20, 27, 41, 0.85) !important;
+          backdrop-filter: blur(16px) !important;
+          -webkit-backdrop-filter: blur(16px) !important;
+          border: 1px solid rgba(56, 189, 248, 0.35) !important;
+          box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6), 0 0 15px rgba(56, 189, 248, 0.25) !important;
           color: #38bdf8 !important;
         }
-        .fab-btn:hover {
+        .fab-luxury:hover {
           transform: scale(1.1) !important;
           background: rgba(30, 41, 59, 0.95) !important;
-          border-color: rgba(56, 189, 248, 0.5) !important;
+          border-color: rgba(56, 189, 248, 0.6) !important;
           box-shadow: 0 12px 35px rgba(0, 0, 0, 0.8), 0 0 25px rgba(56, 189, 248, 0.45) !important;
         }
+        
+        .fab-classic {
+          background: var(--card-background-color, #263238) !important;
+          border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.15)) !important;
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
+          color: var(--primary-text-color, #ffffff) !important;
+        }
+        .fab-classic:hover {
+          transform: scale(1.1) !important;
+          background: var(--primary-color, #0284c7) !important;
+          color: #ffffff !important;
+        }
+
         .fab-btn:active {
           transform: scale(0.95) !important;
         }
@@ -7522,7 +7589,20 @@ class MultizoneThermostatStyleSwitcher extends HTMLElement {
           padding: 20px;
           display: flex;
           flex-direction: column;
-          gap: 12px;
+          gap: 16px;
+        }
+        .section-label {
+          font-size: 11px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+          color: #94a3b8;
+          margin-bottom: 2px;
+        }
+        .options-group {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
         }
         .option-card {
           display: flex;
@@ -7599,9 +7679,73 @@ class MultizoneThermostatStyleSwitcher extends HTMLElement {
         .option-card.active .radio-dot::after {
           display: block;
         }
+
+        /* Toggle Header Row */
+        .toggle-box {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 14px 16px;
+          border-radius: 16px;
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          gap: 12px;
+        }
+        .toggle-info {
+          flex: 1;
+        }
+        .toggle-title {
+          font-size: 14px;
+          font-weight: 700;
+          color: #ffffff;
+          margin-bottom: 2px;
+        }
+        .toggle-desc {
+          font-size: 11px;
+          color: #94a3b8;
+          line-height: 1.3;
+        }
+        /* Switch */
+        .switch {
+          position: relative;
+          display: inline-block;
+          width: 48px;
+          height: 26px;
+          flex-shrink: 0;
+        }
+        .switch input {
+          opacity: 0;
+          width: 0;
+          height: 0;
+        }
+        .slider {
+          position: absolute;
+          cursor: pointer;
+          top: 0; left: 0; right: 0; bottom: 0;
+          background-color: rgba(255, 255, 255, 0.15);
+          transition: .3s;
+          border-radius: 26px;
+        }
+        .slider:before {
+          position: absolute;
+          content: "";
+          height: 20px;
+          width: 20px;
+          left: 3px;
+          bottom: 3px;
+          background-color: white;
+          transition: .3s;
+          border-radius: 50%;
+        }
+        input:checked + .slider {
+          background-color: #38bdf8;
+        }
+        input:checked + .slider:before {
+          transform: translateX(22px);
+        }
       </style>
 
-      <div class="fab-btn" id="fab-btn" title="Personalizza Grafica">
+      <div class="fab-btn ${isClassic ? 'fab-classic' : 'fab-luxury'}" id="fab-btn" title="Personalizza Grafica">
         <ha-icon icon="${icon}"></ha-icon>
       </div>
 
@@ -7609,27 +7753,46 @@ class MultizoneThermostatStyleSwitcher extends HTMLElement {
         <div class="modal-card">
           <div class="modal-header">
             <div class="modal-title">
-              <span>🎨</span> Stile Grafico Termostati
+              <span>🎨</span> Personalizzazione Dashboard
             </div>
             <button class="close-btn" id="close-btn">✕</button>
           </div>
           <div class="modal-body">
-            <div class="option-card ${currentStyle === 'luxury' ? 'active' : ''}" id="opt-luxury">
-              <div class="option-icon">💎</div>
-              <div class="option-details">
-                <div class="option-name">Luxury Vector Arc (Nuovo)</div>
-                <div class="option-desc">Design moderno con arco vettoriale a 270°, regolazione touch e tema glassmorphic.</div>
+            <div>
+              <div class="section-label">Stile Schede Termostati</div>
+              <div class="options-group">
+                <div class="option-card ${currentStyle === 'luxury' ? 'active' : ''}" id="opt-luxury">
+                  <div class="option-icon">💎</div>
+                  <div class="option-details">
+                    <div class="option-name">Luxury Vector Arc (Nuovo)</div>
+                    <div class="option-desc">Design moderno con arco vettoriale a 270°, regolazione touch e tema glassmorphic.</div>
+                  </div>
+                  <div class="radio-dot"></div>
+                </div>
+
+                <div class="option-card ${currentStyle === 'classic' ? 'active' : ''}" id="opt-classic">
+                  <div class="option-icon">🏛️</div>
+                  <div class="option-details">
+                    <div class="option-name">Standard Home Assistant (Classico)</div>
+                    <div class="option-desc">Manopola circolare standard originale di Home Assistant.</div>
+                  </div>
+                  <div class="radio-dot"></div>
+                </div>
               </div>
-              <div class="radio-dot"></div>
             </div>
 
-            <div class="option-card ${currentStyle === 'classic' ? 'active' : ''}" id="opt-classic">
-              <div class="option-icon">🏛️</div>
-              <div class="option-details">
-                <div class="option-name">Standard Home Assistant (Classico)</div>
-                <div class="option-desc">Manopola circolare standard originale di Home Assistant.</div>
+            <div>
+              <div class="section-label">Visualizzazione Interfaccia</div>
+              <div class="toggle-box">
+                <div class="toggle-info">
+                  <div class="toggle-title">Nascondi Barra Superiore</div>
+                  <div class="toggle-desc">Nasconde la barra in alto per una vista pulita. Disattiva per far riapparire la matita di modifica e i menu.</div>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="header-toggle" ${hideHeader ? 'checked' : ''}>
+                  <span class="slider"></span>
+                </label>
               </div>
-              <div class="radio-dot"></div>
             </div>
           </div>
         </div>
@@ -7652,13 +7815,19 @@ class MultizoneThermostatStyleSwitcher extends HTMLElement {
 
     const optClassic = this.shadowRoot.querySelector('#opt-classic');
     if (optClassic) optClassic.addEventListener('click', () => this.setStyle('classic'));
+
+    const headerToggle = this.shadowRoot.querySelector('#header-toggle');
+    if (headerToggle) {
+      headerToggle.addEventListener('change', (e) => {
+        this.toggleHeader(e.target.checked);
+      });
+    }
   }
 }
 
 if (!customElements.get("multizone-thermostat-style-switcher")) {
   customElements.define("multizone-thermostat-style-switcher", MultizoneThermostatStyleSwitcher);
 }
-
 
 class MultizoneThermostatDashboardStrategy extends HTMLElement {
   static async generateDashboard(info) {
@@ -7864,11 +8033,24 @@ class MultizoneThermostatDashboardStrategy extends HTMLElement {
       };
     }
 
+    // Append style switcher into card collection so root cards.length is strictly 1 (panel: true compliant)
+    topRowCards.push({
+      type: "custom:multizone-thermostat-style-switcher"
+    });
+
+    if (columns === 1) {
+      return {
+        cards: [
+          {
+            type: "vertical-stack",
+            cards: topRowCards.concat(zoneCards),
+          }
+        ]
+      };
+    }
+
     return {
       cards: [
-        {
-          type: "custom:multizone-thermostat-style-switcher"
-        },
         {
           type: "custom:multizone-thermostat-responsive-grid",
           columns: columns,
