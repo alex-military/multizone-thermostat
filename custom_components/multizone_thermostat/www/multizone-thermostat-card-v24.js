@@ -3408,15 +3408,30 @@ function closeMzStandaloneModal() {
   }
 }
 
+function getGlobalHass() {
+  if (window.hass) return window.hass;
+  try {
+    const ha = document.querySelector('home-assistant');
+    if (ha && ha.hass) return ha.hass;
+  } catch (e) {}
+  try {
+    const grid = document.querySelector('multizone-thermostat-responsive-grid') || document.querySelector('multizone-thermostat-nav-card');
+    if (grid && grid._hass) return grid._hass;
+  } catch (e) {}
+  return null;
+}
+
 function openMzStandaloneModal(type, hass) {
   closeMzStandaloneModal();
+  const effectiveHass = hass || getGlobalHass();
+
   const overlay = document.createElement('div');
   overlay.id = 'mz-standalone-nav-overlay';
   overlay.style.cssText = [
     'position: fixed',
     'inset: 0',
-    'z-index: 99999',
-    'background: rgba(10, 15, 29, 0.88)',
+    'z-index: 999999',
+    'background: rgba(10, 15, 29, 0.90)',
     'backdrop-filter: blur(12px)',
     '-webkit-backdrop-filter: blur(12px)',
     'overflow-y: auto',
@@ -3442,7 +3457,7 @@ function openMzStandaloneModal(type, hass) {
   const closeBtn = document.createElement('button');
   closeBtn.innerHTML = '✕ Chiudi';
   closeBtn.style.cssText = [
-    'background: rgba(255, 255, 255, 0.12)',
+    'background: rgba(255, 255, 255, 0.14)',
     'color: #ffffff',
     'border: 1px solid rgba(255, 255, 255, 0.25)',
     'border-radius: 10px',
@@ -3452,8 +3467,8 @@ function openMzStandaloneModal(type, hass) {
     'cursor: pointer',
     'transition: background 0.2s ease'
   ].join(';');
-  closeBtn.onmouseover = () => { closeBtn.style.background = 'rgba(255, 255, 255, 0.22)'; };
-  closeBtn.onmouseout = () => { closeBtn.style.background = 'rgba(255, 255, 255, 0.12)'; };
+  closeBtn.onmouseover = () => { closeBtn.style.background = 'rgba(255, 255, 255, 0.25)'; };
+  closeBtn.onmouseout = () => { closeBtn.style.background = 'rgba(255, 255, 255, 0.14)'; };
 
   const dismissModal = () => {
     closeMzStandaloneModal();
@@ -3479,8 +3494,8 @@ function openMzStandaloneModal(type, hass) {
   if (typeof innerCard.setConfig === 'function') {
     innerCard.setConfig({ border_radius: '16px' });
   }
-  if (hass) {
-    innerCard.hass = hass;
+  if (effectiveHass) {
+    innerCard.hass = effectiveHass;
   }
   wrapper.appendChild(innerCard);
   overlay.appendChild(wrapper);
@@ -3506,7 +3521,8 @@ function findLovelaceConfig(el) {
   try {
     const ha = document.querySelector('home-assistant');
     const main = ha && ha.shadowRoot && ha.shadowRoot.querySelector('home-assistant-main');
-    const panel = main && main.shadowRoot && main.shadowRoot.querySelector('ha-panel-lovelace');
+    const resolver = main && main.shadowRoot && main.shadowRoot.querySelector('partial-panel-resolver, ha-panel-lovelace');
+    const panel = resolver && (resolver.tagName === 'HA-PANEL-LOVELACE' ? resolver : (resolver.shadowRoot && resolver.shadowRoot.querySelector('ha-panel-lovelace')));
     if (panel && panel.lovelace && panel.lovelace.config && Array.isArray(panel.lovelace.config.views)) {
       return panel.lovelace.config;
     }
@@ -3514,65 +3530,88 @@ function findLovelaceConfig(el) {
   return null;
 }
 
-function navigateOrFallbackModal(hostEl, targetPath, onFallback) {
-  // Normalize target paths
-  let normalizedPath = targetPath;
-  if (normalizedPath === 'schedulatore') normalizedPath = 'programmazione';
-
-  // If explicit absolute path, navigate directly
-  if (typeof normalizedPath === 'string' && normalizedPath.startsWith('/')) {
-    const navEvent = new CustomEvent('hass-navigate', {
-      detail: { path: normalizedPath },
+function haNavigate(node, path) {
+  if (!path) return;
+  // 1. Dispatch hass-action (official Lovelace action handler)
+  try {
+    const actionEv = new CustomEvent('hass-action', {
+      detail: {
+        config: {
+          tap_action: {
+            action: 'navigate',
+            navigation_path: path
+          }
+        },
+        action: 'tap'
+      },
       bubbles: true,
       composed: true
     });
-    if (hostEl && typeof hostEl.dispatchEvent === 'function') {
-      hostEl.dispatchEvent(navEvent);
+    (node || document.body).dispatchEvent(actionEv);
+  } catch (e) {}
+
+  // 2. Dispatch hass-navigate (Lovelace router event)
+  try {
+    const navEv = new CustomEvent('hass-navigate', {
+      detail: { path: path },
+      bubbles: true,
+      composed: true
+    });
+    (node || document.body).dispatchEvent(navEv);
+  } catch (e) {}
+
+  // 3. Low-level history API and location-changed event (standard HA navigate.ts)
+  try {
+    if (window.location.pathname !== path) {
+      window.history.pushState(null, '', path);
+      const locEv = new CustomEvent('location-changed', {
+        detail: { replace: false },
+        bubbles: true,
+        composed: true
+      });
+      (node || window).dispatchEvent(locEv);
+      window.dispatchEvent(new CustomEvent('location-changed'));
     }
-    window.dispatchEvent(navEvent);
-    return;
-  }
+  } catch (e) {}
+}
+
+function navigateOrFallbackModal(hostEl, targetPath, onFallback) {
+  let normalizedPath = targetPath || 'programmazione';
+  if (normalizedPath === 'schedulatore') normalizedPath = 'programmazione';
+
+  // 1. Resolve dashboard base and target fullPath
+  const parts = window.location.pathname.split('/').filter(Boolean);
+  const dashboardBase = parts.length > 0 ? `/${parts[0]}` : '/lovelace';
+  let fullPath = normalizedPath.startsWith('/') 
+    ? normalizedPath 
+    : `${dashboardBase}/${normalizedPath}`;
 
   const llConfig = findLovelaceConfig(hostEl);
-  let viewSlug = normalizedPath;
   let hasMatchingView = false;
 
   if (llConfig && Array.isArray(llConfig.views)) {
-    let matchedIdx = -1;
     const matchedView = llConfig.views.find((v, idx) => {
       const p = (v.path !== undefined && v.path !== null && v.path !== '') ? String(v.path) : String(idx);
       if (p.toLowerCase() === normalizedPath.toLowerCase() || (normalizedPath === 'programmazione' && p.toLowerCase() === 'schedulatore')) {
-        matchedIdx = idx;
+        fullPath = `${dashboardBase}/${p}`;
         return true;
       }
       const stratType = (v.strategy && v.strategy.type) ? String(v.strategy.type) : '';
       if ((normalizedPath === 'programmazione' || normalizedPath === 'schedulatore') && stratType.includes('multizone-thermostat-scheduler')) {
-        matchedIdx = idx;
+        fullPath = `${dashboardBase}/${p}`;
         return true;
       }
       if (normalizedPath === 'diagnostica' && stratType.includes('multizone-thermostat-diagnostics')) {
-        matchedIdx = idx;
+        fullPath = `${dashboardBase}/${p}`;
         return true;
-      }
-      if (Array.isArray(v.cards)) {
-        const hasCard = JSON.stringify(v.cards).includes(
-          (normalizedPath === 'programmazione' || normalizedPath === 'schedulatore') ? 'multizone-thermostat-scheduler-card' : 'multizone-thermostat-plant-card'
-        );
-        if (hasCard) {
-          matchedIdx = idx;
-          return true;
-        }
       }
       return false;
     });
 
     if (matchedView) {
       hasMatchingView = true;
-      viewSlug = (matchedView.path !== undefined && matchedView.path !== null && matchedView.path !== '')
-        ? String(matchedView.path)
-        : String(matchedIdx);
     } else {
-      // No matching view exists in Lovelace config: open fallback modal immediately
+      // Lovelace config exists but does not contain target view: open fallback modal immediately
       if (typeof onFallback === 'function') {
         onFallback();
         return;
@@ -3580,23 +3619,11 @@ function navigateOrFallbackModal(hostEl, targetPath, onFallback) {
     }
   }
 
-  const parts = window.location.pathname.split('/').filter(Boolean);
-  const dashboardBase = parts.length > 0 ? `/${parts[0]}` : '/lovelace';
-  const fullPath = `${dashboardBase}/${viewSlug}`;
-
-  // Dispatch Home Assistant native hass-navigate event directly (without prior pushState)
-  const navEvent = new CustomEvent('hass-navigate', {
-    detail: { path: fullPath },
-    bubbles: true,
-    composed: true
-  });
-  if (hostEl && typeof hostEl.dispatchEvent === 'function') {
-    hostEl.dispatchEvent(navEvent);
-  }
-  window.dispatchEvent(navEvent);
-
-  // Safety fallback: if URL has not changed after 150ms and fallback is defined, trigger fallback modal
+  // 2. Perform navigation
   const initialPath = window.location.pathname;
+  haNavigate(hostEl, fullPath);
+
+  // 3. Fallback verification: if path hasn't changed after 150ms and fallback is provided
   setTimeout(() => {
     if (window.location.pathname === initialPath && window.location.pathname !== fullPath) {
       if (typeof onFallback === 'function') {
@@ -3827,12 +3854,17 @@ class MultizoneThermostatScheduleSummaryCard extends HTMLElement {
     `;
 
     const card = this.shadowRoot.getElementById('card');
+    const handleSchedClick = (e) => {
+      if (e) e.stopPropagation();
+      const targetPath = (this._config && this._config.navigation_path) ? this._config.navigation_path : 'programmazione';
+      navigateOrFallbackModal(this, targetPath, () => openMzStandaloneModal('scheduler', this._hass));
+    };
+
     if (card) {
-      card.addEventListener('click', () => {
-        const targetPath = (this._config && this._config.navigation_path) ? this._config.navigation_path : 'programmazione';
-        navigateOrFallbackModal(this, targetPath, () => openMzStandaloneModal('scheduler', this._hass));
-      });
+      card.addEventListener('click', handleSchedClick);
     }
+    this.style.cursor = 'pointer';
+    this.onclick = handleSchedClick;
 
     this._rendered = true;
   }
@@ -4082,12 +4114,17 @@ class MultizoneThermostatHealthSummaryCard extends HTMLElement {
     `;
 
     const card = this.shadowRoot.getElementById('card');
+    const handleHealthClick = (e) => {
+      if (e) e.stopPropagation();
+      const targetPath = (this._config && this._config.navigation_path) ? this._config.navigation_path : 'diagnostica';
+      navigateOrFallbackModal(this, targetPath, () => openMzStandaloneModal('diagnostics', this._hass));
+    };
+
     if (card) {
-      card.addEventListener('click', () => {
-        const targetPath = (this._config && this._config.navigation_path) ? this._config.navigation_path : 'diagnostica';
-        navigateOrFallbackModal(this, targetPath, () => openMzStandaloneModal('diagnostics', this._hass));
-      });
+      card.addEventListener('click', handleHealthClick);
     }
+    this.style.cursor = 'pointer';
+    this.onclick = handleHealthClick;
 
     this._rendered = true;
   }
@@ -4196,6 +4233,11 @@ class MultizoneThermostatNavCard extends HTMLElement {
     if (this._hass) {
       this._schedCard.hass = this._hass;
     }
+    this._schedCard.style.cursor = 'pointer';
+    this._schedCard.addEventListener('click', (e) => {
+      e.stopPropagation();
+      navigateOrFallbackModal(this._schedCard, 'programmazione', () => openMzStandaloneModal('scheduler', this._hass));
+    });
 
     this._healthCard = document.createElement('multizone-thermostat-health-summary-card');
     if (typeof this._healthCard.setConfig === 'function') {
@@ -4207,6 +4249,11 @@ class MultizoneThermostatNavCard extends HTMLElement {
     if (this._hass) {
       this._healthCard.hass = this._hass;
     }
+    this._healthCard.style.cursor = 'pointer';
+    this._healthCard.addEventListener('click', (e) => {
+      e.stopPropagation();
+      navigateOrFallbackModal(this._healthCard, 'diagnostica', () => openMzStandaloneModal('diagnostics', this._hass));
+    });
 
     container.appendChild(this._schedCard);
     container.appendChild(this._healthCard);
