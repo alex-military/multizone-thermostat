@@ -8493,6 +8493,7 @@ class MultizoneThermostatDashboardStrategy extends HTMLElement {
           title: "Termostati",
           path: "home",
           icon: "mdi:radiator",
+          panel: true,
           cards: view.cards,
         },
         {
@@ -8500,6 +8501,7 @@ class MultizoneThermostatDashboardStrategy extends HTMLElement {
           path: "programmazione",
           icon: "mdi:calendar-clock",
           subview: true,
+          panel: true,
           cards: schedView.cards,
         },
         {
@@ -8507,6 +8509,7 @@ class MultizoneThermostatDashboardStrategy extends HTMLElement {
           path: "diagnostica",
           icon: "mdi:chart-box-outline",
           subview: true,
+          panel: true,
           cards: diagView.cards,
         }
       ]
