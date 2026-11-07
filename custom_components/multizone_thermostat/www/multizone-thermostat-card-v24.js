@@ -3138,11 +3138,35 @@ class MultizoneThermostatPresetCard extends HTMLElement {
         color: #ffffff;
         transform: translateY(-2px);
       }
-      .preset-btn.active {
+      .preset-btn.active.manual {
         background: rgba(14, 165, 233, 0.2) !important;
         border-color: #38bdf8 !important;
         color: #38bdf8 !important;
         box-shadow: 0 0 15px rgba(56, 189, 248, 0.35) !important;
+      }
+      .preset-btn.active.eco {
+        background: rgba(16, 185, 129, 0.2) !important;
+        border-color: #10b981 !important;
+        color: #34d399 !important;
+        box-shadow: 0 0 15px rgba(16, 185, 129, 0.35) !important;
+      }
+      .preset-btn.active.comfort {
+        background: rgba(245, 158, 11, 0.2) !important;
+        border-color: #f59e0b !important;
+        color: #fbbf24 !important;
+        box-shadow: 0 0 15px rgba(245, 158, 11, 0.35) !important;
+      }
+      .preset-btn.active.sleep {
+        background: rgba(99, 102, 241, 0.2) !important;
+        border-color: #6366f1 !important;
+        color: #818cf8 !important;
+        box-shadow: 0 0 15px rgba(99, 102, 241, 0.35) !important;
+      }
+      .preset-btn.active.away {
+        background: rgba(239, 68, 68, 0.2) !important;
+        border-color: #ef4444 !important;
+        color: #f87171 !important;
+        box-shadow: 0 0 15px rgba(239, 68, 68, 0.35) !important;
       }
       .preset-btn ha-icon {
         --mdc-icon-size: 22px;
@@ -3162,7 +3186,7 @@ class MultizoneThermostatPresetCard extends HTMLElement {
           <span id="title">PRESET GLOBALE</span>
         </div>
         <div class="preset-grid">
-          <div class="preset-btn" data-preset="none" id="btn-none">
+          <div class="preset-btn" data-preset="manual" id="btn-manual">
             <ha-icon icon="mdi:power"></ha-icon>
             <span class="preset-label">Manuale</span>
           </div>
@@ -3200,9 +3224,12 @@ class MultizoneThermostatPresetCard extends HTMLElement {
     const entityId = this.presetEntity;
     if (!entityId) return;
 
+    let targetOption = preset;
+    if (targetOption === 'none') targetOption = 'manual';
+
     this._hass.callService("select", "select_option", {
       entity_id: entityId,
-      option: preset
+      option: targetOption
     });
   }
 
@@ -3218,10 +3245,13 @@ class MultizoneThermostatPresetCard extends HTMLElement {
     const buttons = this.shadowRoot.querySelectorAll('.preset-btn');
     buttons.forEach(btn => {
       const preset = btn.getAttribute('data-preset');
-      if (preset === currentPreset) {
+      const isActive = (preset === currentPreset) || (preset === 'manual' && (currentPreset === 'none' || currentPreset === 'manual'));
+      if (isActive) {
         btn.classList.add('active');
+        btn.classList.add(preset);
       } else {
         btn.classList.remove('active');
+        btn.classList.remove(preset);
       }
     });
   }
