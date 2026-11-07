@@ -29,29 +29,14 @@ from .const import (
     make_zone_entity_id,
 )
 from .schedule.smart_return import SmartReturnPlanner
+from .schedule.storage import ScheduleProfileStorage, default_profiles_dict
 
 _LOGGER = logging.getLogger(__name__)
 
 
 def _default_profiles_dict() -> dict[str, dict[str, Any]]:
     """Return default dictionary of base profiles."""
-    return {
-        "standard": {
-            "name": "Standard",
-            "baseline_preset": DEFAULT_BASELINE_PRESET,
-            "days": {day: {} for day in SCHEDULE_DAYS},
-        },
-        "smart_working": {
-            "name": "Smart Working",
-            "baseline_preset": DEFAULT_BASELINE_PRESET,
-            "days": {day: {} for day in SCHEDULE_DAYS},
-        },
-        "holiday": {
-            "name": "Festivo",
-            "baseline_preset": DEFAULT_BASELINE_PRESET,
-            "days": {day: {} for day in SCHEDULE_DAYS},
-        },
-    }
+    return default_profiles_dict()
 
 
 class ScheduleProfileManager:
@@ -60,16 +45,10 @@ class ScheduleProfileManager:
     def __init__(self, coordinator: Any) -> None:
         """Initialize the schedule profile manager."""
         self.coordinator = coordinator
-        self.scheduler_enabled: bool = False
-        self.active_profile: str = DEFAULT_SCHEDULE_PROFILE
-        self.profile_expires_at: str | None = None
-        self.fallback_profile: str = DEFAULT_SCHEDULE_PROFILE
-        self.profiles: dict[str, dict[str, Any]] = _default_profiles_dict()
-        self.manual_overrides: dict[str, dict[str, Any]] = {}
+        self._storage = ScheduleProfileStorage(coordinator)
         self.schedule_overrides: dict[str, float] = {}
         self.smart_start_info: dict[str, dict[str, Any]] = {}
         self._active_smart_starts: dict[str, dict[str, Any]] = {}
-        self.smart_return: dict[str, Any] | None = None
         self._smart_return_planner = SmartReturnPlanner(
             coordinator,
             getattr(coordinator, "hass", None),
@@ -81,6 +60,69 @@ class ScheduleProfileManager:
     def hass(self):
         """Get Home Assistant instance from coordinator."""
         return self.coordinator.hass
+
+    @property
+    def scheduler_enabled(self) -> bool:
+        """Return whether scheduler is enabled."""
+        return self._storage.scheduler_enabled
+
+    @scheduler_enabled.setter
+    def scheduler_enabled(self, val: bool) -> None:
+        self._storage.scheduler_enabled = val
+
+    @property
+    def active_profile(self) -> str:
+        """Return currently active schedule profile."""
+        return self._storage.active_profile
+
+    @active_profile.setter
+    def active_profile(self, val: str) -> None:
+        self._storage.active_profile = val
+
+    @property
+    def profile_expires_at(self) -> str | None:
+        """Return expiration timestamp of temporary profile."""
+        return self._storage.profile_expires_at
+
+    @profile_expires_at.setter
+    def profile_expires_at(self, val: str | None) -> None:
+        self._storage.profile_expires_at = val
+
+    @property
+    def fallback_profile(self) -> str:
+        """Return fallback profile to revert to when temporary expires."""
+        return self._storage.fallback_profile
+
+    @fallback_profile.setter
+    def fallback_profile(self, val: str) -> None:
+        self._storage.fallback_profile = val
+
+    @property
+    def profiles(self) -> dict[str, dict[str, Any]]:
+        """Return all schedule profiles dictionary."""
+        return self._storage.profiles
+
+    @profiles.setter
+    def profiles(self, val: dict[str, dict[str, Any]]) -> None:
+        self._storage.profiles = val
+
+    @property
+    def manual_overrides(self) -> dict[str, dict[str, Any]]:
+        """Return active manual overrides per zone."""
+        return self._storage.manual_overrides
+
+    @manual_overrides.setter
+    def manual_overrides(self, val: dict[str, dict[str, Any]]) -> None:
+        self._storage.manual_overrides = val
+
+    @property
+    def smart_return(self) -> dict[str, Any] | None:
+        """Return active smart return settings."""
+        return self._storage.smart_return
+
+    @smart_return.setter
+    def smart_return(self, val: dict[str, Any] | None) -> None:
+        self._storage.smart_return = val
 
     def _as_local(self, dt: datetime | None) -> datetime:
         """Convert datetime to configured local timezone."""
@@ -115,72 +157,12 @@ class ScheduleProfileManager:
             return dt
 
     def load_from_storage(self) -> None:
-        """Load schedule state from coordinator persistent settings."""
-        self.scheduler_enabled = bool(
-            self.coordinator.get_persistent_data(KEY_SCHEDULER_ENABLED, False)
-        )
-        self.active_profile = str(
-            self.coordinator.get_persistent_data(KEY_ACTIVE_PROFILE, DEFAULT_SCHEDULE_PROFILE)
-        )
-        self.profile_expires_at = self.coordinator.get_persistent_data(
-            KEY_PROFILE_EXPIRES_AT, None
-        )
-        self.fallback_profile = str(
-            self.coordinator.get_persistent_data(KEY_FALLBACK_PROFILE, DEFAULT_SCHEDULE_PROFILE)
-        )
-
-        saved_profiles = self.coordinator.get_persistent_data(KEY_SCHEDULE_PROFILES)
-        defaults = _default_profiles_dict()
-        if isinstance(saved_profiles, dict):
-            self.profiles = dict(saved_profiles)
-        else:
-            self.profiles = {}
-
-        # Ensure standard, smart_working, holiday always exist
-        for pid, pdata in defaults.items():
-            if pid not in self.profiles or not isinstance(self.profiles[pid], dict):
-                self.profiles[pid] = copy.deepcopy(pdata)
-            else:
-                prof = self.profiles[pid]
-                if "name" not in prof:
-                    prof["name"] = pdata["name"]
-                if "baseline_preset" not in prof:
-                    prof["baseline_preset"] = pdata["baseline_preset"]
-                if "days" not in prof or not isinstance(prof["days"], dict):
-                    prof["days"] = {day: {} for day in SCHEDULE_DAYS}
-                else:
-                    for day in SCHEDULE_DAYS:
-                        if day not in prof["days"] or not isinstance(prof["days"][day], dict):
-                            prof["days"][day] = {}
-
-        for pid, prof in self.profiles.items():
-            if not isinstance(prof, dict):
-                continue
-            if "name" not in prof:
-                prof["name"] = pid.capitalize()
-            if "baseline_preset" not in prof:
-                prof["baseline_preset"] = DEFAULT_BASELINE_PRESET
-            if "days" not in prof or not isinstance(prof["days"], dict):
-                prof["days"] = {day: {} for day in SCHEDULE_DAYS}
-
-        saved_overrides = self.coordinator.get_persistent_data(KEY_MANUAL_OVERRIDES, {})
-        self.manual_overrides = dict(saved_overrides) if isinstance(saved_overrides, dict) else {}
-
-        saved_sr = self.coordinator.get_persistent_data(KEY_SMART_RETURN, None)
-        self.smart_return = dict(saved_sr) if isinstance(saved_sr, dict) else None
+        """Load schedule state from storage."""
+        self._storage.load_from_storage()
 
     async def async_save_to_storage(self) -> None:
-        """Persist schedule state into coordinator settings store."""
-        if hasattr(self.coordinator, "_settings") and isinstance(self.coordinator._settings, dict):
-            self.coordinator._settings[KEY_SCHEDULER_ENABLED] = self.scheduler_enabled
-            self.coordinator._settings[KEY_ACTIVE_PROFILE] = self.active_profile
-            self.coordinator._settings[KEY_PROFILE_EXPIRES_AT] = self.profile_expires_at
-            self.coordinator._settings[KEY_FALLBACK_PROFILE] = self.fallback_profile
-            self.coordinator._settings[KEY_SCHEDULE_PROFILES] = self.profiles
-            self.coordinator._settings[KEY_MANUAL_OVERRIDES] = self.manual_overrides
-            self.coordinator._settings[KEY_SMART_RETURN] = self.smart_return
-            if hasattr(self.coordinator, "_settings_store") and self.coordinator._settings_store:
-                await self.coordinator._settings_store.async_save(self.coordinator._settings)
+        """Persist schedule state into storage."""
+        await self._storage.async_save_to_storage()
 
     async def async_set_scheduler_enabled(
         self, enabled: bool, now: datetime | None = None
@@ -203,37 +185,7 @@ class ScheduleProfileManager:
         self, profile_id: str, profile_data: dict[str, Any], now: datetime | None = None
     ) -> None:
         """Save or update a schedule profile."""
-        name = profile_data.get("name", profile_id.capitalize())
-        baseline = profile_data.get("baseline_preset", DEFAULT_BASELINE_PRESET)
-        raw_days = profile_data.get("days", {})
-
-        normalized_days: dict[str, dict[str, list[dict[str, Any]]]] = {
-            day: {} for day in SCHEDULE_DAYS
-        }
-        if isinstance(raw_days, dict):
-            for day, zones_data in raw_days.items():
-                if day not in normalized_days:
-                    normalized_days[day] = {}
-                if isinstance(zones_data, dict):
-                    for z_key, blocks in zones_data.items():
-                        norm_key = (
-                            z_key if z_key.startswith("climate.") else make_zone_entity_id(z_key)
-                        )
-                        if isinstance(blocks, list):
-                            sorted_blocks = sorted(
-                                [b for b in blocks if isinstance(b, dict)],
-                                key=lambda b: str(b.get("start", "")),
-                            )
-                            normalized_days[day][norm_key] = sorted_blocks
-                        else:
-                            normalized_days[day][norm_key] = []
-
-        self.profiles[profile_id] = {
-            "name": name,
-            "baseline_preset": baseline,
-            "days": normalized_days,
-        }
-
+        self._storage.save_profile(profile_id, profile_data)
         if profile_id == self.active_profile:
             self._active_smart_starts.clear()
 
@@ -247,14 +199,7 @@ class ScheduleProfileManager:
         self, source_id: str, target_id: str, target_name: str | None = None
     ) -> None:
         """Deep duplicate an existing profile into a new profile ID."""
-        if source_id not in self.profiles:
-            raise ValueError(f"Source profile '{source_id}' does not exist")
-        new_prof = copy.deepcopy(self.profiles[source_id])
-        if target_name is not None:
-            new_prof["name"] = target_name
-        else:
-            new_prof["name"] = f"Copy of {new_prof.get('name', source_id)}"
-        self.profiles[target_id] = new_prof
+        self._storage.duplicate_profile(source_id, target_id, target_name)
         await self.async_save_to_storage()
         self._notify_climates()
 
@@ -266,24 +211,8 @@ class ScheduleProfileManager:
         now: datetime | None = None,
     ) -> None:
         """Activate a profile with optional expiration time."""
-        if profile_id not in self.profiles:
-            _LOGGER.warning("Activating unknown profile '%s', initializing default", profile_id)
-            self.profiles[profile_id] = {
-                "name": profile_id.capitalize(),
-                "baseline_preset": DEFAULT_BASELINE_PRESET,
-                "days": {day: {} for day in SCHEDULE_DAYS},
-            }
-
-        self.active_profile = profile_id
+        self._storage.activate_profile(profile_id, expires_at, fallback_profile)
         self._active_smart_starts.clear()
-        if isinstance(expires_at, datetime):
-            self.profile_expires_at = expires_at.isoformat()
-        elif isinstance(expires_at, str) and expires_at.strip():
-            self.profile_expires_at = expires_at.strip()
-        else:
-            self.profile_expires_at = None
-
-        self.fallback_profile = fallback_profile or DEFAULT_SCHEDULE_PROFILE
         await self.async_save_to_storage()
         if self.scheduler_enabled:
             await self.async_evaluate_schedule(now)
@@ -291,34 +220,15 @@ class ScheduleProfileManager:
 
     def check_profile_expiry(self, now: datetime) -> bool:
         """Check if active profile has expired and revert to fallback if so."""
-        if not self.profile_expires_at:
-            return False
-
-        parsed_exp = dt_util.parse_datetime(self.profile_expires_at)
-        if parsed_exp is None:
-            try:
-                parsed_exp = datetime.fromisoformat(self.profile_expires_at)
-            except Exception:
-                self.profile_expires_at = None
-                return False
-
-        check_now = now
-        if parsed_exp.tzinfo is not None and check_now.tzinfo is None:
-            check_now = check_now.replace(tzinfo=parsed_exp.tzinfo)
-        elif parsed_exp.tzinfo is None and check_now.tzinfo is not None:
-            parsed_exp = parsed_exp.replace(tzinfo=check_now.tzinfo)
-
-        if check_now >= parsed_exp:
-            old_profile = self.active_profile
-            self.active_profile = self.fallback_profile or DEFAULT_SCHEDULE_PROFILE
-            self.profile_expires_at = None
+        expired, old_profile, fallback = self._storage.check_profile_expiry(now)
+        if expired:
             self._active_smart_starts.clear()
             if hasattr(self.coordinator, "record_diagnostic_event"):
                 self.coordinator.record_diagnostic_event(
                     "SCHEDULE_PROFILE_EXPIRED",
                     {
                         "expired_profile": old_profile,
-                        "fallback_profile": self.active_profile,
+                        "fallback_profile": fallback,
                         "expired_at": now.isoformat(),
                     },
                 )
