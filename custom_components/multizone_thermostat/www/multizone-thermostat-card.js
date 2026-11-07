@@ -2569,6 +2569,11 @@ class MultizoneThermostatStatusCard extends HTMLElement {
 
     if (isClassic) {
       style.textContent = `
+        :host {
+          display: block;
+          height: 100%;
+          box-sizing: border-box;
+        }
         ha-card {
           padding: 18px 20px;
           border-radius: ${radius} !important;
@@ -2583,7 +2588,8 @@ class MultizoneThermostatStatusCard extends HTMLElement {
           cursor: pointer;
           display: flex;
           align-items: center;
-          min-height: 90px;
+          height: 100%;
+          min-height: 96px;
           position: relative;
           box-sizing: border-box;
         }
@@ -2674,6 +2680,11 @@ class MultizoneThermostatStatusCard extends HTMLElement {
       `;
     } else {
       style.textContent = `
+        :host {
+          display: block;
+          height: 100%;
+          box-sizing: border-box;
+        }
         ha-card {
           padding: 18px 20px;
           border-radius: ${radius} !important;
@@ -2688,7 +2699,8 @@ class MultizoneThermostatStatusCard extends HTMLElement {
           cursor: pointer;
           display: flex;
           align-items: center;
-          min-height: 90px;
+          height: 100%;
+          min-height: 96px;
           position: relative;
           box-sizing: border-box;
         }
@@ -2989,20 +3001,27 @@ class MultizoneThermostatPresetCard extends HTMLElement {
     const isClassic = (this.getEffectiveStyle() === 'classic');
 
     const styleContent = isClassic ? `
+      :host {
+        display: block;
+        height: 100%;
+        box-sizing: border-box;
+      }
       ha-card {
-        padding: 16px 14px;
+        padding: 18px 16px;
         border-radius: ${radius} !important;
         overflow: hidden !important;
         display: flex;
         flex-direction: column;
-        gap: 10px;
+        justify-content: space-between;
+        gap: 12px;
         background: var(--ha-card-background, var(--card-background-color, #1c1c1e)) !important;
         border: var(--ha-card-border-width, 1px) solid var(--ha-card-border-color, var(--divider-color, rgba(255, 255, 255, 0.12))) !important;
         box-shadow: var(--ha-card-box-shadow, 0 2px 8px rgba(0, 0, 0, 0.2)) !important;
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
         box-sizing: border-box;
-        min-height: 90px;
+        height: 100%;
+        min-height: 96px;
       }
       .header {
         display: flex;
@@ -3020,21 +3039,23 @@ class MultizoneThermostatPresetCard extends HTMLElement {
         gap: 8px;
         width: 100%;
         box-sizing: border-box;
+        align-items: stretch;
       }
       .preset-btn {
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        padding: 8px 4px;
-        border-radius: 10px;
+        padding: 10px 4px;
+        border-radius: 12px;
         background: var(--card-background-color, #202b38);
         border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.12));
         color: var(--secondary-text-color, #94a3b8);
         cursor: pointer;
         transition: all 0.2s ease;
-        gap: 4px;
-        min-height: 48px;
+        gap: 6px;
+        min-height: 52px;
+        box-sizing: border-box;
       }
       .preset-btn:hover {
         background: rgba(255, 255, 255, 0.08);
@@ -3047,21 +3068,27 @@ class MultizoneThermostatPresetCard extends HTMLElement {
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
       }
       .preset-btn ha-icon {
-        --mdc-icon-size: 20px;
+        --mdc-icon-size: 22px;
         color: inherit;
       }
       .preset-label {
-        font-size: 10px;
-        font-weight: 600;
+        font-size: 11px;
+        font-weight: 700;
         letter-spacing: 0.2px;
       }
     ` : `
+      :host {
+        display: block;
+        height: 100%;
+        box-sizing: border-box;
+      }
       ha-card {
         padding: 18px 16px;
         border-radius: ${radius} !important;
         overflow: hidden !important;
         display: flex;
         flex-direction: column;
+        justify-content: space-between;
         gap: 12px;
         background: linear-gradient(135deg, rgba(20, 27, 41, 0.88) 0%, rgba(15, 23, 42, 0.94) 100%) !important;
         backdrop-filter: blur(20px) !important;
@@ -3069,7 +3096,8 @@ class MultizoneThermostatPresetCard extends HTMLElement {
         border: 1px solid rgba(255, 255, 255, 0.08) !important;
         box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
         box-sizing: border-box;
-        min-height: 90px;
+        height: 100%;
+        min-height: 96px;
       }
       .header {
         display: flex;
@@ -3087,6 +3115,7 @@ class MultizoneThermostatPresetCard extends HTMLElement {
         gap: 8px;
         width: 100%;
         box-sizing: border-box;
+        align-items: stretch;
       }
       .preset-btn {
         display: flex;
@@ -3102,6 +3131,7 @@ class MultizoneThermostatPresetCard extends HTMLElement {
         transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
         gap: 6px;
         min-height: 52px;
+        box-sizing: border-box;
       }
       .preset-btn:hover {
         background: rgba(255, 255, 255, 0.08);
@@ -3119,7 +3149,7 @@ class MultizoneThermostatPresetCard extends HTMLElement {
         color: inherit;
       }
       .preset-label {
-        font-size: 10px;
+        font-size: 11px;
         font-weight: 700;
         letter-spacing: 0.3px;
       }
@@ -3454,6 +3484,11 @@ class MultizoneThermostatScheduleSummaryCard extends HTMLElement {
     const isClassic = (this.getEffectiveStyle() === 'classic');
 
     const styleContent = isClassic ? `
+      :host {
+        display: block;
+        height: 100%;
+        box-sizing: border-box;
+      }
       ha-card {
         padding: 14px 10px;
         border-radius: ${radius} !important;
@@ -3468,7 +3503,7 @@ class MultizoneThermostatScheduleSummaryCard extends HTMLElement {
         align-items: center;
         justify-content: center;
         height: 100%;
-        min-height: 90px;
+        min-height: 96px;
         cursor: pointer;
         transition: all 0.2s ease;
         box-sizing: border-box;
@@ -3523,6 +3558,11 @@ class MultizoneThermostatScheduleSummaryCard extends HTMLElement {
         background: currentColor;
       }
     ` : `
+      :host {
+        display: block;
+        height: 100%;
+        box-sizing: border-box;
+      }
       ha-card {
         padding: 14px 10px;
         border-radius: ${radius} !important;
@@ -3537,7 +3577,7 @@ class MultizoneThermostatScheduleSummaryCard extends HTMLElement {
         align-items: center;
         justify-content: center;
         height: 100%;
-        min-height: 90px;
+        min-height: 96px;
         cursor: pointer;
         transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
         box-sizing: border-box;
@@ -3696,6 +3736,11 @@ class MultizoneThermostatHealthSummaryCard extends HTMLElement {
     const isClassic = (this.getEffectiveStyle() === 'classic');
 
     const styleContent = isClassic ? `
+      :host {
+        display: block;
+        height: 100%;
+        box-sizing: border-box;
+      }
       ha-card {
         padding: 14px 10px;
         border-radius: ${radius} !important;
@@ -3710,7 +3755,7 @@ class MultizoneThermostatHealthSummaryCard extends HTMLElement {
         align-items: center;
         justify-content: center;
         height: 100%;
-        min-height: 90px;
+        min-height: 96px;
         cursor: pointer;
         transition: all 0.2s ease;
         box-sizing: border-box;
@@ -3765,6 +3810,11 @@ class MultizoneThermostatHealthSummaryCard extends HTMLElement {
         background: currentColor;
       }
     ` : `
+      :host {
+        display: block;
+        height: 100%;
+        box-sizing: border-box;
+      }
       ha-card {
         padding: 14px 10px;
         border-radius: ${radius} !important;
@@ -3779,7 +3829,7 @@ class MultizoneThermostatHealthSummaryCard extends HTMLElement {
         align-items: center;
         justify-content: center;
         height: 100%;
-        min-height: 90px;
+        min-height: 96px;
         cursor: pointer;
         transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
         box-sizing: border-box;
