@@ -1,8 +1,19 @@
-"""Storage and profile persistence engine for Multizone Thermostat Schedule."""
 from __future__ import annotations
+def _parse_time_str(val: str):
+    """Parse HH:MM or HH:MM:SS string to datetime.time."""
+    if not isinstance(val, str):
+        return None
+    for fmt in ("%H:%M", "%H:%M:%S"):
+        try:
+            return datetime.strptime(val.strip(), fmt).time()
+        except ValueError:
+            pass
+    return None
+
+"""Storage and profile persistence engine for Multizone Thermostat Schedule."""
 
 import copy
-from datetime import datetime
+from datetime import datetime, timedelta, time
 import logging
 from typing import Any
 
@@ -189,7 +200,19 @@ class ScheduleProfileStorage:
         if isinstance(expires_at, datetime):
             self.profile_expires_at = expires_at.isoformat()
         elif isinstance(expires_at, str) and expires_at.strip():
-            self.profile_expires_at = expires_at.strip()
+            exp_str = expires_at.strip()
+            # If HH:MM or HH:MM:SS format, resolve against current date
+            t_obj = _parse_time_str(exp_str)
+            if t_obj is not None:
+                now_local = dt_util.now()
+                target_dt = now_local.replace(
+                    hour=t_obj.hour, minute=t_obj.minute, second=t_obj.second, microsecond=0
+                )
+                if target_dt <= now_local:
+                    target_dt += timedelta(days=1)
+                self.profile_expires_at = target_dt.isoformat()
+            else:
+                self.profile_expires_at = exp_str
         else:
             self.profile_expires_at = None
 
@@ -205,8 +228,16 @@ class ScheduleProfileStorage:
             try:
                 parsed_exp = datetime.fromisoformat(self.profile_expires_at)
             except Exception:
-                self.profile_expires_at = None
-                return False, None, None
+                # Fallback: check if time-only string
+                t_obj = _parse_time_str(self.profile_expires_at)
+                if t_obj is not None:
+                    check_now = now
+                    parsed_exp = check_now.replace(
+                        hour=t_obj.hour, minute=t_obj.minute, second=t_obj.second, microsecond=0
+                    )
+                else:
+                    self.profile_expires_at = None
+                    return False, None, None
 
         check_now = now
         if parsed_exp.tzinfo is not None and check_now.tzinfo is None:

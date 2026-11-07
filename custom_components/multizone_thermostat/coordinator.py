@@ -283,6 +283,8 @@ class MultizoneCoordinator:
         self._last_active_time = time.monotonic()
         if hasattr(self, "_settings") and isinstance(self._settings, dict):
             self._settings["last_active_wall_time"] = time.time()
+        if hasattr(self, "storage") and hasattr(self.storage, "debounced_save_settings"):
+            self.storage.debounced_save_settings()
 
     @property
     def is_dhw_active(self) -> bool:

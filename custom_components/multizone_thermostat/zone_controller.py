@@ -245,8 +245,12 @@ class ZoneController:
                     if weather_state and weather_state.state not in ("unavailable", "unknown"):
                         try:
                             outdoor_temp = None
-                            if getattr(weather_state, "domain", None) == "weather":
-                                temp_attr = weather_state.attributes.get("temperature")
+                            is_weather_domain = (
+                                str(self.coordinator.weather_sensor_id).startswith("weather.")
+                                or getattr(weather_state, "entity_id", "").startswith("weather.")
+                            )
+                            if is_weather_domain:
+                                temp_attr = weather_state.attributes.get("temperature") if getattr(weather_state, "attributes", None) else None
                                 if temp_attr is not None:
                                     outdoor_temp = float(temp_attr)
                             else:

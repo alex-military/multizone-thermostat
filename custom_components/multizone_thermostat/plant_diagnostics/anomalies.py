@@ -300,10 +300,32 @@ def evaluate_zone_anomalies(
         is_insane = False
         if current_temp < -30.0 or current_temp > 60.0:
             is_insane = True
-        if state["last_temp_seen"] is not None and state["last_temp_time"] is not None:
+        elif state.get("last_temp_seen") is not None and state.get("last_temp_time") is not None:
             if abs(state["last_temp_seen"] - current_temp) > 4.0 and (now_mono - state["last_temp_time"]) < 600:
-                is_insane = True
-                
+                # Spike sanity check: if the new reading is sustained across consecutive readings,
+                # accept it rather than locking the zone to 0% for 10 full minutes.
+                spike_cand = state.get("spike_cand")
+                spike_count = state.get("spike_count", 0)
+                if spike_cand is not None and abs(spike_cand - current_temp) < 0.5:
+                    spike_count += 1
+                else:
+                    spike_cand = current_temp
+                    spike_count = 1
+                state["spike_cand"] = spike_cand
+                state["spike_count"] = spike_count
+
+                if spike_count >= 3:
+                    # Sustained reading: accept new reading
+                    state["last_temp_seen"] = current_temp
+                    state["last_temp_time"] = now_mono
+                    state["spike_cand"] = None
+                    state["spike_count"] = 0
+                else:
+                    is_insane = True
+            else:
+                state["spike_cand"] = None
+                state["spike_count"] = 0
+
         if is_insane:
             state["active_anomaly"] = ANOMALY_SENSOR_FAULT
             state["anomaly_details"] = f"Implausible temperature reading or abnormal spike ({current_temp}°C)"
@@ -359,13 +381,13 @@ def evaluate_zone_anomalies(
             return ANOMALY_NONE, state["anomaly_details"]
 
         # 1. Staleness Check: Has the temperature sensor not changed in > 6 hours while heating?
-        if state["last_temp_seen"] is None or state["last_temp_seen"] != current_temp:
+        if state.get("last_temp_seen") is None or state.get("last_temp_seen") != current_temp:
             state["last_temp_seen"] = current_temp
             state["last_temp_time"] = now_mono
             
         if (
             (boiler_on and demand > 0.0)
-            and state["last_temp_time"] is not None
+            and state.get("last_temp_time") is not None
             and (now_mono - state["last_temp_time"]) > 21600
         ):
             # Same exact float value for > 6 hours while heating is active
@@ -379,7 +401,7 @@ def evaluate_zone_anomalies(
 
         # 2. Overshoot Check: Only if heating was active recently (within the last 2 ore)
         # If the heating wasn't active recently, warm room temperature is natural ambient/solar heat.
-        heated_recently = state["last_heating_time"] is not None and (now_mono - state["last_heating_time"]) < 7200
+        heated_recently = state.get("last_heating_time") is not None and (now_mono - state.get("last_heating_time", 0)) < 7200
         if heated_recently and target_temp is not None and current_temp > (float(target_temp) + 1.5):
             state["active_anomaly"] = ANOMALY_OVERSHOOT
             state["anomaly_details"] = f"Current temperature ({current_temp}°C) exceeds target ({target_temp}°C) by >1.5°C from residual heat"
@@ -387,11 +409,11 @@ def evaluate_zone_anomalies(
 
         # 3. Stuck Closed Valve: Demand == 100% for > 75 min, but temperature did not rise >= 0.2°C
         if demand >= 99.0 and boiler_on:
-            if state["high_demand_start_time"] is None:
+            if state.get("high_demand_start_time") is None:
                 state["high_demand_start_time"] = now_mono
                 state["high_demand_start_temp"] = current_temp
-            elif (now_mono - state["high_demand_start_time"]) > 4500:  # 75 minutes
-                start_t = state["high_demand_start_temp"]
+            elif (now_mono - (state.get("high_demand_start_time") or 0)) > 4500:  # 75 minutes
+                start_t = state.get("high_demand_start_temp")
                 if start_t is not None and (current_temp - start_t) < 0.2:
                     state["active_anomaly"] = ANOMALY_VALVE_STUCK_CLOSED
                     state["anomaly_details"] = f"Heating active at 100% for >75 min but temperature is not rising ({start_t}°C → {current_temp}°C)"
@@ -409,9 +431,9 @@ def evaluate_zone_anomalies(
             if allow_passive_heat:
                 # Passive heat allowed (fan coil without shut-off valve, open mezzanine, etc.)
                 state["ghost_heat_start_temp"] = None
-            elif state["ghost_heat_start_temp"] is None:
+            elif state.get("ghost_heat_start_temp") is None:
                 state["ghost_heat_start_temp"] = current_temp
-            elif (current_temp - state["ghost_heat_start_temp"]) > 0.8:
+            elif (current_temp - (state.get("ghost_heat_start_temp") or current_temp)) > 0.8:
                 state["active_anomaly"] = ANOMALY_GHOST_HEATING
                 state["anomaly_details"] = f"Temperature rose from {state['ghost_heat_start_temp']}°C to {current_temp}°C with 0% zone demand"
                 return ANOMALY_GHOST_HEATING, state["anomaly_details"]

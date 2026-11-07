@@ -141,7 +141,7 @@ class ScheduleSlotEngine:
                 hour=0, minute=0, second=0, microsecond=0
             )
 
-        slot_id = f"{day_key}_gap_{until_dt.isoformat()}"
+        slot_id = f"gap_{until_dt.isoformat()}"
         return {
             "state_type": "baseline",
             "preset": baseline_preset,
@@ -160,13 +160,18 @@ class ScheduleSlotEngine:
 
         upcoming: list[dict[str, Any]] = []
         max_days = int(horizon_hours // 24) + 2
-        for day_offset in range(0, max_days):
+        seen_keys: set[tuple] = set()
+        for day_offset in range(-1, max_days):
             target_date = now + timedelta(days=day_offset)
             d_key = SCHEDULE_DAYS[target_date.weekday()]
             blocks = days_dict.get(d_key, {}).get(climate_id, [])
             for b in blocks:
                 b_start, b_end = self.parse_block_times(b, target_date)
                 if b_end > now and b_start < horizon_end:
+                    block_key = (b_start, b_end)
+                    if block_key in seen_keys:
+                        continue
+                    seen_keys.add(block_key)
                     preset = b.get("preset", "comfort")
                     target_temp = self.resolve_preset_temp(preset, climate_id)
                     upcoming.append({

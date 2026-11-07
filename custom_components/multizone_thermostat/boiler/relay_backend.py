@@ -16,7 +16,7 @@ from homeassistant.const import (
 
 from .base import BoilerBackend
 from ..pwm_engine import PWMEngine
-from ..const import CONF_ZONE_NAME, CONF_ZONE_CLIMATES, ZONE_MODE_PRIMARY, make_zone_entity_id
+from ..const import CONF_ZONE_NAME, CONF_ZONE_CLIMATES, ZONE_MODE_PRIMARY, ZONE_MODE_SECONDARY, make_zone_entity_id
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -278,7 +278,7 @@ class RelayBoilerBackend(BoilerBackend):
             for zone in self.coordinator.zones:
                 climate_id = make_zone_entity_id(zone[CONF_ZONE_NAME])
                 mode = self.coordinator.get_zone_mode(climate_id)
-                if mode == ZONE_MODE_PRIMARY and self.coordinator.get_zone_demand(climate_id) > 0:
+                if mode in (ZONE_MODE_PRIMARY, ZONE_MODE_SECONDARY) and self.coordinator.get_zone_demand(climate_id) > 0:
                     trv_list = zone.get(CONF_ZONE_CLIMATES) or zone.get("climates") or zone.get("climate_entities") or []
                     if not trv_list:
                         # Zone has no TRVs (e.g. relay only). Heat path is fully open by default.

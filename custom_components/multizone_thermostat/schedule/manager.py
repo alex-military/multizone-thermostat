@@ -151,11 +151,7 @@ class ScheduleProfileManager:
                             return dt.astimezone(tz)
                     except Exception:
                         pass
-                if "Rome" in str(tz_name) or "CET" in str(tz_name):
-                    tz = timezone(timedelta(hours=1))
-                    if dt.tzinfo is None:
-                        return dt.replace(tzinfo=tz)
-                    return dt.astimezone(tz)
+
         try:
             return dt_util.as_local(dt)
         except Exception:
@@ -624,51 +620,53 @@ class ScheduleProfileManager:
                 upcoming = self.get_upcoming_blocks(climate_id, now, horizon_hours=12)
                 future_blocks = [b for b in upcoming if b["start_dt"] > now]
                 if future_blocks:
-                    next_b = future_blocks[0]
-                    block_start_iso = next_b["start_dt"].isoformat()
+                    smart_start_found = False
+                    for next_b in future_blocks:
+                        block_start_iso = next_b["start_dt"].isoformat()
 
-                    active_ss = self._active_smart_starts.get(climate_id)
-                    is_already_preheating = (
-                        active_ss is not None
-                        and active_ss.get("block_start") == block_start_iso
-                        and now < next_b["start_dt"]
-                    )
+                        active_ss = self._active_smart_starts.get(climate_id)
+                        is_already_preheating = (
+                            active_ss is not None
+                            and active_ss.get("block_start") == block_start_iso
+                            and now < next_b["start_dt"]
+                        )
 
-                    if is_already_preheating:
-                        self.schedule_overrides[climate_id] = float(next_b["target_temp"])
-                        self.smart_start_info[climate_id] = active_ss
-                    elif next_b["target_temp"] > slot["target_temp"]:
-                        curr_temp = self._get_zone_current_temp(climate_id)
-                        if curr_temp is not None and curr_temp < next_b["target_temp"]:
-                            heating_rate = self._get_zone_heating_rate(climate_id)
-                            hours_needed = min(
-                                MAX_SMART_START_HOURS,
-                                (next_b["target_temp"] - curr_temp) / heating_rate,
-                            )
-                            preheat_dt = next_b["start_dt"] - timedelta(hours=hours_needed)
-                            check_now = now
-                            if preheat_dt.tzinfo is not None and check_now.tzinfo is None:
-                                check_now = check_now.replace(tzinfo=preheat_dt.tzinfo)
-                            elif preheat_dt.tzinfo is None and check_now.tzinfo is not None:
-                                preheat_dt = preheat_dt.replace(tzinfo=check_now.tzinfo)
+                        if is_already_preheating:
+                            self.schedule_overrides[climate_id] = float(next_b["target_temp"])
+                            self.smart_start_info[climate_id] = active_ss
+                            smart_start_found = True
+                            break
+                        elif next_b["target_temp"] > slot["target_temp"]:
+                            curr_temp = self._get_zone_current_temp(climate_id)
+                            if curr_temp is not None and curr_temp < next_b["target_temp"]:
+                                heating_rate = self._get_zone_heating_rate(climate_id)
+                                hours_needed = min(
+                                    MAX_SMART_START_HOURS,
+                                    (next_b["target_temp"] - curr_temp) / heating_rate,
+                                )
+                                preheat_dt = next_b["start_dt"] - timedelta(hours=hours_needed)
+                                check_now = now
+                                if preheat_dt.tzinfo is not None and check_now.tzinfo is None:
+                                    check_now = check_now.replace(tzinfo=preheat_dt.tzinfo)
+                                elif preheat_dt.tzinfo is None and check_now.tzinfo is not None:
+                                    preheat_dt = preheat_dt.replace(tzinfo=check_now.tzinfo)
 
-                            if check_now >= preheat_dt:
-                                ss_info = {
-                                    "target_temp": float(next_b["target_temp"]),
-                                    "preset": next_b["preset"],
-                                    "block_start": block_start_iso,
-                                    "preheat_start": preheat_dt.isoformat(),
-                                    "heating_rate": round(heating_rate, 2),
-                                    "source": "schedule",
-                                }
-                                self.schedule_overrides[climate_id] = float(next_b["target_temp"])
-                                self.smart_start_info[climate_id] = ss_info
-                                self._active_smart_starts[climate_id] = ss_info
-                            else:
-                                self._active_smart_starts.pop(climate_id, None)
-                        else:
-                            self._active_smart_starts.pop(climate_id, None)
-                    else:
+                                if check_now >= preheat_dt:
+                                    ss_info = {
+                                        "target_temp": float(next_b["target_temp"]),
+                                        "preset": next_b["preset"],
+                                        "block_start": block_start_iso,
+                                        "preheat_start": preheat_dt.isoformat(),
+                                        "heating_rate": round(heating_rate, 2),
+                                        "source": "schedule",
+                                    }
+                                    self.schedule_overrides[climate_id] = float(next_b["target_temp"])
+                                    self.smart_start_info[climate_id] = ss_info
+                                    self._active_smart_starts[climate_id] = ss_info
+                                    smart_start_found = True
+                                    break
+
+                    if not smart_start_found:
                         self._active_smart_starts.pop(climate_id, None)
                 else:
                     self._active_smart_starts.pop(climate_id, None)

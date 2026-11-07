@@ -104,8 +104,10 @@ class MultizoneGlobalPresetSelect(RestoreEntity, SelectEntity):
 
     async def async_will_remove_from_hass(self) -> None:
         """Unregister from coordinator on removal."""
-        if hasattr(self._coordinator, "_selects"):
-            self._coordinator._selects.pop("global_preset", None)
+        for attr in ("_select_entities", "_selects"):
+            reg = getattr(self._coordinator, attr, None)
+            if isinstance(reg, dict):
+                reg.pop("global_preset", None)
 
 
 class MultizoneDemandStrategySelect(RestoreEntity, SelectEntity):
@@ -169,10 +171,10 @@ class MultizoneDemandStrategySelect(RestoreEntity, SelectEntity):
 
     async def async_will_remove_from_hass(self) -> None:
         """Unregister from coordinator on removal."""
-        if hasattr(self._coordinator, "_select_entities"):
-            self._coordinator._select_entities.pop("demand_strategy", None)
-        if hasattr(self._coordinator, "_selects"):
-            self._coordinator._selects.pop("demand_strategy", None)
+        for attr in ("_select_entities", "_selects"):
+            reg = getattr(self._coordinator, attr, None)
+            if isinstance(reg, dict):
+                reg.pop("demand_strategy", None)
 
 
 class MultizoneZoneSelect(RestoreEntity, SelectEntity):
@@ -270,8 +272,10 @@ class MultizoneZoneSelect(RestoreEntity, SelectEntity):
 
     async def async_will_remove_from_hass(self) -> None:
         """Unregister from coordinator on removal."""
-        if hasattr(self._coordinator, "_selects"):
-            self._coordinator._selects.pop(f"zone_mode_{self._climate_id}", None)
+        for attr in ("_select_entities", "_selects"):
+            reg = getattr(self._coordinator, attr, None)
+            if isinstance(reg, dict):
+                reg.pop(f"zone_mode_{self._climate_id}", None)
 
 
 class MultizoneScheduleProfileSelect(RestoreEntity, SelectEntity):
@@ -330,6 +334,8 @@ class MultizoneScheduleProfileSelect(RestoreEntity, SelectEntity):
         """Unregister from coordinator on removal."""
         if getattr(self._coordinator, "_profile_select", None) is self:
             self._coordinator._profile_select = None
-        if hasattr(self._coordinator, "_select_entities") and isinstance(self._coordinator._select_entities, dict):
-            self._coordinator._select_entities.pop("schedule_profile", None)
+        for attr in ("_select_entities", "_selects"):
+            reg = getattr(self._coordinator, attr, None)
+            if isinstance(reg, dict):
+                reg.pop("schedule_profile", None)
 

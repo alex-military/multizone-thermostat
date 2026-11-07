@@ -126,6 +126,11 @@ class StorageManager:
         # Bug 1 Fixed: Use native HA Store delay_save which guarantees flush on HA stop
         self._settings_store.async_delay_save(self._get_settings_data, 120.0)
 
+    def debounced_save_settings(self, delay: float = 60.0) -> None:
+        """Debounced save of settings/runtime timestamps (avoids SD card wear)."""
+        if hasattr(self, "_settings_store") and self._settings_store is not None:
+            self._settings_store.async_delay_save(self._get_settings_data, delay)
+
     def async_unload(self) -> None:
         """Cancel any pending tasks on unload."""
         # Note: Store handles its own shutdown flushing via HA core events.

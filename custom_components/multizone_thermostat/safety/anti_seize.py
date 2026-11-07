@@ -63,9 +63,9 @@ class AntiSeizeManager:
             self._task = self.hass.async_create_task(self.async_execute())
 
     def trigger_manually(self) -> asyncio.Task:
-        """Manually trigger anti-seize routine."""
+        """Manually trigger anti-seize routine safely without competing tasks."""
         if self._task and not self._task.done():
-            self._task.cancel()
+            return self._task
         self._task = self.hass.async_create_task(self.async_execute())
         return self._task
 
