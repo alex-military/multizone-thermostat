@@ -3416,29 +3416,33 @@ function findLovelaceConfig(el) {
 }
 
 function navigateOrFallbackModal(hostEl, targetPath, onFallback) {
+  // Normalize target paths
+  let normalizedPath = targetPath;
+  if (normalizedPath === 'schedulatore') normalizedPath = 'programmazione';
+
   const llConfig = findLovelaceConfig(hostEl);
-  let viewSlug = targetPath;
+  let viewSlug = normalizedPath;
 
   if (llConfig && Array.isArray(llConfig.views)) {
     let matchedIdx = -1;
     const matchedView = llConfig.views.find((v, idx) => {
       const p = (v.path !== undefined && v.path !== null && v.path !== '') ? String(v.path) : String(idx);
-      if (p.toLowerCase() === targetPath.toLowerCase()) {
+      if (p.toLowerCase() === normalizedPath.toLowerCase() || (normalizedPath === 'programmazione' && p.toLowerCase() === 'schedulatore')) {
         matchedIdx = idx;
         return true;
       }
       const stratType = (v.strategy && v.strategy.type) ? String(v.strategy.type) : '';
-      if (targetPath === 'programmazione' && stratType.includes('multizone-thermostat-scheduler')) {
+      if ((normalizedPath === 'programmazione' || normalizedPath === 'schedulatore') && stratType.includes('multizone-thermostat-scheduler')) {
         matchedIdx = idx;
         return true;
       }
-      if (targetPath === 'diagnostica' && stratType.includes('multizone-thermostat-diagnostics')) {
+      if (normalizedPath === 'diagnostica' && stratType.includes('multizone-thermostat-diagnostics')) {
         matchedIdx = idx;
         return true;
       }
       if (Array.isArray(v.cards)) {
         const hasCard = JSON.stringify(v.cards).includes(
-          targetPath === 'programmazione' ? 'multizone-thermostat-scheduler-card' : 'multizone-thermostat-plant-card'
+          (normalizedPath === 'programmazione' || normalizedPath === 'schedulatore') ? 'multizone-thermostat-scheduler-card' : 'multizone-thermostat-plant-card'
         );
         if (hasCard) {
           matchedIdx = idx;
@@ -3448,15 +3452,13 @@ function navigateOrFallbackModal(hostEl, targetPath, onFallback) {
       return false;
     });
 
-    if (!matchedView) {
-      if (typeof onFallback === 'function') {
-        onFallback();
-        return;
-      }
-    } else {
+    if (matchedView) {
       viewSlug = (matchedView.path !== undefined && matchedView.path !== null && matchedView.path !== '')
         ? String(matchedView.path)
         : String(matchedIdx);
+    } else if (typeof onFallback === 'function') {
+      onFallback();
+      return;
     }
   }
 
@@ -3464,12 +3466,28 @@ function navigateOrFallbackModal(hostEl, targetPath, onFallback) {
   const dashboardBase = parts.length > 0 ? `/${parts[0]}` : '/lovelace';
   const fullPath = `${dashboardBase}/${viewSlug}`;
 
+  // 1. History API & standard location-changed event
   window.history.pushState(null, '', fullPath);
   window.dispatchEvent(new CustomEvent('location-changed', {
     bubbles: true,
     composed: true,
     detail: { replace: false }
   }));
+
+  // 2. Dispatch Home Assistant native hass-navigate event
+  const navEvent = new CustomEvent('hass-navigate', {
+    detail: { path: fullPath },
+    bubbles: true,
+    composed: true
+  });
+  if (hostEl && typeof hostEl.dispatchEvent === 'function') {
+    hostEl.dispatchEvent(navEvent);
+  }
+  window.dispatchEvent(navEvent);
+}
+
+function navigateToLovelaceView(viewSlug) {
+  navigateOrFallbackModal(document.body, viewSlug);
 }
 
 /* ==================== SUMMARY NAVIGATION CARDS ==================== */
@@ -3688,9 +3706,12 @@ class MultizoneThermostatScheduleSummaryCard extends HTMLElement {
     `;
 
     const card = this.shadowRoot.getElementById('card');
-    card.addEventListener('click', () => {
-      navigateToLovelaceView('schedulatore');
-    });
+    if (card) {
+      card.addEventListener('click', () => {
+        const targetPath = (this._config && this._config.navigation_path) ? this._config.navigation_path : 'programmazione';
+        navigateOrFallbackModal(this, targetPath);
+      });
+    }
 
     this._rendered = true;
   }
@@ -3940,9 +3961,12 @@ class MultizoneThermostatHealthSummaryCard extends HTMLElement {
     `;
 
     const card = this.shadowRoot.getElementById('card');
-    card.addEventListener('click', () => {
-      navigateToLovelaceView('diagnostica');
-    });
+    if (card) {
+      card.addEventListener('click', () => {
+        const targetPath = (this._config && this._config.navigation_path) ? this._config.navigation_path : 'diagnostica';
+        navigateOrFallbackModal(this, targetPath);
+      });
+    }
 
     this._rendered = true;
   }
