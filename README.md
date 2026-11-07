@@ -147,7 +147,7 @@ Experience the diagnostic supervision and building energy calculation features d
 [![Launch Live Simulator](https://img.shields.io/badge/Launch%20Live%20Simulator-GitHub%20Pages-0ea5e9?style=for-the-badge&logo=googlechrome&logoColor=white)](https://alex-military.github.io/multizone-thermostat/)
 
 - **Live Web App**: [https://alex-military.github.io/multizone-thermostat/](https://alex-military.github.io/multizone-thermostat/)
-- **Offline / Local**: Open [`examples/diagnostics_demo.html`](examples/diagnostics_demo.html) directly in any browser.
+- **Offline / Local**: Open [`docs/index.html`](docs/index.html) directly in any browser.
 - **Multilingual Support**: Instant toggle between 🇬🇧 English, 🇮🇹 Italian, and 🇷🇺 Russian.
 
 > [!TIP]

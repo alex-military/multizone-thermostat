@@ -179,7 +179,7 @@ You can also test the full diagnostic dashboard interactively in your web browse
 [![Launch Live Simulator](https://img.shields.io/badge/Launch%20Live%20Simulator-GitHub%20Pages-0ea5e9?style=for-the-badge&logo=googlechrome&logoColor=white)](https://alex-military.github.io/multizone-thermostat/)
 
 - **Live Web App**: [https://alex-military.github.io/multizone-thermostat/](https://alex-military.github.io/multizone-thermostat/)
-- **Offline / Local**: Open [`examples/diagnostics_demo.html`](examples/diagnostics_demo.html) directly in any browser.
+- **Offline / Local**: Open [`docs/index.html`](docs/index.html) directly in any browser.
 - **Interactive Scenarios**:
   - **Normal Operation**: optimal health, low short-cycling frequency, healthy valves.
   - **High Short-Cycling Warning**: boiler cycle wear alerts and mitigation hints.

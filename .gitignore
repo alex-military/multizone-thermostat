@@ -18,3 +18,4 @@ simulate*.py
 .agents/
 reset_integration.py
 
+tests/docker_env/
