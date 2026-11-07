@@ -1,5 +1,18 @@
 # Changelog
 
+## [6.0.6] - 2026-11-07
+### Fix: Bulletproof Dashboard Navigation & Instant Fallback Modal
+- **Home Assistant Native Navigation Fix**:
+  - Eliminated premature `window.history.pushState` call prior to `hass-navigate`, which caused Home Assistant's internal router (`navigate()`) to detect `window.location.pathname === path` and abort view transitions.
+  - Directly dispatches bubbling & composed `hass-navigate` to smoothly transition to `programmazione` and `diagnostica` subviews.
+- **Fail-Safe Standalone Modal Overlay**:
+  - Implemented automatic fallback overlay (`openMzStandaloneModal`) for dashboards lacking subviews or when clicked outside the full strategy view.
+  - Seamlessly opens the Scheduler (`multizone-thermostat-scheduler-card`) or Plant Diagnostics (`multizone-thermostat-plant-card`) in an interactive modal with ESC key and backdrop dismissal.
+- **Panel View Multi-Card Conflict Resolution**:
+  - Removed strict `panel: true` constraint from auto-generated strategy views to prevent Home Assistant's `Questa vista contiene più di una scheda, ma una vista a pannello può mostrare solo una scheda` error when adding or rearranging dashboard cards.
+- **Card Synchronization**:
+  - Maintained 100% byte-for-byte SHA256 parity between `multizone-thermostat-card.js` and `multizone-thermostat-card-v24.js`.
+
 ## [6.0.5] - 2026-11-07
 ### Refactor: Modular Schedule Subsystem (SRP Architecture) & Timezone Hardening
 - **Modular Schedule Package (`custom_components/multizone_thermostat/schedule/`)**:

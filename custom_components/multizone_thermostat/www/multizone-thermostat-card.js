@@ -3401,6 +3401,97 @@ if (!customElements.get("multizone-thermostat-spacer")) {
 /* ==================== HEALTH SUMMARY CARD ==================== */
 /* ==================== SCHEDULE SUMMARY NAVIGATION BUTTON CARD ==================== */
 
+function closeMzStandaloneModal() {
+  const existing = document.getElementById('mz-standalone-nav-overlay');
+  if (existing) {
+    existing.remove();
+  }
+}
+
+function openMzStandaloneModal(type, hass) {
+  closeMzStandaloneModal();
+  const overlay = document.createElement('div');
+  overlay.id = 'mz-standalone-nav-overlay';
+  overlay.style.cssText = [
+    'position: fixed',
+    'inset: 0',
+    'z-index: 99999',
+    'background: rgba(10, 15, 29, 0.88)',
+    'backdrop-filter: blur(12px)',
+    '-webkit-backdrop-filter: blur(12px)',
+    'overflow-y: auto',
+    'padding: 24px 16px',
+    'box-sizing: border-box',
+    'display: flex',
+    'flex-direction: column',
+    'align-items: center'
+  ].join(';');
+
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = 'width: 100%; max-width: 1200px; margin: 0 auto; box-sizing: border-box;';
+
+  const topBar = document.createElement('div');
+  topBar.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding: 0 4px;';
+
+  const titleEl = document.createElement('div');
+  titleEl.style.cssText = 'font-size: 1.2rem; font-weight: 700; color: #ffffff; display: flex; align-items: center; gap: 10px;';
+  titleEl.innerHTML = type === 'scheduler'
+    ? '<ha-icon icon="mdi:calendar-clock" style="color:#38bdf8;"></ha-icon> <span>Programmazione Fasce Orarie</span>'
+    : '<ha-icon icon="mdi:chart-box-outline" style="color:#10b981;"></ha-icon> <span>Diagnostica & Impianto</span>';
+
+  const closeBtn = document.createElement('button');
+  closeBtn.innerHTML = '✕ Chiudi';
+  closeBtn.style.cssText = [
+    'background: rgba(255, 255, 255, 0.12)',
+    'color: #ffffff',
+    'border: 1px solid rgba(255, 255, 255, 0.25)',
+    'border-radius: 10px',
+    'padding: 8px 18px',
+    'font-size: 0.95rem',
+    'font-weight: 600',
+    'cursor: pointer',
+    'transition: background 0.2s ease'
+  ].join(';');
+  closeBtn.onmouseover = () => { closeBtn.style.background = 'rgba(255, 255, 255, 0.22)'; };
+  closeBtn.onmouseout = () => { closeBtn.style.background = 'rgba(255, 255, 255, 0.12)'; };
+
+  const dismissModal = () => {
+    closeMzStandaloneModal();
+    window.removeEventListener('keydown', keyHandler);
+  };
+
+  const keyHandler = (e) => {
+    if (e.key === 'Escape') dismissModal();
+  };
+  window.addEventListener('keydown', keyHandler);
+  closeBtn.addEventListener('click', dismissModal);
+
+  topBar.appendChild(titleEl);
+  topBar.appendChild(closeBtn);
+  wrapper.appendChild(topBar);
+
+  let innerCard;
+  if (type === 'scheduler') {
+    innerCard = document.createElement('multizone-thermostat-scheduler-card');
+  } else {
+    innerCard = document.createElement('multizone-thermostat-plant-card');
+  }
+  if (typeof innerCard.setConfig === 'function') {
+    innerCard.setConfig({ border_radius: '16px' });
+  }
+  if (hass) {
+    innerCard.hass = hass;
+  }
+  wrapper.appendChild(innerCard);
+  overlay.appendChild(wrapper);
+
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) dismissModal();
+  });
+
+  document.body.appendChild(overlay);
+}
+
 function findLovelaceConfig(el) {
   let node = el;
   while (node) {
@@ -3412,6 +3503,14 @@ function findLovelaceConfig(el) {
     }
     node = node.parentNode || node.host || null;
   }
+  try {
+    const ha = document.querySelector('home-assistant');
+    const main = ha && ha.shadowRoot && ha.shadowRoot.querySelector('home-assistant-main');
+    const panel = main && main.shadowRoot && main.shadowRoot.querySelector('ha-panel-lovelace');
+    if (panel && panel.lovelace && panel.lovelace.config && Array.isArray(panel.lovelace.config.views)) {
+      return panel.lovelace.config;
+    }
+  } catch (e) {}
   return null;
 }
 
@@ -3420,8 +3519,23 @@ function navigateOrFallbackModal(hostEl, targetPath, onFallback) {
   let normalizedPath = targetPath;
   if (normalizedPath === 'schedulatore') normalizedPath = 'programmazione';
 
+  // If explicit absolute path, navigate directly
+  if (typeof normalizedPath === 'string' && normalizedPath.startsWith('/')) {
+    const navEvent = new CustomEvent('hass-navigate', {
+      detail: { path: normalizedPath },
+      bubbles: true,
+      composed: true
+    });
+    if (hostEl && typeof hostEl.dispatchEvent === 'function') {
+      hostEl.dispatchEvent(navEvent);
+    }
+    window.dispatchEvent(navEvent);
+    return;
+  }
+
   const llConfig = findLovelaceConfig(hostEl);
   let viewSlug = normalizedPath;
+  let hasMatchingView = false;
 
   if (llConfig && Array.isArray(llConfig.views)) {
     let matchedIdx = -1;
@@ -3453,12 +3567,16 @@ function navigateOrFallbackModal(hostEl, targetPath, onFallback) {
     });
 
     if (matchedView) {
+      hasMatchingView = true;
       viewSlug = (matchedView.path !== undefined && matchedView.path !== null && matchedView.path !== '')
         ? String(matchedView.path)
         : String(matchedIdx);
-    } else if (typeof onFallback === 'function') {
-      onFallback();
-      return;
+    } else {
+      // No matching view exists in Lovelace config: open fallback modal immediately
+      if (typeof onFallback === 'function') {
+        onFallback();
+        return;
+      }
     }
   }
 
@@ -3466,15 +3584,7 @@ function navigateOrFallbackModal(hostEl, targetPath, onFallback) {
   const dashboardBase = parts.length > 0 ? `/${parts[0]}` : '/lovelace';
   const fullPath = `${dashboardBase}/${viewSlug}`;
 
-  // 1. History API & standard location-changed event
-  window.history.pushState(null, '', fullPath);
-  window.dispatchEvent(new CustomEvent('location-changed', {
-    bubbles: true,
-    composed: true,
-    detail: { replace: false }
-  }));
-
-  // 2. Dispatch Home Assistant native hass-navigate event
+  // Dispatch Home Assistant native hass-navigate event directly (without prior pushState)
   const navEvent = new CustomEvent('hass-navigate', {
     detail: { path: fullPath },
     bubbles: true,
@@ -3484,10 +3594,21 @@ function navigateOrFallbackModal(hostEl, targetPath, onFallback) {
     hostEl.dispatchEvent(navEvent);
   }
   window.dispatchEvent(navEvent);
+
+  // Safety fallback: if URL has not changed after 150ms and fallback is defined, trigger fallback modal
+  const initialPath = window.location.pathname;
+  setTimeout(() => {
+    if (window.location.pathname === initialPath && window.location.pathname !== fullPath) {
+      if (typeof onFallback === 'function') {
+        onFallback();
+      }
+    }
+  }, 150);
 }
 
 function navigateToLovelaceView(viewSlug) {
-  navigateOrFallbackModal(document.body, viewSlug);
+  const type = (viewSlug === 'programmazione' || viewSlug === 'schedulatore') ? 'scheduler' : 'diagnostics';
+  navigateOrFallbackModal(document.body, viewSlug, () => openMzStandaloneModal(type, null));
 }
 
 /* ==================== SUMMARY NAVIGATION CARDS ==================== */
@@ -3709,7 +3830,7 @@ class MultizoneThermostatScheduleSummaryCard extends HTMLElement {
     if (card) {
       card.addEventListener('click', () => {
         const targetPath = (this._config && this._config.navigation_path) ? this._config.navigation_path : 'programmazione';
-        navigateOrFallbackModal(this, targetPath);
+        navigateOrFallbackModal(this, targetPath, () => openMzStandaloneModal('scheduler', this._hass));
       });
     }
 
@@ -3964,7 +4085,7 @@ class MultizoneThermostatHealthSummaryCard extends HTMLElement {
     if (card) {
       card.addEventListener('click', () => {
         const targetPath = (this._config && this._config.navigation_path) ? this._config.navigation_path : 'diagnostica';
-        navigateOrFallbackModal(this, targetPath);
+        navigateOrFallbackModal(this, targetPath, () => openMzStandaloneModal('diagnostics', this._hass));
       });
     }
 
@@ -4067,7 +4188,10 @@ class MultizoneThermostatNavCard extends HTMLElement {
 
     this._schedCard = document.createElement('multizone-thermostat-schedule-summary-card');
     if (typeof this._schedCard.setConfig === 'function') {
-      this._schedCard.setConfig({ border_radius: radius });
+      this._schedCard.setConfig({
+        border_radius: radius,
+        navigation_path: (this._config && (this._config.scheduler_path || this._config.navigation_path)) || 'programmazione'
+      });
     }
     if (this._hass) {
       this._schedCard.hass = this._hass;
@@ -4075,7 +4199,10 @@ class MultizoneThermostatNavCard extends HTMLElement {
 
     this._healthCard = document.createElement('multizone-thermostat-health-summary-card');
     if (typeof this._healthCard.setConfig === 'function') {
-      this._healthCard.setConfig({ border_radius: radius });
+      this._healthCard.setConfig({
+        border_radius: radius,
+        navigation_path: (this._config && (this._config.diagnostics_path || this._config.navigation_path)) || 'diagnostica'
+      });
     }
     if (this._hass) {
       this._healthCard.hass = this._hass;
@@ -8319,7 +8446,6 @@ class MultizoneThermostatDashboardStrategy extends HTMLElement {
           title: "Termostati",
           path: "home",
           icon: "mdi:radiator",
-          panel: true,
           cards: view.cards,
         },
         {
@@ -8327,7 +8453,6 @@ class MultizoneThermostatDashboardStrategy extends HTMLElement {
           path: "programmazione",
           icon: "mdi:calendar-clock",
           subview: true,
-          panel: true,
           cards: schedView.cards,
         },
         {
@@ -8335,7 +8460,6 @@ class MultizoneThermostatDashboardStrategy extends HTMLElement {
           path: "diagnostica",
           icon: "mdi:chart-box-outline",
           subview: true,
-          panel: true,
           cards: diagView.cards,
         }
       ]
