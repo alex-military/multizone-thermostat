@@ -1381,11 +1381,13 @@ class MultizoneThermostatDialCard extends HTMLElement {
   connectedCallback() {
     this._styleListener = (e) => {
       const newStyle = e.detail?.style || 'luxury';
-      if ((this._config?.card_style || this._config?.style) !== newStyle) {
-        if (this._config) this._config.card_style = newStyle;
-        this.renderStructure();
-        this.updateCard();
+      this._effectiveStyle = newStyle;
+      if (this._config) this._config.card_style = newStyle;
+      if (newStyle === 'classic' && !this._helpers) {
+        this.loadHelpers();
       }
+      this.renderStructure();
+      this.updateCard();
     };
     window.addEventListener('mz-style-changed', this._styleListener);
   }
@@ -1396,16 +1398,23 @@ class MultizoneThermostatDialCard extends HTMLElement {
     }
   }
 
+  getEffectiveStyle() {
+    if (this._effectiveStyle) return this._effectiveStyle;
+    const saved = localStorage.getItem('mz_card_style');
+    if (saved) return saved;
+    if (this._config && (this._config.card_style || this._config.style)) {
+      return this._config.card_style || this._config.style;
+    }
+    return 'luxury';
+  }
+
   setConfig(config) {
     if (!config || !config.entity) {
       throw new Error("Specificare un termostato (climate entity)");
     }
-    const prevStyle = this._config ? (this._config.card_style || this._config.style) : null;
+    const prevStyle = this.getEffectiveStyle();
     this._config = Object.assign({}, config);
-    if (!this._config.card_style && !this._config.style) {
-      this._config.card_style = localStorage.getItem('mz_card_style') || "luxury";
-    }
-    const newStyle = this._config.card_style || this._config.style || "luxury";
+    const newStyle = this.getEffectiveStyle();
 
     if (newStyle === "classic" && !this._helpers) {
       this.loadHelpers();
@@ -1420,8 +1429,7 @@ class MultizoneThermostatDialCard extends HTMLElement {
   async loadHelpers() {
     try {
       this._helpers = await window.loadCardHelpers();
-      const style = this._config.card_style || this._config.style || "luxury";
-      if (style === "classic") {
+      if (this.getEffectiveStyle() === "classic") {
         this.createChildCard();
       }
     } catch (err) {
@@ -1466,7 +1474,7 @@ class MultizoneThermostatDialCard extends HTMLElement {
 
   renderStructure() {
     const radius = (this._config && this._config.border_radius) ? this._config.border_radius : '20px';
-    const isClassic = (this._config && (this._config.card_style === "classic" || this._config.style === "classic"));
+    const isClassic = (this.getEffectiveStyle() === "classic");
 
     if (isClassic) {
       this.renderClassicStructure(radius);
@@ -1573,10 +1581,17 @@ class MultizoneThermostatDialCard extends HTMLElement {
     `;
 
     this.setupClassicEventListeners();
-    if (!this._childCard && this._helpers) {
-      this.createChildCard();
-    } else if (!this._helpers) {
-      this.loadHelpers();
+    const body = this.shadowRoot.querySelector('#card-body');
+    if (body) {
+      body.innerHTML = '';
+      if (this._childCard) {
+        if (this._hass) this._childCard.hass = this._hass;
+        body.appendChild(this._childCard);
+      } else if (this._helpers) {
+        this.createChildCard();
+      } else {
+        this.loadHelpers();
+      }
     }
   }
 
@@ -2222,7 +2237,7 @@ class MultizoneThermostatDialCard extends HTMLElement {
     }
 
     // Classic style handles inner HA child card
-    const isClassic = (this._config.card_style === "classic" || this._config.style === "classic");
+    const isClassic = (this.getEffectiveStyle() === "classic");
     if (isClassic) {
       if (this._childCard) {
         this._childCard.hass = this._hass;
@@ -3725,6 +3740,10 @@ class MultizoneThermostatResponsiveGrid extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
+    const switcher = this.shadowRoot.querySelector('multizone-thermostat-style-switcher');
+    if (switcher) {
+      try { switcher.hass = hass; } catch (e) {}
+    }
     if (this._cardElements && this._cardElements.length > 0) {
       for (const el of this._cardElements) {
         try {
@@ -3744,6 +3763,7 @@ class MultizoneThermostatResponsiveGrid extends HTMLElement {
           display: block;
           width: 100%;
           box-sizing: border-box;
+          position: relative;
         }
         .responsive-grid {
           display: grid;
@@ -3766,6 +3786,7 @@ class MultizoneThermostatResponsiveGrid extends HTMLElement {
         }
       </style>
       <div class="responsive-grid" id="grid"></div>
+      <multizone-thermostat-style-switcher></multizone-thermostat-style-switcher>
     `;
 
     const grid = this.shadowRoot.getElementById('grid');
@@ -7367,27 +7388,65 @@ if (!customElements.get("multizone-thermostat-scheduler-card")) {
 }
 
 /* ==================== FLOATING STYLE SWITCHER WITH POPUP MODAL ==================== */
-function applyHeaderVisibility(hide) {
-  let styleTag = document.getElementById('mz-hide-header-style');
-  if (hide) {
-    if (!styleTag) {
-      styleTag = document.createElement('style');
-      styleTag.id = 'mz-hide-header-style';
-      styleTag.textContent = `
-        app-header, .header, ha-top-app-bar {
-          display: none !important;
-        }
-        hui-root, #view, #columns {
-          padding-top: 0 !important;
-          margin-top: 0 !important;
-        }
-      `;
-      document.head.appendChild(styleTag);
+function setHeaderVisibility(hide, retryCount = 0) {
+  try {
+    // 1. Document head global fallback
+    let docStyle = document.getElementById('mz-header-hide-style-global');
+    if (hide) {
+      if (!docStyle) {
+        docStyle = document.createElement('style');
+        docStyle.id = 'mz-header-hide-style-global';
+        docStyle.textContent = `
+          app-header, .header, ha-top-app-bar, ha-top-app-bar-fixed, ha-tabs {
+            display: none !important;
+          }
+          #view, #columns, hui-root {
+            padding-top: 0 !important;
+            margin-top: 0 !important;
+          }
+        `;
+        document.head.appendChild(docStyle);
+      }
+    } else {
+      if (docStyle) docStyle.remove();
     }
-  } else {
-    if (styleTag && styleTag.parentNode) {
-      styleTag.parentNode.removeChild(styleTag);
+
+    // 2. Piercing Lovelace hui-root Shadow DOM
+    const ha = document.querySelector('home-assistant');
+    const main = ha?.shadowRoot?.querySelector('home-assistant-main');
+    const lovelace = main?.shadowRoot?.querySelector('ha-panel-lovelace');
+    const huiRoot = lovelace?.shadowRoot?.querySelector('hui-root');
+    
+    if (!huiRoot || !huiRoot.shadowRoot) {
+      if (retryCount < 10) {
+        setTimeout(() => setHeaderVisibility(hide, retryCount + 1), 300);
+      }
+      return;
     }
+
+    let style = huiRoot.shadowRoot.querySelector('#mz-header-hide-style');
+    if (hide) {
+      if (!style) {
+        style = document.createElement('style');
+        style.id = 'mz-header-hide-style';
+        style.textContent = `
+          .header, app-header, ha-top-app-bar, ha-top-app-bar-fixed, ha-tabs {
+            display: none !important;
+          }
+          #view, #columns {
+            padding-top: 0 !important;
+            margin-top: 0 !important;
+          }
+        `;
+        huiRoot.shadowRoot.appendChild(style);
+      }
+    } else {
+      if (style) {
+        style.remove();
+      }
+    }
+  } catch (e) {
+    console.warn("Could not toggle header visibility:", e);
   }
 }
 
@@ -7408,9 +7467,8 @@ class MultizoneThermostatStyleSwitcher extends HTMLElement {
   }
 
   connectedCallback() {
-    // Apply header visibility on connect
     const shouldHide = localStorage.getItem('mz_hide_header') === 'true';
-    applyHeaderVisibility(shouldHide);
+    setHeaderVisibility(shouldHide);
 
     this._styleListener = (e) => {
       this.render();
@@ -7441,7 +7499,7 @@ class MultizoneThermostatStyleSwitcher extends HTMLElement {
 
   toggleHeader(hide) {
     localStorage.setItem('mz_hide_header', hide ? 'true' : 'false');
-    applyHeaderVisibility(hide);
+    setHeaderVisibility(hide);
     this.render();
   }
 
@@ -7483,26 +7541,26 @@ class MultizoneThermostatStyleSwitcher extends HTMLElement {
           transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
         }
         
-        /* Responsive FAB button style based on active mode */
+        /* Responsive styling: Luxury vs Classic */
         .fab-luxury {
           background: rgba(20, 27, 41, 0.85) !important;
           backdrop-filter: blur(16px) !important;
           -webkit-backdrop-filter: blur(16px) !important;
-          border: 1px solid rgba(56, 189, 248, 0.35) !important;
+          border: 1.5px solid rgba(56, 189, 248, 0.4) !important;
           box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6), 0 0 15px rgba(56, 189, 248, 0.25) !important;
           color: #38bdf8 !important;
         }
         .fab-luxury:hover {
           transform: scale(1.1) !important;
           background: rgba(30, 41, 59, 0.95) !important;
-          border-color: rgba(56, 189, 248, 0.6) !important;
-          box-shadow: 0 12px 35px rgba(0, 0, 0, 0.8), 0 0 25px rgba(56, 189, 248, 0.45) !important;
+          border-color: rgba(56, 189, 248, 0.7) !important;
+          box-shadow: 0 12px 35px rgba(0, 0, 0, 0.8), 0 0 25px rgba(56, 189, 248, 0.5) !important;
         }
         
         .fab-classic {
-          background: var(--card-background-color, #263238) !important;
-          border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.15)) !important;
-          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
+          background: var(--card-background-color, #202b38) !important;
+          border: 1.5px solid var(--divider-color, rgba(255, 255, 255, 0.2)) !important;
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5) !important;
           color: var(--primary-text-color, #ffffff) !important;
         }
         .fab-classic:hover {
@@ -7524,7 +7582,7 @@ class MultizoneThermostatStyleSwitcher extends HTMLElement {
           position: fixed;
           inset: 0;
           z-index: 10000;
-          background: rgba(0, 0, 0, 0.7);
+          background: rgba(0, 0, 0, 0.75);
           backdrop-filter: blur(8px);
           -webkit-backdrop-filter: blur(8px);
           display: ${this._isOpen ? 'flex' : 'none'};
@@ -7539,7 +7597,7 @@ class MultizoneThermostatStyleSwitcher extends HTMLElement {
           to { opacity: 1; }
         }
         .modal-card {
-          background: linear-gradient(135deg, rgba(20, 27, 41, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%);
+          background: linear-gradient(135deg, rgba(20, 27, 41, 0.96) 0%, rgba(15, 23, 42, 0.99) 100%);
           border: 1px solid rgba(255, 255, 255, 0.12);
           border-radius: 24px;
           box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.9), 0 0 30px rgba(56, 189, 248, 0.2);
@@ -7705,7 +7763,6 @@ class MultizoneThermostatStyleSwitcher extends HTMLElement {
           color: #94a3b8;
           line-height: 1.3;
         }
-        /* Switch */
         .switch {
           position: relative;
           display: inline-block;
@@ -8021,22 +8078,6 @@ class MultizoneThermostatDashboardStrategy extends HTMLElement {
       card_style: cardStyle,
       border_radius: "20px",
     }));
-
-    if (columns === 1) {
-      return {
-        cards: [
-          {
-            type: "vertical-stack",
-            cards: topRowCards.concat(zoneCards),
-          }
-        ]
-      };
-    }
-
-    // Append style switcher into card collection so root cards.length is strictly 1 (panel: true compliant)
-    topRowCards.push({
-      type: "custom:multizone-thermostat-style-switcher"
-    });
 
     if (columns === 1) {
       return {
