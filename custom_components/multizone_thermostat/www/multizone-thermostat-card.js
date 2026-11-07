@@ -1,6 +1,13 @@
 // window.customCards definition to register the cards in Lovelace UI card picker
 window.customCards = window.customCards || [];
 window.customCards.push({
+  type: "multizone-thermostat-style-switcher",
+  name: "Multizone Thermostat Style Switcher (Floating Button)",
+  description: "Floating action button that opens an interactive modal to switch between Luxury and Classic styles.",
+  preview: true,
+});
+
+window.customCards.push({
   type: "multizone-thermostat-button-card",
   name: "Multizone Thermostat Card (Buttons)",
   description: "A card to control a heating zone using simple buttons and a bypass switch.",
@@ -1371,12 +1378,33 @@ class MultizoneThermostatDialCard extends HTMLElement {
     this.updateCard();
   }
 
+  connectedCallback() {
+    this._styleListener = (e) => {
+      const newStyle = e.detail?.style || 'luxury';
+      if ((this._config?.card_style || this._config?.style) !== newStyle) {
+        if (this._config) this._config.card_style = newStyle;
+        this.renderStructure();
+        this.updateCard();
+      }
+    };
+    window.addEventListener('mz-style-changed', this._styleListener);
+  }
+
+  disconnectedCallback() {
+    if (this._styleListener) {
+      window.removeEventListener('mz-style-changed', this._styleListener);
+    }
+  }
+
   setConfig(config) {
     if (!config || !config.entity) {
       throw new Error("Specificare un termostato (climate entity)");
     }
     const prevStyle = this._config ? (this._config.card_style || this._config.style) : null;
     this._config = Object.assign({}, config);
+    if (!this._config.card_style && !this._config.style) {
+      this._config.card_style = localStorage.getItem('mz_card_style') || "luxury";
+    }
     const newStyle = this._config.card_style || this._config.style || "luxury";
 
     if (newStyle === "classic" && !this._helpers) {
@@ -7338,6 +7366,300 @@ if (!customElements.get("multizone-thermostat-scheduler-card")) {
   customElements.define("multizone-thermostat-scheduler-card", MultizoneThermostatSchedulerCard);
 }
 
+/* ==================== FLOATING STYLE SWITCHER WITH POPUP MODAL ==================== */
+class MultizoneThermostatStyleSwitcher extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: 'open' });
+    this._isOpen = false;
+  }
+
+  setConfig(config) {
+    this._config = Object.assign({}, config || {});
+    this.render();
+  }
+
+  getCardSize() {
+    return 0;
+  }
+
+  connectedCallback() {
+    this.render();
+  }
+
+  getCurrentStyle() {
+    return localStorage.getItem('mz_card_style') || 'luxury';
+  }
+
+  setStyle(style) {
+    localStorage.setItem('mz_card_style', style);
+    window.dispatchEvent(new CustomEvent('mz-style-changed', { detail: { style } }));
+    this.closeModal();
+  }
+
+  openModal() {
+    this._isOpen = true;
+    this.render();
+  }
+
+  closeModal() {
+    this._isOpen = false;
+    this.render();
+  }
+
+  render() {
+    const currentStyle = this.getCurrentStyle();
+    const bottom = this._config?.bottom || '2.5vh';
+    const right = this._config?.right || '2.5vh';
+    const icon = this._config?.icon || 'mdi:palette-outline';
+
+    this.shadowRoot.innerHTML = `
+      <style>
+        :host {
+          display: block;
+        }
+        .fab-btn {
+          position: fixed !important;
+          bottom: ${bottom} !important;
+          right: ${right} !important;
+          width: 52px !important;
+          height: 52px !important;
+          border-radius: 50% !important;
+          background: rgba(20, 27, 41, 0.85) !important;
+          backdrop-filter: blur(16px) !important;
+          -webkit-backdrop-filter: blur(16px) !important;
+          border: 1px solid rgba(255, 255, 255, 0.18) !important;
+          box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6), 0 0 15px rgba(56, 189, 248, 0.25) !important;
+          z-index: 9999 !important;
+          display: flex !important;
+          justify-content: center !important;
+          align-items: center !important;
+          cursor: pointer !important;
+          transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+          color: #38bdf8 !important;
+        }
+        .fab-btn:hover {
+          transform: scale(1.1) !important;
+          background: rgba(30, 41, 59, 0.95) !important;
+          border-color: rgba(56, 189, 248, 0.5) !important;
+          box-shadow: 0 12px 35px rgba(0, 0, 0, 0.8), 0 0 25px rgba(56, 189, 248, 0.45) !important;
+        }
+        .fab-btn:active {
+          transform: scale(0.95) !important;
+        }
+        .fab-btn ha-icon {
+          --mdc-icon-size: 26px;
+          color: inherit;
+        }
+
+        /* Modal Overlay */
+        .modal-overlay {
+          position: fixed;
+          inset: 0;
+          z-index: 10000;
+          background: rgba(0, 0, 0, 0.7);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+          display: ${this._isOpen ? 'flex' : 'none'};
+          align-items: center;
+          justify-content: center;
+          padding: 16px;
+          box-sizing: border-box;
+          animation: fadeIn 0.2s ease;
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        .modal-card {
+          background: linear-gradient(135deg, rgba(20, 27, 41, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          border-radius: 24px;
+          box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.9), 0 0 30px rgba(56, 189, 248, 0.2);
+          width: 100%;
+          max-width: 440px;
+          overflow: hidden;
+          animation: popIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        @keyframes popIn {
+          from { transform: scale(0.92); opacity: 0; }
+          to { transform: scale(1); opacity: 1; }
+        }
+        .modal-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 18px 20px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .modal-title {
+          font-size: 16px;
+          font-weight: 800;
+          color: #ffffff;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .close-btn {
+          background: rgba(255, 255, 255, 0.06);
+          border: none;
+          color: #94a3b8;
+          width: 30px;
+          height: 30px;
+          border-radius: 50%;
+          cursor: pointer;
+          font-size: 16px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s ease;
+        }
+        .close-btn:hover {
+          background: rgba(255, 255, 255, 0.15);
+          color: #ffffff;
+        }
+        .modal-body {
+          padding: 20px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+        .option-card {
+          display: flex;
+          align-items: center;
+          padding: 14px 16px;
+          border-radius: 16px;
+          background: rgba(255, 255, 255, 0.03);
+          border: 1.5px solid rgba(255, 255, 255, 0.08);
+          cursor: pointer;
+          gap: 14px;
+          transition: all 0.2s ease;
+        }
+        .option-card:hover {
+          background: rgba(255, 255, 255, 0.06);
+          border-color: rgba(255, 255, 255, 0.18);
+          transform: translateY(-1px);
+        }
+        .option-card.active {
+          background: rgba(14, 165, 233, 0.15);
+          border-color: #38bdf8;
+          box-shadow: 0 0 20px rgba(14, 165, 233, 0.25);
+        }
+        .option-icon {
+          width: 44px;
+          height: 44px;
+          border-radius: 12px;
+          background: rgba(255, 255, 255, 0.06);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 22px;
+          flex-shrink: 0;
+        }
+        .option-card.active .option-icon {
+          background: rgba(14, 165, 233, 0.25);
+          color: #38bdf8;
+        }
+        .option-details {
+          flex: 1;
+        }
+        .option-name {
+          font-size: 14px;
+          font-weight: 700;
+          color: #ffffff;
+          margin-bottom: 2px;
+        }
+        .option-desc {
+          font-size: 11px;
+          color: #94a3b8;
+          line-height: 1.3;
+        }
+        .radio-dot {
+          width: 20px;
+          height: 20px;
+          border-radius: 50%;
+          border: 2px solid rgba(255, 255, 255, 0.2);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+        .option-card.active .radio-dot {
+          border-color: #38bdf8;
+          background: #38bdf8;
+        }
+        .radio-dot::after {
+          content: '';
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: #ffffff;
+          display: none;
+        }
+        .option-card.active .radio-dot::after {
+          display: block;
+        }
+      </style>
+
+      <div class="fab-btn" id="fab-btn" title="Personalizza Grafica">
+        <ha-icon icon="${icon}"></ha-icon>
+      </div>
+
+      <div class="modal-overlay" id="modal-overlay">
+        <div class="modal-card">
+          <div class="modal-header">
+            <div class="modal-title">
+              <span>🎨</span> Stile Grafico Termostati
+            </div>
+            <button class="close-btn" id="close-btn">✕</button>
+          </div>
+          <div class="modal-body">
+            <div class="option-card ${currentStyle === 'luxury' ? 'active' : ''}" id="opt-luxury">
+              <div class="option-icon">💎</div>
+              <div class="option-details">
+                <div class="option-name">Luxury Vector Arc (Nuovo)</div>
+                <div class="option-desc">Design moderno con arco vettoriale a 270°, regolazione touch e tema glassmorphic.</div>
+              </div>
+              <div class="radio-dot"></div>
+            </div>
+
+            <div class="option-card ${currentStyle === 'classic' ? 'active' : ''}" id="opt-classic">
+              <div class="option-icon">🏛️</div>
+              <div class="option-details">
+                <div class="option-name">Standard Home Assistant (Classico)</div>
+                <div class="option-desc">Manopola circolare standard originale di Home Assistant.</div>
+              </div>
+              <div class="radio-dot"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const fab = this.shadowRoot.querySelector('#fab-btn');
+    if (fab) fab.addEventListener('click', () => this.openModal());
+
+    const closeBtn = this.shadowRoot.querySelector('#close-btn');
+    if (closeBtn) closeBtn.addEventListener('click', () => this.closeModal());
+
+    const overlay = this.shadowRoot.querySelector('#modal-overlay');
+    if (overlay) overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) this.closeModal();
+    });
+
+    const optLuxury = this.shadowRoot.querySelector('#opt-luxury');
+    if (optLuxury) optLuxury.addEventListener('click', () => this.setStyle('luxury'));
+
+    const optClassic = this.shadowRoot.querySelector('#opt-classic');
+    if (optClassic) optClassic.addEventListener('click', () => this.setStyle('classic'));
+  }
+}
+
+if (!customElements.get("multizone-thermostat-style-switcher")) {
+  customElements.define("multizone-thermostat-style-switcher", MultizoneThermostatStyleSwitcher);
+}
+
+
 class MultizoneThermostatDashboardStrategy extends HTMLElement {
   static async generateDashboard(info) {
     const view = await this.generateView(info);
@@ -7542,6 +7864,9 @@ class MultizoneThermostatDashboardStrategy extends HTMLElement {
 
     return {
       cards: [
+        {
+          type: "custom:multizone-thermostat-style-switcher"
+        },
         {
           type: "custom:multizone-thermostat-responsive-grid",
           columns: columns,
