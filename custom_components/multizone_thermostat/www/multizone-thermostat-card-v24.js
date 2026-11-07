@@ -1496,11 +1496,11 @@ class MultizoneThermostatDialCard extends HTMLElement {
           position: relative;
           overflow: hidden !important;
           border-radius: ${radius} !important;
-          background: linear-gradient(135deg, rgba(20, 27, 41, 0.88) 0%, rgba(15, 23, 42, 0.94) 100%) !important;
-          backdrop-filter: blur(20px) !important;
-          -webkit-backdrop-filter: blur(20px) !important;
-          border: 1px solid rgba(255, 255, 255, 0.08) !important;
-          box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+          background: var(--ha-card-background, var(--card-background-color, #1c1c1e)) !important;
+          border: var(--ha-card-border-width, 1px) solid var(--ha-card-border-color, var(--divider-color, rgba(255, 255, 255, 0.12))) !important;
+          box-shadow: var(--ha-card-box-shadow, 0 2px 8px rgba(0, 0, 0, 0.2)) !important;
+          backdrop-filter: none !important;
+          -webkit-backdrop-filter: none !important;
           transition: all 0.3s ease;
           display: flex;
           flex-direction: column;
@@ -1516,15 +1516,15 @@ class MultizoneThermostatDialCard extends HTMLElement {
         }
         .title {
           font-size: 16px;
-          font-weight: 800;
-          color: #ffffff;
+          font-weight: 700;
+          color: var(--primary-text-color, #ffffff);
         }
         .segmented-control {
           display: flex;
           align-items: center;
-          background: rgba(15, 23, 42, 0.85);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          border-radius: 12px;
+          background: var(--card-background-color, #202b38);
+          border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.15));
+          border-radius: 10px;
           padding: 2px;
           gap: 2px;
         }
@@ -2513,12 +2513,34 @@ class MultizoneThermostatCardEditor extends HTMLElement {
   }
 }
 
+function getActiveMzCardStyle() {
+  return localStorage.getItem('mz_card_style') || 'luxury';
+}
+
 /* ==================== STATUS (BUTTON-STYLE MASTER SWITCH) CARD CLASS ==================== */
 /* ==================== MULTIZONE STATUS CARD ==================== */
 class MultizoneThermostatStatusCard extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
+  }
+
+  connectedCallback() {
+    this._styleListener = () => {
+      this.renderStructure();
+      this.updateCard();
+    };
+    window.addEventListener('mz-style-changed', this._styleListener);
+  }
+
+  disconnectedCallback() {
+    if (this._styleListener) {
+      window.removeEventListener('mz-style-changed', this._styleListener);
+    }
+  }
+
+  getEffectiveStyle() {
+    return getActiveMzCardStyle();
   }
 
   set hass(hass) {
@@ -2543,119 +2565,227 @@ class MultizoneThermostatStatusCard extends HTMLElement {
     const style = document.createElement('style');
 
     const radius = (this._config && this._config.border_radius) ? this._config.border_radius : '20px';
+    const isClassic = (this.getEffectiveStyle() === 'classic');
 
-    style.textContent = `
-      ha-card {
-        padding: 18px 20px;
-        border-radius: ${radius} !important;
-        overflow: hidden !important;
-        color: white;
-        background: linear-gradient(135deg, rgba(20, 27, 41, 0.88) 0%, rgba(15, 23, 42, 0.94) 100%) !important;
-        backdrop-filter: blur(20px) !important;
-        -webkit-backdrop-filter: blur(20px) !important;
-        border: 1px solid rgba(255, 255, 255, 0.08) !important;
-        box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
-        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        min-height: 90px;
-        position: relative;
-        box-sizing: border-box;
-      }
-      ha-card:hover {
-        transform: translateY(-2px);
-        border-color: rgba(255, 255, 255, 0.16) !important;
-        box-shadow: 0 16px 40px -10px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
-      }
-      ha-card:active {
-        transform: translateY(0);
-      }
-      .card-content {
-        display: flex;
-        align-items: center;
-        width: 100%;
-        gap: 16px;
-        pointer-events: none;
-      }
-      .icon-wrap {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 58px;
-        height: 58px;
-        border-radius: 18px;
-        background: rgba(255, 255, 255, 0.06);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        flex-shrink: 0;
-        transition: transform 0.2s ease, background 0.3s ease, box-shadow 0.3s ease;
-      }
-      ha-card:hover .icon-wrap {
-        transform: scale(1.08);
-      }
-      .icon-wrap ha-icon {
-        --mdc-icon-size: 30px;
-        color: inherit;
-      }
-      .info-container {
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        flex-grow: 1;
-        overflow: hidden;
-        gap: 3px;
-      }
-      .sub-title {
-        font-size: 11px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.8px;
-        color: #94a3b8;
-      }
-      .name {
-        font-size: 17px;
-        font-weight: 800;
-        margin: 0;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        color: #ffffff;
-        letter-spacing: -0.3px;
-      }
-      .status-pill {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 3px 10px;
-        border-radius: 9999px;
-        font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 0.3px;
-        text-transform: uppercase;
-        align-self: flex-start;
-        margin-top: 2px;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-      }
-      .status-dot {
-        width: 6px;
-        height: 6px;
-        border-radius: 50%;
-        background: currentColor;
-        box-shadow: 0 0 6px currentColor;
-      }
-      .telemetry {
-        font-size: 11px;
-        color: #94a3b8;
-        font-weight: 600;
-        margin-top: 2px;
-      }
-      .heating-aura {
-        background: radial-gradient(circle at 30% 50%, rgba(249, 115, 22, 0.25) 0%, rgba(239, 68, 68, 0.08) 50%, rgba(20, 27, 41, 0.92) 80%) !important;
-      }
-      .idle-aura {
-        background: radial-gradient(circle at 30% 50%, rgba(245, 158, 11, 0.18) 0%, rgba(20, 27, 41, 0.92) 80%) !important;
-      }
-    `;
+    if (isClassic) {
+      style.textContent = `
+        ha-card {
+          padding: 18px 20px;
+          border-radius: ${radius} !important;
+          overflow: hidden !important;
+          color: var(--primary-text-color, white);
+          background: var(--ha-card-background, var(--card-background-color, #1c1c1e)) !important;
+          border: var(--ha-card-border-width, 1px) solid var(--ha-card-border-color, var(--divider-color, rgba(255, 255, 255, 0.12))) !important;
+          box-shadow: var(--ha-card-box-shadow, 0 2px 8px rgba(0, 0, 0, 0.2)) !important;
+          backdrop-filter: none !important;
+          -webkit-backdrop-filter: none !important;
+          transition: all 0.3s ease;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          min-height: 90px;
+          position: relative;
+          box-sizing: border-box;
+        }
+        ha-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+        }
+        ha-card:active {
+          transform: translateY(0);
+        }
+        .card-content {
+          display: flex;
+          align-items: center;
+          width: 100%;
+          gap: 16px;
+          pointer-events: none;
+        }
+        .icon-wrap {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 54px;
+          height: 54px;
+          border-radius: 12px;
+          background: var(--secondary-background-color, rgba(255, 255, 255, 0.05));
+          border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.12));
+          flex-shrink: 0;
+          transition: transform 0.2s ease;
+        }
+        ha-card:hover .icon-wrap {
+          transform: scale(1.05);
+        }
+        .icon-wrap ha-icon {
+          --mdc-icon-size: 28px;
+          color: var(--primary-color, #0284c7);
+        }
+        .info-container {
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          flex-grow: 1;
+          overflow: hidden;
+          gap: 3px;
+        }
+        .sub-title {
+          font-size: 11px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.8px;
+          color: var(--secondary-text-color, #94a3b8);
+        }
+        .name {
+          font-size: 16px;
+          font-weight: 700;
+          margin: 0;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          color: var(--primary-text-color, #ffffff);
+        }
+        .status-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 2px 8px;
+          border-radius: 6px;
+          font-size: 11px;
+          font-weight: 600;
+          letter-spacing: 0.3px;
+          align-self: flex-start;
+          margin-top: 2px;
+          background: rgba(255, 255, 255, 0.06);
+          color: var(--primary-text-color, #ffffff);
+          border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.1));
+        }
+        .status-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: currentColor;
+        }
+        .telemetry {
+          font-size: 11px;
+          color: var(--secondary-text-color, #94a3b8);
+          font-weight: 500;
+          margin-top: 2px;
+        }
+      `;
+    } else {
+      style.textContent = `
+        ha-card {
+          padding: 18px 20px;
+          border-radius: ${radius} !important;
+          overflow: hidden !important;
+          color: white;
+          background: linear-gradient(135deg, rgba(20, 27, 41, 0.88) 0%, rgba(15, 23, 42, 0.94) 100%) !important;
+          backdrop-filter: blur(20px) !important;
+          -webkit-backdrop-filter: blur(20px) !important;
+          border: 1px solid rgba(255, 255, 255, 0.08) !important;
+          box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+          transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          min-height: 90px;
+          position: relative;
+          box-sizing: border-box;
+        }
+        ha-card:hover {
+          transform: translateY(-2px);
+          border-color: rgba(255, 255, 255, 0.16) !important;
+          box-shadow: 0 16px 40px -10px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
+        }
+        ha-card:active {
+          transform: translateY(0);
+        }
+        .card-content {
+          display: flex;
+          align-items: center;
+          width: 100%;
+          gap: 16px;
+          pointer-events: none;
+        }
+        .icon-wrap {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 58px;
+          height: 58px;
+          border-radius: 18px;
+          background: rgba(255, 255, 255, 0.06);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          flex-shrink: 0;
+          transition: transform 0.2s ease, background 0.3s ease, box-shadow 0.3s ease;
+        }
+        ha-card:hover .icon-wrap {
+          transform: scale(1.08);
+        }
+        .icon-wrap ha-icon {
+          --mdc-icon-size: 30px;
+          color: inherit;
+        }
+        .info-container {
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          flex-grow: 1;
+          overflow: hidden;
+          gap: 3px;
+        }
+        .sub-title {
+          font-size: 11px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.8px;
+          color: #94a3b8;
+        }
+        .name {
+          font-size: 17px;
+          font-weight: 800;
+          margin: 0;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          color: #ffffff;
+          letter-spacing: -0.3px;
+        }
+        .status-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 3px 10px;
+          border-radius: 9999px;
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.3px;
+          text-transform: uppercase;
+          align-self: flex-start;
+          margin-top: 2px;
+          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        }
+        .status-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: currentColor;
+          box-shadow: 0 0 6px currentColor;
+        }
+        .telemetry {
+          font-size: 11px;
+          color: #94a3b8;
+          font-weight: 600;
+          margin-top: 2px;
+        }
+        .heating-aura {
+          background: radial-gradient(circle at 30% 50%, rgba(249, 115, 22, 0.25) 0%, rgba(239, 68, 68, 0.08) 50%, rgba(20, 27, 41, 0.92) 80%) !important;
+        }
+        .idle-aura {
+          background: radial-gradient(circle at 30% 50%, rgba(245, 158, 11, 0.18) 0%, rgba(20, 27, 41, 0.92) 80%) !important;
+        }
+      `;
+    }
 
     card.id = 'status-card';
     card.innerHTML = `
@@ -2681,6 +2811,7 @@ class MultizoneThermostatStatusCard extends HTMLElement {
       this.toggleMaster();
     });
 
+    this.shadowRoot.innerHTML = '';
     this.shadowRoot.appendChild(style);
     this.shadowRoot.appendChild(card);
     this._rendered = true;
@@ -2713,109 +2844,82 @@ class MultizoneThermostatStatusCard extends HTMLElement {
 
     boilerEntity = this._config.entity || this._config.boiler_entity;
     if (!boilerEntity) {
-      const zoneClimate = Object.values(this._hass.states).find(s => 
-        s.entity_id.startsWith('climate.') && s.attributes && s.attributes.hybrid_zone === true && s.attributes.boiler_entity_id
-      );
-      
-      if (zoneClimate) {
-        boilerEntity = zoneClimate.attributes.boiler_entity_id;
-      } else {
-        const boilerFound = this._hass && this._hass.states && Object.keys(this._hass.states).find(key => {
-          return key.startsWith('switch.') && (key.includes('boiler') || key.includes('caldaia'));
-        });
-        if (boilerFound) {
-           boilerEntity = boilerFound;
+      boilerEntity = findBoilerEntity(this._hass);
+    }
+
+    let isBoilerActive = false;
+    let boilerText = "OFF";
+
+    if (boilerEntity) {
+      const bState = this._hass.states[boilerEntity];
+      if (bState) {
+        if (boilerEntity.startsWith("switch.")) {
+          isBoilerActive = bState.state === "on";
+          boilerText = isBoilerActive ? "ON" : "OFF";
+        } else if (boilerEntity.startsWith("sensor.")) {
+          const val = parseFloat(bState.state);
+          isBoilerActive = !isNaN(val) && val > 0;
+          boilerText = `${bState.state} ${bState.attributes.unit_of_measurement || ''}`.trim();
         }
       }
     }
-    const boilerState = boilerEntity ? this._hass.states[boilerEntity] : null;
-    let isBoilerOn = false;
 
-    if (boilerEntity && boilerState) {
-      isBoilerOn = boilerState.state === "on";
-    } else {
-      const isAnyPrimaryHeating = Object.values(this._hass.states).some(s => 
-        s.entity_id.startsWith('climate.') && 
-        s.attributes && 
-        s.attributes.hybrid_zone === true &&
-        s.attributes.zone_mode === 'primary' &&
-        s.attributes.hvac_action === 'heating'
-      );
-      if (isAnyPrimaryHeating) {
-        isBoilerOn = true;
-      }
+    const card = this.shadowRoot.getElementById('status-card');
+    const iconWrap = this.shadowRoot.getElementById('master-icon-wrap');
+    const icon = this.shadowRoot.getElementById('master-icon');
+    const pill = this.shadowRoot.getElementById('master-pill');
+    const stateText = this.shadowRoot.getElementById('master-state-text');
+    const telemetry = this.shadowRoot.getElementById('master-telemetry');
+
+    if (telemetry) {
+      telemetry.textContent = `Caldaia: ${boilerText}`;
     }
 
-    const card = this.shadowRoot.querySelector('ha-card');
-    const wrapEl = this.shadowRoot.querySelector('#master-icon-wrap');
-    const iconEl = this.shadowRoot.querySelector('#master-icon');
-    const pillEl = this.shadowRoot.querySelector('#master-pill');
-    const stateTextEl = this.shadowRoot.querySelector('#master-state-text');
-    const telemetryEl = this.shadowRoot.querySelector('#master-telemetry');
+    const isClassic = (this.getEffectiveStyle() === 'classic');
 
     if (!isMasterOn) {
-      if (card) {
-        card.classList.remove('heating-aura', 'idle-aura');
+      if (card && !isClassic) card.className = "";
+      if (iconWrap) {
+        iconWrap.style.background = isClassic ? "var(--secondary-background-color, rgba(255, 255, 255, 0.05))" : "rgba(255, 255, 255, 0.04)";
+        iconWrap.style.borderColor = "var(--divider-color, rgba(255, 255, 255, 0.1))";
+        iconWrap.style.boxShadow = "none";
       }
-      if (wrapEl) {
-        wrapEl.style.background = "rgba(255, 255, 255, 0.05)";
-        wrapEl.style.color = "#64748b";
-        wrapEl.style.borderColor = "rgba(255, 255, 255, 0.1)";
-        wrapEl.style.boxShadow = "none";
+      if (icon) icon.style.color = "var(--secondary-text-color, #94a3b8)";
+      if (pill) {
+        pill.style.background = isClassic ? "rgba(255, 255, 255, 0.06)" : "rgba(148, 163, 184, 0.12)";
+        pill.style.color = "var(--secondary-text-color, #94a3b8)";
+        pill.style.borderColor = "var(--divider-color, rgba(148, 163, 184, 0.25))";
       }
-      if (iconEl) {
-        iconEl.setAttribute('icon', "mdi:power");
-      }
-      if (pillEl) {
-        pillEl.style.background = "rgba(148, 163, 184, 0.12)";
-        pillEl.style.color = "#94a3b8";
-        pillEl.style.borderColor = "rgba(148, 163, 184, 0.25)";
-      }
-      if (stateTextEl) stateTextEl.textContent = getTranslation(this._hass, 'off');
-      if (telemetryEl) telemetryEl.textContent = `${getTranslation(this._hass, 'caldaia_circ')}: OFF`;
+      if (stateText) stateText.textContent = "SPENTO";
     } else {
-      if (isBoilerOn) {
-        if (card) {
-          card.classList.add('heating-aura');
-          card.classList.remove('idle-aura');
+      if (isBoilerActive) {
+        if (card && !isClassic) card.className = "heating-aura";
+        if (iconWrap) {
+          iconWrap.style.background = "rgba(249, 115, 22, 0.2)";
+          iconWrap.style.borderColor = "#f97316";
+          iconWrap.style.boxShadow = isClassic ? "none" : "0 0 15px rgba(249, 115, 22, 0.4)";
         }
-        if (wrapEl) {
-          wrapEl.style.background = "linear-gradient(135deg, #f97316, #ef4444)";
-          wrapEl.style.color = "#ffffff";
-          wrapEl.style.borderColor = "#f97316";
-          wrapEl.style.boxShadow = "0 0 25px rgba(239, 68, 68, 0.45)";
+        if (icon) icon.style.color = "#f97316";
+        if (pill) {
+          pill.style.background = "rgba(249, 115, 22, 0.15)";
+          pill.style.color = "#f97316";
+          pill.style.borderColor = "rgba(249, 115, 22, 0.4)";
         }
-        if (iconEl) {
-          iconEl.setAttribute('icon', "mdi:fire");
-        }
-        if (pillEl) {
-          pillEl.style.background = "rgba(249, 115, 22, 0.18)";
-          pillEl.style.color = "#fb923c";
-          pillEl.style.borderColor = "rgba(249, 115, 22, 0.4)";
-        }
-        if (stateTextEl) stateTextEl.textContent = getTranslation(this._hass, 'heating_active');
-        if (telemetryEl) telemetryEl.textContent = `${getTranslation(this._hass, 'caldaia_circ')}: ATTIVO`;
+        if (stateText) stateText.textContent = "RISCALDAMENTO ATTIVO";
       } else {
-        if (card) {
-          card.classList.add('idle-aura');
-          card.classList.remove('heating-aura');
+        if (card && !isClassic) card.className = "idle-aura";
+        if (iconWrap) {
+          iconWrap.style.background = "rgba(245, 158, 11, 0.15)";
+          iconWrap.style.borderColor = "#f59e0b";
+          iconWrap.style.boxShadow = isClassic ? "none" : "0 0 15px rgba(245, 158, 11, 0.25)";
         }
-        if (wrapEl) {
-          wrapEl.style.background = "linear-gradient(135deg, #f59e0b, #d97706)";
-          wrapEl.style.color = "#ffffff";
-          wrapEl.style.borderColor = "#f59e0b";
-          wrapEl.style.boxShadow = "0 0 20px rgba(245, 158, 11, 0.35)";
+        if (icon) icon.style.color = "#f59e0b";
+        if (pill) {
+          pill.style.background = "rgba(245, 158, 11, 0.15)";
+          pill.style.color = "#f59e0b";
+          pill.style.borderColor = "rgba(245, 158, 11, 0.35)";
         }
-        if (iconEl) {
-          iconEl.setAttribute('icon', "mdi:power");
-        }
-        if (pillEl) {
-          pillEl.style.background = "rgba(245, 158, 11, 0.18)";
-          pillEl.style.color = "#fbbf24";
-          pillEl.style.borderColor = "rgba(245, 158, 11, 0.4)";
-        }
-        if (stateTextEl) stateTextEl.textContent = getTranslation(this._hass, 'idle');
-        if (telemetryEl) telemetryEl.textContent = `${getTranslation(this._hass, 'caldaia_circ')}: STANDBY`;
+        if (stateText) stateText.textContent = "STANDBY (ACCESO)";
       }
     }
   }
@@ -2826,7 +2930,25 @@ class MultizoneThermostatPresetCard extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
+  }
+
+  connectedCallback() {
+    this._styleListener = () => {
+      this.renderStructure();
+      this.updateCard();
+    };
+    window.addEventListener('mz-style-changed', this._styleListener);
     this.renderStructure();
+  }
+
+  disconnectedCallback() {
+    if (this._styleListener) {
+      window.removeEventListener('mz-style-changed', this._styleListener);
+    }
+  }
+
+  getEffectiveStyle() {
+    return getActiveMzCardStyle();
   }
 
   set hass(hass) {
@@ -2835,7 +2957,9 @@ class MultizoneThermostatPresetCard extends HTMLElement {
   }
 
   setConfig(config) {
-    this._config = config;
+    this._config = Object.assign({}, config || {});
+    this.renderStructure();
+    this.updateCard();
   }
 
   getCardSize() {
@@ -2862,143 +2986,171 @@ class MultizoneThermostatPresetCard extends HTMLElement {
 
   renderStructure() {
     const radius = (this._config && this._config.border_radius) ? this._config.border_radius : '20px';
+    const isClassic = (this.getEffectiveStyle() === 'classic');
+
+    const styleContent = isClassic ? `
+      ha-card {
+        padding: 16px 14px;
+        border-radius: ${radius} !important;
+        overflow: hidden !important;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        background: var(--ha-card-background, var(--card-background-color, #1c1c1e)) !important;
+        border: var(--ha-card-border-width, 1px) solid var(--ha-card-border-color, var(--divider-color, rgba(255, 255, 255, 0.12))) !important;
+        box-shadow: var(--ha-card-box-shadow, 0 2px 8px rgba(0, 0, 0, 0.2)) !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        box-sizing: border-box;
+        min-height: 90px;
+      }
+      .header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        color: var(--secondary-text-color, #94a3b8);
+      }
+      .preset-grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 8px;
+        width: 100%;
+        box-sizing: border-box;
+      }
+      .preset-btn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 8px 4px;
+        border-radius: 10px;
+        background: var(--card-background-color, #202b38);
+        border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.12));
+        color: var(--secondary-text-color, #94a3b8);
+        cursor: pointer;
+        transition: all 0.2s ease;
+        gap: 4px;
+        min-height: 48px;
+      }
+      .preset-btn:hover {
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--primary-text-color, white);
+      }
+      .preset-btn.active {
+        background: var(--primary-color, #0284c7) !important;
+        border-color: var(--primary-color, #0284c7) !important;
+        color: #ffffff !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      }
+      .preset-btn ha-icon {
+        --mdc-icon-size: 20px;
+        color: inherit;
+      }
+      .preset-label {
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.2px;
+      }
+    ` : `
+      ha-card {
+        padding: 18px 16px;
+        border-radius: ${radius} !important;
+        overflow: hidden !important;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        background: linear-gradient(135deg, rgba(20, 27, 41, 0.88) 0%, rgba(15, 23, 42, 0.94) 100%) !important;
+        backdrop-filter: blur(20px) !important;
+        -webkit-backdrop-filter: blur(20px) !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+        box-sizing: border-box;
+        min-height: 90px;
+      }
+      .header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #94a3b8;
+      }
+      .preset-grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 8px;
+        width: 100%;
+        box-sizing: border-box;
+      }
+      .preset-btn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 10px 4px;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        color: #94a3b8;
+        cursor: pointer;
+        transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        gap: 6px;
+        min-height: 52px;
+      }
+      .preset-btn:hover {
+        background: rgba(255, 255, 255, 0.08);
+        color: #ffffff;
+        transform: translateY(-2px);
+      }
+      .preset-btn.active {
+        background: rgba(14, 165, 233, 0.2) !important;
+        border-color: #38bdf8 !important;
+        color: #38bdf8 !important;
+        box-shadow: 0 0 15px rgba(56, 189, 248, 0.35) !important;
+      }
+      .preset-btn ha-icon {
+        --mdc-icon-size: 22px;
+        color: inherit;
+      }
+      .preset-label {
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+      }
+    `;
+
     this.shadowRoot.innerHTML = `
-      <style>
-        ha-card {
-          padding: 18px 16px;
-          border-radius: ${radius} !important;
-          overflow: hidden !important;
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-          background: linear-gradient(135deg, rgba(20, 27, 41, 0.88) 0%, rgba(15, 23, 42, 0.94) 100%) !important;
-          backdrop-filter: blur(20px) !important;
-          -webkit-backdrop-filter: blur(20px) !important;
-          border: 1px solid rgba(255, 255, 255, 0.08) !important;
-          box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
-          box-sizing: border-box;
-          min-height: 90px;
-        }
-        .header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          margin-bottom: 2px;
-        }
-        .header-left {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          font-weight: 800;
-          font-size: 12px;
-          color: #cbd5e1;
-          text-transform: uppercase;
-          letter-spacing: 0.8px;
-        }
-        .active-badge {
-          font-size: 10px;
-          font-weight: 700;
-          padding: 2px 8px;
-          border-radius: 9999px;
-          background: rgba(14, 165, 233, 0.15);
-          color: #38bdf8;
-          border: 1px solid rgba(14, 165, 233, 0.3);
-          text-transform: uppercase;
-          letter-spacing: 0.3px;
-        }
-        .buttons-row {
-          display: grid;
-          grid-template-columns: repeat(5, 1fr);
-          gap: 8px;
-        }
-        .preset-btn {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          background: rgba(255, 255, 255, 0.03);
-          color: #94a3b8;
-          border-radius: 14px;
-          padding: 12px 4px;
-          cursor: pointer;
-          transition: all 0.25s ease;
-          border: 1px solid rgba(255, 255, 255, 0.07);
-          gap: 6px;
-        }
-        .preset-btn:hover {
-          background: rgba(255, 255, 255, 0.08);
-          transform: translateY(-2px);
-          border-color: rgba(255, 255, 255, 0.16);
-          color: #ffffff;
-        }
-        .preset-btn.active.manual {
-          background: linear-gradient(135deg, rgba(14, 165, 233, 0.25), rgba(56, 189, 248, 0.12));
-          color: #38bdf8;
-          border: 1.5px solid #38bdf8;
-          box-shadow: 0 0 16px rgba(56, 189, 248, 0.35);
-        }
-        .preset-btn.active.eco {
-          background: linear-gradient(135deg, rgba(16, 185, 129, 0.25), rgba(52, 211, 153, 0.12));
-          color: #34d399;
-          border: 1.5px solid #10b981;
-          box-shadow: 0 0 16px rgba(16, 185, 129, 0.35);
-        }
-        .preset-btn.active.comfort {
-          background: linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(251, 191, 36, 0.12));
-          color: #fbbf24;
-          border: 1.5px solid #f59e0b;
-          box-shadow: 0 0 16px rgba(245, 158, 11, 0.35);
-        }
-        .preset-btn.active.sleep {
-          background: linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(129, 140, 248, 0.12));
-          color: #818cf8;
-          border: 1.5px solid #6366f1;
-          box-shadow: 0 0 16px rgba(99, 102, 241, 0.35);
-        }
-        .preset-btn.active.away {
-          background: linear-gradient(135deg, rgba(239, 68, 68, 0.25), rgba(248, 113, 113, 0.12));
-          color: #f87171;
-          border: 1.5px solid #ef4444;
-          box-shadow: 0 0 16px rgba(239, 68, 68, 0.35);
-        }
-        .preset-btn ha-icon {
-          --mdc-icon-size: 24px;
-        }
-        .preset-label {
-          font-size: 11px;
-          font-weight: 700;
-          text-align: center;
-          word-break: break-word;
-        }
-      </style>
+      <style>${styleContent}</style>
       <ha-card>
         <div class="header">
-          <div class="header-left">
-            <span style="color: #38bdf8; font-size: 14px;">⚡</span>
-            <span id="card-title">Preset Globale</span>
-          </div>
-          <span class="active-badge" id="active-preset-badge">Manuale</span>
+          <span id="title">PRESET GLOBALE</span>
         </div>
-        <div class="buttons-row">
-          <div class="preset-btn" data-preset="manual" id="btn-manual">
+        <div class="preset-grid">
+          <div class="preset-btn" data-preset="none" id="btn-none">
             <ha-icon icon="mdi:power"></ha-icon>
-            <div class="preset-label" id="lbl-manual">Manual</div>
+            <span class="preset-label">Manuale</span>
           </div>
           <div class="preset-btn" data-preset="eco" id="btn-eco">
             <ha-icon icon="mdi:leaf"></ha-icon>
-            <div class="preset-label" id="lbl-eco">Eco</div>
+            <span class="preset-label">Eco</span>
           </div>
           <div class="preset-btn" data-preset="comfort" id="btn-comfort">
             <ha-icon icon="mdi:sofa"></ha-icon>
-            <div class="preset-label" id="lbl-comfort">Comfort</div>
+            <span class="preset-label">Comfort</span>
           </div>
           <div class="preset-btn" data-preset="sleep" id="btn-sleep">
             <ha-icon icon="mdi:bed"></ha-icon>
-            <div class="preset-label" id="lbl-sleep">Sleep</div>
+            <span class="preset-label">Notte</span>
           </div>
           <div class="preset-btn" data-preset="away" id="btn-away">
             <ha-icon icon="mdi:car"></ha-icon>
-            <div class="preset-label" id="lbl-away">Away</div>
+            <span class="preset-label">Fuori Casa</span>
           </div>
         </div>
       </ha-card>
@@ -3006,7 +3158,7 @@ class MultizoneThermostatPresetCard extends HTMLElement {
 
     const buttons = this.shadowRoot.querySelectorAll('.preset-btn');
     buttons.forEach(btn => {
-      btn.addEventListener('click', (e) => {
+      btn.addEventListener('click', () => {
         const preset = btn.getAttribute('data-preset');
         this.selectPreset(preset);
       });
@@ -3027,38 +3179,19 @@ class MultizoneThermostatPresetCard extends HTMLElement {
   updateCard() {
     if (!this._hass || !this._hass.states) return;
     const entityId = this.presetEntity;
-    if (!entityId || !this._hass.states[entityId]) return;
+    if (!entityId) return;
 
-    const state = this._hass.states[entityId].state;
+    const stateObj = this._hass.states[entityId];
+    if (!stateObj) return;
 
-    // Localize labels
-    const titleEl = this.shadowRoot.querySelector('#card-title');
-    if (titleEl) {
-      titleEl.textContent = this._config?.title || getTranslation(this._hass, 'preset_card_title');
-    }
-    const lblManual = this.shadowRoot.querySelector('#lbl-manual');
-    if (lblManual) lblManual.textContent = getTranslation(this._hass, 'preset_manual');
-    const lblEco = this.shadowRoot.querySelector('#lbl-eco');
-    if (lblEco) lblEco.textContent = getTranslation(this._hass, 'preset_eco');
-    const lblComfort = this.shadowRoot.querySelector('#lbl-comfort');
-    if (lblComfort) lblComfort.textContent = getTranslation(this._hass, 'preset_comfort');
-    const lblSleep = this.shadowRoot.querySelector('#lbl-sleep');
-    if (lblSleep) lblSleep.textContent = getTranslation(this._hass, 'preset_sleep');
-    const lblAway = this.shadowRoot.querySelector('#lbl-away');
-    if (lblAway) lblAway.textContent = getTranslation(this._hass, 'preset_away');
-
-    const activeBadge = this.shadowRoot.querySelector('#active-preset-badge');
-    if (activeBadge) {
-      activeBadge.textContent = state.toUpperCase();
-    }
-
+    const currentPreset = stateObj.state;
     const buttons = this.shadowRoot.querySelectorAll('.preset-btn');
     buttons.forEach(btn => {
-      const p = btn.getAttribute('data-preset');
-      if (p === state) {
-        btn.className = `preset-btn active ${p}`;
+      const preset = btn.getAttribute('data-preset');
+      if (preset === currentPreset) {
+        btn.classList.add('active');
       } else {
-        btn.className = 'preset-btn';
+        btn.classList.remove('active');
       }
     });
   }
@@ -3287,6 +3420,24 @@ class MultizoneThermostatScheduleSummaryCard extends HTMLElement {
     this.attachShadow({ mode: 'open' });
   }
 
+  connectedCallback() {
+    this._styleListener = () => {
+      this.renderStructure();
+      this.updateCard();
+    };
+    window.addEventListener('mz-style-changed', this._styleListener);
+  }
+
+  disconnectedCallback() {
+    if (this._styleListener) {
+      window.removeEventListener('mz-style-changed', this._styleListener);
+    }
+  }
+
+  getEffectiveStyle() {
+    return getActiveMzCardStyle();
+  }
+
   set hass(hass) {
     this._hass = hass;
     this.updateCard();
@@ -3300,150 +3451,202 @@ class MultizoneThermostatScheduleSummaryCard extends HTMLElement {
 
   renderStructure() {
     const radius = (this._config && this._config.border_radius) ? this._config.border_radius : '20px';
+    const isClassic = (this.getEffectiveStyle() === 'classic');
+
+    const styleContent = isClassic ? `
+      ha-card {
+        padding: 14px 10px;
+        border-radius: ${radius} !important;
+        overflow: hidden !important;
+        background: var(--ha-card-background, var(--card-background-color, #1c1c1e)) !important;
+        border: var(--ha-card-border-width, 1px) solid var(--ha-card-border-color, var(--divider-color, rgba(255, 255, 255, 0.12))) !important;
+        box-shadow: var(--ha-card-box-shadow, 0 2px 8px rgba(0, 0, 0, 0.2)) !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        color: var(--primary-text-color, white);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        min-height: 90px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        box-sizing: border-box;
+      }
+      ha-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+      }
+      .badge-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        gap: 4px;
+        width: 100%;
+      }
+      .icon-box {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        background: var(--secondary-background-color, rgba(255, 255, 255, 0.06));
+        border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.12));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--primary-color, #0284c7);
+      }
+      .icon-box ha-icon { --mdc-icon-size: 20px; }
+      .badge-title {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.2px;
+        color: var(--primary-text-color, #ffffff);
+      }
+      .badge-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 6px;
+        border-radius: 6px;
+        font-size: 9px;
+        font-weight: 600;
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--secondary-text-color, #94a3b8);
+        border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.1));
+      }
+      .badge-dot {
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        background: currentColor;
+      }
+    ` : `
+      ha-card {
+        padding: 14px 10px;
+        border-radius: ${radius} !important;
+        overflow: hidden !important;
+        background: linear-gradient(135deg, rgba(20, 27, 41, 0.88) 0%, rgba(15, 23, 42, 0.94) 100%) !important;
+        backdrop-filter: blur(20px) !important;
+        -webkit-backdrop-filter: blur(20px) !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        min-height: 90px;
+        cursor: pointer;
+        transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        box-sizing: border-box;
+      }
+      ha-card:hover {
+        transform: translateY(-2px);
+        border-color: rgba(255, 255, 255, 0.16) !important;
+        box-shadow: 0 16px 40px -10px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
+      }
+      .badge-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        gap: 5px;
+        width: 100%;
+      }
+      .icon-box {
+        width: 38px;
+        height: 38px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #94a3b8;
+        transition: transform 0.2s ease;
+      }
+      ha-card:hover .icon-box {
+        transform: scale(1.08);
+      }
+      .icon-box ha-icon { --mdc-icon-size: 20px; }
+      .badge-title {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.2px;
+        color: #ffffff;
+      }
+      .badge-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 7px;
+        border-radius: 9999px;
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.2px;
+        text-transform: uppercase;
+        background: rgba(148, 163, 184, 0.12);
+        color: #94a3b8;
+        border: 1px solid rgba(148, 163, 184, 0.25);
+      }
+      .badge-dot {
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        background: currentColor;
+        box-shadow: 0 0 4px currentColor;
+      }
+    `;
+
     this.shadowRoot.innerHTML = `
-      <style>
-        ha-card {
-          padding: 14px 10px;
-          border-radius: ${radius} !important;
-          overflow: hidden !important;
-          background: linear-gradient(135deg, rgba(20, 27, 41, 0.88) 0%, rgba(15, 23, 42, 0.94) 100%) !important;
-          backdrop-filter: blur(20px) !important;
-          -webkit-backdrop-filter: blur(20px) !important;
-          border: 1px solid rgba(255, 255, 255, 0.08) !important;
-          box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
-          color: white;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          height: 100%;
-          min-height: 90px;
-          cursor: pointer;
-          transition: all 0.25s ease;
-          box-sizing: border-box;
-        }
-        ha-card:hover {
-          transform: translateY(-2px);
-          border-color: rgba(56, 189, 248, 0.4) !important;
-          box-shadow: 0 16px 40px -10px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
-        }
-        .container {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 6px;
-          text-align: center;
-          width: 100%;
-        }
-        .icon-wrap {
-          width: 44px;
-          height: 44px;
-          border-radius: 14px;
-          background: rgba(14, 165, 233, 0.15);
-          color: #38bdf8;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          transition: transform 0.2s ease, background 0.3s ease;
-          border: 1px solid rgba(14, 165, 233, 0.25);
-          box-shadow: 0 0 15px rgba(14, 165, 233, 0.2);
-        }
-        ha-card:hover .icon-wrap {
-          transform: scale(1.08);
-        }
-        ha-icon {
-          --mdc-icon-size: 26px;
-          color: inherit;
-        }
-        .title {
-          font-weight: 700;
-          font-size: 0.95rem;
-          letter-spacing: -0.2px;
-          color: #ffffff;
-        }
-        .status-pill {
-          display: inline-flex;
-          align-items: center;
-          gap: 5px;
-          padding: 3px 9px;
-          border-radius: 9999px;
-          font-size: 11px;
-          font-weight: 700;
-          letter-spacing: 0.3px;
-          background: rgba(14, 165, 233, 0.15);
-          color: #38bdf8;
-          border: 1px solid rgba(14, 165, 233, 0.35);
-          max-width: 95%;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-        .status-dot {
-          width: 6px;
-          height: 6px;
-          border-radius: 50%;
-          background: currentColor;
-          flex-shrink: 0;
-        }
-      </style>
-      <ha-card id="sched-card">
-        <div class="container">
-          <div class="icon-wrap" id="sched-icon-wrap">
-            <ha-icon id="sched-icon" icon="mdi:calendar-clock"></ha-icon>
+      <style>${styleContent}</style>
+      <ha-card id="card">
+        <div class="badge-content">
+          <div class="icon-box" id="icon-box">
+            <ha-icon icon="mdi:calendar-clock"></ha-icon>
           </div>
-          <div class="title" id="sched-title">Programmazione</div>
-          <div class="status-pill" id="sched-pill">
-            <span class="status-dot"></span>
-            <span id="sched-subtitle">In Pausa</span>
+          <div class="badge-title">Programmazione</div>
+          <div class="badge-pill" id="pill">
+            <span class="badge-dot" id="dot"></span>
+            <span id="label">In Pausa</span>
           </div>
         </div>
       </ha-card>
     `;
 
-    const card = this.shadowRoot.querySelector('#sched-card');
-    if (card) {
-      card.addEventListener('click', () => {
-        const targetPath = (this._config && this._config.navigation_path) ? this._config.navigation_path : 'programmazione';
-        navigateOrFallbackModal(this, targetPath);
-      });
-    }
+    const card = this.shadowRoot.getElementById('card');
+    card.addEventListener('click', () => {
+      navigateToLovelaceView('schedulatore');
+    });
+
     this._rendered = true;
   }
 
   updateCard() {
-    if (!this._hass || !this._hass.states) return;
-    if (!this._rendered) return;
+    if (!this._hass || !this._rendered) return;
+    const pill = this.shadowRoot.getElementById('pill');
+    const label = this.shadowRoot.getElementById('label');
+    const dot = this.shadowRoot.getElementById('dot');
 
-    let schedEntity = null;
-    for (const eid of Object.keys(this._hass.states)) {
-      if (eid.startsWith("select.") && eid.includes("schedule_profile")) {
-        schedEntity = eid;
-        break;
-      }
-    }
+    const profileState = this._hass.states['select.multizone_thermostat_active_profile'];
+    const activeProfile = profileState ? profileState.state : 'standard';
 
-    const subtitleEl = this.shadowRoot.querySelector('#sched-subtitle');
-    const wrapEl = this.shadowRoot.querySelector('#sched-icon-wrap');
-    const pillEl = this.shadowRoot.querySelector('#sched-pill');
-
-    if (!schedEntity) {
-      if (subtitleEl) subtitleEl.textContent = "In Pausa";
-      return;
-    }
-
-    const stateObj = this._hass.states[schedEntity];
-    const profile = stateObj.state || "In Pausa";
-    if (subtitleEl) subtitleEl.textContent = profile;
-
-    if (profile.toLowerCase() !== "off" && profile.toLowerCase() !== "in pausa" && profile.toLowerCase() !== "pause") {
-      if (wrapEl) {
-        wrapEl.style.background = "rgba(14, 165, 233, 0.25)";
-        wrapEl.style.color = "#38bdf8";
-      }
-      if (pillEl) {
-        pillEl.style.background = "rgba(14, 165, 233, 0.2)";
-        pillEl.style.color = "#38bdf8";
-        pillEl.style.borderColor = "rgba(14, 165, 233, 0.4)";
-      }
+    if (activeProfile && activeProfile !== 'none') {
+      const name = activeProfile.charAt(0).toUpperCase() + activeProfile.slice(1);
+      label.textContent = name;
+      pill.style.background = 'rgba(56, 189, 248, 0.15)';
+      pill.style.color = '#38bdf8';
+      pill.style.borderColor = 'rgba(56, 189, 248, 0.35)';
+      if (dot) dot.style.background = '#38bdf8';
+    } else {
+      label.textContent = 'In Pausa';
+      pill.style.background = 'rgba(148, 163, 184, 0.12)';
+      pill.style.color = '#94a3b8';
+      pill.style.borderColor = 'rgba(148, 163, 184, 0.25)';
+      if (dot) dot.style.background = '#94a3b8';
     }
   }
 }
@@ -3459,6 +3662,24 @@ class MultizoneThermostatHealthSummaryCard extends HTMLElement {
     this.attachShadow({ mode: 'open' });
   }
 
+  connectedCallback() {
+    this._styleListener = () => {
+      this.renderStructure();
+      this.updateCard();
+    };
+    window.addEventListener('mz-style-changed', this._styleListener);
+  }
+
+  disconnectedCallback() {
+    if (this._styleListener) {
+      window.removeEventListener('mz-style-changed', this._styleListener);
+    }
+  }
+
+  getEffectiveStyle() {
+    return getActiveMzCardStyle();
+  }
+
   set hass(hass) {
     this._hass = hass;
     this.updateCard();
@@ -3472,167 +3693,210 @@ class MultizoneThermostatHealthSummaryCard extends HTMLElement {
 
   renderStructure() {
     const radius = (this._config && this._config.border_radius) ? this._config.border_radius : '20px';
+    const isClassic = (this.getEffectiveStyle() === 'classic');
+
+    const styleContent = isClassic ? `
+      ha-card {
+        padding: 14px 10px;
+        border-radius: ${radius} !important;
+        overflow: hidden !important;
+        background: var(--ha-card-background, var(--card-background-color, #1c1c1e)) !important;
+        border: var(--ha-card-border-width, 1px) solid var(--ha-card-border-color, var(--divider-color, rgba(255, 255, 255, 0.12))) !important;
+        box-shadow: var(--ha-card-box-shadow, 0 2px 8px rgba(0, 0, 0, 0.2)) !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        color: var(--primary-text-color, white);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        min-height: 90px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        box-sizing: border-box;
+      }
+      ha-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+      }
+      .badge-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        gap: 4px;
+        width: 100%;
+      }
+      .icon-box {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        background: var(--secondary-background-color, rgba(255, 255, 255, 0.06));
+        border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.12));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #10b981;
+      }
+      .icon-box ha-icon { --mdc-icon-size: 20px; }
+      .badge-title {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.2px;
+        color: var(--primary-text-color, #ffffff);
+      }
+      .badge-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 6px;
+        border-radius: 6px;
+        font-size: 9px;
+        font-weight: 600;
+        background: rgba(16, 185, 129, 0.12);
+        color: #10b981;
+        border: 1px solid rgba(16, 185, 129, 0.25);
+      }
+      .badge-dot {
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        background: currentColor;
+      }
+    ` : `
+      ha-card {
+        padding: 14px 10px;
+        border-radius: ${radius} !important;
+        overflow: hidden !important;
+        background: linear-gradient(135deg, rgba(20, 27, 41, 0.88) 0%, rgba(15, 23, 42, 0.94) 100%) !important;
+        backdrop-filter: blur(20px) !important;
+        -webkit-backdrop-filter: blur(20px) !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        min-height: 90px;
+        cursor: pointer;
+        transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        box-sizing: border-box;
+      }
+      ha-card:hover {
+        transform: translateY(-2px);
+        border-color: rgba(255, 255, 255, 0.16) !important;
+        box-shadow: 0 16px 40px -10px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
+      }
+      .badge-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        gap: 5px;
+        width: 100%;
+      }
+      .icon-box {
+        width: 38px;
+        height: 38px;
+        border-radius: 12px;
+        background: rgba(16, 185, 129, 0.12);
+        border: 1px solid rgba(16, 185, 129, 0.25);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #10b981;
+        transition: transform 0.2s ease;
+      }
+      ha-card:hover .icon-box {
+        transform: scale(1.08);
+      }
+      .icon-box ha-icon { --mdc-icon-size: 20px; }
+      .badge-title {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.2px;
+        color: #ffffff;
+      }
+      .badge-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 7px;
+        border-radius: 9999px;
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.2px;
+        text-transform: uppercase;
+        background: rgba(16, 185, 129, 0.15);
+        color: #10b981;
+        border: 1px solid rgba(16, 185, 129, 0.35);
+      }
+      .badge-dot {
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        background: currentColor;
+        box-shadow: 0 0 4px currentColor;
+      }
+    `;
+
     this.shadowRoot.innerHTML = `
-      <style>
-        ha-card {
-          padding: 14px 10px;
-          border-radius: ${radius} !important;
-          overflow: hidden !important;
-          background: linear-gradient(135deg, rgba(20, 27, 41, 0.88) 0%, rgba(15, 23, 42, 0.94) 100%) !important;
-          backdrop-filter: blur(20px) !important;
-          -webkit-backdrop-filter: blur(20px) !important;
-          border: 1px solid rgba(255, 255, 255, 0.08) !important;
-          box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
-          color: white;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          height: 100%;
-          min-height: 90px;
-          cursor: pointer;
-          transition: all 0.25s ease;
-          box-sizing: border-box;
-        }
-        ha-card:hover {
-          transform: translateY(-2px);
-          border-color: rgba(16, 185, 129, 0.4) !important;
-          box-shadow: 0 16px 40px -10px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
-        }
-        .container {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 6px;
-          text-align: center;
-          width: 100%;
-        }
-        .icon-wrap {
-          width: 44px;
-          height: 44px;
-          border-radius: 14px;
-          background: rgba(16, 185, 129, 0.15);
-          color: #34d399;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          transition: transform 0.2s ease, background 0.3s ease;
-          border: 1px solid rgba(16, 185, 129, 0.25);
-          box-shadow: 0 0 15px rgba(16, 185, 129, 0.2);
-        }
-        ha-card:hover .icon-wrap {
-          transform: scale(1.08);
-        }
-        ha-icon {
-          --mdc-icon-size: 26px;
-          color: inherit;
-        }
-        .title {
-          font-weight: 700;
-          font-size: 0.95rem;
-          letter-spacing: -0.2px;
-          color: #ffffff;
-        }
-        .status-pill {
-          display: inline-flex;
-          align-items: center;
-          gap: 5px;
-          padding: 3px 9px;
-          border-radius: 9999px;
-          font-size: 11px;
-          font-weight: 700;
-          letter-spacing: 0.3px;
-          background: rgba(16, 185, 129, 0.15);
-          color: #34d399;
-          border: 1px solid rgba(16, 185, 129, 0.35);
-          max-width: 95%;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-        .status-dot {
-          width: 6px;
-          height: 6px;
-          border-radius: 50%;
-          background: currentColor;
-          flex-shrink: 0;
-        }
-      </style>
-      <ha-card id="health-card">
-        <div class="container">
-          <div class="icon-wrap" id="health-icon-wrap">
-            <ha-icon id="health-icon" icon="mdi:shield-check"></ha-icon>
+      <style>${styleContent}</style>
+      <ha-card id="card">
+        <div class="badge-content">
+          <div class="icon-box" id="icon-box">
+            <ha-icon icon="mdi:shield-check"></ha-icon>
           </div>
-          <div class="title" id="health-title">Diagnostica</div>
-          <div class="status-pill" id="health-pill">
-            <span class="status-dot"></span>
-            <span id="health-subtitle">Sistema Ok</span>
+          <div class="badge-title">Diagnostica</div>
+          <div class="badge-pill" id="pill">
+            <span class="badge-dot" id="dot"></span>
+            <span id="label">Sistema OK</span>
           </div>
         </div>
       </ha-card>
     `;
 
-    const card = this.shadowRoot.querySelector('#health-card');
-    if (card) {
-      card.addEventListener('click', () => {
-        const targetPath = (this._config && this._config.navigation_path) ? this._config.navigation_path : 'diagnostica';
-        navigateOrFallbackModal(this, targetPath);
-      });
-    }
+    const card = this.shadowRoot.getElementById('card');
+    card.addEventListener('click', () => {
+      navigateToLovelaceView('diagnostica');
+    });
+
     this._rendered = true;
   }
 
   updateCard() {
-    if (!this._hass || !this._hass.states) return;
-    if (!this._rendered) return;
+    if (!this._hass || !this._rendered) return;
+    const pill = this.shadowRoot.getElementById('pill');
+    const label = this.shadowRoot.getElementById('label');
+    const dot = this.shadowRoot.getElementById('dot');
+    const iconBox = this.shadowRoot.getElementById('icon-box');
 
-    let healthEntity = null;
-    for (const eid of Object.keys(this._hass.states)) {
-      if (eid.startsWith("sensor.") && 
-          this._hass.states[eid].attributes && 
-          this._hass.states[eid].attributes.hasOwnProperty("anomalies_count")) {
-        healthEntity = eid;
+    const errSensors = ['binary_sensor.multizone_thermostat_anomaly_detected'];
+    let hasAnomaly = false;
+    for (const sid of errSensors) {
+      if (this._hass.states[sid]?.state === 'on') {
+        hasAnomaly = true;
         break;
       }
     }
 
-    const iconEl = this.shadowRoot.querySelector('#health-icon');
-    const subtitleEl = this.shadowRoot.querySelector('#health-subtitle');
-    const wrapEl = this.shadowRoot.querySelector('#health-icon-wrap');
-    const pillEl = this.shadowRoot.querySelector('#health-pill');
-
-    if (!healthEntity) {
-      if (subtitleEl) subtitleEl.textContent = "Non trovato";
-      if (iconEl) iconEl.icon = "mdi:shield-off";
-      return;
-    }
-
-    const stateObj = this._hass.states[healthEntity];
-    const anomalies = stateObj.attributes.anomalies || [];
-    
-    if (anomalies.length === 0) {
-      if (subtitleEl) subtitleEl.textContent = "Sistema Ok";
-      if (iconEl) iconEl.icon = "mdi:shield-check";
-      if (wrapEl) {
-        wrapEl.style.background = "rgba(16, 185, 129, 0.2)";
-        wrapEl.style.color = "#34d399";
-      }
-      if (pillEl) {
-        pillEl.style.background = "rgba(16, 185, 129, 0.15)";
-        pillEl.style.color = "#34d399";
-        pillEl.style.borderColor = "rgba(16, 185, 129, 0.35)";
-      }
+    if (hasAnomaly) {
+      label.textContent = 'Allarme';
+      pill.style.background = 'rgba(239, 68, 68, 0.18)';
+      pill.style.color = '#ef4444';
+      pill.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+      if (dot) dot.style.background = '#ef4444';
+      if (iconBox) iconBox.style.color = '#ef4444';
     } else {
-      if (subtitleEl) subtitleEl.textContent = anomalies.length + (anomalies.length === 1 ? " Anomalia" : " Anomalie");
-      if (iconEl) iconEl.icon = "mdi:alert";
-      if (wrapEl) {
-        wrapEl.style.background = "rgba(245, 158, 11, 0.2)";
-        wrapEl.style.color = "#fbbf24";
-      }
-      if (pillEl) {
-        pillEl.style.background = "rgba(245, 158, 11, 0.15)";
-        pillEl.style.color = "#fbbf24";
-        pillEl.style.borderColor = "rgba(245, 158, 11, 0.35)";
-      }
+      label.textContent = 'Sistema Ok';
+      pill.style.background = 'rgba(16, 185, 129, 0.15)';
+      pill.style.color = '#10b981';
+      pill.style.borderColor = 'rgba(16, 185, 129, 0.35)';
+      if (dot) dot.style.background = '#10b981';
+      if (iconBox) iconBox.style.color = '#10b981';
     }
   }
 }
@@ -3641,7 +3905,6 @@ if (!customElements.get("multizone-thermostat-health-summary-card")) {
   customElements.define("multizone-thermostat-health-summary-card", MultizoneThermostatHealthSummaryCard);
 }
 
-/* ==================== COMBINED NAV COLUMN CARD ==================== */
 class MultizoneThermostatNavCard extends HTMLElement {
   constructor() {
     super();
@@ -3702,16 +3965,20 @@ class MultizoneThermostatNavCard extends HTMLElement {
     if (typeof this._schedCard.setConfig === 'function') {
       this._schedCard.setConfig({ border_radius: radius });
     }
-    if (this._hass) this._schedCard.hass = this._hass;
-    container.appendChild(this._schedCard);
+    if (this._hass) {
+      this._schedCard.hass = this._hass;
+    }
 
     this._healthCard = document.createElement('multizone-thermostat-health-summary-card');
     if (typeof this._healthCard.setConfig === 'function') {
       this._healthCard.setConfig({ border_radius: radius });
     }
-    if (this._hass) this._healthCard.hass = this._hass;
-    container.appendChild(this._healthCard);
+    if (this._hass) {
+      this._healthCard.hass = this._hass;
+    }
 
+    container.appendChild(this._schedCard);
+    container.appendChild(this._healthCard);
     this._rendered = true;
   }
 }
@@ -3719,6 +3986,7 @@ class MultizoneThermostatNavCard extends HTMLElement {
 if (!customElements.get("multizone-thermostat-nav-card")) {
   customElements.define("multizone-thermostat-nav-card", MultizoneThermostatNavCard);
 }
+
 
 /* ==================== RESPONSIVE GRID CARD ==================== */
 class MultizoneThermostatResponsiveGrid extends HTMLElement {
@@ -7597,14 +7865,63 @@ class MultizoneThermostatStyleSwitcher extends HTMLElement {
           to { opacity: 1; }
         }
         .modal-card {
-          background: linear-gradient(135deg, rgba(20, 27, 41, 0.96) 0%, rgba(15, 23, 42, 0.99) 100%);
-          border: 1px solid rgba(255, 255, 255, 0.12);
           border-radius: 24px;
-          box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.9), 0 0 30px rgba(56, 189, 248, 0.2);
           width: 100%;
           max-width: 440px;
           overflow: hidden;
           animation: popIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .modal-card.modal-luxury {
+          background: linear-gradient(135deg, rgba(20, 27, 41, 0.96) 0%, rgba(15, 23, 42, 0.99) 100%);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.9), 0 0 30px rgba(56, 189, 248, 0.2);
+        }
+        .modal-card.modal-classic {
+          background: var(--ha-card-background, var(--card-background-color, #1c1c1e)) !important;
+          border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.15)) !important;
+          box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6) !important;
+        }
+        .modal-classic .modal-header {
+          border-bottom: 1px solid var(--divider-color, rgba(255, 255, 255, 0.12)) !important;
+        }
+        .modal-classic .modal-title {
+          color: var(--primary-text-color, #ffffff) !important;
+        }
+        .modal-classic .section-label {
+          color: var(--secondary-text-color, #94a3b8) !important;
+        }
+        .modal-classic .option-card {
+          background: var(--card-background-color, #202b38) !important;
+          border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.12)) !important;
+        }
+        .modal-classic .option-card:hover {
+          background: rgba(255, 255, 255, 0.05) !important;
+        }
+        .modal-classic .option-card.active {
+          background: rgba(var(--rgb-primary-color, 2, 132, 199), 0.15) !important;
+          border-color: var(--primary-color, #0284c7) !important;
+          box-shadow: 0 0 16px rgba(var(--rgb-primary-color, 2, 132, 199), 0.25) !important;
+        }
+        .modal-classic .option-card.active .option-icon {
+          background: rgba(var(--rgb-primary-color, 2, 132, 199), 0.25) !important;
+          color: var(--primary-color, #0284c7) !important;
+        }
+        .modal-classic .option-card.active .radio-dot {
+          border-color: var(--primary-color, #0284c7) !important;
+          background: var(--primary-color, #0284c7) !important;
+        }
+        .modal-classic .toggle-box {
+          background: var(--card-background-color, #202b38) !important;
+          border: 1px solid var(--divider-color, rgba(255, 255, 255, 0.12)) !important;
+        }
+        .modal-classic .toggle-title {
+          color: var(--primary-text-color, #ffffff) !important;
+        }
+        .modal-classic .toggle-desc {
+          color: var(--secondary-text-color, #94a3b8) !important;
+        }
+        .modal-classic input:checked + .slider {
+          background-color: var(--primary-color, #0284c7) !important;
         }
         @keyframes popIn {
           from { transform: scale(0.92); opacity: 0; }
@@ -7807,7 +8124,7 @@ class MultizoneThermostatStyleSwitcher extends HTMLElement {
       </div>
 
       <div class="modal-overlay" id="modal-overlay">
-        <div class="modal-card">
+        <div class="modal-card ${isClassic ? 'modal-classic' : 'modal-luxury'}">
           <div class="modal-header">
             <div class="modal-title">
               <span>🎨</span> Personalizzazione Dashboard
