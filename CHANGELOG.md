@@ -1,5 +1,20 @@
 # Changelog
 
+## [6.0.5] - 2026-11-07
+### Refactor: Modular Schedule Subsystem (SRP Architecture) & Timezone Hardening
+- **Modular Schedule Package (`custom_components/multizone_thermostat/schedule/`)**:
+  - Decomposed the monolithic schedule manager into specialized, single-responsibility components:
+    - `storage.py`: Dedicated HA `.storage` persistence, profile CRUD, block normalization, and profile expiration tracking.
+    - `slot_engine.py`: Weekly timeline evaluation, block time parsing, midnight crossing resolution, baseline fallback, and lookahead windows.
+    - `smart_return.py`: "Thermal Radar" preheating planner, room heating rate estimation, and arrival plan calculation.
+    - `manager.py`: Runtime orchestrator dedicated strictly to zone/master entity wake-up and live event coordination.
+  - Kept `schedule_manager.py` as an ultra-compact, 100% backward-compatible facade.
+- **Timezone Fallback Fix**:
+  - Fixed a latent `NameError: timezone` bug in `_as_local` when handling static timezone offsets.
+- **Unit Test Coverage**:
+  - Added dedicated unit test suites for `ScheduleProfileStorage`, `ScheduleSlotEngine`, and `SmartReturnPlanner` (181 test cases passing).
+
+
 ## [6.0.2] - 2026-11-05
 ### Fix: Dashboard Columns Wrapping & Strategy View Compatibility
 - **Lovelace Dashboard Strategy Config Resolution**:
