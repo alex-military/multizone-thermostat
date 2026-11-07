@@ -7679,6 +7679,7 @@ class MultizoneThermostatDashboardStrategy extends HTMLElement {
           title: "Programmazione",
           path: "programmazione",
           icon: "mdi:calendar-clock",
+          subview: true,
           panel: true,
           cards: schedView.cards,
         },
@@ -7686,6 +7687,7 @@ class MultizoneThermostatDashboardStrategy extends HTMLElement {
           title: "Diagnostica & Efficienza",
           path: "diagnostica",
           icon: "mdi:chart-box-outline",
+          subview: true,
           panel: true,
           cards: diagView.cards,
         }
