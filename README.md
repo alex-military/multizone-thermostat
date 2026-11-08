@@ -4,6 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 [![HACS](https://img.shields.io/badge/HACS-Custom_Integration-orange.svg?style=flat-square)](https://hacs.xyz/)
 [![Live Simulator](https://img.shields.io/badge/Live%20Simulator-GitHub%20Pages-0ea5e9?style=flat-square&logo=googlechrome&logoColor=white)](https://alex-military.github.io/multizone-thermostat/)
+[![Support on Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20Me-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white)](https://ko-fi.com/Z8L52A8URQ)
 
 A comprehensive custom integration for Home Assistant that provides **multi-zone heating management**, **centralized boiler supervision**, **dual-drive OpenTherm/Relay modulation**, and **building energy diagnostics**. No YAML automations or scripts required — everything is configured seamlessly through the Home Assistant UI.
 
@@ -245,6 +246,20 @@ Explore our dedicated documentation pages for deep dives:
 ## Acknowledgments
 
 A special thanks to the creators of [SmartThermostat](https://github.com/ScratMan/HASmartThermostat) and [vindaalex/multizone-thermostat](https://github.com/vindaalex/multizone-thermostat). The core mathematical logic for the PID controller and the Autotuning algorithm in this project were deeply inspired by and adapted from their fantastic open-source work.
+
+## Support & Donations
+
+If you find this integration helpful and would like to support its ongoing development, maintenance, and new features, consider buying a coffee!
+
+<p align="left">
+  <a href="https://ko-fi.com/Z8L52A8URQ" target="_blank">
+    <img src="https://storage.ko-fi.com/cdn/kofi2.png?v=3" alt="Support on Ko-fi" height="38">
+  </a>
+</p>
+
+*GitHub Sponsors will also be available once account verification completes.*
+
+---
 
 ## License
 
