@@ -1,19 +1,24 @@
-* [🏠 Panoramica](home.md)
-* [📥 Installazione & Requisiti](installation.md)
-* [⚙️ Procedura Guidata (Config Flow)](setup_wizard.md)
+* [🏠 Overview](home.md)
+* [📥 Installation & Requirements](installation.md)
+* [⚙️ Setup Wizard (Config Flow)](setup_wizard.md)
 
-* **Novità Fase 11 (Beta)**
-  * [🔥 Centrale Bivalente & Solare](hybrid_energy.md)
-  * [❄️ Climatizzatori Split d'Ambiente](split_climate.md)
-  * [🔄 Raffrescamento & Doppio Binario](cooling_season.md)
+* **Phase 11 (Beta Features)**
+  * [🔥 Bivalent Plant & Solar](hybrid_energy.md)
+  * [❄️ Room Split Air Conditioners](split_climate.md)
+  * [🔄 Summer Cooling & Dual-Track](cooling_season.md)
 
-* **Funzionalità & Protezioni**
-  * [📅 Programmazione & Smart Return](scheduling.md)
-  * [🛡️ Protezioni & Diagnostica Impianto](diagnostics_safety.md)
+* **Algorithms & Climate Control**
+  * [🧠 Autotuning, PID & 0-10V Valves](algorithms_tuning.md)
+  * [📅 Scheduling & Smart Return](scheduling.md)
 
-* **Interfaccia Grafica**
-  * [🎨 Guida alle Schede Lovelace](cards_guide.md)
-  * [🎮 Simulatore Live (3 Dashboard) ↗](simulator.html)
+* **Diagnostics, Safety & Integrations**
+  * [🛡️ Plant Safeguards & Diagnostics](diagnostics_safety.md)
+  * [📋 Entities Created & Exposed Services](entities_services.md)
+  * [❓ Troubleshooting & FAQ](faq_troubleshooting.md)
 
-* **Link Esterni**
+* **Lovelace User Interface**
+  * [🎨 Complete Lovelace Cards Guide](cards_guide.md)
+  * [🎮 Interactive Live Simulator (3 Dashboards)](simulator_view.md)
+
+* **External Links**
   * [GitHub Repository ↗](https://github.com/alex-military/multizone-thermostat)

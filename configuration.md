@@ -2,6 +2,13 @@
 
 [⬅️ Back to Main Readme](README.md) • [🌿 Hybrid Plant, Split AC & Energy Guide](hybrid_and_energy.md) • [🎨 Cards Guide](cards.md)
 
+> [!TIP]
+> 📖 **Interactive Multilingual Wiki Available!**  
+> For the complete step-by-step documentation, collapsible configuration flows, settings map, and live simulator, visit:  
+> - 🇬🇧 **[English Documentation Wiki](docs/wiki/index.html#/setup_wizard)**
+> - 🇮🇹 **[Wiki Documentazione in Italiano](docs/wiki/index.html#/it/setup_wizard)**  
+> - 🎮 **[Interactive 3-Dashboard Live Simulator](docs/wiki/index.html#/simulator_view)**
+
 Everything you need to know to set up, configure, and understand how the Multizone Thermostat integration works.
 
 > [!IMPORTANT]

@@ -2132,9 +2132,9 @@ class MultizoneThermostatDialCard extends HTMLElement {
         }
         .pills-row {
           display: flex;
-          align-items: center;
-          gap: 6px;
-          flex-wrap: wrap;
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 4px;
         }
         .header-center {
           position: absolute;

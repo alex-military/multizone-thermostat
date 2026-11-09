@@ -1,39 +1,88 @@
-# Programmazione Settimanale & Smart Return
+# Weekly Scheduling & Smart Return
 
-<span class="badge-stable">STABILE</span>
+<span class="badge-stable">STABLE</span>
 
-
-Multizone Thermostat integra un motore di programmazione oraria settimanale completo e nativo, visualizzabile tramite una matrice grafica a 24 ore e arricchito da algoritmi di anticipo termico predittivo.
-
----
-
-## 1. La Scheda Scheduler (`custom:multizone-thermostat-scheduler-card`)
-
-La scheda di programmazione consente di:
-* **Visualizzare la Matrix 24 Ore**: Una vista orizzontale a fasce colorate che mostra l'alternanza dei preset (Comfort, Eco, Notte, Fuori Casa) per tutte le zone della casa.
-* **Modifica Rapida delle Fasce**: Toccando qualsiasi blocco orario è possibile regolare ora di inizio, ora di fine e il preset assegnato alla stanza.
-* **Copia Multi-Giorno**: Pulsante per replicare la configurazione dal Lunedì al Venerdì (giorni lavorativi) o sull'intero fine settimana con un solo tocco.
+Multizone Thermostat integrates a native weekly schedule engine with a visual 24-hour timeline matrix and predictive thermal anticipation (**Smart Return**).
 
 ---
 
-## 2. Gestione Multi-Profilo
+## 1. The Scheduler Card (`custom:multizone-thermostat-scheduler-card`)
 
-Puoi salvare e alternare profili settimanali diversi in base alle tue abitudini di vita:
-* **Standard**: Routine feriale tipica.
-* **Festivo / Weekend**: Sveglia posticipata e comfort continuo durante il giorno.
-* **Smart Working**: Riscaldamento continuativo per le stanze studio/lavoro durante le ore lavorative.
-* **Personalizzato**: Nuovi profili creati liberamente.
-
-I profili possono essere attivati manualmente, via automazione o con una scadenza temporale automatica (es. attiva "Ospiti" fino a domenica sera alle 23:00, con rientro automatico a "Standard").
+* **24-Hour Timeline Matrix**: Visual timeline with color-coded preset blocks (Comfort, Eco, Sleep, Away) across all rooms throughout the day.
+* **Touch-Friendly Block Editing**: Tap any time block to adjust start time, end time, and assigned preset mode.
+* **Quick Multi-Day Copy**: Copy configurations across weekdays (Monday–Friday) or weekends with a single tap.
 
 ---
 
-## 3. Pianificatore Rientro Intelligente ("Smart Return")
+## 2. Multi-Profile Management & Timed Expirations
 
-Se sei fuori casa o l'impianto è spento (Master OFF) e vuoi trovare la casa calda al tuo arrivo:
-1. Apri la schermata **Pianifica Rientro** dalla scheda del termostato o dallo Scheduler.
-2. Imposta l'orario previsto di arrivo a casa (ad esempio le 18:30).
-3. **Il Radar Termico Predittivo**:
-   Il sistema conosce la velocità di riscaldamento (°C/ora) di ciascuna stanza grazie all'algoritmo di auto-apprendimento:
-   * Se il salone impiega 45 minuti per scaldarsi e la camera da letto 1 ora e 15 minuti, l'impianto accenderà prima la camera (alle 17:15) e poi il salone (alle 17:45).
-   * Alle 18:30 precise tutte le stanze saranno esattamente alla temperatura desiderata, senza sprecare energia accendendo prima del dovuto.
+* **Standard**: Typical weekday work schedule.
+* **Weekend / Holiday**: Delayed wake-up and continuous daytime comfort.
+* **Smart Working**: Dedicated daytime heating for home offices.
+* **Guests / Vacation**: Custom profiles for temporary events.
+
+### Temporary Profiles with Auto-Reversion
+Activate special profiles with an expiration timestamp via UI or Home Assistant service:
+* E.g.: Activate **"Guests"** until Sunday at 23:00.
+* Once expired, the system automatically reverts to **"Standard"**, preventing accidental energy waste.
+
+---
+
+## 3. Predictive Smart Return (Pianifica Rientro)
+
+Conventional setback systems rely on guesswork ("turn on heating 1 hour before arrival").
+Multizone Thermostat deploys a **Predictive Thermal Radar**:
+
+```mermaid
+flowchart TD
+    Arrivo["<b>Target Arrival Time: 18:30</b>"] --> Radar["<b>Multizone Predictive Thermal Radar</b><br>Computes pre-heating advance per room based on learned inertia"]
+    Radar --> Z1["<b>Master Bedroom</b> (Inertia 1h 15m, R = 1.2 °C/h)<br>🚀 Pre-heat starts at <b>17:15</b>"]
+    Radar --> Z2["<b>Living Room</b> (Inertia 45m, R = 2.0 °C/h)<br>🚀 Pre-heat starts at <b>17:45</b>"]
+    Radar --> Z3["<b>Kitchen</b> (Inertia 30m, R = 2.8 °C/h)<br>🚀 Pre-heat starts at <b>18:00</b>"]
+    Z1 --> Obiettivo["<b>Exact Arrival at 18:30</b><br>All rooms reach Comfort simultaneously!"]
+    Z2 --> Obiettivo
+    Z3 --> Obiettivo
+```
+
+### Pre-Heating Time Calculation
+Using the learned warm-up rate $R$ (°C/hour):
+
+$$\Delta t_{\text{lead\_time}} = \frac{T_{\text{comfort}} - T_{\text{current}}}{R}$$
+
+* Rooms warm up at their natural rates without wasted early heating.
+* **Result**: At 18:30 sharp, every room reaches comfort simultaneously.
+
+---
+
+## 4. YAML Automation Examples
+
+### Trigger Smart Return on Leaving the Office (GPS Geofence)
+```yaml
+automation:
+  - alias: "Smart Return upon Leaving Work"
+    trigger:
+      - platform: zone
+        entity_id: person.alex
+        zone: zone.office
+        event: leave
+    action:
+      - service: multizone_thermostat.set_smart_return
+        data:
+          arrival_time: "19:00"
+          preset: comfort
+```
+
+### Switch to Smart Working Profile
+```yaml
+automation:
+  - alias: "Activate Smart Working Profile"
+    trigger:
+      - platform: state
+        entity_id: input_boolean.work_from_home
+        to: "on"
+    action:
+      - service: multizone_thermostat.activate_schedule_profile
+        data:
+          profile_id: smart_working
+          fallback_profile: standard
+```

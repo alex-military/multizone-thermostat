@@ -5,6 +5,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 [![HACS](https://img.shields.io/badge/HACS-Custom_Integration-orange.svg?style=flat-square)](https://hacs.xyz/)
 [![Live Simulator](https://img.shields.io/badge/Live%20Simulator-GitHub%20Pages-0ea5e9?style=flat-square&logo=googlechrome&logoColor=white)](https://alex-military.github.io/multizone-thermostat/)
+[![Wiki Documentation](https://img.shields.io/badge/Documentation-Wiki%20(EN)-38bdf8.svg?style=flat-square&logo=gitbook&logoColor=white)](docs/wiki/index.html)
+[![Wiki Documentazione](https://img.shields.io/badge/Documentazione-Wiki%20(IT)-f59e0b.svg?style=flat-square&logo=gitbook&logoColor=white)](docs/wiki/index.html#/it/home)
 
 > [!IMPORTANT]
 > **🚀 Beta Testing Release: v6.1.0-beta.1 (Phase 11: Hybrid Plant, Room Split AC & Solar Energy Management)**
@@ -12,7 +14,13 @@
 
 A comprehensive custom integration for Home Assistant that provides **multi-zone heating & cooling management**, **bivalent boiler & heat pump supervision**, **room split AC integration**, **solar self-consumption & battery protection**, **dual-drive OpenTherm/Relay modulation**, and **building energy diagnostics**. No YAML automations or scripts required — everything is configured seamlessly through the Home Assistant UI.
 
-![Dashboard Preview](images/dashboard_3col.png)
+<div align="center">
+  <img src="images/dashboard_winter.jpg" alt="Winter Heating View" width="48%">
+  <img src="images/dashboard_summer.jpg" alt="Summer Cooling View" width="48%">
+  <p><em>Left: Winter Heating Mode (Gas & Split Dual Heat) • Right: Summer Cooling Mode (Auto-Filtered Uncooled Rooms)</em></p>
+</div>
+
+> **🎯 The Vision**: Multizone Thermostat is built to become the single, unified climate and thermal management hub for Home Assistant, bringing together boilers, heat pumps, split ACs, radiant floors, fancoils, pellet stoves, solar PV, and battery storage under one intelligent, autonomous brain.
 
 ---
 

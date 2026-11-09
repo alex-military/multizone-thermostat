@@ -2,6 +2,13 @@
 
 [⬅️ Back to Main Readme](README.md) • [🌿 Hybrid Plant, Split AC & Energy Guide](hybrid_and_energy.md) • [⚙️ Configuration Guide](configuration.md)
 
+> [!TIP]
+> 📖 **Interactive Multilingual Wiki Available!**  
+> Explore our interactive Wiki:  
+> - 🇬🇧 **[English Lovelace Cards Guide](docs/wiki/index.html#/cards_guide)**
+> - 🇮🇹 **[Guida Schede Lovelace in Italiano](docs/wiki/index.html#/it/cards_guide)**  
+> - 🎮 **[Interactive 3-Dashboard Live Simulator](docs/wiki/index.html#/simulator_view)**
+
 This integration includes custom Lovelace cards and auto-generated dashboard strategies to manage your multi-zone climate system, bivalent central plant, room split air conditioners, and building energy diagnostics directly in Home Assistant. The cards are **auto-registered** — no manual resource configuration is required.
 
 > [!IMPORTANT]

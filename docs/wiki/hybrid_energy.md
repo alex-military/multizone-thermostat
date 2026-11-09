@@ -1,65 +1,109 @@
-# Centrale Bivalente & Gestione Energetica
+# Bivalent Central Plant & Energy Management
 
 <span class="badge-beta">BETA</span>
 
-La **Fase 11** introduce un motore di orchestrazione termico ed energetico avanzato (`PlantOrchestrator` & `EnergyManager`), capace di gestire contemporaneamente caldaie a combustibile e pompe di calore idroniche, ottimizzando l'autoconsumo da fotovoltaico anche in contesti Off-Grid.
+Phase 11 transforms Multizone Thermostat into an advanced thermal and energy orchestration platform (`PlantOrchestrator` & `EnergyManager`), coordinating combustion boilers and hydronic heat pumps while maximizing renewable solar self-consumption—even in completely **off-grid** or zero-export environments.
 
 ---
 
-## 1. Centrale Termica Bivalente (Caldaia + Pompa di Calore)
+## 1. Bivalent Central Plant (Gas Boiler + Heat Pump)
 
-L'impianto centrale può pilotare contemporaneamente o alternativamente:
-1. **Caldaia a Gas / Combustibile**:
-   * Relè ON/OFF con cicli PWM intelligenti.
-   * Modulante OpenTherm con regolazione dinamica della temperatura dell'acqua in base al fabbisogno reale ($35^\circ\text{C} - 75^\circ\text{C}$).
-2. **Pompa di Calore Idronica (PDC)**:
-   * Termostato dedicato (`climate.*`), contatto pulito/SG-Ready (`switch.*`), oppure modulazione OpenTherm/Modbus.
-   * Modalità estiva reversibile per impianti radianti o fancoil con blocco assoluto della caldaia a gas a 0%.
-
-### Le 5 Priorità di Riscaldamento
-Selezionabili direttamente dal selettore a pillola della card Lovelace o tramite `select.master_control_heat_source_priority`:
-
-| Modalità | Comportamento Gas | Comportamento Elettrico (Split & PDC) |
-|---|---|---|
-| **`auto`** | Copre il fabbisogno di base dell'abitazione | Subentra con **Surplus Solare**, pianificazione EMHASS o avvio rapido **Quick Boost** |
-| **`hybrid`** | Riscalda tutte le stanze convenzionali | Le stanze con split usano l'elettrico **solo se c'è sole**; senza sole tornano a gas per non consumare la batteria |
-| **`combined`** | Lavora stabilmente a regime idronico | Interviene in parallelo al gas in caso di surplus solare o forte shock termico ($\Delta T \ge 1.5^\circ\text{C}$) |
-| **`electric_only`** | **Forzato a 0%** (zero gas bruciato) | 100% della richiesta termica gestito da PDC centrale e split |
-| **`gas_only`** | 100% della richiesta termica a gas | Split e PDC disattivati in riscaldamento |
-
----
-
-## 2. Autoconsumo Fotovoltaico, Sistemi Off-Grid & Clipping
-
-A differenza di molti algoritmi che richiedono obbligatoriamente un sensore di esportazione verso la rete pubblica, il motore energetico è pensato anche per **impianti a isola (Off-Grid)** o con inverter a immissione zero (*curtailment/zero-export*):
+The central plant engine arbitrates between two primary generator tiers:
 
 ```mermaid
 flowchart TD
-    Inizio["Rilevamento Stato Energetico"] --> CheckGrid{"Export Rete > Soglia?"}
-    CheckGrid -->|Si| TriggerSurplus["Abilita Surplus Solare Gratuito"]
-    CheckGrid -->|No o Assente| CheckOffGrid{"SoC Batteria >= 95%<br>& Produzione PV >= 300W<br>& Batteria Idle/Carica?"}
-    CheckOffGrid -->|Si| TriggerSurplus
-    CheckOffGrid -->|No| CheckEMHASS{"EMHASS / Predbat > 0W?"}
-    CheckEMHASS -->|Si| TriggerSurplus
-    CheckEMHASS -->|No| NormalMode["Modalita Ordinaria a Gas"]
-    TriggerSurplus --> Guard{"Batteria in scarica >150W<br>per piu di 5 minuti?"}
-    Guard -->|"Si! Nuvola o carichi"| FallbackGas["Interrompi Surplus Elettrico!<br>Torna Immediatamente a Gas"]
-    Guard -->|No| MaintainElectric["Mantieni Split/PDC Elettrici"]
+    PlantOrch["<b>Plant Orchestrator</b><br>(Central Plant Supervision)"]
+    
+    PlantOrch -->|Heating Demand| Gas["<b>Gas / Pellet Boiler</b>"]
+    Gas --> Rel["Relay PWM (Cyclic ON/OFF)"]
+    Gas --> OT["Modulating OpenTherm Gateway"]
+    
+    PlantOrch -->|Hybrid / Chilled Water| PDC["<b>Hydronic Heat Pump (PDC)</b>"]
+    PDC --> HP1["Climate Interface (Flow Setpoint & Mode)"]
+    PDC --> HP2["Dry Contact / SG-Ready Relay"]
+    PDC --> HP3["OpenTherm / Modbus Bus"]
 ```
 
-### Salvaguardie Fondamentali per la Batteria
-* **Guardia Anti-Scarica Continua (`battery_max_discharge_time`)**:
-  Se la casa comincia ad assorbire energia dalla batteria domestica (scarica continua $> 150\text{ W}$) per un periodo configurabile (default: **5 minuti consecutivi**), il sistema interrompe l'overheat elettrico e **riaccende la caldaia a gas**, preservando l'accumulo per la sera.
-* **Riserva Minima Notturna (`battery_min_reserve_soc`)**:
-  Soglia minima di sicurezza (es. 80% o 85%). Al di sotto di questa soglia l'impianto termico non può mai attingere alla batteria per riscaldare la casa.
-* **Anti-Pendolamento Compressori (`solar_min_run_time`)**:
-  Garantisce che una volta avviato un compressore elettrico, esso resti in marcia continuativa per almeno 10 minuti, proteggendo la meccanica dell'inverter da nuvole passeggere.
-* **Accumulo Termico nei Muri (`solar_overheat_offset`)**:
-  Possibilità di incrementare temporaneamente la temperatura ambiente delle stanze fino a **+3.0°C** durante il picco solare gratuito, trasformando l'edificio in una batteria termica.
+### Supported System Architectures
+1. **Standard Bivalent Hybrid System**: Gas boiler handles cold winter baselines; heat pump engages during mild shoulder seasons or summer cooling.
+2. **Full-Electric Installation (Heat Pump Only)**: By disabling the boiler (`enable_gas_heater: False`), the heat pump manages 100% of the home's heating and cooling.
+3. **Traditional Gas Boiler + Room Split AC Units**: Central boiler serves hydronic radiators while individual room splits leverage free rooftop solar power.
 
 ---
 
-## 3. Bridge Predittivo EMHASS & Predbat
-Puoi collegare direttamente l'entità di output del tuo ottimizzatore economico:
-* Riconosce segnali booleani (`on`, `true`, `boost`).
-* Riconosce **sensori numerici in Watt** (es. `sensor.p_deferrable0 > 0 W`).
+## 2. The 5 Heat Source Priorities
+
+Configurable from the Lovelace Preset Card or via `select.master_control_heat_source_priority`:
+
+| Priority | Gas Boiler Behavior | Electric Behavior (Splits & Heat Pump) | Recommended Scenario |
+|---|---|---|---|
+| **`auto`** | Covers household baseline heating. | Engages automatically during **Free Solar Surplus**, EMHASS dispatch, or cold **Quick Heat Boost** (ΔT ≥ 1.5 °C). | Set-and-forget everyday comfort. |
+| **`hybrid`** | Heats conventional rooms via hydronics. | Rooms with split units use electric heating **only when solar surplus is available**; falls back to gas without sun to preserve batteries. | Homes with home batteries to preserve for the night. |
+| **`combined`** | Maintains steady hydronic heating. | Operates in parallel with gas during solar surplus or large temperature drops to warm the house as quickly as possible. | Large houses or returning from prolonged absence. |
+| **`electric_only`** | **Locked at 0%** (zero gas burned). | 100% of heat demand directed to central heat pump and room split units. | All-electric homes, gas supply outages, or peak sunny days. |
+| **`gas_only`** | 100% of heat demand supplied by gas. | Splits and heat pumps disabled in heating mode. | Prolonged bad weather or AC maintenance. |
+
+---
+
+## 3. Solar Self-Consumption & Off-Grid Standalone Systems
+
+Traditional solar diverters require a grid export sensor (`grid_export > 500 W`).
+This fails on **off-grid standalone setups** or **zero-export inverters (curtailment)**, where export power is 0 W and the inverter curtails panel generation as soon as the battery is full.
+
+Multizone Thermostat uses an intelligent anti-clipping algorithm:
+
+```mermaid
+flowchart TD
+    V1["1. Energy Sensor Evaluation"] --> V2{"Grid Export > Threshold W?"}
+    V2 -->|Yes| V3["Activate Free Solar Surplus!"]
+    V2 -->|No / None| V4{"Battery SoC ≥ 95%<br>& PV Power ≥ 300W?"}
+    V4 -->|Yes| V3
+    V4 -->|No| V5{"EMHASS / Predbat Signal > 0W?"}
+    V5 -->|Yes| V3
+    V5 -->|No| V6["No Surplus: Maintain Baseline Mode"]
+    
+    V3 --> G1{"Household battery discharging continuously<br>> 150W for more than 5 minutes?"}
+    G1 -->|Yes: Cloud or heavy loads| G2["HALT ELECTRIC SURPLUS!<br>Restart Gas Boiler"]
+    G1 -->|No: Stable solar| G3["Keep Splits & Heat Pump Active"]
+```
+
+### Essential Battery Safeguards
+
+1. **Continuous Discharge Timeout (`battery_max_discharge_time`)**:
+   If passing clouds or heavy household appliances (oven, induction hob) cause continuous battery discharge (> 150 W) for longer than the configured timeout (default: **5 minutes**), the system immediately suspends electric heating and **restarts the gas boiler**, safeguarding night reserves.
+2. **Minimum Night Reserve SoC (`battery_min_reserve_soc`)**:
+   Hard security floor (recommended 80–85%). Electric solar heating is strictly locked out if the battery falls below this level.
+3. **Compressor Anti-Chatter Protection (`solar_min_run_time`)**:
+   Enforces a minimum continuous run time (default: **10 minutes**) on inverter heat pump and split compressors to prevent wear from transient cloud shadows.
+4. **Thermal Pre-Storage in Building Walls (`solar_overheat_offset`)**:
+   During peak solar hours when batteries are saturated, the system can temporarily elevate the target temperature of conditioned rooms by **+0.5 °C** to **+3.0 °C**, storing free solar energy directly into the building's thermal mass.
+
+---
+
+## 4. AI Optimizer Bridge (EMHASS & Predbat)
+
+Connect your local economic optimizer directly:
+* **Boolean Signals**: Recognizes `on`, `true`, `active`, `boost`.
+* **Numeric Power Sensors**: If EMHASS schedules a deferrable load (e.g. `sensor.p_deferrable0`), Multizone Thermostat monitors the numeric Watt value: as soon as it reads $> 0\text{ W}$, solar surplus engages automatically.
+
+---
+
+## 5. Configuration Parameters Reference
+
+| Parameter | Configuration Key | Default | Description |
+|---|---|---|---|
+| Gas Boiler Enable | `enable_gas_heater` | `True` | If disabled, operates in pure Full-Electric mode. |
+| Heat Pump Enable | `enable_heat_pump` | `False` | Enables central hydronic heat pump coordination. |
+| Heat Pump Type | `heat_pump_type` | `climate` | Select from `climate`, `switch`, or `opentherm`. |
+| Reversible Cooling | `heat_pump_cooling` | `True` | Enables chilled water cooling while locking gas combustion. |
+| Energy Management | `energy_management_enabled` | `False` | Master switch for the Energy Manager. |
+| Solar PV Sensor | `solar_power_sensor` | `None` | Real-time rooftop solar generation in Watts. |
+| Grid Export Sensor | `grid_export_sensor` | `None` | Grid feed-in sensor in Watts (optional). |
+| Export Threshold | `solar_export_threshold` | `500.0 W` | Minimum export power to trigger surplus mode. |
+| Battery SoC Sensor | `battery_soc_sensor` | `None` | Battery state of charge percentage (0-100%). |
+| Battery Power Sensor | `battery_power_sensor` | `None` | Battery charge/discharge power in Watts. |
+| Night Reserve SoC | `battery_min_reserve_soc` | `20.0%` | Recommended 80–85% to preserve battery overnight. |
+| Max Discharge Time | `battery_max_discharge_time` | `5 min` | Max consecutive discharge minutes before gas fallback. |
+| Min Cycle Duration | `solar_min_run_time` | `10 min` | Inverter compressor anti-chatter protection. |
+| Thermal Mass Offset | `solar_overheat_offset` | `0.0°C` | Target elevation during free solar surplus (up to +3.0°C). |
+| External AI Override | `external_solar_override_entity` | `None` | EMHASS deferrable load sensor or Predbat signal. |

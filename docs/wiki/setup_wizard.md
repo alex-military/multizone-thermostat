@@ -1,75 +1,154 @@
-# Procedura Guidata (Config Flow)
+# Setup Wizard (Config Flow & Options)
 
-La configurazione iniziale di **Multizone Thermostat** avviene al 100% tramite l'interfaccia grafica di Home Assistant (Config Flow), senza dover modificare file `configuration.yaml`.
-
----
-
-## Avvio della Procedura
-1. Vai in **Impostazioni → Dispositivi e Servizi**.
-2. Fai clic su **Aggiungi Integrazione** in basso a destra.
-3. Cerca **"Multizone Thermostat"** e selezionalo.
+The entire configuration of **Multizone Thermostat** is performed 100% via Home Assistant's visual interface (Config Flow & Options Flow), eliminating the need for manual YAML editing.
 
 ---
 
-## Passaggi della Configurazione
+## 1. Initial Setup (Config Flow)
 
-### 1. Selezione Generatori Centrali
+To launch the setup wizard:
+1. Go to **Settings → Devices & Services**.
+2. Click **Add Integration** in the bottom right corner.
+3. Search for **"Multizone Thermostat"** and select it.
 
+```mermaid
+flowchart TD
+    S1["Step 1: Central Generators (Gas / Heat Pump)"] --> S1a{"Gas Boiler Enabled?"}
+    S1a -->|Yes| C_Gas["Step 1a: Gas Boiler Config<br>(Relay PWM or OpenTherm)"]
+    S1a -->|No| S1b{"Heat Pump Enabled?"}
+    C_Gas --> S1b
+    S1b -->|Yes| C_PDC["Step 1b: Central Heat Pump Config<br>(Climate, Switch or OpenTherm)"]
+    S1b -->|No| Zone1["Step 2: Add First Thermal Zone"]
+    C_PDC --> Zone1
+    Zone1 --> CalibCheck{"TRVs + External Sensor?"}
+    CalibCheck -->|Yes| S3["Step 3: TRV Offset Calibration Mapping"]
+    CalibCheck -->|No| S4{"Add Another Zone?"}
+    S3 --> S4
+    S4 -->|Yes| Zone1
+    S4 -->|No| S5["Step 5: Solar & Battery Management (Optional)"]
+    S5 --> S6["Step 6: Local Calendar"]
+    S6 --> S7["Step 7: Weather Compensation Curve"]
+    S7 --> S8["Step 8: Presence & Geofencing"]
+    S8 --> Fine["Setup Complete!"]
+```
+
+---
+
+### Step-by-Step Configuration Guide
+
+#### Step 1: Central Generator Selection
 <span class="badge-beta">BETA</span>
 
-Puoi selezionare uno o entrambi i generatori termici della casa:
-* ☑️ **Caldaia a Gas / Combustibile**: Abilita il supporto a generatori a combustione.
-* ☑️ **Pompa di Calore Idronica (PDC)**: Abilita il supporto alla pompa di calore centrale (per impianti bivalenti ibridi o full-electric).
+Select the physical generators present in your heating plant:
+* ☑️ **Gas / Fuel Boiler (`enable_gas_heater`)**: Enables combustion boilers (natural gas, LPG, diesel, pellets).
+* ☑️ **Central Hydronic Heat Pump (`enable_heat_pump`)**: Enables central heat pump coordination for bivalent hybrid or full-electric systems.
 
-### 1a. Configurazione Caldaia a Gas
+#### Step 1a: Gas Boiler Configuration
+<span class="badge-stable">STABLE</span>
 
-<span class="badge-stable">STABILE</span>
+* **Relay Mode (ON/OFF PWM)**:
+  * `boiler_switch`: Select the switch entity (`switch.*`) controlling the boiler burner or circulation pump.
+* **OpenTherm Modulating Mode**:
+  * `opentherm_entity`: Select the OpenTherm gateway entity (`climate`, `water_heater`, or `number`).
+  * `opentherm_ch_switch`: Optional central heating enable switch (CH switch).
+  * `opentherm_min_temp` / `opentherm_max_temp`: Water flow temperature limits (e.g. 35 °C – 75 °C for radiators, 25 °C – 45 °C for underfloor).
 
-* **Modalità Relè (ON/OFF PWM)**: Seleziona l'entità interruttore (`switch.*`) che comanda il consenso caldaia o la pompa di circolazione.
-* **Modalità OpenTherm (Modulante)**: Seleziona l'entità gateway OpenTherm (`climate`, `water_heater` o `number`) e imposta i limiti di temperatura dell'acqua di mandata ($T_{\text{min}}$ es. 35°C, $T_{\text{max}}$ es. 75°C).
-
-### 1b. Configurazione Pompa di Calore Idronica
-
+#### Step 1b: Central Heat Pump Configuration
 <span class="badge-beta">BETA</span>
 
-* **Tipo di Interfaccia**: `climate` (entità termostato PDC), `switch` (consenso ON/OFF o contatto SG-Ready) o `opentherm`.
-* **Range Riscaldamento**: Temperatura mandata min/max (es. 25°C – 55°C).
-* **Raffrescamento Idronico Reversibile (`heat_pump_cooling`)**: Abilita l'invio di acqua refrigerata in estate (es. impianto a pavimento con deumidificatori o fancoil), escludendo categoricamente la caldaia a gas.
+* **Control Interface (`heat_pump_type`)**:
+  * `climate`: Modulates flow temperature setpoints and handles `heat`/`cool`/`off` mode switching.
+  * `switch`: Dry contact relay or **Smart Grid Ready (SG-Ready)** input.
+  * `opentherm`: Modulating OpenTherm / Modbus bus drive.
+* **Heating Range**: Flow setpoint limits for heating (e.g. 25 °C – 50 °C).
+* **Reversible Cooling (`heat_pump_cooling`)**: Enables summer chilled water generation for fancoils or underfloor cooling with dehumidifiers, strictly locking the gas boiler to 0%.
 
 ---
 
-### 2. Creazione della Zona Termica (Stanza)
-La schermata di aggiunta zona è suddivisa in sezioni a fisarmonica:
+#### Step 2: Thermal Zone Creation (Rooms)
+Organized into collapsible accordion sections:
 
-* **Impostazioni Principali**: Nome della stanza, sensore di temperatura principale (`sensor.*`) e temperatura target di base.
-* **▶ Teste Termostatiche TRV (Standard)** <span class="badge-stable">STABILE</span>: Assegna una o più valvole TRV (`climate.*`). Il sistema calcola la media e sincronizza i setpoint.
-* **▶ Valvole Proporzionali & 0-10V** <span class="badge-stable">STABILE</span>: Per attuatori motorizzati graduali o dimmer 0-10V (`valve` o `number`), con scala in **Percentuale (0–100%)** o **Volt (0.0–10.0 V)**.
-* **▶ Attuatori a Relè (PWM)** <span class="badge-stable">STABILE</span>: Relè o testine elettrotermiche ON/OFF pilotate con modulazione proporzionale temporale.
-* **▶ Climatizzatore Split d'Ambiente** <span class="badge-beta">BETA</span>:
-  * Entità del condizionatore split (`climate.*`).
-  * **Ruolo Operativo**: `heat_cool` (tutto l'anno), `heating_only` (solo supporto riscaldamento), `cooling_only` (solo aria condizionata estiva).
-  * **Bypass Sonda a Soffitto (Iniezione Sensore Reale)**: Inietta nello split un target ricalcolato per non farlo spegnere per accumulo di aria calda a soffitto.
-  * **Quick Heat Boost**: Accende lo split a massima potenza se la stanza parte fredda con $\Delta T \ge 1.5^\circ\text{C}$.
-* **▶ Protezioni & Avanzate** <span class="badge-stable">STABILE</span>: Sensori apertura finestre, timeout watchdog sonde wireless, anti-bloccaggio estivo e apporto termico passivo.
+* **Main Settings**:
+  * **Room Name**: Display label in the dashboard (e.g. "Living Room", "Master Bedroom").
+  * **Primary Temperature Sensor (`temp_sensor`)**: Eye-level reference thermometer (`sensor.*`).
+  * **Base Target Temperature**: Initial setpoint (e.g. 20.5 °C).
+* **▶ Smart Radiator TRVs (Standard)** <span class="badge-stable">STABLE</span>:
+  * Select smart radiator valves (`climate.*`). The system synchronizes setpoints and averages temperatures.
+* **▶ Proportional & 0-10V Analog Actuators** <span class="badge-stable">STABLE</span>:
+  * For gradual motorized valves or 0–10V dimmer modules (`valve.*` or `number.*`).
+  * **Valve Scale**: Choose between **Percentage (0–100%)** or **Voltage (0.0–10.0 V)**.
+* **▶ Relay Actuators (PWM)** <span class="badge-stable">STABLE</span>:
+  * Electrothermal actuators driven via time-proportional cycles.
+* **▶ Room Split Air Conditioners** <span class="badge-beta">BETA</span>:
+  * Associate an individual split unit (`climate.*`).
+  * **Operational Role**: `heat_cool` (all year), `heating_only` (winter boost), `cooling_only` (summer cooling).
+  * **Ceiling Sensor Bypass (Real Sensor Injection)**: Enabled by default. Injects a compensated target to prevent premature throttling caused by ceiling heat pooling.
+  * **Quick Heat Boost**: Fires the split at maximum power alongside radiators when starting cold (ΔT ≥ 1.5 °C).
+* **▶ Protections & Advanced** <span class="badge-stable">STABLE</span>:
+  * **Window Sensors**: Automatically halts heating/cooling when windows are opened.
+  * **Sensor Watchdog Timeout**: Maximum minutes before declaring a wireless sensor offline and switching to TRV internal sensors.
+  * **Summer Anti-Seize & Passive Heat Intake**.
 
 ---
 
-### 3. Gestione Energetica & Solare
-
+#### Step 5: Solar Energy, PV & Battery Storage
 <span class="badge-beta">BETA</span>
 
-Se disponi di impianto fotovoltaico o accumulo a batteria:
-* **Sensore Produzione Fotovoltaica**: Potenza istantanea dei pannelli in Watt.
-* **Sensore Immissione in Rete**: Potenza esportata (opzionale: non indispensabile per impianti a isola).
-* **Sensori Batteria & Protezione Notturna**:
-  * Sensore percentuale carica SoC (es. non scaricare sotto l'80% per preservare la notte).
-  * Sensore potenza batteria in Watt e **Guardia Anti-Scarica** (torna a gas se la batteria viene scaricata per più di 5 minuti).
-* **Integrazione EMHASS / Predbat**: Entità segnale o sensore numerico di carico differibile (`sensor.p_deferrable0 > 0 W`).
-* **Offset Accumulo Termico Gratuito**: Aumento setpoint ($0.0^\circ\text{C} \dots +3.0^\circ\text{C}$) durante le ore di sole per immagazzinare calore nei muri.
+* **Solar Generation Sensor**: Real-time rooftop PV power in Watts (`sensor.*`).
+* **Grid Export Sensor**: Export power in Watts (optional for off-grid setups).
+* **Battery SoC Sensor**: Household battery state of charge percentage (`sensor.*`).
+* **Battery Power Sensor**: Charge/discharge power in Watts with automatic polarity detection.
+* **Minimum Night Reserve SoC (`battery_min_reserve_soc`)**: Threshold (recommended 80–85%) below which electric heating is locked out.
+* **Continuous Discharge Safeguard (`battery_max_discharge_time`)**: Maximum consecutive minutes of battery discharge (> 150 W) before reverting to the gas boiler (default: 5 min).
+* **EMHASS / Predbat Bridge**: Deferrable load sensor (`sensor.p_deferrable0 > 0 W`) or boolean boost entity.
+* **Thermal Mass Storage Offset**: Room target boost (0.0 °C to +3.0 °C) to store free solar heat into building walls during peak generation.
 
 ---
 
-### 4. Impostazioni Globali (Calendario, Meteo, Presenza)
-* **Calendario**: Associazione del Calendario Locale per gli orari.
-* **Compensazione Climatica**: Sensore temperatura esterna per adattare la mandata in base alla dispersione dell'edificio.
-* **Geofencing**: Sensore di presenza per impostare automaticamente il preset Fuori Casa (*Away*) quando tutti escono.
+## 2. Post-Installation Options Menu (Options Flow)
+
+At any time after initial installation, you can adjust settings without losing learned thermal curves or state:
+
+1. Navigate to **Settings → Devices & Services**.
+2. Click on **Multizone Thermostat** and select **Configure**.
+3. Choose from the available options:
+
+* **Modify Central Generators**: Add or remove boiler/heat pump, switch between Relay and OpenTherm, or update water temperature limits.
+* **Configure Solar & Battery Management**: Adjust surplus thresholds, battery timeouts, EMHASS entities, and thermal overheating offsets.
+* **Add New Thermal Zone**: Add a new room with the guided wizard.
+* **Edit Existing Zone**: Reassign actuators, add a room split AC, configure window sensors, or adjust passive heat.
+* **Remove a Thermal Zone**: Cleanly delete a zone and its associated entities.
+* **Edit Calendar, Weather Curve, or Geofencing**: Update weather sensors or presence devices.
+
+---
+
+## 3. Complete Settings Map: Where to Find Every Feature
+
+Use this reference table to find exactly where to activate and tune every single feature:
+
+| Feature | Location in Home Assistant UI | Configuration Keys / Entities |
+|---|---|---|
+| **Gas Boiler (Relay PWM / OpenTherm)** | *Configure → Modify Central Generators* | `boiler_mode`, `boiler_switch`, `opentherm_entity`, `opentherm_min_temp`, `opentherm_max_temp` |
+| **Central Hydronic Heat Pump (PDC)** | *Configure → Modify Central Generators* | `enable_heat_pump`, `heat_pump_type`, `heat_pump_entity`, `heat_pump_cooling` |
+| **Heat Source Priority (5 Modes)** | *Lovelace Preset Card* or Entity Controls | `select.master_control_heat_source_priority` (`auto`, `hybrid`, `combined`, `electric_only`, `gas_only`) |
+| **Seasonal Mode (Heat 🔥 / Cool ❄️)** | *Lovelace Preset Card* (Slider) or Entity | `select.master_control_master_operation_mode` (`heat`, `cool`) |
+| **Room Split Air Conditioners** | *Configure → Edit Zone → [Room] → Room Split AC* | `split_climate_entity`, `split_role` (`heat_cool`, `heating_only`, `cooling_only`) |
+| **Ceiling Sensor Bypass (Target Injection)** | *Configure → Edit Zone → [Room] → Room Split AC* | `split_sensor_injection: True` (enabled by default) |
+| **Quick Heat Boost (Thermal Shock)** | *Configure → Edit Zone → [Room] → Room Split AC* | `split_quick_boost: True`, threshold `split_boost_delta` (default: 1.5 °C) |
+| **Single-Room Split Manual Button** | *Lovelace Dial Card* (Header center) | Automatically visible for rooms with split (active when Master is OFF, locked when Master is ON) |
+| **Automatic Dashboard Summer Filter** | *Dial Card YAML Configuration* | Card option: `hide_if_cannot_cool: true` |
+| **Card Visual Style (Classic vs Luxury)** | *Dial Card YAML Configuration* | Card option: `card_style: classic` or `luxury` |
+| **Solar Surplus & Inverter Anti-Clipping** | *Configure → Configure Solar & Batteries* | `solar_power_sensor`, `battery_soc_sensor`, `battery_power_sensor` |
+| **Battery Discharge Safeguard** | *Configure → Configure Solar & Batteries* | `battery_max_discharge_time` (default: 5 min before gas fallback) |
+| **Minimum Night Reserve SoC** | *Configure → Configure Solar & Batteries* | `battery_min_reserve_soc` (recommended 80–85%) |
+| **Thermal Pre-Storage (Wall Overheating)** | *Configure → Configure Solar & Batteries* | `solar_overheat_offset` (0.0 °C to +3.0 °C) |
+| **AI Optimizer Bridge (EMHASS / Predbat)** | *Configure → Configure Solar & Batteries* | `external_solar_override_entity` (Watt sensor or boolean) |
+| **Boiler Anti-Short-Cycle Protection** | *Settings → Devices & Services → Master Entities* | `number.master_control_min_cycle_on` and `min_cycle_off` (default: 5 min) |
+| **Motorized Valve Opening Delay** | *Settings → Devices & Services → Master Entities* | `number.master_control_valve_delay` (default: 0 sec, 90-120s recommended for wax actuators) |
+| **Summer Anti-Seize Valve Exercise** | *Settings → Devices & Services → Master Entities* | `number.master_control_anti_seize_idle_days` (15 days) and `duration` (2 min) |
+| **Emergency Anti-Frost Protection** | *Settings → Devices & Services → Master Entities* | `number.master_control_anti_frost_temperature` (default: 7.0 °C) |
+| **Window Open Contact Sensor** | *Configure → Edit Zone → [Room] → Protections* | `window_sensor` (`binary_sensor.*`) |
+| **TRV Calibration Offset Injection** | *Configure → Edit Zone → [Room] → TRV Calibration* | Calibration offset entity (e.g. `number.trv_calibration_offset`) |
+| **Proportional 0–100% or 0–10V Valves** | *Configure → Edit Zone → [Room] → Proportional Valves* | `valve_entities`, scale `percent` (0-100%) or `volt` (0-10.0 V) |
+| **Weekly Matrix Scheduling** | *Lovelace Scheduler Card* | 24-hour visual matrix with profiles (Standard, Weekend, Smart Working, Custom) |
+| **Predictive Smart Return** | *Lovelace Scheduler Card* or HA Service | `multizone_thermostat.set_smart_return` |

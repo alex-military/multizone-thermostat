@@ -2,6 +2,13 @@
 
 [⬅️ Back to Main Readme](README.md) • [⚙️ Configuration Guide](configuration.md) • [🎨 Cards Guide](cards.md)
 
+> [!TIP]
+> 📖 **Interactive Multilingual Wiki Available!**  
+> Explore our interactive Wiki:  
+> - 🇬🇧 **[English Hybrid Plant & Energy Guide](docs/wiki/index.html#/hybrid_energy)**
+> - 🇮🇹 **[Centrale Bivalente & Solare in Italiano](docs/wiki/index.html#/it/hybrid_energy)**  
+> - 🎮 **[Interactive 3-Dashboard Live Simulator](docs/wiki/index.html#/simulator_view)**
+
 > [!IMPORTANT]
 > **Phase 11 (v6.1.0-beta)** introduces a comprehensive climate and energy architecture supporting bivalent heating plants, per-room air-to-air split integration, off-grid and solar self-consumption optimization, and dual-track seasonal regulation (Heat & Cool).
 

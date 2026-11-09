@@ -1,46 +1,84 @@
-# Climatizzatori Split d'Ambiente
+# Room Split Air Conditioners
 
 <span class="badge-beta">BETA</span>
 
-
-La **Fase 11** consente di associare a ogni singola zona termica il proprio climatizzatore split (`climate.*`), integrandolo nell'orchestrazione con i termosifoni e le valvole idroniche.
-
----
-
-## 1. Risoluzione del Problema della Sonda a Soffitto
-
-Tutti gli split commerciali (Daikin, Mitsubishi, Gree, Haier, ecc.) integrano una sonda di temperatura direttamente all'interno dell'unità interna montata vicino al soffitto.
-* **Il problema**: L'aria calda sale naturalmente verso l'alto e si accumula a soffitto in pochi minuti. Lo split "pensa" che la stanza sia calda e taglia prematuramente la potenza, lasciando il pavimento e l'altezza uomo ancora freddi.
-* **La soluzione: Iniezione Dinamica della Sonda Reale**:
-  Multizone Thermostat legge il termometro reale posizionato ad altezza d'uomo e inietta in tempo reale un setpoint compensato allo split:
-  $$T_{\text{split\_inviato}} = T_{\text{desiderato}} + (T_{\text{split\_letto}} - T_{\text{sensore\_reale}})$$
-  In questo modo lo split modula in modo fluido e costante fino a quando l'ambiente reale ha raggiunto il comfort perfetto.
+Phase 11 allows each thermal zone to bind an individual room split air conditioner (`climate.*`), orchestrating it in harmony with hydronic radiators and zone valves.
 
 ---
 
-## 2. Quick Heat Boost (Shock Termico a Freddo)
+## 1. The Ceiling Stratification & Sensor Problem
 
-Quando una stanza parte completamente fredda con un dislivello termico significativo:
-1. **Scatto del Boost**: Se $\Delta T = (T_{\text{target}} - T_{\text{ambiente}}) \ge 1.5^\circ\text{C}$, lo split parte a piena potenza insieme ai radiatori (**Dual Heat**).
-2. **Raggiungimento Comfort**: Quando la stanza arriva a soli $0.3^\circ\text{C}$ dal target, lo split si spegne dolcemente.
-3. **Mantenimento a Basso Consumo**: La fase stazionaria di mantenimento viene affidata alla sola caldaia/radiatori a regime termico minimo.
+All commercial split air conditioning indoor units (Daikin, Mitsubishi, Gree, Haier, Samsung, Panasonic, etc.) measure room air temperature directly inside the unit mounted high on the wall near the ceiling.
+
+```mermaid
+flowchart TD
+    subgraph SenzaIniezione ["❌ Conventional Behavior (Without Injection)"]
+        S1["Hot air naturally rises to the ceiling<br>(T = 23.0 °C measured at ceiling)"] --> S2["The split assumes the room is already warm and throttles down!"]
+        S2 --> S3["Living height and floor remain cold (T = 18.5 °C)!"]
+    end
+    
+    subgraph ConIniezione ["✅ Multizone Thermostat Solution (Dynamic Injection)"]
+        M1["Real Eye-Level Room Sensor (T = 18.5 °C)"] --> M2["Compensated Target Calculation:<br>T_split = T_desired + (T_split_ceiling - T_real)"]
+        M2 --> M3["Inject Compensated Setpoint into Split via Home Assistant"]
+        M3 --> M4["Split modulates continuously until true eye-level comfort is achieved!"]
+    end
+```
+
+### The Dynamic Injection Formula
+
+When `split_sensor_injection: True` is enabled, Multizone Thermostat intercepts the ceiling probe reading and calculates the real-time offset compared to the room's true thermometer:
+
+$$T_{\text{split\_injected}} = T_{\text{desired}} + \left(T_{\text{split\_sensor}} - T_{\text{real\_sensor}}\right)$$
+
+#### Practical Example
+* **Desired Room Temperature**: 20.5 °C
+* **Real Measured Temperature at Eye Level**: 19.0 °C (room is still cold)
+* **Temperature Measured by Ceiling Split Sensor**: 22.0 °C (heat pooled near ceiling)
+* **Calculation**: $T_{\text{split\_injected}} = 20.5 + (22.0 - 19.0) = 23.5\ ^\circ\text{C}$
+* **Result**: Multizone Thermostat commands the split unit to target 23.5 °C. The split continues heating until the eye-level sensor reaches 20.5 °C, eliminating cold feet and temperature swings.
 
 ---
 
-## 3. Disaccoppiamento Idronico Automatico
+## 2. Quick Heat Boost (Thermal Shock)
 
-Quando una stanza viene riscaldata dallo split (per surplus solare, per boost o per accensione manuale), Multizone Thermostat **azzera a `0.0%` la richiesta idronica di quella specifica stanza**.
-* La valvola di zona o la testina TRV del termosifone si chiude.
-* La caldaia a gas non consuma combustibile per quella stanza.
-* Le altre stanze prive di split continuano a essere scaldate regolarmente dalla caldaia a gas senza interferenze.
+When a room starts cold with a significant temperature gap:
+
+1. **Boost Trigger**: If $\Delta T = (T_{\text{target}} - T_{\text{ambient}}) \ge 1.5\ ^\circ\text{C}$ (configurable via `split_boost_delta`), the system fires both hydronic radiators and the split unit at full capacity (**Dual Heat**).
+2. **Rapid Warm-up**: Forced warm air circulates the room volume, reducing warm-up times by 60–70%.
+3. **Graceful Exit**: Once the room is within 0.3 °C of the setpoint, the split unit powers down softly.
+4. **Silent Maintenance**: Steady-state maintenance is handled exclusively by silent low-temperature radiators, eliminating fan noise and draft currents while occupied.
 
 ---
 
-## 4. Pulsante Accensione Manuale Singola Stanza
+## 3. Automatic Hydronic Decoupling
 
-Sulla scheda del termostato (Dial Card) è presente un pulsante centrale dedicato all'accensione locale dello split:
+When a room split is actively heating (via solar surplus, boost, or manual run):
+* Multizone Thermostat **suppresses hydronic gas demand for that specific room to `0.0%`**.
+* The zone valve or thermostatic radiator valve (TRV) closes.
+* The central gas boiler consumes zero fuel for that room.
+* Other rooms without split units continue to be heated normally by hydronics without disturbance.
 
-* **Visibile solo dove serve**: Compare unicamente nelle stanze dotate di condizionatore split.
-* **A Master Spento (OFF)**: Premendo il pulsante a impianto centrale spento, **si accende soltanto lo split elettrico** di quella stanza per un riscaldamento rapido localizzato. La caldaia a gas rimane rigorosamente spenta. La card mostra il badge **`⚡ ELETTRICO`**.
-* **Blocco di Sicurezza a Master Acceso**: Quando il Master generale della casa è acceso, il pulsante viene disabilitato per evitare che un tocco accidentale scolleghi la stanza dall'orchestrazione generale.
-* **Sincronizzazione Automatica**: Se il Master viene acceso successivamente, l'accensione manuale locale si disattiva e la stanza si riallinea al preset globale della casa.
+---
+
+## 4. Single-Room Split Manual Button
+
+On the Lovelace **Dial Card**, centered in the header, is a dedicated split button:
+
+* **Smart Visibility**: Appears only in rooms configured with a split unit (`split_climate_entity`).
+* **Operation with Central Heating OFF**:
+  * Tapping the button when central heating is OFF turns on **only the electric split** for that room.
+  * The gas boiler and hydronic circulators remain off (`switch.caldaia: off`).
+  * The card immediately displays the **`⚡ ELECTRIC`** badge and cyan glow.
+* **Master ON Safety Lockout**:
+  * When central heating is ON, the button is disabled to prevent accidental clicks from interfering with whole-house orchestration.
+* **Automatic Resync**:
+  * Turning ON master heating resets the local override and aligns the room with the global household preset.
+
+---
+
+## 5. Operational Roles
+
+Configured via the `split_role` parameter:
+* **`heat_cool` (All Year)**: Operates for winter heating support and primary summer air conditioning.
+* **`heating_only` (Winter Only)**: Assists radiators or absorbs solar surplus; idle in summer.
+* **`cooling_only` (Summer Only)**: Reserved exclusively for summer cooling (never engages in winter).
