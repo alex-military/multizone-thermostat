@@ -15,7 +15,7 @@ from homeassistant.helpers.event import (
     async_track_time_interval,
 )
 
-from .const import DOMAIN, CONF_ZONES, CONF_ZONE_NAME, make_zone_entity_id, make_via_device_kwargs
+from .const import DOMAIN, CONF_ZONES, CONF_ZONE_NAME, make_zone_entity_id, make_via_device_kwargs, make_zone_device_info
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -70,17 +70,11 @@ class DemandSensor(SensorEntity):
         self._attr_unique_id = f"{DOMAIN}_{entry_id}_demand_{climate_entity_id}"
         
         master_dev_id = getattr(coordinator, "master_device_id", None)
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, f"{entry_id}_virtual_thermostats")},
-            name="Multizone Brain",
-            manufacturer="Custom Integration",
-            model="Multizone Brain",
-            **make_via_device_kwargs(entry_id, master_dev_id),
-        )
+        self._attr_device_info = make_zone_device_info(entry_id, self._name, master_dev_id)
 
     @property
     def name(self) -> str:
-        return f"{self._name} Demand"
+        return "Demand"
 
     @property
     def native_value(self) -> float:
@@ -119,45 +113,55 @@ class AutotuneSensor(SensorEntity):
         self._attr_unique_id = f"{DOMAIN}_{entry_id}_autotune_{climate_entity_id}"
         
         master_dev_id = getattr(coordinator, "master_device_id", None)
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, f"{entry_id}_virtual_thermostats")},
-            name="Multizone Brain",
-            manufacturer="Custom Integration",
-            model="Multizone Brain",
-            **make_via_device_kwargs(entry_id, master_dev_id),
-        )
+        self._attr_device_info = make_zone_device_info(entry_id, self._name, master_dev_id)
 
     @property
     def name(self) -> str:
-        return f"{self._name} Autotuning"
+        return "Autotuning"
 
     @property
     def native_value(self) -> str:
-        """Return the current autotuner state."""
-        tuner = self._coordinator.zone_controller.get_autotuner(self._climate_entity_id)
+        """Return the current autotuner state for the active season."""
+        season = getattr(self._coordinator, "master_hvac_mode", "heat") or "heat"
+        season_mode = "cool" if str(season).lower() == "cool" else "heat"
+        tuner = self._coordinator.zone_controller.get_autotuner(self._climate_entity_id, mode=season_mode)
         if not tuner:
             return "unknown"
+        season_label = "Freddo" if season_mode == "cool" else "Caldo"
         if tuner.state == tuner.STATE_COMPLETED:
-            return "Smart PID Active"
-        return f"Learning ({len(tuner.completed_cycles)}/{tuner.required_cycles})"
+            return f"Smart PID Attivo ({season_label})"
+        return f"Apprendimento {season_label} ({len(tuner.completed_cycles)}/{tuner.required_cycles})"
 
     @property
     def extra_state_attributes(self):
-        """Return computed PID parameters."""
-        tuner = self._coordinator.zone_controller.get_autotuner(self._climate_entity_id)
-        if not tuner:
-            return {}
-        if tuner.state == tuner.STATE_COMPLETED:
-            return {
-                "Kp": round(tuner.kp, 2),
-                "Ki": round(tuner.ki, 4),
-                "Kd": round(tuner.kd, 2)
-            }
-        return {
-            "Kp": 0.0,
-            "Ki": 0.0,
-            "Kd": 0.0
+        """Return detailed dual-track heat and cool PID & autotuner parameters."""
+        season = getattr(self._coordinator, "master_hvac_mode", "heat") or "heat"
+        season_mode = "cool" if str(season).lower() == "cool" else "heat"
+        tuner_heat = self._coordinator.zone_controller.get_autotuner(self._climate_entity_id, mode="heat")
+        tuner_cool = self._coordinator.zone_controller.get_autotuner(self._climate_entity_id, mode="cool")
+
+        active_tuner = tuner_cool if season_mode == "cool" else tuner_heat
+        kp_active = round(active_tuner.kp, 2) if active_tuner and active_tuner.state == active_tuner.STATE_COMPLETED else 0.0
+        ki_active = round(active_tuner.ki, 4) if active_tuner and active_tuner.state == active_tuner.STATE_COMPLETED else 0.0
+        kd_active = round(active_tuner.kd, 2) if active_tuner and active_tuner.state == active_tuner.STATE_COMPLETED else 0.0
+
+        attrs = {
+            "active_season": season_mode,
+            "Kp": kp_active,
+            "Ki": ki_active,
+            "Kd": kd_active,
+            "heat_status": tuner_heat.state if tuner_heat else "unknown",
+            "heat_cycles": f"{len(tuner_heat.completed_cycles)}/{tuner_heat.required_cycles}" if tuner_heat else "0/3",
+            "heat_kp": round(tuner_heat.kp, 2) if tuner_heat and tuner_heat.state == tuner_heat.STATE_COMPLETED else 0.0,
+            "heat_ki": round(tuner_heat.ki, 4) if tuner_heat and tuner_heat.state == tuner_heat.STATE_COMPLETED else 0.0,
+            "heat_kd": round(tuner_heat.kd, 2) if tuner_heat and tuner_heat.state == tuner_heat.STATE_COMPLETED else 0.0,
+            "cool_status": tuner_cool.state if tuner_cool else "unknown",
+            "cool_cycles": f"{len(tuner_cool.completed_cycles)}/{tuner_cool.required_cycles}" if tuner_cool else "0/3",
+            "cool_kp": round(tuner_cool.kp, 2) if tuner_cool and tuner_cool.state == tuner_cool.STATE_COMPLETED else 0.0,
+            "cool_ki": round(tuner_cool.ki, 4) if tuner_cool and tuner_cool.state == tuner_cool.STATE_COMPLETED else 0.0,
+            "cool_kd": round(tuner_cool.kd, 2) if tuner_cool and tuner_cool.state == tuner_cool.STATE_COMPLETED else 0.0,
         }
+        return attrs
 
     async def async_added_to_hass(self) -> None:
         """Listen to updates."""
@@ -187,13 +191,7 @@ class ThermalSensorBase(SensorEntity):
         self._coordinator = coordinator
         
         master_dev_id = getattr(coordinator, "master_device_id", None)
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, f"{entry_id}_virtual_thermostats")},
-            name="Multizone Brain",
-            manufacturer="Custom Integration",
-            model="Multizone Brain",
-            **make_via_device_kwargs(entry_id, master_dev_id),
-        )
+        self._attr_device_info = make_zone_device_info(entry_id, self._name, master_dev_id)
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
@@ -217,7 +215,7 @@ class HeatingRateSensor(ThermalSensorBase):
     
     @property
     def name(self) -> str:
-        return f"{self._name} Heating Rate"
+        return "Heating Rate"
         
     @property
     def native_value(self) -> float:
@@ -238,7 +236,7 @@ class CoolingRateSensor(ThermalSensorBase):
     
     @property
     def name(self) -> str:
-        return f"{self._name} Cooling Rate"
+        return "Cooling Rate"
         
     @property
     def native_value(self) -> float:
@@ -259,7 +257,7 @@ class ThermalInertiaSensor(ThermalSensorBase):
     
     @property
     def name(self) -> str:
-        return f"{self._name} Thermal Inertia"
+        return "Thermal Inertia"
         
     @property
     def native_value(self) -> float:
@@ -407,6 +405,7 @@ class MultizoneZoneEnergyClassSensor(ThermalSensorBase):
     """Sensor reporting the theoretical energy efficiency class of a zone."""
 
     _attr_icon = "mdi:home-lightning-bolt-outline"
+    _attr_translation_key = "energy_class"
 
     def __init__(self, hass: HomeAssistant, entry_id: str, name: str, climate_entity_id: str, coordinator) -> None:
         super().__init__(hass, entry_id, name, climate_entity_id, coordinator)
@@ -415,7 +414,7 @@ class MultizoneZoneEnergyClassSensor(ThermalSensorBase):
 
     @property
     def name(self) -> str:
-        return f"{self._name} Classe Energetica"
+        return "Energy Class"
 
     @property
     def native_value(self) -> str:
@@ -446,7 +445,7 @@ class MultizoneZoneRetentionTimeSensor(ThermalSensorBase):
 
     @property
     def name(self) -> str:
-        return f"{self._name} Thermal Retention Time"
+        return "Thermal Retention Time"
 
     @property
     def native_value(self) -> float | None:
@@ -468,7 +467,7 @@ class MultizoneZoneRadiatorSizingSensor(ThermalSensorBase):
 
     @property
     def name(self) -> str:
-        return f"{self._name} Radiator Sizing"
+        return "Radiator Sizing"
 
     @property
     def native_value(self) -> str:

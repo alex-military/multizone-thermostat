@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Multizone Thermostat — Documentazione & Wiki</title>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+  <meta name="description" content="Guida completa, configurazione, centrale bivalente, split AC e schede Lovelace per Multizone Thermostat Home Assistant">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
+  
+  <!-- Mermaid.js for Diagrams -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  
+  <!-- Docsify Themeable: Dark Theme -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsify-themeable@0/dist/css/theme-simple-dark.css">
+  
+  <style>
+    :root {
+      /* Palette Scura Moderna (Dark Mode Premium) */
+      --base-background-color: #0b1120;
+      --base-color: #e2e8f0;
+      --base-font-size: 15px;
+      --base-line-height: 1.65;
+      
+      /* Accent Colors (Home Assistant Sky Blue) */
+      --theme-color: #38bdf8;
+      --link-color: #38bdf8;
+      --link-color--hover: #7dd3fc;
+      
+      /* Sidebar */
+      --sidebar-background: #111827;
+      --sidebar-border-color: #1f2937;
+      --sidebar-width: 300px;
+      --sidebar-name-color: #38bdf8;
+      --sidebar-nav-link-color: #94a3b8;
+      --sidebar-nav-link-color--hover: #ffffff;
+      --sidebar-nav-link-color--active: #38bdf8;
+      --sidebar-nav-link-font-weight--active: 700;
+      --sidebar-nav-link-background--active: rgba(56, 189, 248, 0.08);
+      
+      /* Headers & Typography */
+      --heading-color: #f8fafc;
+      --heading-h1-color: #38bdf8;
+      --heading-h2-color: #f1f5f9;
+      --heading-h3-color: #cbd5e1;
+      
+      /* Code Blocks */
+      --code-theme-background: #030712;
+      --code-theme-text: #e2e8f0;
+      --code-inline-background: #1f2937;
+      --code-inline-color: #38bdf8;
+      --code-font-size: 0.9em;
+      
+      /* Tables */
+      --table-cell-border-color: #1f2937;
+      --table-head-border-color: #374151;
+      --table-row-odd-background: rgba(31, 41, 55, 0.4);
+      --table-row-even-background: transparent;
+      
+      /* Search */
+      --search-input-background-color: #1f2937;
+      --search-input-color: #ffffff;
+      --search-result-heading-color: #38bdf8;
+      --search-result-item-color: #cbd5e1;
+      
+      /* Scrollbar */
+      --scrollbar-thumb-background: #374151;
+    }
+    
+    html, body {
+      background-color: #0b1120 !important;
+      color: #e2e8f0 !important;
+      scroll-behavior: smooth;
+    }
+    
+    .sidebar {
+      background-color: #111827 !important;
+      border-right: 1px solid #1f2937 !important;
+    }
+
+    /* Badge Beta & Stabile */
+    .badge-beta {
+      display: inline-block;
+      font-size: 0.70rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: #f59e0b;
+      color: #0f172a;
+      vertical-align: middle;
+      margin-left: 6px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+    
+    .badge-stable {
+      display: inline-block;
+      font-size: 0.70rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: #10b981;
+      color: #ffffff;
+      vertical-align: middle;
+      margin-left: 6px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+
+    .callout-beta {
+      padding: 14px 18px;
+      background: rgba(245, 158, 11, 0.10);
+      border-left: 4px solid #f59e0b;
+      border-radius: 6px;
+      margin: 20px 0;
+      font-size: 0.94rem;
+      color: #fef3c7;
+    }
+    .callout-beta strong {
+      color: #fbbf24;
+    }
+
+    .markdown-section pre > code {
+      border-radius: 8px;
+      border: 1px solid #1f2937;
+    }
+
+    /* Mermaid Container in Dark Mode */
+    .mermaid {
+      text-align: center;
+      margin: 25px auto;
+      background: rgba(17, 24, 39, 0.75);
+      padding: 20px;
+      border-radius: 10px;
+      border: 1px solid #1f2937;
+      overflow-x: auto;
+    }
+    .mermaid svg {
+      max-width: 100% !important;
+      height: auto !important;
+    }
+
+    /* Offset for sticky headings */
+    :target::before {
+      content: "";
+      display: block;
+      height: 30px;
+      margin: -30px 0 0;
+    }
+
+    /* Subcategory links styling */
+    .sidebar-nav li > ul {
+      padding-left: 14px;
+      border-left: 1px solid #1f2937;
+      margin-left: 10px;
+    }
+    .sidebar-nav a {
+      transition: color 0.15s ease, transform 0.15s ease;
+      cursor: pointer;
+    }
+    .sidebar-nav a:hover {
+      transform: translateX(3px);
+    }
+
+    .sidebar-nav .active > a {
+      color: #38bdf8 !important;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">Caricamento documentazione...</div>
+  
+  <script>
+    // Initialize Mermaid with Dark Theme
+    if (window.mermaid) {
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: 'dark',
+        themeVariables: {
+          darkMode: true,
+          background: '#0b1120',
+          primaryColor: '#0284c7',
+          primaryTextColor: '#f8fafc',
+          primaryBorderColor: '#38bdf8',
+          lineColor: '#38bdf8',
+          secondaryColor: '#1e293b',
+          tertiaryColor: '#111827',
+          edgeLabelBackground: '#1e293b',
+          nodeTextColor: '#f8fafc'
+        }
+      });
+    }
+
+    window.$docsify = {
+      name: '<span style="color:#38bdf8;font-weight:800;">Multizone</span> Thermostat',
+      repo: 'https://github.com/alex-military/multizone-thermostat',
+      loadSidebar: '_sidebar.md',
+      loadNavbar: false,
+      subMaxLevel: 3,
+      auto2top: true,
+      homepage: 'home.md',
+      relativePath: false,
+      search: {
+        maxAge: 86400000,
+        paths: 'auto',
+        placeholder: 'Cerca nella documentazione...',
+        noData: 'Nessun risultato trovato!',
+        depth: 3
+      },
+      copyCode: {
+        buttonText: 'Copia',
+        errorText: 'Errore',
+        successText: 'Copiato!'
+      },
+      pagination: {
+        previousText: 'Precedente',
+        nextText: 'Successivo',
+        crossChapter: true
+      },
+      markdown: {
+        renderer: {
+          code: function(code, lang) {
+            if (lang === "mermaid") {
+              return '<div class="mermaid">' + code + '</div>';
+            }
+            return this.origin.code.apply(this, arguments);
+          }
+        }
+      },
+      plugins: [
+        function(hook, vm) {
+          hook.doneEach(function() {
+            // Render Mermaid charts on page load/transition
+            if (window.mermaid) {
+              try {
+                window.mermaid.run({
+                  querySelector: '.mermaid'
+                });
+              } catch (e) {
+                console.error("Mermaid run error:", e);
+              }
+            }
+          });
+        }
+      ]
+    };
+
+    // Robust subcategory navigation scroll handler
+    function scrollToTargetAnchor(hash) {
+      if (!hash) hash = window.location.hash;
+      if (hash && hash.includes('?id=')) {
+        var rawId = hash.split('?id=')[1];
+        var id = decodeURIComponent(rawId);
+        var elem = document.getElementById(id) || 
+                   document.getElementById('_' + id) ||
+                   document.querySelector('[id*="' + id.replace(/[^\w-]/g, '') + '"]');
+        if (elem) {
+          elem.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }
+    }
+
+    window.addEventListener('hashchange', function() {
+      setTimeout(scrollToTargetAnchor, 80);
+    });
+
+    document.addEventListener('click', function(e) {
+      var a = e.target.closest('a');
+      if (a) {
+        var href = a.getAttribute('href');
+        if (href && href.includes('?id=')) {
+          setTimeout(function() {
+            scrollToTargetAnchor(href);
+          }, 60);
+        }
+      }
+    });
+  </script>
+  
+  <!-- Docsify Core -->
+  <script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/docsify.min.js"></script>
+  <!-- Themeable Plugin -->
+  <script src="https://cdn.jsdelivr.net/npm/docsify-themeable@0/dist/js/docsify-themeable.min.js"></script>
+  <!-- Plugins -->
+  <script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/plugins/search.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docsify-copy-code/dist/docsify-copy-code.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docsify-pagination/dist/docsify-pagination.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docsify/lib/plugins/zoom-image.min.js"></script>
+  <!-- Prism Syntax Highlighting -->
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-yaml.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-bash.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-python.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-json.min.js"></script>
+</body>
+</html>

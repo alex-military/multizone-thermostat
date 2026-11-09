@@ -101,6 +101,11 @@ class MultizoneThermostatPlantCard extends HTMLElement {
         color: #f87171;
         border: 1px solid rgba(239, 68, 68, 0.3);
       }
+      .status-neutral {
+        background: rgba(148, 163, 184, 0.15);
+        color: #94a3b8;
+        border: 1px solid rgba(148, 163, 184, 0.3);
+      }
       .status-dot {
         width: 8px;
         height: 8px;
@@ -331,47 +336,74 @@ class MultizoneThermostatPlantCard extends HTMLElement {
       const alertBox = this.shadowRoot.getElementById('alert-box');
       const alertDesc = this.shadowRoot.getElementById('alert-desc');
 
-      const statusVal = healthState ? healthState.state : "Optimal";
+      const isHealthUnavailable = !healthState || ['unavailable', 'unknown'].includes(healthState.state);
+      const statusVal = isHealthUnavailable ? null : healthState.state;
       const isCritical = statusVal === "Critical" || statusVal === "Critico";
       const isWarning = statusVal === "Warning" || statusVal === "Attenzione";
       const isOptimal = statusVal === "Optimal" || statusVal === "Ottimale";
       if (healthBadge && healthText) {
-        if (isCritical) {
+        if (isHealthUnavailable) {
+          healthText.innerText = "--";
+          healthBadge.className = "status-badge status-neutral";
+        } else if (isCritical) {
           healthText.innerText = t('critical');
           healthBadge.className = "status-badge status-critical";
         } else if (isWarning) {
           healthText.innerText = t('warning');
           healthBadge.className = "status-badge status-warning";
-        } else {
+        } else if (isOptimal) {
           healthText.innerText = t('optimal');
           healthBadge.className = "status-badge status-optimal";
+        } else {
+          healthText.innerText = statusVal;
+          healthBadge.className = "status-badge status-neutral";
         }
       }
 
-      if (cyclesVal && cyclesState) {
-        const c = parseFloat(cyclesState.state) || 0;
-        cyclesVal.innerText = c.toFixed(1);
-        if (cyclesSub) {
-          if (c <= 3.5) {
-            cyclesSub.innerText = t('wear_low');
-            cyclesSub.style.color = "#34d399";
-          } else if (c <= 5.0) {
-            cyclesSub.innerText = t('wear_moderate');
-            cyclesSub.style.color = "#fbbf24";
+      if (cyclesVal) {
+        if (cyclesState && !['unavailable', 'unknown'].includes(cyclesState.state)) {
+          const c = parseFloat(cyclesState.state);
+          if (!isNaN(c)) {
+            cyclesVal.innerText = c.toFixed(1);
+            if (cyclesSub) {
+              if (c <= 3.5) {
+                cyclesSub.innerText = t('wear_low');
+                cyclesSub.style.color = "#34d399";
+              } else if (c <= 5.0) {
+                cyclesSub.innerText = t('wear_moderate');
+                cyclesSub.style.color = "#fbbf24";
+              } else {
+                cyclesSub.innerText = t('wear_high');
+                cyclesSub.style.color = "#f87171";
+              }
+            }
           } else {
-            cyclesSub.innerText = t('wear_high');
-            cyclesSub.style.color = "#f87171";
+            cyclesVal.innerText = "--";
+            if (cyclesSub) {
+              cyclesSub.innerText = "--";
+              cyclesSub.style.color = "#94a3b8";
+            }
+          }
+        } else {
+          cyclesVal.innerText = "--";
+          if (cyclesSub) {
+            cyclesSub.innerText = "--";
+            cyclesSub.style.color = "#94a3b8";
           }
         }
       }
 
-      if (runtimeVal && runtimeState) {
-        const r = parseFloat(runtimeState.state) || 0;
-        runtimeVal.innerText = r.toFixed(1);
+      if (runtimeVal) {
+        if (runtimeState && !['unavailable', 'unknown'].includes(runtimeState.state)) {
+          const r = parseFloat(runtimeState.state);
+          runtimeVal.innerText = !isNaN(r) ? r.toFixed(1) : "--";
+        } else {
+          runtimeVal.innerText = "--";
+        }
       }
 
       if (alertBox && alertDesc) {
-        const hasAnomaly = anomalyState ? anomalyState.state === "on" : !isOptimal;
+        const hasAnomaly = anomalyState ? anomalyState.state === "on" : (!isHealthUnavailable && !isOptimal);
         if (hasAnomaly && healthState && healthState.attributes && healthState.attributes.anomalies && healthState.attributes.anomalies.length > 0) {
           alertBox.className = "alert-box alert-err";
           const items = healthState.attributes.anomalies.map(a => `• <b>${a.zone}</b>: ${a.description}`).join('<br>');

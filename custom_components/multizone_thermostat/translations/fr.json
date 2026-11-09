@@ -1,355 +1,537 @@
 {
-    "config": {
-        "step": {
-            "user": {
-                "title": "Configuration de Multizone Thermostat",
-                "description": "Bienvenue dans Multizone Thermostat. Veuillez sélectionner le mode de contrôle de votre chaudière principale.",
-                "data": {
-                    "boiler_mode": "Mode de Contrôle de la Chaudière"
-                }
-            },
-            "weather": {
-                "title": "Compensation Météo",
-                "description": "Sélectionnez un capteur de température extérieure ou météo pour activer la compensation météo. Cela ajustera dynamiquement le chauffage en fonction des conditions extérieures.",
-                "data": {
-                    "weather_sensor": "Capteur de Température Extérieure"
-                }
-            },
-            "calendar": {
-                "title": "Calendrier Global",
-                "description": "Sélectionnez une entité calendrier local pour contrôler la programmation du système multizone.",
-                "data": {
-                    "global_calendar": "Entité Calendrier"
-                }
-            },
-            "add_zone": {
-                "title": "Ajouter une zone de chauffage ({zone_number})",
-                "description": "Configurez une zone de chauffage. {zones_added} zone(s) déjà ajoutée(s).",
-                "data": {
-                    "name": "Nom de la Zone",
-                    "temp_sensor": "Capteur de Température de Zone",
-                    "target_temperature": "Température Cible de Base"
-                },
-                "sections": {
-                    "trv_settings": {
-                        "name": "Vannes thermostatiques de radiateur (TRV)",
-                        "description": "Vannes thermostatiques connectées standard avec contrôle de température.",
-                        "data": {
-                            "climate_entities": "Entité Climate",
-                            "trv_preset_sync": "Activer la synchro des préréglages TRV",
-                            "authoritative_climate_sync": "Synchronisation Faisant Foi du Thermostat Mural"
-                        }
-                    },
-                    "valve_settings": {
-                        "name": "Vannes proportionnelles & 0-10V",
-                        "description": "Contrôle direct du pourcentage d'ouverture ou tension analogique 0-10V.",
-                        "data": {
-                            "valve_entities": "Entités de vanne / actionneur",
-                            "valve_scale": "Mode d'échelle de sortie"
-                        }
-                    },
-                    "relay_settings": {
-                        "name": "Actionneurs à relais (PWM)",
-                        "description": "Interrupteurs ON/OFF et actionneurs thermiques contrôlés par modulation d'impulsions (PWM).",
-                        "data": {
-                            "switch_entities": "Interrupteurs de Zone / Relais"
-                        }
-                    },
-                    "safety_settings": {
-                        "name": "Protections & Paramètres avancés",
-                        "description": "Bypass de fenêtre, délais de sécurité et cycle estival anti-grippage.",
-                        "data": {
-                            "window_sensor": "Capteur de Fenêtre (Optionnel)",
-                            "sensor_timeout_min": "Délai Watchdog Capteur (minutes)",
-                            "anti_seize_zone_enable": "Activer la protection anti-grippage (Été) pour cette zone",
-                            "allow_passive_heat": "Autoriser la chaleur passive (Fancoil sans vanne / Mezzanine)",
-                            "weight": "Poids Thermique de la Zone (Surface / Puissance des Émetteurs)"
-                        }
-                    }
-                },
-                "data_description": {
-                    "name": "Un nom convivial pour cette zone",
-                    "temp_sensor": "Capteur principal de température ambiante de la zone",
-                    "target_temperature": "Consigne de température par défaut pour cette zone"
-                }
-            },
-            "trv_calibration": {
-                "title": "Configuration TRV (Capteur de décalage)",
-                "description": "Sélectionnez les entités de décalage de température (calibration) pour chaque TRV de la zone {zone_name}. Ce sont généralement des entités `number` fournies par votre intégration TRV (ex. Better Thermostat, Z2M, ZHA). Si laissé vide, nous utiliserons la compensation de température cible."
-            },
-            "another_zone": {
-                "title": "Ajouter une autre zone ?",
-                "description": "Vous avez ajouté {zones_added} zone(s) : {zones_list}.",
-                "data": {
-                    "add_another": "Ajouter une autre zone"
-                }
-            },
-            "geofencing": {
-                "title": "Geofencing & Programmation Intelligente",
-                "description": "Souhaitez-vous activer le géorepérage et le mode Nuit Auto ? Si activé, sélectionnez un capteur de présence (ex. zone.home ou entité personne).",
-                "data": {
-                    "geofencing_enabled": "Activer le Géofencing & Nuit Auto",
-                    "presence_sensor": "Capteur de Présence"
-                }
-            },
-            "confirm": {
-                "title": "Confirmer la Configuration",
-                "description": "Prêt à configurer le Thermostat Multizone.\n\n**Zones ({zones_count}) :**\n{zones_list}\n\nCliquez sur Soumettre pour créer l'intégration."
-            },
-            "boiler_relay": {
-                "title": "Configuration Relais Chaudière",
-                "description": "Sélectionnez l'interrupteur (switch) qui contrôle le relais de votre chaudière (circulateur).",
-                "data": {
-                    "boiler_switch": "Interrupteur Chaudière"
-                },
-                "data_description": {
-                    "boiler_switch": "L'interrupteur/relais qui contrôle la pompe de la chaudière"
-                }
-            },
-            "boiler_opentherm": {
-                "title": "Configuration OpenTherm",
-                "description": "Configurez OpenTherm via le mode Dual-Path : Option 1 (Passerelle Climate) : entité climate avec télémétrie automatique des attributs ; Option 2 (Dissociée) : entité number de consigne et commutateur optionnel d'activation CH. Définissez les températures d'eau minimale et maximale.",
-                "data": {
-                    "opentherm_entity": "Entité OpenTherm (Climate/Water Heater)",
-                    "opentherm_min_temp": "Température Minimale de l'eau (°C)",
-                    "opentherm_max_temp": "Température Maximale de l'eau (°C)",
-                    "opentherm_ch_switch": "Interrupteur d'activation du chauffage central (optionnel)"
-                }
-            }
-        },
-        "abort": {
-            "already_configured": "Multizone Thermostat est déjà configuré. Utilisez les Options pour modifier les zones.",
-            "no_switches_found": "Aucun interrupteur trouvé dans Home Assistant. Veuillez d'abord ajouter un relais/interrupteur.",
-            "no_zones_configured": "Aucune zone configurée. Veuillez ajouter au moins une zone.",
-            "no_temp_sensors_found": "Aucun capteur de température trouvé dans Home Assistant."
-        },
-        "error": {
-            "zone_name_required": "Le nom de la zone ne peut pas être vide.",
-            "presence_sensor_required": "Un capteur de présence est requis lorsque le geofencing est activé.",
-            "invalid_temp_range": "La température minimale doit être inférieure à la température maximale.",
-            "no_actuators_selected": "Vous devez sélectionner au moins une entité climate ou un interrupteur pour la zone.",
-            "zone_name_exists": "Une zone avec ce nom existe déjà."
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configuration de Multizone Thermostat",
+        "description": "Bienvenue dans Multizone Thermostat. Veuillez sélectionner le mode de contrôle de votre chaudière principale.",
+        "data": {
+          "enable_gas_heater": "Gas / Combustion Boiler",
+          "enable_heat_pump": "Electric Heat Pump (PDC)"
         }
+      },
+      "weather": {
+        "title": "Compensation Météo",
+        "description": "Sélectionnez un capteur de température extérieure ou météo pour activer la compensation météo. Cela ajustera dynamiquement le chauffage en fonction des conditions extérieures.",
+        "data": {
+          "weather_sensor": "Capteur de Température Extérieure"
+        }
+      },
+      "calendar": {
+        "title": "Calendrier Global",
+        "description": "Sélectionnez une entité calendrier local pour contrôler la programmation du système multizone.",
+        "data": {
+          "global_calendar": "Entité Calendrier"
+        }
+      },
+      "add_zone": {
+        "title": "Ajouter une zone de chauffage ({zone_number})",
+        "description": "Configurez une zone de chauffage. {zones_added} zone(s) déjà ajoutée(s).",
+        "data": {
+          "name": "Nom de la Zone",
+          "temp_sensor": "Capteur de Température de Zone",
+          "target_temperature": "Température Cible de Base"
+        },
+        "sections": {
+          "trv_settings": {
+            "name": "Vannes thermostatiques de radiateur (TRV)",
+            "description": "Vannes thermostatiques connectées standard avec contrôle de température.",
+            "data": {
+              "climate_entities": "Entité Climate",
+              "trv_preset_sync": "Activer la synchro des préréglages TRV",
+              "authoritative_climate_sync": "Synchronisation Faisant Foi du Thermostat Mural"
+            }
+          },
+          "valve_settings": {
+            "name": "Vannes proportionnelles & 0-10V",
+            "description": "Contrôle direct du pourcentage d'ouverture ou tension analogique 0-10V.",
+            "data": {
+              "valve_entities": "Entités de vanne / actionneur",
+              "valve_scale": "Mode d'échelle de sortie"
+            }
+          },
+          "relay_settings": {
+            "name": "Actionneurs à relais (PWM)",
+            "description": "Interrupteurs ON/OFF et actionneurs thermiques contrôlés par modulation d'impulsions (PWM).",
+            "data": {
+              "switch_entities": "Interrupteurs de Zone / Relais"
+            }
+          },
+          "safety_settings": {
+            "name": "Protections & Paramètres avancés",
+            "description": "Bypass de fenêtre, délais de sécurité et cycle estival anti-grippage.",
+            "data": {
+              "window_sensor": "Capteur de Fenêtre (Optionnel)",
+              "sensor_timeout_min": "Délai Watchdog Capteur (minutes)",
+              "anti_seize_zone_enable": "Activer la protection anti-grippage (Été) pour cette zone",
+              "allow_passive_heat": "Autoriser la chaleur passive (Fancoil sans vanne / Mezzanine)",
+              "weight": "Poids Thermique de la Zone (Surface / Puissance des Émetteurs)"
+            }
+          },
+          "split_settings": {
+            "name": "Room Air Split Actuators",
+            "description": "Secondary direct-expansion split AC / Heat Pump unit for this room.",
+            "data": {
+              "split_climate_entity": "Split AC / Heat Pump Entity",
+              "split_role": "Operational Role",
+              "split_solar_priority": "Solar Priority (Prefer Split on PV Surplus)",
+              "split_quick_boost": "Thermal Shock / Quick Heat Boost",
+              "split_boost_delta": "Boost Delta-T Threshold (°C)",
+              "split_sensor_injection": "Inject Room Sensor (Bypass Ceiling Probe)"
+            }
+          }
+        },
+        "data_description": {
+          "name": "Un nom convivial pour cette zone",
+          "temp_sensor": "Capteur principal de température ambiante de la zone",
+          "target_temperature": "Consigne de température par défaut pour cette zone"
+        }
+      },
+      "trv_calibration": {
+        "title": "Configuration TRV (Capteur de décalage)",
+        "description": "Sélectionnez les entités de décalage de température (calibration) pour chaque TRV de la zone {zone_name}. Ce sont généralement des entités `number` fournies par votre intégration TRV (ex. Better Thermostat, Z2M, ZHA). Si laissé vide, nous utiliserons la compensation de température cible.",
+        "data": {}
+      },
+      "another_zone": {
+        "title": "Ajouter une autre zone ?",
+        "description": "Vous avez ajouté {zones_added} zone(s) : {zones_list}.",
+        "data": {
+          "add_another": "Ajouter une autre zone"
+        }
+      },
+      "geofencing": {
+        "title": "Geofencing & Programmation Intelligente",
+        "description": "Souhaitez-vous activer le géorepérage et le mode Nuit Auto ? Si activé, sélectionnez un capteur de présence (ex. zone.home ou entité personne).",
+        "data": {
+          "geofencing_enabled": "Activer le Géofencing & Nuit Auto",
+          "presence_sensor": "Capteur de Présence"
+        }
+      },
+      "confirm": {
+        "title": "Confirmer la Configuration",
+        "description": "Prêt à configurer le Thermostat Multizone.\n\n**Zones ({zones_count}) :**\n{zones_list}\n\nCliquez sur Soumettre pour créer l'intégration.",
+        "data": {}
+      },
+      "boiler_relay": {
+        "title": "Configuration Relais Chaudière",
+        "description": "Sélectionnez l'interrupteur (switch) qui contrôle le relais de votre chaudière (circulateur).",
+        "data": {
+          "boiler_switch": "Interrupteur Chaudière"
+        },
+        "data_description": {
+          "boiler_switch": "L'interrupteur/relais qui contrôle la pompe de la chaudière"
+        }
+      },
+      "boiler_opentherm": {
+        "title": "Configuration OpenTherm",
+        "description": "Configurez OpenTherm via le mode Dual-Path : Option 1 (Passerelle Climate) : entité climate avec télémétrie automatique des attributs ; Option 2 (Dissociée) : entité number de consigne et commutateur optionnel d'activation CH. Définissez les températures d'eau minimale et maximale.",
+        "data": {
+          "opentherm_entity": "Entité OpenTherm (Climate/Water Heater)",
+          "opentherm_min_temp": "Température Minimale de l'eau (°C)",
+          "opentherm_max_temp": "Température Maximale de l'eau (°C)",
+          "opentherm_ch_switch": "Interrupteur d'activation du chauffage central (optionnel)"
+        }
+      },
+      "boiler_mode": {
+        "title": "Gas Boiler Mode",
+        "description": "Select how you want to control your gas boiler (Relay ON/OFF or OpenTherm Modulating).",
+        "data": {
+          "boiler_mode": "Boiler Control Mode"
+        }
+      },
+      "heat_pump": {
+        "title": "Central Heat Pump (PDC) Setup",
+        "description": "Configure your central hydronic heat pump entity and temperature limits.",
+        "data": {
+          "heat_pump_type": "Heat Pump Control Type",
+          "heat_pump_entity": "Heat Pump Entity",
+          "heat_pump_min_temp": "Minimum Flow Water Temperature (°C)",
+          "heat_pump_max_temp": "Maximum Flow Water Temperature (°C)",
+          "heat_pump_ch_switch": "Heating Enable Switch (Optional)",
+          "heat_pump_cooling": "Activer le mode refroidissement",
+          "hp_cool_min_temp": "Température minimale eau froide (°C)",
+          "hp_cool_max_temp": "Température maximale eau froide (°C)"
+        }
+      },
+      "energy_management": {
+        "title": "Solar Self-Consumption & Energy Management",
+        "description": "Configure solar PV surplus detection, battery protection, or external signals from EMHASS/Predbat.",
+        "data": {
+          "energy_management_enabled": "Enable Solar Energy Management",
+          "solar_power_sensor": "Solar Production Power Sensor (W)",
+          "grid_export_sensor": "Grid Export Power Sensor (W)",
+          "battery_soc_sensor": "Battery State of Charge (SOC) Sensor (%)",
+          "external_solar_override_entity": "External Solar Signal / Switch (EMHASS/Predbat)",
+          "solar_export_threshold": "Surplus Export Threshold (W)",
+          "battery_min_reserve_soc": "Battery Safety Reserve Minimum SOC (%)",
+          "solar_min_run_time": "Durée Minimale de Cycle Solaire Anti-Court-Cycle (minutes)",
+          "solar_overheat_offset": "Offset d'Accumulation Thermique Solaire / EMHASS (+°C)",
+          "battery_power_sensor": "Battery Power Sensor (W, optional)",
+          "solar_forecast_sensor": "Solar Forecast Sensor (W or kWh, optional)",
+          "solar_irradiance_sensor": "Solar Irradiance Sensor (W/m² or lux, optional)",
+          "battery_max_discharge_time": "Max Allowed Battery Discharge Time (minutes)",
+          "battery_power_inverted": "Invert Battery Power Sign (if positive = discharge)"
+        }
+      }
     },
-    "options": {
-        "step": {
-            "init": {
-                "title": "Options Multizone Thermostat",
-                "description": "Zones configurées: **{zones_count}**\n\nQue souhaitez-vous modifier?",
-                "data": {
-                    "action": "Action"
-                }
-            },
-            "change_boiler": {
-                "title": "Changer le Mode de la Chaudière",
-                "data": {
-                    "boiler_mode": "Mode de Contrôle de la Chaudière"
-                }
-            },
-            "edit_calendar": {
-                "title": "Calendrier Global",
-                "description": "Sélectionnez une entité calendrier local pour contrôler la programmation du système multizone.",
-                "data": {
-                    "global_calendar": "Entité Calendrier"
-                }
-            },
-            "add_zone": {
-                "title": "Ajouter une Nouvelle Zone",
-                "data": {
-                    "climate_entities": "Entité Climate",
-                    "anti_seize_zone_enable": "Activer la protection anti-grippage (Été) pour cette zone",
-                    "allow_passive_heat": "Autoriser la chaleur passive (Fancoil sans vanne / Mezzanine)",
-                    "window_sensor": "Capteur de Fenêtre (Optionnel)",
-                    "name": "Nom de la Zone",
-                    "trv_preset_sync": "Activer la synchro des préréglages TRV",
-                    "switch_entities": "Interrupteurs de Zone / Relais",
-                    "temp_sensor": "Capteur de Température de Zone",
-                    "target_temperature": "Température Cible de Base",
-                    "sensor_timeout_min": "Délai Watchdog Capteur (minutes)"
-                },
-                "sections": {
-                    "trv_settings": {
-                        "name": "Vannes thermostatiques de radiateur (TRV)",
-                        "description": "Vannes thermostatiques connectées standard avec contrôle de température.",
-                        "data": {
-                            "climate_entities": "Entité Climate",
-                            "trv_preset_sync": "Activer la synchro des préréglages TRV",
-                            "authoritative_climate_sync": "Synchronisation Faisant Foi du Thermostat Mural"
-                        }
-                    },
-                    "valve_settings": {
-                        "name": "Vannes proportionnelles & 0-10V",
-                        "description": "Contrôle direct du pourcentage d'ouverture ou tension analogique 0-10V.",
-                        "data": {
-                            "valve_entities": "Entités de vanne / actionneur",
-                            "valve_scale": "Mode d'échelle de sortie"
-                        }
-                    },
-                    "relay_settings": {
-                        "name": "Actionneurs à relais (PWM)",
-                        "description": "Interrupteurs ON/OFF et actionneurs thermiques contrôlés par modulation d'impulsions (PWM).",
-                        "data": {
-                            "switch_entities": "Interrupteurs de Zone / Relais"
-                        }
-                    },
-                    "safety_settings": {
-                        "name": "Protections & Paramètres avancés",
-                        "description": "Bypass de fenêtre, délais de sécurité et cycle estival anti-grippage.",
-                        "data": {
-                            "window_sensor": "Capteur de Fenêtre (Optionnel)",
-                            "sensor_timeout_min": "Délai Watchdog Capteur (minutes)",
-                            "anti_seize_zone_enable": "Activer la protection anti-grippage (Été) pour cette zone",
-                            "allow_passive_heat": "Autoriser la chaleur passive (Fancoil sans vanne / Mezzanine)",
-                            "weight": "Poids Thermique de la Zone (Surface / Puissance des Émetteurs)"
-                        }
-                    }
-                },
-                "data_description": {
-                    "climate_entities": "L'entité climate pour cette pièce/zone",
-                    "allow_passive_heat": "Désactive la détection d'anomalie de surchauffe passive si cette zone absorbe naturellement la chaleur au repos (ex. mezzanine ouverte ou ventilo-convecteur sans vanne de zone).",
-                    "window_sensor": "Contourner automatiquement la zone lorsque ce capteur est ouvert",
-                    "sensor_timeout_min": "Durée maximale sans mise à jour avant le basculement en mode sécurité / capteur TRV interne",
-                    "name": "Un nom convivial pour cette zone (pré-rempli à partir du nom de l'entité climate)",
-                    "trv_preset_sync": "Synchroniser automatiquement le mode prédéfini lors du changement de mode HVAC (pour vannes TRV physiques)"
-                }
-            },
-            "remove_zone": {
-                "title": "Supprimer une Zone",
-                "description": "Sélectionnez la zone à supprimer. L'interrupteur de cette zone sera également supprimé.",
-                "data": {
-                    "zone_name": "Zone à Supprimer"
-                }
-            },
-            "edit_zone": {
-                "title": "Modifier les Paramètres de la Zone",
-                "description": "Modifier les paramètres d'une zone.",
-                "data": {
-                    "zone_name": "Zone",
-                    "temp_sensor": "Capteur de Température de Zone",
-                    "target_temperature": "Température Cible de Base"
-                },
-                "sections": {
-                    "trv_settings": {
-                        "name": "Vannes thermostatiques de radiateur (TRV)",
-                        "description": "Vannes thermostatiques connectées standard avec contrôle de température.",
-                        "data": {
-                            "climate_entities": "TRVs de Zone / Climates",
-                            "trv_preset_sync": "Activer la synchro des préréglages TRV",
-                            "authoritative_climate_sync": "Synchronisation Faisant Foi du Thermostat Mural"
-                        }
-                    },
-                    "valve_settings": {
-                        "name": "Vannes proportionnelles & 0-10V",
-                        "description": "Contrôle direct du pourcentage d'ouverture ou tension analogique 0-10V.",
-                        "data": {
-                            "valve_entities": "Entités de vanne / actionneur",
-                            "valve_scale": "Mode d'échelle de sortie"
-                        }
-                    },
-                    "relay_settings": {
-                        "name": "Actionneurs à relais (PWM)",
-                        "description": "Interrupteurs ON/OFF et actionneurs thermiques contrôlés par modulation d'impulsions (PWM).",
-                        "data": {
-                            "switch_entities": "Interrupteurs de Zone / Relais"
-                        }
-                    },
-                    "safety_settings": {
-                        "name": "Protections & Paramètres avancés",
-                        "description": "Bypass de fenêtre, délais de sécurité et cycle estival anti-grippage.",
-                        "data": {
-                            "window_sensor": "Capteur de Fenêtre (Optionnel)",
-                            "sensor_timeout_min": "Délai Watchdog Capteur (minutes)",
-                            "anti_seize_zone_enable": "Activer la protection anti-grippage (Été) pour cette zone",
-                            "allow_passive_heat": "Autoriser la chaleur passive (Fancoil sans vanne / Mezzanine)",
-                            "weight": "Poids Thermique de la Zone (Surface / Puissance des Émetteurs)"
-                        }
-                    }
-                }
-            },
-            "edit_geofencing": {
-                "title": "Geofencing & Programmation Intelligente",
-                "description": "Activer ou désactiver le Geofencing et sélectionner le capteur de présence.",
-                "data": {
-                    "geofencing_enabled": "Activer le Geofencing & Nuit Auto",
-                    "presence_sensor": "Capteur de Présence"
-                }
-            },
-            "trv_calibration_add": {
-                "title": "Configuration TRV (Capteur Externe) (Ajout)",
-                "description": "Sélectionnez les entités de décalage de température (calibration) pour chaque TRV de la zone {zone_name}. Ce sont généralement des entités `number` fournies par votre intégration TRV (ex. Better Thermostat, Z2M, ZHA). Si laissé vide, nous utiliserons la compensation de température cible."
-            },
-            "trv_calibration_edit": {
-                "title": "Configuration TRV (Capteur Externe) (Modif)",
-                "description": "Sélectionnez les entités de décalage de température (calibration) pour chaque TRV de la zone {zone_name}. Ce sont généralement des entités `number` fournies par votre intégration TRV (ex. Better Thermostat, Z2M, ZHA). Si laissé vide, nous utiliserons la compensation de température cible."
-            },
-            "edit_weather_comp": {
-                "title": "Modifier la Compensation Météo",
-                "description": "Sélectionnez un capteur de température extérieure pour activer la compensation météo.",
-                "data": {
-                    "weather_sensor": "Capteur de Température Extérieure"
-                }
-            },
-            "boiler_relay": {
-                "title": "Configuration Relais Chaudière",
-                "description": "Sélectionnez l'interrupteur (switch) qui contrôle le relais de votre chaudière (circulateur).",
-                "data": {
-                    "boiler_switch": "Interrupteur Chaudière"
-                },
-                "data_description": {
-                    "boiler_switch": "L'interrupteur/relais qui contrôle la pompe de la chaudière"
-                }
-            },
-            "boiler_opentherm": {
-                "title": "Configuration OpenTherm",
-                "description": "Configurez OpenTherm via le mode Dual-Path : Option 1 (Passerelle Climate) : entité climate avec télémétrie automatique des attributs ; Option 2 (Dissociée) : entité number de consigne et commutateur optionnel d'activation CH. Définissez les températures d'eau minimale et maximale.",
-                "data": {
-                    "opentherm_entity": "Entité OpenTherm",
-                    "opentherm_min_temp": "Température Minimale de l'eau (°C)",
-                    "opentherm_max_temp": "Température Maximale de l'eau (°C)",
-                    "opentherm_ch_switch": "Interrupteur d'activation du chauffage central (optionnel)"
-                }
-            }
-        },
-        "abort": {
-            "no_zones_configured": "Aucune zone configurée.",
-            "no_climates_available": "Toutes les entités climate disponibles sont déjà configurées en tant que zones.",
-            "no_temp_sensors_found": "Aucun capteur de température trouvé dans Home Assistant.",
-            "no_switches_found": "Aucun interrupteur trouvé dans Home Assistant.",
-            "no_virtual_thermostats": "Aucun thermostat virtuel configuré."
-        },
-        "error": {
-            "zone_name_required": "Le nom de la zone ne peut pas être vide.",
-            "presence_sensor_required": "Un capteur de présence est requis lorsque le geofencing est activé.",
-            "invalid_temp_range": "La température minimale doit être inférieure à la température maximale.",
-            "no_actuators_selected": "Vous devez sélectionner au moins une entité climate ou un interrupteur pour la zone.",
-            "zone_name_exists": "Une zone avec ce nom existe déjà."
-        }
+    "abort": {
+      "already_configured": "Multizone Thermostat est déjà configuré. Utilisez les Options pour modifier les zones.",
+      "no_switches_found": "Aucun interrupteur trouvé dans Home Assistant. Veuillez d'abord ajouter un relais/interrupteur.",
+      "no_zones_configured": "Aucune zone configurée. Veuillez ajouter au moins une zone.",
+      "no_temp_sensors_found": "Aucun capteur de température trouvé dans Home Assistant."
     },
-    "entity": {
-        "switch": {
-            "master": {
-                "name": "Maître Chauffage"
-            }
-        },
-        "select": {
-            "global_preset": {
-                "name": "Préréglage Global",
-                "state": {
-                    "manual": "Manuel",
-                    "eco": "Éco",
-                    "comfort": "Confort",
-                    "sleep": "Nuit",
-                    "away": "Absent"
-                }
-            },
-            "demand_strategy": {
-                "name": "Stratégie d'Agrégation de la Demande",
-                "state": {
-                    "max": "Demande Maximale de Zone (MAX)",
-                    "weighted_average": "Moyenne Pondérée",
-                    "sum_capped": "Somme Cumulée (Plafonnée à 100%)"
-                }
-            }
-        }
+    "error": {
+      "zone_name_required": "Le nom de la zone ne peut pas être vide.",
+      "presence_sensor_required": "Un capteur de présence est requis lorsque le geofencing est activé.",
+      "invalid_temp_range": "La température minimale doit être inférieure à la température maximale.",
+      "no_actuators_selected": "Vous devez sélectionner au moins une entité climate ou un interrupteur pour la zone.",
+      "zone_name_exists": "Une zone avec ce nom existe déjà.",
+      "no_plants_selected": "You must select at least one central heating plant (Gas boiler or Heat pump)."
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options Multizone Thermostat",
+        "description": "Zones configurées: **{zones_count}**\n\nQue souhaitez-vous modifier?",
+        "data": {
+          "action": "Action"
+        },
+        "menu_options": {
+          "change_boiler": "Modifier chaudière / mode d'installation",
+          "edit_heat_pump": "Modifier Pompe à Chaleur (PAC)",
+          "edit_energy_management": "Modifier Gestion Solaire & Énergie",
+          "add_zone": "Ajouter une zone",
+          "edit_zone": "Modifier une zone",
+          "remove_zone": "Supprimer une zone",
+          "edit_weather_comp": "Modifier Compensation Météo",
+          "edit_geofencing": "Modifier Paramètres de Géorepérage",
+          "edit_calendar": "Modifier Calendrier Global"
+        }
+      },
+      "change_boiler": {
+        "title": "Changer le Mode de la Chaudière",
+        "data": {
+          "boiler_mode": "Mode de Contrôle de la Chaudière"
+        }
+      },
+      "edit_calendar": {
+        "title": "Calendrier Global",
+        "description": "Sélectionnez une entité calendrier local pour contrôler la programmation du système multizone.",
+        "data": {
+          "global_calendar": "Entité Calendrier"
+        }
+      },
+      "add_zone": {
+        "title": "Ajouter une Nouvelle Zone",
+        "data": {
+          "climate_entities": "Entité Climate",
+          "anti_seize_zone_enable": "Activer la protection anti-grippage (Été) pour cette zone",
+          "allow_passive_heat": "Autoriser la chaleur passive (Fancoil sans vanne / Mezzanine)",
+          "window_sensor": "Capteur de Fenêtre (Optionnel)",
+          "name": "Nom de la Zone",
+          "trv_preset_sync": "Activer la synchro des préréglages TRV",
+          "switch_entities": "Interrupteurs de Zone / Relais",
+          "temp_sensor": "Capteur de Température de Zone",
+          "target_temperature": "Température Cible de Base",
+          "sensor_timeout_min": "Délai Watchdog Capteur (minutes)"
+        },
+        "sections": {
+          "trv_settings": {
+            "name": "Vannes thermostatiques de radiateur (TRV)",
+            "description": "Vannes thermostatiques connectées standard avec contrôle de température.",
+            "data": {
+              "climate_entities": "Entité Climate",
+              "trv_preset_sync": "Activer la synchro des préréglages TRV",
+              "authoritative_climate_sync": "Synchronisation Faisant Foi du Thermostat Mural"
+            }
+          },
+          "valve_settings": {
+            "name": "Vannes proportionnelles & 0-10V",
+            "description": "Contrôle direct du pourcentage d'ouverture ou tension analogique 0-10V.",
+            "data": {
+              "valve_entities": "Entités de vanne / actionneur",
+              "valve_scale": "Mode d'échelle de sortie"
+            }
+          },
+          "relay_settings": {
+            "name": "Actionneurs à relais (PWM)",
+            "description": "Interrupteurs ON/OFF et actionneurs thermiques contrôlés par modulation d'impulsions (PWM).",
+            "data": {
+              "switch_entities": "Interrupteurs de Zone / Relais"
+            }
+          },
+          "safety_settings": {
+            "name": "Protections & Paramètres avancés",
+            "description": "Bypass de fenêtre, délais de sécurité et cycle estival anti-grippage.",
+            "data": {
+              "window_sensor": "Capteur de Fenêtre (Optionnel)",
+              "sensor_timeout_min": "Délai Watchdog Capteur (minutes)",
+              "anti_seize_zone_enable": "Activer la protection anti-grippage (Été) pour cette zone",
+              "allow_passive_heat": "Autoriser la chaleur passive (Fancoil sans vanne / Mezzanine)",
+              "weight": "Poids Thermique de la Zone (Surface / Puissance des Émetteurs)"
+            }
+          },
+          "split_settings": {
+            "name": "Room Air Split Actuators",
+            "description": "Secondary direct-expansion split AC / Heat Pump unit for this room.",
+            "data": {
+              "split_climate_entity": "Split AC / Heat Pump Entity",
+              "split_role": "Operational Role",
+              "split_solar_priority": "Solar Priority (Prefer Split on PV Surplus)",
+              "split_quick_boost": "Thermal Shock / Quick Heat Boost",
+              "split_boost_delta": "Boost Delta-T Threshold (°C)",
+              "split_sensor_injection": "Inject Room Sensor (Bypass Ceiling Probe)"
+            }
+          }
+        },
+        "data_description": {
+          "climate_entities": "L'entité climate pour cette pièce/zone",
+          "allow_passive_heat": "Désactive la détection d'anomalie de surchauffe passive si cette zone absorbe naturellement la chaleur au repos (ex. mezzanine ouverte ou ventilo-convecteur sans vanne de zone).",
+          "window_sensor": "Contourner automatiquement la zone lorsque ce capteur est ouvert",
+          "sensor_timeout_min": "Durée maximale sans mise à jour avant le basculement en mode sécurité / capteur TRV interne",
+          "name": "Un nom convivial pour cette zone (pré-rempli à partir du nom de l'entité climate)",
+          "trv_preset_sync": "Synchroniser automatiquement le mode prédéfini lors du changement de mode HVAC (pour vannes TRV physiques)"
+        }
+      },
+      "remove_zone": {
+        "title": "Supprimer une Zone",
+        "description": "Sélectionnez la zone à supprimer. L'interrupteur de cette zone sera également supprimé.",
+        "data": {
+          "zone_name": "Zone à Supprimer"
+        }
+      },
+      "edit_zone": {
+        "title": "Modifier les Paramètres de la Zone",
+        "description": "Modifier les paramètres d'une zone.",
+        "data": {
+          "zone_name": "Zone",
+          "temp_sensor": "Capteur de Température de Zone",
+          "target_temperature": "Température Cible de Base"
+        },
+        "sections": {
+          "trv_settings": {
+            "name": "Vannes thermostatiques de radiateur (TRV)",
+            "description": "Vannes thermostatiques connectées standard avec contrôle de température.",
+            "data": {
+              "climate_entities": "TRVs de Zone / Climates",
+              "trv_preset_sync": "Activer la synchro des préréglages TRV",
+              "authoritative_climate_sync": "Synchronisation Faisant Foi du Thermostat Mural"
+            }
+          },
+          "valve_settings": {
+            "name": "Vannes proportionnelles & 0-10V",
+            "description": "Contrôle direct du pourcentage d'ouverture ou tension analogique 0-10V.",
+            "data": {
+              "valve_entities": "Entités de vanne / actionneur",
+              "valve_scale": "Mode d'échelle de sortie"
+            }
+          },
+          "relay_settings": {
+            "name": "Actionneurs à relais (PWM)",
+            "description": "Interrupteurs ON/OFF et actionneurs thermiques contrôlés par modulation d'impulsions (PWM).",
+            "data": {
+              "switch_entities": "Interrupteurs de Zone / Relais"
+            }
+          },
+          "safety_settings": {
+            "name": "Protections & Paramètres avancés",
+            "description": "Bypass de fenêtre, délais de sécurité et cycle estival anti-grippage.",
+            "data": {
+              "window_sensor": "Capteur de Fenêtre (Optionnel)",
+              "sensor_timeout_min": "Délai Watchdog Capteur (minutes)",
+              "anti_seize_zone_enable": "Activer la protection anti-grippage (Été) pour cette zone",
+              "allow_passive_heat": "Autoriser la chaleur passive (Fancoil sans vanne / Mezzanine)",
+              "weight": "Poids Thermique de la Zone (Surface / Puissance des Émetteurs)"
+            }
+          },
+          "split_settings": {
+            "name": "Room Air Split Actuators",
+            "description": "Secondary direct-expansion split AC / Heat Pump unit for this room.",
+            "data": {
+              "split_climate_entity": "Split AC / Heat Pump Entity",
+              "split_role": "Operational Role",
+              "split_solar_priority": "Solar Priority (Prefer Split on PV Surplus)",
+              "split_quick_boost": "Thermal Shock / Quick Heat Boost",
+              "split_boost_delta": "Boost Delta-T Threshold (°C)",
+              "split_sensor_injection": "Inject Room Sensor (Bypass Ceiling Probe)"
+            }
+          }
+        }
+      },
+      "edit_geofencing": {
+        "title": "Geofencing & Programmation Intelligente",
+        "description": "Activer ou désactiver le Geofencing et sélectionner le capteur de présence.",
+        "data": {
+          "geofencing_enabled": "Activer le Geofencing & Nuit Auto",
+          "presence_sensor": "Capteur de Présence"
+        }
+      },
+      "trv_calibration_add": {
+        "title": "Configuration TRV (Capteur Externe) (Ajout)",
+        "description": "Sélectionnez les entités de décalage de température (calibration) pour chaque TRV de la zone {zone_name}. Ce sont généralement des entités `number` fournies par votre intégration TRV (ex. Better Thermostat, Z2M, ZHA). Si laissé vide, nous utiliserons la compensation de température cible.",
+        "data": {}
+      },
+      "trv_calibration_edit": {
+        "title": "Configuration TRV (Capteur Externe) (Modif)",
+        "description": "Sélectionnez les entités de décalage de température (calibration) pour chaque TRV de la zone {zone_name}. Ce sont généralement des entités `number` fournies par votre intégration TRV (ex. Better Thermostat, Z2M, ZHA). Si laissé vide, nous utiliserons la compensation de température cible.",
+        "data": {}
+      },
+      "edit_weather_comp": {
+        "title": "Modifier la Compensation Météo",
+        "description": "Sélectionnez un capteur de température extérieure pour activer la compensation météo.",
+        "data": {
+          "weather_sensor": "Capteur de Température Extérieure"
+        }
+      },
+      "boiler_relay": {
+        "title": "Configuration Relais Chaudière",
+        "description": "Sélectionnez l'interrupteur (switch) qui contrôle le relais de votre chaudière (circulateur).",
+        "data": {
+          "boiler_switch": "Interrupteur Chaudière"
+        },
+        "data_description": {
+          "boiler_switch": "L'interrupteur/relais qui contrôle la pompe de la chaudière"
+        }
+      },
+      "boiler_opentherm": {
+        "title": "Configuration OpenTherm",
+        "description": "Configurez OpenTherm via le mode Dual-Path : Option 1 (Passerelle Climate) : entité climate avec télémétrie automatique des attributs ; Option 2 (Dissociée) : entité number de consigne et commutateur optionnel d'activation CH. Définissez les températures d'eau minimale et maximale.",
+        "data": {
+          "opentherm_entity": "Entité OpenTherm",
+          "opentherm_min_temp": "Température Minimale de l'eau (°C)",
+          "opentherm_max_temp": "Température Maximale de l'eau (°C)",
+          "opentherm_ch_switch": "Interrupteur d'activation du chauffage central (optionnel)"
+        }
+      },
+      "edit_energy_management": {
+        "title": "Solar Self-Consumption & Energy Management",
+        "description": "Configure solar PV surplus detection, battery protection, or external signals from EMHASS/Predbat.",
+        "data": {
+          "energy_management_enabled": "Enable Solar Energy Management",
+          "solar_power_sensor": "Solar Production Power Sensor (W)",
+          "grid_export_sensor": "Grid Export Power Sensor (W)",
+          "battery_soc_sensor": "Battery State of Charge (SOC) Sensor (%)",
+          "external_solar_override_entity": "External Solar Signal / Switch (EMHASS/Predbat)",
+          "solar_export_threshold": "Surplus Export Threshold (W)",
+          "battery_min_reserve_soc": "Battery Safety Reserve Minimum SOC (%)",
+          "solar_min_run_time": "Durée Minimale de Cycle Solaire Anti-Court-Cycle (minutes)",
+          "solar_overheat_offset": "Offset d'Accumulation Thermique Solaire / EMHASS (+°C)",
+          "battery_power_sensor": "Battery Power Sensor (W, optional)",
+          "solar_forecast_sensor": "Solar Forecast Sensor (W or kWh, optional)",
+          "solar_irradiance_sensor": "Solar Irradiance Sensor (W/m² or lux, optional)",
+          "battery_max_discharge_time": "Max Allowed Battery Discharge Time (minutes)",
+          "battery_power_inverted": "Invert Battery Power Sign (if positive = discharge)"
+        }
+      },
+      "edit_heat_pump": {
+        "title": "Modifier la pompe à chaleur centrale",
+        "description": "Modifier l'entité et les limites de température de la pompe à chaleur centrale.",
+        "data": {
+          "enable_heat_pump": "Activer la pompe à chaleur centrale",
+          "heat_pump_type": "Type de contrôle de pompe à chaleur",
+          "heat_pump_entity": "Entité de pompe à chaleur",
+          "heat_pump_cooling": "Activer le mode refroidissement",
+          "heat_pump_min_temp": "Température minimale de départ (°C)",
+          "heat_pump_max_temp": "Température maximale de départ (°C)",
+          "hp_cool_min_temp": "Température minimale eau froide (°C)",
+          "hp_cool_max_temp": "Température maximale eau froide (°C)",
+          "heat_pump_ch_switch": "Interrupteur d'activation chauffage (Optionnel)"
+        }
+      },
+      "trv_calibration": {
+        "title": "Configuration TRV (Capteur d'offset)",
+        "description": "Sélectionnez les entités d'offset pour chaque TRV de la zone {zone_name}.",
+        "data": {}
+      }
+    },
+    "abort": {
+      "no_zones_configured": "Aucune zone configurée.",
+      "no_climates_available": "Toutes les entités climate disponibles sont déjà configurées en tant que zones.",
+      "no_temp_sensors_found": "Aucun capteur de température trouvé dans Home Assistant.",
+      "no_switches_found": "Aucun interrupteur trouvé dans Home Assistant.",
+      "no_virtual_thermostats": "Aucun thermostat virtuel configuré."
+    },
+    "error": {
+      "zone_name_required": "Le nom de la zone ne peut pas être vide.",
+      "presence_sensor_required": "Un capteur de présence est requis lorsque le geofencing est activé.",
+      "invalid_temp_range": "La température minimale doit être inférieure à la température maximale.",
+      "no_actuators_selected": "Vous devez sélectionner au moins une entité climate ou un interrupteur pour la zone.",
+      "zone_name_exists": "Une zone avec ce nom existe déjà.",
+      "hp_temps_invalid": "La température minimale chaud/froid de la PAC doit être inférieure à la température maximale.",
+      "no_plants_selected": "Vous devez sélectionner au moins un générateur (Chaudière gaz, Pompe à chaleur ou Split de zone)."
+    }
+  },
+  "entity": {
+    "switch": {
+      "master": {
+        "name": "Maître Chauffage"
+      },
+      "master_allow_split_heating": {
+        "name": "Autoriser le chauffage par split"
+      },
+      "master_allow_split_cooling": {
+        "name": "Autoriser le refroidissement par split"
+      }
+    },
+    "select": {
+      "global_preset": {
+        "name": "Préréglage Global",
+        "state": {
+          "manual": "Manuel",
+          "eco": "Éco",
+          "comfort": "Confort",
+          "sleep": "Nuit",
+          "away": "Absent"
+        }
+      },
+      "demand_strategy": {
+        "name": "Stratégie d'Agrégation de la Demande",
+        "state": {
+          "max": "Demande Maximale de Zone (MAX)",
+          "weighted_average": "Moyenne Pondérée",
+          "sum_capped": "Somme Cumulée (Plafonnée à 100%)"
+        }
+      },
+      "master_heat_source_priority": {
+        "name": "Priorité de la source de chaleur",
+        "state": {
+          "auto": "Automatique (Surplus PV, Quick Boost & IA)",
+          "hybrid": "Manuel Hybride (Split si présent, Gaz pour le reste)",
+          "combined": "Manuel Combiné (Gaz + Split en simultané)",
+          "gas_only": "Manuel Gaz Seul (Bloque le Split)",
+          "electric_only": "Manuel Électrique Seul (Bloque la Chaudière)"
+        }
+      },
+      "master_operation_mode": {
+        "name": "Mode de Fonctionnement Master",
+        "state": {
+          "heat": "Chauffage",
+          "cool": "Refroidissement"
+        }
+      },
+      "schedule_profile": {
+        "name": "Profil de programmation"
+      }
+    },
+    "sensor": {
+      "energy_class": {
+        "name": "Classe énergétique"
+      }
+    }
+  },
+  "selector": {
+    "action": {
+      "options": {
+        "change_boiler": "Modifier chaudière / mode d'installation",
+        "edit_heat_pump": "Modifier Pompe à Chaleur (PAC)",
+        "edit_energy_management": "Modifier Gestion Solaire & Énergie",
+        "add_zone": "Ajouter une zone",
+        "edit_zone": "Modifier une zone",
+        "remove_zone": "Supprimer une zone",
+        "edit_weather_comp": "Modifier Compensation Météo",
+        "edit_geofencing": "Modifier Paramètres de Géorepérage",
+        "edit_calendar": "Modifier Calendrier Global"
+      }
+    }
+  }
 }

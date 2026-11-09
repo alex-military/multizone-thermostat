@@ -1,355 +1,537 @@
 {
-    "config": {
-        "step": {
-            "user": {
-                "title": "Multizone Thermostat Konfiguration",
-                "description": "Willkommen bei Multizone Thermostat. Bitte wählen Sie den Steuermodus Ihres Hauptkessels.",
-                "data": {
-                    "boiler_mode": "Kesselsteuermodus"
-                }
-            },
-            "weather": {
-                "title": "Wetterkompensation",
-                "description": "Wählen Sie einen Außentemperatur- oder Wettersensor, um die Wetterkompensation zu aktivieren. Dadurch wird die Heizlogik dynamisch an die Außenbedingungen angepasst.",
-                "data": {
-                    "weather_sensor": "Außentemperatursensor"
-                }
-            },
-            "calendar": {
-                "title": "Globaler Kalender",
-                "description": "Wählen Sie eine lokale Kalender-Entität, um den Zeitplan des Multizonen-Systems zu steuern.",
-                "data": {
-                    "global_calendar": "Kalender-Entität"
-                }
-            },
-            "add_zone": {
-                "title": "Heizzone hinzufügen ({zone_number})",
-                "description": "Konfigurieren Sie eine Heizzone. {zones_added} Zone(n) bereits hinzugefügt.",
-                "data": {
-                    "name": "Zonenname",
-                    "temp_sensor": "Zonentemperatursensor",
-                    "target_temperature": "Basis-Solltemperatur"
-                },
-                "sections": {
-                    "trv_settings": {
-                        "name": "Thermostatische Heizkörperventile (TRV)",
-                        "description": "Intelligente Standard-Heizkörperthermostate mit Temperaturregelung.",
-                        "data": {
-                            "climate_entities": "Climate-Entität",
-                            "trv_preset_sync": "TRV-Preset-Synchronisierung aktivieren",
-                            "authoritative_climate_sync": "Autoritative Wandthermostat-Synchronisierung"
-                        }
-                    },
-                    "valve_settings": {
-                        "name": "Proportional- & 0-10V-Ventile",
-                        "description": "Direkte Steuerung des Öffnungsprozentsatzes oder analoge Spannungssteuerung 0-10V.",
-                        "data": {
-                            "valve_entities": "Ventil- / Stellantrieb-Entitäten",
-                            "valve_scale": "Ausgangsskalierungsmodus"
-                        }
-                    },
-                    "relay_settings": {
-                        "name": "Relais-Aktoren (PWM)",
-                        "description": "EIN/AUS-Schalter und thermische Stellantriebe, gesteuert über Pulsweitenmodulation.",
-                        "data": {
-                            "switch_entities": "Zonenschalter / Relais"
-                        }
-                    },
-                    "safety_settings": {
-                        "name": "Schutzfunktionen & Erweiterte Einstellungen",
-                        "description": "Fenster-Bypass, Sicherheits-Timeouts und sommerlicher Blockierschutz.",
-                        "data": {
-                            "window_sensor": "Fenstersensor (Optional)",
-                            "sensor_timeout_min": "Sensor-Watchdog-Timeout (Minuten)",
-                            "anti_seize_zone_enable": "Blockierschutz (Sommerschutz) für diese Zone aktivieren",
-                            "allow_passive_heat": "Passive Wärme zulassen (Fancoil ohne Ventil / Zwischengeschoss)",
-                            "weight": "Thermisches Zonengewicht (Fläche / Heizkörperleistung)"
-                        }
-                    }
-                },
-                "data_description": {
-                    "name": "Ein benutzerfreundlicher Name für diese Zone",
-                    "temp_sensor": "Primärer Raumtemperatursensor der Zone",
-                    "target_temperature": "Standard-Solltemperatur für diese Zone"
-                }
-            },
-            "trv_calibration": {
-                "title": "TRV-Konfiguration (Versatzsensor)",
-                "description": "Wählen Sie die Temperatur-Offset-Entitäten (Kalibrierung) für jedes TRV in der Zone {zone_name}. Dies sind normalerweise `number`-Entitäten Ihrer TRV-Integration (z. B. Better Thermostat, Z2M, ZHA). Wenn leer gelassen, verwenden wir die Zieltemperaturkompensation."
-            },
-            "another_zone": {
-                "title": "Weitere Zone hinzufügen?",
-                "description": "Sie haben {zones_added} Zone(n) hinzugefügt: {zones_list}.",
-                "data": {
-                    "add_another": "Weitere Zone hinzufügen"
-                }
-            },
-            "geofencing": {
-                "title": "Geofencing & Intelligenter Zeitplan",
-                "description": "Möchten Sie Geofencing und den Auto-Nacht-Modus aktivieren? Wenn aktiviert, wählen Sie einen Anwesenheitssensor (z. B. zone.home oder eine Personen-Entität).",
-                "data": {
-                    "geofencing_enabled": "Geofencing & Auto-Nacht aktivieren",
-                    "presence_sensor": "Anwesenheitssensor"
-                }
-            },
-            "confirm": {
-                "title": "Konfiguration bestätigen",
-                "description": "Bereit zum Einrichten des Multizonen-Thermostats.\n\n**Zonen ({zones_count}):**\n{zones_list}\n\nKlicken Sie auf Absenden, um die Integration zu erstellen."
-            },
-            "boiler_relay": {
-                "title": "Kesselrelais Einrichtung",
-                "description": "Wählen Sie den Schalter (Switch), der Ihr Kesselrelais (Umwälzpumpe) steuert.",
-                "data": {
-                    "boiler_switch": "Kesselschalter"
-                },
-                "data_description": {
-                    "boiler_switch": "Der Schalter/Relais, das die Kesselumwälzpumpe steuert"
-                }
-            },
-            "boiler_opentherm": {
-                "title": "OpenTherm Einrichtung",
-                "description": "Konfigurieren Sie OpenTherm über den Dual-Pfad: Option 1 (Climate Gateway): Climate-Entität mit automatischer Attribut-Telemetrie; Option 2 (Entkoppelt): Number-Sollwert-Entität plus optionaler CH-Freigabeschalter. Definieren Sie minimale und maximale Wassertemperaturen.",
-                "data": {
-                    "opentherm_entity": "OpenTherm-Entität (Climate/Water Heater)",
-                    "opentherm_min_temp": "Minimale Wassertemperatur (°C)",
-                    "opentherm_max_temp": "Maximale Wassertemperatur (°C)",
-                    "opentherm_ch_switch": "Heizungsfreigabeschalter CH (optional)"
-                }
-            }
-        },
-        "abort": {
-            "already_configured": "Multizone Thermostat ist bereits konfiguriert. Verwenden Sie die Optionen, um Zonen zu ändern.",
-            "no_switches_found": "Keine Schalter in Home Assistant gefunden. Bitte fügen Sie zuerst ein Relais/Schalter hinzu.",
-            "no_zones_configured": "Keine Zonen konfiguriert. Bitte fügen Sie mindestens eine Zone hinzu.",
-            "no_temp_sensors_found": "Keine Temperatursensoren in Home Assistant gefunden."
-        },
-        "error": {
-            "zone_name_required": "Zonenname darf nicht leer sein.",
-            "presence_sensor_required": "Ein Anwesenheitssensor ist erforderlich, wenn Geofencing aktiviert ist.",
-            "invalid_temp_range": "Die Mindesttemperatur muss unter der Höchsttemperatur liegen.",
-            "no_actuators_selected": "Sie müssen mindestens eine Climate-Entität oder einen Schalter für die Zone auswählen.",
-            "zone_name_exists": "Eine Zone mit diesem Namen existiert bereits."
+  "config": {
+    "step": {
+      "user": {
+        "title": "Multizone Thermostat Konfiguration",
+        "description": "Willkommen bei Multizone Thermostat. Bitte wählen Sie den Steuermodus Ihres Hauptkessels.",
+        "data": {
+          "enable_gas_heater": "Gas / Combustion Boiler",
+          "enable_heat_pump": "Electric Heat Pump (PDC)"
         }
+      },
+      "weather": {
+        "title": "Wetterkompensation",
+        "description": "Wählen Sie einen Außentemperatur- oder Wettersensor, um die Wetterkompensation zu aktivieren. Dadurch wird die Heizlogik dynamisch an die Außenbedingungen angepasst.",
+        "data": {
+          "weather_sensor": "Außentemperatursensor"
+        }
+      },
+      "calendar": {
+        "title": "Globaler Kalender",
+        "description": "Wählen Sie eine lokale Kalender-Entität, um den Zeitplan des Multizonen-Systems zu steuern.",
+        "data": {
+          "global_calendar": "Kalender-Entität"
+        }
+      },
+      "add_zone": {
+        "title": "Heizzone hinzufügen ({zone_number})",
+        "description": "Konfigurieren Sie eine Heizzone. {zones_added} Zone(n) bereits hinzugefügt.",
+        "data": {
+          "name": "Zonenname",
+          "temp_sensor": "Zonentemperatursensor",
+          "target_temperature": "Basis-Solltemperatur"
+        },
+        "sections": {
+          "trv_settings": {
+            "name": "Thermostatische Heizkörperventile (TRV)",
+            "description": "Intelligente Standard-Heizkörperthermostate mit Temperaturregelung.",
+            "data": {
+              "climate_entities": "Climate-Entität",
+              "trv_preset_sync": "TRV-Preset-Synchronisierung aktivieren",
+              "authoritative_climate_sync": "Autoritative Wandthermostat-Synchronisierung"
+            }
+          },
+          "valve_settings": {
+            "name": "Proportional- & 0-10V-Ventile",
+            "description": "Direkte Steuerung des Öffnungsprozentsatzes oder analoge Spannungssteuerung 0-10V.",
+            "data": {
+              "valve_entities": "Ventil- / Stellantrieb-Entitäten",
+              "valve_scale": "Ausgangsskalierungsmodus"
+            }
+          },
+          "relay_settings": {
+            "name": "Relais-Aktoren (PWM)",
+            "description": "EIN/AUS-Schalter und thermische Stellantriebe, gesteuert über Pulsweitenmodulation.",
+            "data": {
+              "switch_entities": "Zonenschalter / Relais"
+            }
+          },
+          "safety_settings": {
+            "name": "Schutzfunktionen & Erweiterte Einstellungen",
+            "description": "Fenster-Bypass, Sicherheits-Timeouts und sommerlicher Blockierschutz.",
+            "data": {
+              "window_sensor": "Fenstersensor (Optional)",
+              "sensor_timeout_min": "Sensor-Watchdog-Timeout (Minuten)",
+              "anti_seize_zone_enable": "Blockierschutz (Sommerschutz) für diese Zone aktivieren",
+              "allow_passive_heat": "Passive Wärme zulassen (Fancoil ohne Ventil / Zwischengeschoss)",
+              "weight": "Thermisches Zonengewicht (Fläche / Heizkörperleistung)"
+            }
+          },
+          "split_settings": {
+            "name": "Room Air Split Actuators",
+            "description": "Secondary direct-expansion split AC / Heat Pump unit for this room.",
+            "data": {
+              "split_climate_entity": "Split AC / Heat Pump Entity",
+              "split_role": "Operational Role",
+              "split_solar_priority": "Solar Priority (Prefer Split on PV Surplus)",
+              "split_quick_boost": "Thermal Shock / Quick Heat Boost",
+              "split_boost_delta": "Boost Delta-T Threshold (°C)",
+              "split_sensor_injection": "Inject Room Sensor (Bypass Ceiling Probe)"
+            }
+          }
+        },
+        "data_description": {
+          "name": "Ein benutzerfreundlicher Name für diese Zone",
+          "temp_sensor": "Primärer Raumtemperatursensor der Zone",
+          "target_temperature": "Standard-Solltemperatur für diese Zone"
+        }
+      },
+      "trv_calibration": {
+        "title": "TRV-Konfiguration (Versatzsensor)",
+        "description": "Wählen Sie die Temperatur-Offset-Entitäten (Kalibrierung) für jedes TRV in der Zone {zone_name}. Dies sind normalerweise `number`-Entitäten Ihrer TRV-Integration (z. B. Better Thermostat, Z2M, ZHA). Wenn leer gelassen, verwenden wir die Zieltemperaturkompensation.",
+        "data": {}
+      },
+      "another_zone": {
+        "title": "Weitere Zone hinzufügen?",
+        "description": "Sie haben {zones_added} Zone(n) hinzugefügt: {zones_list}.",
+        "data": {
+          "add_another": "Weitere Zone hinzufügen"
+        }
+      },
+      "geofencing": {
+        "title": "Geofencing & Intelligenter Zeitplan",
+        "description": "Möchten Sie Geofencing und den Auto-Nacht-Modus aktivieren? Wenn aktiviert, wählen Sie einen Anwesenheitssensor (z. B. zone.home oder eine Personen-Entität).",
+        "data": {
+          "geofencing_enabled": "Geofencing & Auto-Nacht aktivieren",
+          "presence_sensor": "Anwesenheitssensor"
+        }
+      },
+      "confirm": {
+        "title": "Konfiguration bestätigen",
+        "description": "Bereit zum Einrichten des Multizonen-Thermostats.\n\n**Zonen ({zones_count}):**\n{zones_list}\n\nKlicken Sie auf Absenden, um die Integration zu erstellen.",
+        "data": {}
+      },
+      "boiler_relay": {
+        "title": "Kesselrelais Einrichtung",
+        "description": "Wählen Sie den Schalter (Switch), der Ihr Kesselrelais (Umwälzpumpe) steuert.",
+        "data": {
+          "boiler_switch": "Kesselschalter"
+        },
+        "data_description": {
+          "boiler_switch": "Der Schalter/Relais, das die Kesselumwälzpumpe steuert"
+        }
+      },
+      "boiler_opentherm": {
+        "title": "OpenTherm Einrichtung",
+        "description": "Konfigurieren Sie OpenTherm über den Dual-Pfad: Option 1 (Climate Gateway): Climate-Entität mit automatischer Attribut-Telemetrie; Option 2 (Entkoppelt): Number-Sollwert-Entität plus optionaler CH-Freigabeschalter. Definieren Sie minimale und maximale Wassertemperaturen.",
+        "data": {
+          "opentherm_entity": "OpenTherm-Entität (Climate/Water Heater)",
+          "opentherm_min_temp": "Minimale Wassertemperatur (°C)",
+          "opentherm_max_temp": "Maximale Wassertemperatur (°C)",
+          "opentherm_ch_switch": "Heizungsfreigabeschalter CH (optional)"
+        }
+      },
+      "boiler_mode": {
+        "title": "Gas Boiler Mode",
+        "description": "Select how you want to control your gas boiler (Relay ON/OFF or OpenTherm Modulating).",
+        "data": {
+          "boiler_mode": "Boiler Control Mode"
+        }
+      },
+      "heat_pump": {
+        "title": "Central Heat Pump (PDC) Setup",
+        "description": "Configure your central hydronic heat pump entity and temperature limits.",
+        "data": {
+          "heat_pump_type": "Heat Pump Control Type",
+          "heat_pump_entity": "Heat Pump Entity",
+          "heat_pump_min_temp": "Minimum Flow Water Temperature (°C)",
+          "heat_pump_max_temp": "Maximum Flow Water Temperature (°C)",
+          "heat_pump_ch_switch": "Heating Enable Switch (Optional)",
+          "heat_pump_cooling": "Kühlmodus aktivieren",
+          "hp_cool_min_temp": "Minimale Kühlwassertemperatur (°C)",
+          "hp_cool_max_temp": "Maximale Kühlwassertemperatur (°C)"
+        }
+      },
+      "energy_management": {
+        "title": "Solar Self-Consumption & Energy Management",
+        "description": "Configure solar PV surplus detection, battery protection, or external signals from EMHASS/Predbat.",
+        "data": {
+          "energy_management_enabled": "Enable Solar Energy Management",
+          "solar_power_sensor": "Solar Production Power Sensor (W)",
+          "grid_export_sensor": "Grid Export Power Sensor (W)",
+          "battery_soc_sensor": "Battery State of Charge (SOC) Sensor (%)",
+          "external_solar_override_entity": "External Solar Signal / Switch (EMHASS/Predbat)",
+          "solar_export_threshold": "Surplus Export Threshold (W)",
+          "battery_min_reserve_soc": "Battery Safety Reserve Minimum SOC (%)",
+          "solar_min_run_time": "Minimale Solar-Laufzeit Taktschutz (Minuten)",
+          "solar_overheat_offset": "Solar / EMHASS Wärmespeicher-Überhöhung (+°C)",
+          "battery_power_sensor": "Battery Power Sensor (W, optional)",
+          "solar_forecast_sensor": "Solar Forecast Sensor (W or kWh, optional)",
+          "solar_irradiance_sensor": "Solar Irradiance Sensor (W/m² or lux, optional)",
+          "battery_max_discharge_time": "Max Allowed Battery Discharge Time (minutes)",
+          "battery_power_inverted": "Invert Battery Power Sign (if positive = discharge)"
+        }
+      }
     },
-    "options": {
-        "step": {
-            "init": {
-                "title": "Multizone Thermostat Optionen",
-                "description": "Konfigurierte Zonen: **{zones_count}**\n\nWas möchten Sie ändern?",
-                "data": {
-                    "action": "Aktion"
-                }
-            },
-            "change_boiler": {
-                "title": "Kesselmodus ändern",
-                "data": {
-                    "boiler_mode": "Kesselsteuermodus"
-                }
-            },
-            "edit_calendar": {
-                "title": "Globaler Kalender",
-                "description": "Wählen Sie eine lokale Kalender-Entität, um den Zeitplan des Multizonen-Systems zu steuern.",
-                "data": {
-                    "global_calendar": "Kalender-Entität"
-                }
-            },
-            "add_zone": {
-                "title": "Neue Zone hinzufügen",
-                "data": {
-                    "climate_entities": "Climate-Entität",
-                    "anti_seize_zone_enable": "Blockierschutz (Sommerschutz) für diese Zone aktivieren",
-                    "allow_passive_heat": "Passive Wärme zulassen (Fancoil ohne Ventil / Zwischengeschoss)",
-                    "window_sensor": "Fenstersensor (Optional)",
-                    "name": "Zonenname",
-                    "trv_preset_sync": "TRV-Preset-Synchronisierung aktivieren",
-                    "switch_entities": "Zonenschalter / Relais",
-                    "temp_sensor": "Zonen-Temperatursensor",
-                    "target_temperature": "Basis-Zieltemperatur",
-                    "sensor_timeout_min": "Sensor-Watchdog-Timeout (Minuten)"
-                },
-                "sections": {
-                    "trv_settings": {
-                        "name": "Thermostatische Heizkörperventile (TRV)",
-                        "description": "Intelligente Standard-Heizkörperthermostate mit Temperaturregelung.",
-                        "data": {
-                            "climate_entities": "Climate-Entität",
-                            "trv_preset_sync": "TRV-Preset-Synchronisierung aktivieren",
-                            "authoritative_climate_sync": "Autoritative Wandthermostat-Synchronisierung"
-                        }
-                    },
-                    "valve_settings": {
-                        "name": "Proportional- & 0-10V-Ventile",
-                        "description": "Direkte Steuerung des Öffnungsprozentsatzes oder analoge Spannungssteuerung 0-10V.",
-                        "data": {
-                            "valve_entities": "Ventil- / Stellantrieb-Entitäten",
-                            "valve_scale": "Ausgangsskalierungsmodus"
-                        }
-                    },
-                    "relay_settings": {
-                        "name": "Relais-Aktoren (PWM)",
-                        "description": "EIN/AUS-Schalter und thermische Stellantriebe, gesteuert über Pulsweitenmodulation.",
-                        "data": {
-                            "switch_entities": "Zonenschalter / Relais"
-                        }
-                    },
-                    "safety_settings": {
-                        "name": "Schutzfunktionen & Erweiterte Einstellungen",
-                        "description": "Fenster-Bypass, Sicherheits-Timeouts und sommerlicher Blockierschutz.",
-                        "data": {
-                            "window_sensor": "Fenstersensor (Optional)",
-                            "sensor_timeout_min": "Sensor-Watchdog-Timeout (Minuten)",
-                            "anti_seize_zone_enable": "Blockierschutz (Sommerschutz) für diese Zone aktivieren",
-                            "allow_passive_heat": "Passive Wärme zulassen (Fancoil ohne Ventil / Zwischengeschoss)",
-                            "weight": "Thermisches Zonengewicht (Fläche / Heizkörperleistung)"
-                        }
-                    }
-                },
-                "data_description": {
-                    "climate_entities": "Die Climate-Entität für diesen Raum/Zone",
-                    "allow_passive_heat": "Deaktiviert die Erkennung von Geisterheizungsanomalien, wenn diese Zone im Ruhezustand auf natürliche Weise Wärme aufnimmt (z. B. offenes Zwischengeschoss oder Fancoil ohne Zonenventil).",
-                    "window_sensor": "Zone automatisch umgehen, wenn dieser Sensor geöffnet ist",
-                    "sensor_timeout_min": "Maximale Dauer ohne Updates, bevor in den Sicherheitsmodus / TRV-internen Sensor gewechselt wird",
-                    "name": "Ein benutzerfreundlicher Name für diese Zone (vorausgefüllt aus dem Namen der Climate-Entität)",
-                    "trv_preset_sync": "Preset-Modus automatisch synchronisieren, wenn sich der HVAC-Modus ändert (für physische TRV-Ventile)"
-                }
-            },
-            "remove_zone": {
-                "title": "Eine Zone entfernen",
-                "description": "Wählen Sie die zu entfernende Zone aus. Der Schalter für diese Zone wird ebenfalls entfernt.",
-                "data": {
-                    "zone_name": "Zone zum Entfernen"
-                }
-            },
-            "edit_zone": {
-                "title": "Zoneneinstellungen bearbeiten",
-                "description": "Bearbeiten Sie die Einstellungen für eine Zone.",
-                "data": {
-                    "zone_name": "Zone",
-                    "temp_sensor": "Zonen-Temperatursensor",
-                    "target_temperature": "Basis-Zieltemperatur"
-                },
-                "sections": {
-                    "trv_settings": {
-                        "name": "Thermostatische Heizkörperventile (TRV)",
-                        "description": "Intelligente Standard-Heizkörperthermostate mit Temperaturregelung.",
-                        "data": {
-                            "climate_entities": "Zonen-TRVs / Climates",
-                            "trv_preset_sync": "TRV-Preset-Synchronisierung aktivieren",
-                            "authoritative_climate_sync": "Autoritative Wandthermostat-Synchronisierung"
-                        }
-                    },
-                    "valve_settings": {
-                        "name": "Proportional- & 0-10V-Ventile",
-                        "description": "Direkte Steuerung des Öffnungsprozentsatzes oder analoge Spannungssteuerung 0-10V.",
-                        "data": {
-                            "valve_entities": "Ventil- / Stellantrieb-Entitäten",
-                            "valve_scale": "Ausgangsskalierungsmodus"
-                        }
-                    },
-                    "relay_settings": {
-                        "name": "Relais-Aktoren (PWM)",
-                        "description": "EIN/AUS-Schalter und thermische Stellantriebe, gesteuert über Pulsweitenmodulation.",
-                        "data": {
-                            "switch_entities": "Zonenschalter / Relais"
-                        }
-                    },
-                    "safety_settings": {
-                        "name": "Schutzfunktionen & Erweiterte Einstellungen",
-                        "description": "Fenster-Bypass, Sicherheits-Timeouts und sommerlicher Blockierschutz.",
-                        "data": {
-                            "window_sensor": "Fenstersensor (Optional)",
-                            "sensor_timeout_min": "Sensor-Watchdog-Timeout (Minuten)",
-                            "anti_seize_zone_enable": "Blockierschutz (Sommerschutz) für diese Zone aktivieren",
-                            "allow_passive_heat": "Passive Wärme zulassen (Fancoil ohne Ventil / Zwischengeschoss)",
-                            "weight": "Thermisches Zonengewicht (Fläche / Heizkörperleistung)"
-                        }
-                    }
-                }
-            },
-            "edit_geofencing": {
-                "title": "Geofencing & Intelligenter Zeitplan",
-                "description": "Aktivieren oder deaktivieren Sie Geofencing und wählen Sie den Anwesenheitssensor.",
-                "data": {
-                    "geofencing_enabled": "Geofencing & Auto-Nacht aktivieren",
-                    "presence_sensor": "Anwesenheitssensor"
-                }
-            },
-            "trv_calibration_add": {
-                "title": "TRV-Konfiguration (Externer Sensor) (Hinzufügen)",
-                "description": "Wählen Sie die Temperatur-Offset-Entitäten (Kalibrierung) für jedes TRV in der Zone {zone_name}. Dies sind normalerweise `number`-Entitäten Ihrer TRV-Integration (z. B. Better Thermostat, Z2M, ZHA). Wenn leer gelassen, verwenden wir die Zieltemperaturkompensation."
-            },
-            "trv_calibration_edit": {
-                "title": "TRV-Konfiguration (Externer Sensor) (Bearbeiten)",
-                "description": "Wählen Sie die Temperatur-Offset-Entitäten (Kalibrierung) für jedes TRV in der Zone {zone_name}. Dies sind normalerweise `number`-Entitäten Ihrer TRV-Integration (z. B. Better Thermostat, Z2M, ZHA). Wenn leer gelassen, verwenden wir die Zieltemperaturkompensation."
-            },
-            "edit_weather_comp": {
-                "title": "Wetterkompensation bearbeiten",
-                "description": "Wählen Sie einen Außentemperatursensor, um die automatische Wetterkompensation zu aktivieren.",
-                "data": {
-                    "weather_sensor": "Außentemperatursensor"
-                }
-            },
-            "boiler_relay": {
-                "title": "Kesselrelais Einrichtung",
-                "description": "Wählen Sie den Schalter (Switch), der Ihr Kesselrelais (Umwälzpumpe) steuert.",
-                "data": {
-                    "boiler_switch": "Kesselschalter"
-                },
-                "data_description": {
-                    "boiler_switch": "Der Schalter/Relais, das die Kesselumwälzpumpe steuert"
-                }
-            },
-            "boiler_opentherm": {
-                "title": "OpenTherm Einrichtung",
-                "description": "Konfigurieren Sie OpenTherm über den Dual-Pfad: Option 1 (Climate Gateway): Climate-Entität mit automatischer Attribut-Telemetrie; Option 2 (Entkoppelt): Number-Sollwert-Entität plus optionaler CH-Freigabeschalter. Definieren Sie minimale und maximale Wassertemperaturen.",
-                "data": {
-                    "opentherm_entity": "OpenTherm-Entität",
-                    "opentherm_min_temp": "Minimale Wassertemperatur (°C)",
-                    "opentherm_max_temp": "Maximale Wassertemperatur (°C)",
-                    "opentherm_ch_switch": "Heizungsfreigabeschalter CH (optional)"
-                }
-            }
-        },
-        "abort": {
-            "no_zones_configured": "Keine Zonen konfiguriert.",
-            "no_climates_available": "Alle verfügbaren Climate-Entitäten sind bereits als Zonen konfiguriert.",
-            "no_temp_sensors_found": "Keine Temperatursensoren in Home Assistant gefunden.",
-            "no_switches_found": "Keine Schalter in Home Assistant gefunden.",
-            "no_virtual_thermostats": "Keine virtuellen Thermostate konfiguriert."
-        },
-        "error": {
-            "zone_name_required": "Zonenname darf nicht leer sein.",
-            "presence_sensor_required": "Ein Anwesenheitssensor ist erforderlich, wenn Geofencing aktiviert ist.",
-            "invalid_temp_range": "Die Mindesttemperatur muss unter der Höchsttemperatur liegen.",
-            "no_actuators_selected": "Sie müssen mindestens eine Climate-Entität oder einen Schalter für die Zone auswählen.",
-            "zone_name_exists": "Eine Zone mit diesem Namen existiert bereits."
-        }
+    "abort": {
+      "already_configured": "Multizone Thermostat ist bereits konfiguriert. Verwenden Sie die Optionen, um Zonen zu ändern.",
+      "no_switches_found": "Keine Schalter in Home Assistant gefunden. Bitte fügen Sie zuerst ein Relais/Schalter hinzu.",
+      "no_zones_configured": "Keine Zonen konfiguriert. Bitte fügen Sie mindestens eine Zone hinzu.",
+      "no_temp_sensors_found": "Keine Temperatursensoren in Home Assistant gefunden."
     },
-    "entity": {
-        "switch": {
-            "master": {
-                "name": "Heizung Master"
-            }
-        },
-        "select": {
-            "global_preset": {
-                "name": "Globales Preset",
-                "state": {
-                    "manual": "Manuell",
-                    "eco": "Eco",
-                    "comfort": "Komfort",
-                    "sleep": "Nacht",
-                    "away": "Abwesend"
-                }
-            },
-            "demand_strategy": {
-                "name": "Bedarfsaggregationsstrategie",
-                "state": {
-                    "max": "Maximaler Zonenbedarf (MAX)",
-                    "weighted_average": "Gewichteter Durchschnitt",
-                    "sum_capped": "Kumulative Summe (Begrenzt auf 100%)"
-                }
-            }
-        }
+    "error": {
+      "zone_name_required": "Zonenname darf nicht leer sein.",
+      "presence_sensor_required": "Ein Anwesenheitssensor ist erforderlich, wenn Geofencing aktiviert ist.",
+      "invalid_temp_range": "Die Mindesttemperatur muss unter der Höchsttemperatur liegen.",
+      "no_actuators_selected": "Sie müssen mindestens eine Climate-Entität oder einen Schalter für die Zone auswählen.",
+      "zone_name_exists": "Eine Zone mit diesem Namen existiert bereits.",
+      "no_plants_selected": "You must select at least one central heating plant (Gas boiler or Heat pump)."
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Multizone Thermostat Optionen",
+        "description": "Konfigurierte Zonen: **{zones_count}**\n\nWas möchten Sie ändern?",
+        "data": {
+          "action": "Aktion"
+        },
+        "menu_options": {
+          "change_boiler": "Heizkessel- / Anlagenmodus ändern",
+          "edit_heat_pump": "Wärmepumpe (WP) bearbeiten",
+          "edit_energy_management": "Solar- & Energiemanagement bearbeiten",
+          "add_zone": "Zone hinzufügen",
+          "edit_zone": "Zone bearbeiten",
+          "remove_zone": "Zone entfernen",
+          "edit_weather_comp": "Witterungsführung bearbeiten",
+          "edit_geofencing": "Geofencing-Einstellungen bearbeiten",
+          "edit_calendar": "Globalen Kalender bearbeiten"
+        }
+      },
+      "change_boiler": {
+        "title": "Kesselmodus ändern",
+        "data": {
+          "boiler_mode": "Kesselsteuermodus"
+        }
+      },
+      "edit_calendar": {
+        "title": "Globaler Kalender",
+        "description": "Wählen Sie eine lokale Kalender-Entität, um den Zeitplan des Multizonen-Systems zu steuern.",
+        "data": {
+          "global_calendar": "Kalender-Entität"
+        }
+      },
+      "add_zone": {
+        "title": "Neue Zone hinzufügen",
+        "data": {
+          "climate_entities": "Climate-Entität",
+          "anti_seize_zone_enable": "Blockierschutz (Sommerschutz) für diese Zone aktivieren",
+          "allow_passive_heat": "Passive Wärme zulassen (Fancoil ohne Ventil / Zwischengeschoss)",
+          "window_sensor": "Fenstersensor (Optional)",
+          "name": "Zonenname",
+          "trv_preset_sync": "TRV-Preset-Synchronisierung aktivieren",
+          "switch_entities": "Zonenschalter / Relais",
+          "temp_sensor": "Zonen-Temperatursensor",
+          "target_temperature": "Basis-Zieltemperatur",
+          "sensor_timeout_min": "Sensor-Watchdog-Timeout (Minuten)"
+        },
+        "sections": {
+          "trv_settings": {
+            "name": "Thermostatische Heizkörperventile (TRV)",
+            "description": "Intelligente Standard-Heizkörperthermostate mit Temperaturregelung.",
+            "data": {
+              "climate_entities": "Climate-Entität",
+              "trv_preset_sync": "TRV-Preset-Synchronisierung aktivieren",
+              "authoritative_climate_sync": "Autoritative Wandthermostat-Synchronisierung"
+            }
+          },
+          "valve_settings": {
+            "name": "Proportional- & 0-10V-Ventile",
+            "description": "Direkte Steuerung des Öffnungsprozentsatzes oder analoge Spannungssteuerung 0-10V.",
+            "data": {
+              "valve_entities": "Ventil- / Stellantrieb-Entitäten",
+              "valve_scale": "Ausgangsskalierungsmodus"
+            }
+          },
+          "relay_settings": {
+            "name": "Relais-Aktoren (PWM)",
+            "description": "EIN/AUS-Schalter und thermische Stellantriebe, gesteuert über Pulsweitenmodulation.",
+            "data": {
+              "switch_entities": "Zonenschalter / Relais"
+            }
+          },
+          "safety_settings": {
+            "name": "Schutzfunktionen & Erweiterte Einstellungen",
+            "description": "Fenster-Bypass, Sicherheits-Timeouts und sommerlicher Blockierschutz.",
+            "data": {
+              "window_sensor": "Fenstersensor (Optional)",
+              "sensor_timeout_min": "Sensor-Watchdog-Timeout (Minuten)",
+              "anti_seize_zone_enable": "Blockierschutz (Sommerschutz) für diese Zone aktivieren",
+              "allow_passive_heat": "Passive Wärme zulassen (Fancoil ohne Ventil / Zwischengeschoss)",
+              "weight": "Thermisches Zonengewicht (Fläche / Heizkörperleistung)"
+            }
+          },
+          "split_settings": {
+            "name": "Room Air Split Actuators",
+            "description": "Secondary direct-expansion split AC / Heat Pump unit for this room.",
+            "data": {
+              "split_climate_entity": "Split AC / Heat Pump Entity",
+              "split_role": "Operational Role",
+              "split_solar_priority": "Solar Priority (Prefer Split on PV Surplus)",
+              "split_quick_boost": "Thermal Shock / Quick Heat Boost",
+              "split_boost_delta": "Boost Delta-T Threshold (°C)",
+              "split_sensor_injection": "Inject Room Sensor (Bypass Ceiling Probe)"
+            }
+          }
+        },
+        "data_description": {
+          "climate_entities": "Die Climate-Entität für diesen Raum/Zone",
+          "allow_passive_heat": "Deaktiviert die Erkennung von Geisterheizungsanomalien, wenn diese Zone im Ruhezustand auf natürliche Weise Wärme aufnimmt (z. B. offenes Zwischengeschoss oder Fancoil ohne Zonenventil).",
+          "window_sensor": "Zone automatisch umgehen, wenn dieser Sensor geöffnet ist",
+          "sensor_timeout_min": "Maximale Dauer ohne Updates, bevor in den Sicherheitsmodus / TRV-internen Sensor gewechselt wird",
+          "name": "Ein benutzerfreundlicher Name für diese Zone (vorausgefüllt aus dem Namen der Climate-Entität)",
+          "trv_preset_sync": "Preset-Modus automatisch synchronisieren, wenn sich der HVAC-Modus ändert (für physische TRV-Ventile)"
+        }
+      },
+      "remove_zone": {
+        "title": "Eine Zone entfernen",
+        "description": "Wählen Sie die zu entfernende Zone aus. Der Schalter für diese Zone wird ebenfalls entfernt.",
+        "data": {
+          "zone_name": "Zone zum Entfernen"
+        }
+      },
+      "edit_zone": {
+        "title": "Zoneneinstellungen bearbeiten",
+        "description": "Bearbeiten Sie die Einstellungen für eine Zone.",
+        "data": {
+          "zone_name": "Zone",
+          "temp_sensor": "Zonen-Temperatursensor",
+          "target_temperature": "Basis-Zieltemperatur"
+        },
+        "sections": {
+          "trv_settings": {
+            "name": "Thermostatische Heizkörperventile (TRV)",
+            "description": "Intelligente Standard-Heizkörperthermostate mit Temperaturregelung.",
+            "data": {
+              "climate_entities": "Zonen-TRVs / Climates",
+              "trv_preset_sync": "TRV-Preset-Synchronisierung aktivieren",
+              "authoritative_climate_sync": "Autoritative Wandthermostat-Synchronisierung"
+            }
+          },
+          "valve_settings": {
+            "name": "Proportional- & 0-10V-Ventile",
+            "description": "Direkte Steuerung des Öffnungsprozentsatzes oder analoge Spannungssteuerung 0-10V.",
+            "data": {
+              "valve_entities": "Ventil- / Stellantrieb-Entitäten",
+              "valve_scale": "Ausgangsskalierungsmodus"
+            }
+          },
+          "relay_settings": {
+            "name": "Relais-Aktoren (PWM)",
+            "description": "EIN/AUS-Schalter und thermische Stellantriebe, gesteuert über Pulsweitenmodulation.",
+            "data": {
+              "switch_entities": "Zonenschalter / Relais"
+            }
+          },
+          "safety_settings": {
+            "name": "Schutzfunktionen & Erweiterte Einstellungen",
+            "description": "Fenster-Bypass, Sicherheits-Timeouts und sommerlicher Blockierschutz.",
+            "data": {
+              "window_sensor": "Fenstersensor (Optional)",
+              "sensor_timeout_min": "Sensor-Watchdog-Timeout (Minuten)",
+              "anti_seize_zone_enable": "Blockierschutz (Sommerschutz) für diese Zone aktivieren",
+              "allow_passive_heat": "Passive Wärme zulassen (Fancoil ohne Ventil / Zwischengeschoss)",
+              "weight": "Thermisches Zonengewicht (Fläche / Heizkörperleistung)"
+            }
+          },
+          "split_settings": {
+            "name": "Room Air Split Actuators",
+            "description": "Secondary direct-expansion split AC / Heat Pump unit for this room.",
+            "data": {
+              "split_climate_entity": "Split AC / Heat Pump Entity",
+              "split_role": "Operational Role",
+              "split_solar_priority": "Solar Priority (Prefer Split on PV Surplus)",
+              "split_quick_boost": "Thermal Shock / Quick Heat Boost",
+              "split_boost_delta": "Boost Delta-T Threshold (°C)",
+              "split_sensor_injection": "Inject Room Sensor (Bypass Ceiling Probe)"
+            }
+          }
+        }
+      },
+      "edit_geofencing": {
+        "title": "Geofencing & Intelligenter Zeitplan",
+        "description": "Aktivieren oder deaktivieren Sie Geofencing und wählen Sie den Anwesenheitssensor.",
+        "data": {
+          "geofencing_enabled": "Geofencing & Auto-Nacht aktivieren",
+          "presence_sensor": "Anwesenheitssensor"
+        }
+      },
+      "trv_calibration_add": {
+        "title": "TRV-Konfiguration (Externer Sensor) (Hinzufügen)",
+        "description": "Wählen Sie die Temperatur-Offset-Entitäten (Kalibrierung) für jedes TRV in der Zone {zone_name}. Dies sind normalerweise `number`-Entitäten Ihrer TRV-Integration (z. B. Better Thermostat, Z2M, ZHA). Wenn leer gelassen, verwenden wir die Zieltemperaturkompensation.",
+        "data": {}
+      },
+      "trv_calibration_edit": {
+        "title": "TRV-Konfiguration (Externer Sensor) (Bearbeiten)",
+        "description": "Wählen Sie die Temperatur-Offset-Entitäten (Kalibrierung) für jedes TRV in der Zone {zone_name}. Dies sind normalerweise `number`-Entitäten Ihrer TRV-Integration (z. B. Better Thermostat, Z2M, ZHA). Wenn leer gelassen, verwenden wir die Zieltemperaturkompensation.",
+        "data": {}
+      },
+      "edit_weather_comp": {
+        "title": "Wetterkompensation bearbeiten",
+        "description": "Wählen Sie einen Außentemperatursensor, um die automatische Wetterkompensation zu aktivieren.",
+        "data": {
+          "weather_sensor": "Außentemperatursensor"
+        }
+      },
+      "boiler_relay": {
+        "title": "Kesselrelais Einrichtung",
+        "description": "Wählen Sie den Schalter (Switch), der Ihr Kesselrelais (Umwälzpumpe) steuert.",
+        "data": {
+          "boiler_switch": "Kesselschalter"
+        },
+        "data_description": {
+          "boiler_switch": "Der Schalter/Relais, das die Kesselumwälzpumpe steuert"
+        }
+      },
+      "boiler_opentherm": {
+        "title": "OpenTherm Einrichtung",
+        "description": "Konfigurieren Sie OpenTherm über den Dual-Pfad: Option 1 (Climate Gateway): Climate-Entität mit automatischer Attribut-Telemetrie; Option 2 (Entkoppelt): Number-Sollwert-Entität plus optionaler CH-Freigabeschalter. Definieren Sie minimale und maximale Wassertemperaturen.",
+        "data": {
+          "opentherm_entity": "OpenTherm-Entität",
+          "opentherm_min_temp": "Minimale Wassertemperatur (°C)",
+          "opentherm_max_temp": "Maximale Wassertemperatur (°C)",
+          "opentherm_ch_switch": "Heizungsfreigabeschalter CH (optional)"
+        }
+      },
+      "edit_energy_management": {
+        "title": "Solar Self-Consumption & Energy Management",
+        "description": "Configure solar PV surplus detection, battery protection, or external signals from EMHASS/Predbat.",
+        "data": {
+          "energy_management_enabled": "Enable Solar Energy Management",
+          "solar_power_sensor": "Solar Production Power Sensor (W)",
+          "grid_export_sensor": "Grid Export Power Sensor (W)",
+          "battery_soc_sensor": "Battery State of Charge (SOC) Sensor (%)",
+          "external_solar_override_entity": "External Solar Signal / Switch (EMHASS/Predbat)",
+          "solar_export_threshold": "Surplus Export Threshold (W)",
+          "battery_min_reserve_soc": "Battery Safety Reserve Minimum SOC (%)",
+          "solar_min_run_time": "Minimale Solar-Laufzeit Taktschutz (Minuten)",
+          "solar_overheat_offset": "Solar / EMHASS Wärmespeicher-Überhöhung (+°C)",
+          "battery_power_sensor": "Battery Power Sensor (W, optional)",
+          "solar_forecast_sensor": "Solar Forecast Sensor (W or kWh, optional)",
+          "solar_irradiance_sensor": "Solar Irradiance Sensor (W/m² or lux, optional)",
+          "battery_max_discharge_time": "Max Allowed Battery Discharge Time (minutes)",
+          "battery_power_inverted": "Invert Battery Power Sign (if positive = discharge)"
+        }
+      },
+      "edit_heat_pump": {
+        "title": "Zentrale Wärmepumpe bearbeiten",
+        "description": "Zentrale Wärmepumpen-Entität und Temperaturgrenzwerte anpassen.",
+        "data": {
+          "enable_heat_pump": "Zentrale Wärmepumpe aktivieren",
+          "heat_pump_type": "Wärmepumpen-Steuerungstyp",
+          "heat_pump_entity": "Wärmepumpen-Entität",
+          "heat_pump_cooling": "Kühlmodus aktivieren",
+          "heat_pump_min_temp": "Minimale Vorlauftemperatur (°C)",
+          "heat_pump_max_temp": "Maximale Vorlauftemperatur (°C)",
+          "hp_cool_min_temp": "Minimale Kühlwassertemperatur (°C)",
+          "hp_cool_max_temp": "Maximale Kühlwassertemperatur (°C)",
+          "heat_pump_ch_switch": "Heizungs-Freigabeschalter (Optional)"
+        }
+      },
+      "trv_calibration": {
+        "title": "TRV-Konfiguration (Offset-Sensor)",
+        "description": "Wählen Sie die Offset-Entitäten für jedes TRV in der Zone {zone_name}.",
+        "data": {}
+      }
+    },
+    "abort": {
+      "no_zones_configured": "Keine Zonen konfiguriert.",
+      "no_climates_available": "Alle verfügbaren Climate-Entitäten sind bereits als Zonen konfiguriert.",
+      "no_temp_sensors_found": "Keine Temperatursensoren in Home Assistant gefunden.",
+      "no_switches_found": "Keine Schalter in Home Assistant gefunden.",
+      "no_virtual_thermostats": "Keine virtuellen Thermostate konfiguriert."
+    },
+    "error": {
+      "zone_name_required": "Zonenname darf nicht leer sein.",
+      "presence_sensor_required": "Ein Anwesenheitssensor ist erforderlich, wenn Geofencing aktiviert ist.",
+      "invalid_temp_range": "Die Mindesttemperatur muss unter der Höchsttemperatur liegen.",
+      "no_actuators_selected": "Sie müssen mindestens eine Climate-Entität oder einen Schalter für die Zone auswählen.",
+      "zone_name_exists": "Eine Zone mit diesem Namen existiert bereits.",
+      "hp_temps_invalid": "Die minimale Heiz-/Kühltemperatur der Wärmepumpe muss niedriger sein als die maximale Temperatur.",
+      "no_plants_selected": "Mindestens ein Wärmeerzeuger muss ausgewählt sein (Gaskessel, Wärmepumpe oder Split-Zone)."
+    }
+  },
+  "entity": {
+    "switch": {
+      "master": {
+        "name": "Heizung Master"
+      },
+      "master_allow_split_heating": {
+        "name": "Split-Heizung erlauben"
+      },
+      "master_allow_split_cooling": {
+        "name": "Split-Kühlung erlauben"
+      }
+    },
+    "select": {
+      "global_preset": {
+        "name": "Globales Preset",
+        "state": {
+          "manual": "Manuell",
+          "eco": "Eco",
+          "comfort": "Komfort",
+          "sleep": "Nacht",
+          "away": "Abwesend"
+        }
+      },
+      "demand_strategy": {
+        "name": "Bedarfsaggregationsstrategie",
+        "state": {
+          "max": "Maximaler Zonenbedarf (MAX)",
+          "weighted_average": "Gewichteter Durchschnitt",
+          "sum_capped": "Kumulative Summe (Begrenzt auf 100%)"
+        }
+      },
+      "master_heat_source_priority": {
+        "name": "Wärmequellen-Priorität",
+        "state": {
+          "auto": "Automatisch (PV-Überschuss, Quick Boost & KI)",
+          "hybrid": "Manuell Hybrid (Split wo vorhanden, Gas sonst)",
+          "combined": "Manuell Kombiniert (Gas + Split gleichzeitig)",
+          "gas_only": "Manuell Nur Gas (Split gesperrt)",
+          "electric_only": "Manuell Nur Elektrisch (Kessel gesperrt)"
+        }
+      },
+      "master_operation_mode": {
+        "name": "Master-Betriebsmodus",
+        "state": {
+          "heat": "Heizen",
+          "cool": "Kühlen"
+        }
+      },
+      "schedule_profile": {
+        "name": "Zeitplanprofil"
+      }
+    },
+    "sensor": {
+      "energy_class": {
+        "name": "Energieeffizienzklasse"
+      }
+    }
+  },
+  "selector": {
+    "action": {
+      "options": {
+        "change_boiler": "Heizkessel- / Anlagenmodus ändern",
+        "edit_heat_pump": "Wärmepumpe (WP) bearbeiten",
+        "edit_energy_management": "Solar- & Energiemanagement bearbeiten",
+        "add_zone": "Zone hinzufügen",
+        "edit_zone": "Zone bearbeiten",
+        "remove_zone": "Zone entfernen",
+        "edit_weather_comp": "Witterungsführung bearbeiten",
+        "edit_geofencing": "Geofencing-Einstellungen bearbeiten",
+        "edit_calendar": "Globalen Kalender bearbeiten"
+      }
+    }
+  }
 }

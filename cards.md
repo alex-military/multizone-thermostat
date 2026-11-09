@@ -1,134 +1,104 @@
 # Multizone Thermostat Custom Lovelace Cards
 
-[⬅️ Back to Main Readme](README.md)
+[⬅️ Back to Main Readme](README.md) • [🌿 Hybrid Plant, Split AC & Energy Guide](hybrid_and_energy.md) • [⚙️ Configuration Guide](configuration.md)
 
-This integration includes three custom Lovelace cards to control your heating zones and view the central heating status directly in your Home Assistant dashboards. The cards are **auto-registered** — no manual resource configuration needed.
+This integration includes custom Lovelace cards and auto-generated dashboard strategies to manage your multi-zone climate system, bivalent central plant, room split air conditioners, and building energy diagnostics directly in Home Assistant. The cards are **auto-registered** — no manual resource configuration is required.
 
-## 1. Central Heating Status Card (`custom:multizone-thermostat-status-card`)
-A zero-configuration, button-style card that displays the status of the central heating master switch. It changes color and icon dynamically depending on the state of the Master Switch and the Boiler/Circulator:
-- **Grey (Off)**: The master heating system is disabled.
-- **Yellow (Standby)**: The master heating system is enabled, but no zone is currently calling for heat (boiler is idle).
-- **Orange (Heating)**: The master heating system is enabled, and at least one zone is calling for heat (boiler is active).
-
-### States
-| Off | Standby (Idle) | Active Heating |
-|---|---|---|
-| ![Master Off](images/status_off.png) | ![Master Standby](images/status_idle.png) | ![Master Heating](images/status_heating.png) |
+> [!IMPORTANT]
+> **Phase 11 (v6.1.0-beta)** introduces 1-to-1 visual twin styling matching Home Assistant's native thermostat cards, direct arc touch/click target setting, active source badges (`🔥 GAS`, `⚡ ELETTRICO`, `🔥⚡ GAS + ELETTRICO`), single-room split manual override with safety lockout, seasonal Caldo 🔥 / Freddo ❄️ presets, and constant-height segmented priority selectors.
 
 ---
 
-## 2. Dial Thermostat Card (`custom:multizone-thermostat-dial-card`)
-Wraps the native Home Assistant circular thermostat card and adds a built-in selector to easily set the zone to Primary, Secondary, or Bypass.
-- **Primary**: Zone is fully active and can trigger the boiler.
-- **Secondary**: Zone opens its valves to receive heat when the boiler is running, but cannot trigger the boiler by itself.
-- **Bypassed**: Dims the dial, disables temperature controls, and displays a clean "Zone Excluded / Bypassed" message.
+## 1. Central Heating & Cooling Status Card (`custom:multizone-thermostat-status-card`)
+A zero-configuration, button-style card that displays the real-time status of the central plant master switch and generator staging:
+- **Dynamic Color Aura**:
+  - **Grey (Off)**: System disabled.
+  - **Yellow (Standby)**: Enabled, but all zones satisfied (circulators and burners idle).
+  - **Orange (Heating)**: Central boiler or electric heating active.
+  - **Cyan/Celeste (Cooling)**: Central heat pump or room split cooling active.
+- **Generator Telemetry Subtitle**:
+  - `Caldaia: ON` / `Caldaia: ON + Split` / `Split Elettrico: ON` / `Zone attive: X`.
 
-### States
-| Primary (Idle) | Secondary (Idle) | Bypassed | Active Heating |
-|---|---|---|---|
-| ![Dial Primary](images/dial_primary.png) | ![Dial Secondary](images/dial_secondary.png) | ![Dial Bypassed](images/dial_bypass.png) | ![Dial Heating](images/dial_heating.png) |
-
----
-
-## 3. Button Thermostat Card (`custom:multizone-thermostat-button-card`)
-A compact button-based thermostat card designed for spaces where a circular dial is too large. It includes temperature controls (`+` / `-`), current and target temperature displays, HVAC mode selectors, and the Zone Mode selector.
-- **Active**: Fully interactive controls with dynamic orange halo when heating.
-- **Bypassed**: Dims the controls and displays a "Zone Excluded / Bypassed" overlay.
-
-### States
-| Primary (Idle) | Secondary (Idle) | Bypassed | Active Heating |
-|---|---|---|---|
-| ![Button Primary](images/button_primary.png) | ![Button Secondary](images/button_secondary.png) | ![Button Bypassed](images/button_bypass.png) | ![Button Heating](images/button_heating.png) |
-
----
-
-## 4. Global Preset Card (`custom:multizone-thermostat-preset-card`)
-A zero-configuration, multi-button card designed for quick selection of the global heating preset (Manual, Eco, Comfort, Sleep, Away). 
-- **Auto-Discovery**: Automatically finds and binds to the `select.master_control_global_preset` entity without any configuration.
-- **Dynamic Styling**: The active preset is dynamically highlighted using your current Home Assistant theme colors.
-- **Smart Memory**: Changing the preset instantly recalls the exact temperatures and zone modes (Primary/Secondary/Bypass) you had previously set for that specific preset.
-
-![Global Preset Card](images/preset_card.png)
-
----
-
-## Card Configuration
-
-### Status Card (Zero-Config)
-The status card requires zero configuration because it automatically detects your Master Switch:
 ```yaml
 type: custom:multizone-thermostat-status-card
 ```
 
-### Dial Thermostat Card
+---
+
+## 2. Dial Thermostat Card (`custom:multizone-thermostat-dial-card`)
+
+A modern circular thermostat designed as a **1-to-1 Visual Twin** of the native Home Assistant thermostat card, with extensive enhancements for multi-zone and bivalent systems:
+
+### Key Enhancements (v6.1.0-beta)
+- **1-to-1 Geometry**: Design disponibile in stile Luxury e Classic perfettamente integrato in Home Assistant.
+- **Direct Arc Click / Touch**: Click or tap anywhere along the circular arc to immediately set the desired target temperature without needing to drag the handle.
+- **Circular Step Buttons `[-]` and `[+]`**: Ergonomic 42px diameter buttons positioned symmetrically in the bottom dial opening to adjust temperature by 0.5°C steps.
+- **Clean Title Case & Comma Formatted**: Displays clean status text ("Riscaldamento", "Spento", "In attesa") and Italian/European comma decimals (e.g. `21,5 °C` and `19,5 °C`).
+- **Active Source Badge (Top Left)**:
+  - `🔥 GAS` (Orange): Zone heated by the central gas boiler.
+  - `⚡ ELETTRICO` (Cyan): Zone heated or cooled by the room split AC.
+  - `🔥⚡ GAS + ELETTRICO` (Amber): Combined operation with gas radiators and electric split working together.
+- **Room Split AC Manual Run Button (Header Center)**:
+  - Posizionato al centro matematico della card per le stanze con climatizzatore split associato.
+  - **Master OFF**: Allows running the split air conditioner independently for that room without turning on the gas boiler.
+  - **Master ON (Safety Lockout)**: Automatically disables clicks when central heating is ON to prevent conflicts with whole-house orchestration.
+- **Automatic Summer Filtering (`hide_if_cannot_cool: true`)**: Automatically hides zones that do not have cooling capability when the system switches to summer mode.
+- **Zone Mode Selector**: Cycle between `Primaria`, `Secondaria`, and `Bypassata` with a single touch.
+
 ```yaml
 type: custom:multizone-thermostat-dial-card
-entity: climate.your_climate_entity           # Your climate entity (copy ID from HA UI)
-title: Living Room                            # (Optional) Custom title
+entity: climate.multizone_thermostat_salone
+title: Salone
 ```
-
-### Button Thermostat Card
-```yaml
-type: custom:multizone-thermostat-button-card
-entity: climate.your_climate_entity           # Your climate entity (copy ID from HA UI)
-title: Living Room                            # (Optional) Custom title
-```
-
-### Global Preset Card (Zero-Config)
-The preset card automatically finds your global preset entity. You can optionally override it or set a custom title.
-```yaml
-type: custom:multizone-thermostat-preset-card
-# title: "My Presets"                           # (Optional) Custom title
-# entity: select.master_control_global_preset # (Optional) Override auto-discovery
-```
-
-> **Tip**: To find your exact entity IDs, go to **Settings → Devices & Services → Multizone Thermostat** and click on any entity. The entity ID is shown at the bottom of the entity page.
 
 ---
 
-## 5. Auto-Generated Dashboard Strategy (`custom:multizone-thermostat-dashboard`)
-If you want a complete, ready-to-use dashboard without writing any YAML for individual cards, you can use the built-in Dashboard Strategy. This strategy automatically discovers all your heating zones, virtual thermostats, presets, and the master switch, generating a beautifully structured layout instantly.
-
-### Features
-- **Zero Configuration**: Automatically finds and connects all your entities.
-- **Dynamic Grid**: Automatically calculates rows and columns based on your preference.
-- **Clean Titles**: Automatically strips out the technical "Virtual Thermostats VT" prefix from your zones.
-- **Native Styling**: Smooth rounded corners and perfectly sized cards without needing external plugins like `card-mod`.
-
-### How to use
-You can add it as a new View in your existing dashboard. Open the Raw Configuration Editor and add this under `views:`:
+## 3. Button Thermostat Card (`custom:multizone-thermostat-button-card`)
+A compact button-based thermostat card designed for dense dashboard grids where a circular dial is too large:
+- Includes temperature step controls (`+` / `-`), current and target temperature displays, HVAC modes, and zone mode selector.
+- Features active source badges (`🔥 GAS`, `⚡ ELETTRICO`, `🔥⚡ GAS + ELETTRICO`).
+- Shows orange aura during heating and cyan aura during cooling.
 
 ```yaml
-views:
-  - title: Clima
-    path: clima
-    icon: mdi:thermostat
-    panel: true    # Recommended: Sets the view to full-width for the best layout
-    strategy:
-      type: custom:multizone-thermostat-dashboard
-      columns: 3   # Optional: Set the number of columns (default is 3)
+type: custom:multizone-thermostat-button-card
+entity: climate.multizone_thermostat_camera
+title: Camera Matrimoniale
 ```
 
-### Layout Customization
-You can customize the number of columns to perfectly fit your device screen (e.g., tablet vs phone) simply by changing the `columns` parameter.
+---
 
-#### 2 Columns Layout (`columns: 2`)
-![Dashboard 2 Columns](images/dashboard_2col.png)
+## 4. Global Preset Card (`custom:multizone-thermostat-preset-card`)
+A multi-function global control bar with dynamic theme styling and constant height across seasons:
+- **Header All-in-One**:
+  - **Left**: Segmented pill selector for **Heat Source Priority** (`Auto`, `Ibrido`, `Combinato`, `Elettrico`, `Gas`). In summer cooling mode, automatically transitions to the aesthetic pill `❄️ Raffrescamento Elettrico` with the exact same height.
+  - **Right**: Master Seasonal Switch (**Caldo 🔥 / Freddo ❄️**).
+- **Preset Buttons**: `Manuale`, `Eco`, `Comfort`, `Notte`, `Fuori Casa`.
+- **Dual-Track Memory**: Automatically recalls winter targets (`presets_heat`) in winter and summer targets (`presets_cool`) in summer.
 
-#### 3 Columns Layout (`columns: 3`)
-![Dashboard 3 Columns](images/dashboard_3col.png)
+```yaml
+type: custom:multizone-thermostat-preset-card
+```
 
-#### 4 Columns Layout (`columns: 4`)
-![Dashboard 4 Columns](images/dashboard_4col.png)
+---
+
+## 5. Weekly Scheduler Card (`custom:multizone-thermostat-scheduler-card`)
+An interactive weekly scheduling interface with thermal anticipation:
+- **24-Hour Timeline Matrix**: Visual timeline with color-coded preset blocks per zone.
+- **Multi-Profile Management**: Fast switching between *Standard*, *Festivo / Weekend*, *Smart Working*, and custom user profiles.
+- **Smart Return (Pianifica Rientro)**: Predictive arrival planner calculating thermal pre-heating times based on learned room thermal dispersion.
+
+```yaml
+type: custom:multizone-thermostat-scheduler-card
+```
 
 ---
 
 ## 6. Central Plant Health Card (`custom:multizone-thermostat-plant-card`)
-A zero-configuration, glassmorphic card that displays physical boiler telemetry, short-cycling frequency, and overall plant health.
-- **Auto-Discovery**: Automatically finds and binds to the central health and boiler runtime sensors.
-- **Short-Cycling Alert**: Monitors hourly ignition frequency and alerts if wear is high (> 5 cycles/h).
-- **Active Anomalies List**: Expands dynamically to display exact room details whenever an anomaly (stuck valve, ghost heating) is active.
-- **OpenTherm Telemetry**: Automatically displays water pressure (Bar), flow & return temperatures (°C), burner flame status, modulation %, and OEM fault codes when OpenTherm mode is active.
+A glassmorphic card displaying real-time boiler and heat pump telemetry:
+- **Auto-Discovery**: Automatically binds to central plant diagnostics.
+- **Ignition Frequency**: Tracks burner starts per hour and warns against short-cycling wear (> 5 cycles/h).
+- **OpenTherm Telemetry**: Water pressure (Bar), return temperature (°C), flame state, modulation %, and OEM fault codes.
+- **Active Anomalies List**: Real-time list of mechanical issues (stuck valves, ghost heating, sensor fallback).
 
 ```yaml
 type: custom:multizone-thermostat-plant-card
@@ -136,58 +106,45 @@ type: custom:multizone-thermostat-plant-card
 
 ---
 
-## 7. Zone Energy & Building Efficiency Card (`custom:multizone-thermostat-zone-energy-card`)
-A card designed to display the building energy efficiency metrics for a specific heating zone:
-- **European Energy Class (A4 → G)**: Theoretical energy grade calculated from thermal dispersion and outdoor weather $\Delta T$.
-- **Mini Ribbon Scale**: Visual colored scale highlighting the active energy tier.
-- **Thermal Retention Time**: Displays hours needed for the room to lose $1.0^\circ\text{C}$.
-- **Radiator Sizing**: Evaluates whether the heating emitter is optimal, undersized, or oversized.
-- **Mechanical Valve Surveillance**: Alerts in real-time if a valve is stuck closed or leaking heat.
-- **Battery Status & Health**: Live battery percentage (%) and color-coded icon (Green >80%, Yellow >40%, Orange >15%, Red <15%) auto-discovered from TRVs and wireless temperature sensors (Zigbee2MQTT, ZHA, Tuya, Avatto).
-- **Interactive Mode Switching**: Click directly on the `PRIMARIA`, `SECONDARIA`, or `BYPASSATA` badge to cycle the zone mode on the fly.
-- **Interactive Passive Heat Switch**: Click directly on the valve status footer to toggle **Apporto Passivo** (passive heat intake) for rooms like open lofts or fan coils without cutoff valves.
+## 7. Zone Energy Efficiency Card (`custom:multizone-thermostat-zone-energy-card`)
+Displays thermal performance and physical building metrics for each room:
+- **European Energy Class (A4 → G)**: Derived from building heat loss rates and weather $\Delta T$.
+- **Thermal Retention Time**: Hours required for the room to drop by $1.0^\circ\text{C}$.
+- **Radiator Sizing**: Evaluation of emitter capacity (undersized, optimal, oversized).
+- **Battery Health**: Universal battery indicator across Zigbee2MQTT, ZHA, and Tuya devices.
+- **Interactive Toggles**: Cycle zone mode or toggle *Apporto Passivo* (passive heat intake) directly from the card.
 
 ```yaml
 type: custom:multizone-thermostat-zone-energy-card
-entity: climate.multizone_thermostat_soggiorno
+entity: climate.multizone_thermostat_salone
 ```
 
 ---
 
-## 8. Auto-Generated Diagnostic View Strategy (`custom:multizone-thermostat-diagnostics`)
-If you want an entire, self-updating diagnostic view that automatically lists the central plant health and creates cards for **every zone** in your house without writing any YAML:
+## 8. Auto-Generated Dashboard Strategies
+
+### Thermostats View Strategy (`custom:multizone-thermostat-dashboard`)
+Automatically builds a complete responsive climate dashboard with presets, master controls, and zone cards without writing YAML for individual entities:
+
+```yaml
+views:
+  - title: Clima
+    path: clima
+    icon: mdi:thermostat
+    strategy:
+      type: custom:multizone-thermostat-dashboard
+      columns: 3 # (Optional: 1, 2, 3, or 4 columns)
+```
+
+### Diagnostics View Strategy (`custom:multizone-thermostat-diagnostics`)
+Generates a complete building efficiency and plant health view for all zones:
 
 ```yaml
 views:
   - title: Diagnostica
     path: diagnostica
     icon: mdi:chart-box-outline
-    panel: true
     strategy:
       type: custom:multizone-thermostat-diagnostics
-      columns: 3 # (Optional: default 3)
+      columns: 3
 ```
-
----
-
-## 🌟 Live Interactive Demo & Multilingual Support
-
-The Lovelace cards automatically adapt to your Home Assistant language setting (**English**, **Italian**, and **Russian** supported natively).
-
-You can also test the full diagnostic dashboard interactively in your web browser with our standalone web simulator:
-
-[![Launch Live Simulator](https://img.shields.io/badge/Launch%20Live%20Simulator-GitHub%20Pages-0ea5e9?style=for-the-badge&logo=googlechrome&logoColor=white)](https://alex-military.github.io/multizone-thermostat/)
-
-- **Live Web App**: [https://alex-military.github.io/multizone-thermostat/](https://alex-military.github.io/multizone-thermostat/)
-- **Offline / Local**: Open [`docs/index.html`](docs/index.html) directly in any browser.
-- **Interactive Scenarios**:
-  - **Normal Operation**: optimal health, low short-cycling frequency, healthy valves.
-  - **High Short-Cycling Warning**: boiler cycle wear alerts and mitigation hints.
-  - **Stuck Valve Anomaly**: critical red alert when a room demands heat but radiator stays cold.
-  - **Passive Heat Intake (Mezzanine / Fan coil)**: valve bypass and passive heat tracking.
-  - **Instant Multilingual Switch**: Toggle between 🇬🇧 English, 🇮🇹 Italian, and 🇷🇺 Russian with a single click.
-
-> **Note**: If you installed via HACS, the Lovelace card resource is registered automatically. If cards don't appear, add the resource manually:
-> Go to **Settings → Dashboards → Resources** → Add `/multizone_thermostat_card/multizone-thermostat-card.js` as **JavaScript Module**.
-
-

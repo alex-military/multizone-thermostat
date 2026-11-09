@@ -1,16 +1,5 @@
-from __future__ import annotations
-def _parse_time_str(val: str):
-    """Parse HH:MM or HH:MM:SS string to datetime.time."""
-    if not isinstance(val, str):
-        return None
-    for fmt in ("%H:%M", "%H:%M:%S"):
-        try:
-            return datetime.strptime(val.strip(), fmt).time()
-        except ValueError:
-            pass
-    return None
-
 """Storage and profile persistence engine for Multizone Thermostat Schedule."""
+from __future__ import annotations
 
 import copy
 from datetime import datetime, timedelta, time
@@ -34,6 +23,18 @@ from ..const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _parse_time_str(val: str):
+    """Parse HH:MM or HH:MM:SS string to datetime.time."""
+    if not isinstance(val, str):
+        return None
+    for fmt in ("%H:%M", "%H:%M:%S"):
+        try:
+            return datetime.strptime(val.strip(), fmt).time()
+        except ValueError:
+            pass
+    return None
 
 
 def default_profiles_dict() -> dict[str, dict[str, Any]]:

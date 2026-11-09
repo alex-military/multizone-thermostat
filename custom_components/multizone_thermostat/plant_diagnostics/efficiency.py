@@ -78,11 +78,42 @@ def get_zone_radiator_sizing(coordinator: Any, climate_id: str) -> str:
     relative to the room's heat loss rate.
     """
     try:
+        is_cooling_only = False
+        zones = getattr(coordinator, "zones", [])
+        for z in zones:
+            cid = z.get("climate_id")
+            if not cid:
+                from ..const import make_zone_entity_id, CONF_ZONE_NAME
+                cid = make_zone_entity_id(z.get(CONF_ZONE_NAME, ""))
+            if cid == climate_id:
+                if z.get("split_role") == "cooling_only" or z.get("cooling_only"):
+                    is_cooling_only = True
+                break
+
+        if not is_cooling_only:
+            climates = getattr(coordinator, "_climate_entities", {})
+            if isinstance(climates, dict) and climate_id in climates:
+                ent = climates[climate_id]
+                modes = getattr(ent, "hvac_modes", None) or getattr(ent, "_attr_hvac_modes", None)
+                if modes and "cool" in modes and "heat" not in modes:
+                    is_cooling_only = True
+
+        master_mode = str(getattr(coordinator, "master_hvac_mode", "heat")).lower()
+
         thermal = coordinator.zone_controller.get_thermal_model(climate_id)
-        if not thermal or thermal.heating_rate < 0.1 or thermal.cooling_rate < 0.05:
+        if not thermal:
             return "Learning..."
 
-        ratio = thermal.heating_rate / thermal.cooling_rate
+        h_rate = getattr(thermal, "heating_rate", 0.0)
+        c_rate = getattr(thermal, "cooling_rate", 0.0)
+
+        if is_cooling_only or (master_mode == "cool" and h_rate <= 0.05):
+            return "Optimal"
+
+        if h_rate < 0.1 or c_rate < 0.05:
+            return "Learning..."
+
+        ratio = h_rate / c_rate
         if ratio < 1.3:
             return "Undersized"
         elif ratio <= 3.8:
@@ -91,3 +122,5 @@ def get_zone_radiator_sizing(coordinator: Any, climate_id: str) -> str:
             return "Oversized"
     except Exception:
         return "Learning..."
+
+calculate_radiator_sizing = get_zone_radiator_sizing

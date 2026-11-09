@@ -270,10 +270,20 @@ class MultizoneThermostatStatusCard extends HTMLElement {
           margin-top: 2px;
         }
         .heating-aura {
-          background: radial-gradient(circle at 30% 50%, rgba(249, 115, 22, 0.25) 0%, rgba(239, 68, 68, 0.08) 50%, rgba(20, 27, 41, 0.92) 80%) !important;
+          background: radial-gradient(circle at 30% 50%, rgba(249, 115, 22, 0.28) 0%, rgba(239, 68, 68, 0.10) 50%, rgba(20, 27, 41, 0.92) 85%) !important;
+          border-color: rgba(249, 115, 22, 0.35) !important;
+        }
+        .cooling-aura {
+          background: radial-gradient(circle at 30% 50%, rgba(56, 189, 248, 0.28) 0%, rgba(14, 165, 233, 0.10) 50%, rgba(20, 27, 41, 0.92) 85%) !important;
+          border-color: rgba(56, 189, 248, 0.35) !important;
         }
         .idle-aura {
           background: radial-gradient(circle at 30% 50%, rgba(245, 158, 11, 0.18) 0%, rgba(20, 27, 41, 0.92) 80%) !important;
+          border-color: rgba(245, 158, 11, 0.25) !important;
+        }
+        .cool-idle-aura {
+          background: radial-gradient(circle at 30% 50%, rgba(14, 165, 233, 0.15) 0%, rgba(20, 27, 41, 0.92) 80%) !important;
+          border-color: rgba(56, 189, 248, 0.2) !important;
         }
       `;
     }
@@ -333,8 +343,11 @@ class MultizoneThermostatStatusCard extends HTMLElement {
       }
     }
 
+    const masterMode = typeof getMasterHVACMode === 'function' ? getMasterHVACMode(this._hass) : 'heat';
+    const isCoolMode = (masterMode === 'cool');
+
     boilerEntity = this._config.entity || this._config.boiler_entity;
-    if (!boilerEntity) {
+    if (!boilerEntity && typeof findBoilerEntity === 'function') {
       boilerEntity = findBoilerEntity(this._hass);
     }
 
@@ -355,56 +368,192 @@ class MultizoneThermostatStatusCard extends HTMLElement {
       }
     }
 
+    // Central Heat Pump (PDC) detection
+    let hpEntity = this._config.heat_pump_entity || this._config.hp_entity || null;
+    const masterStateObj = (masterEntity && this._hass.states[masterEntity]) ? this._hass.states[masterEntity] : null;
+    if (!hpEntity && masterStateObj && masterStateObj.attributes) {
+      hpEntity = masterStateObj.attributes.heat_pump_ch_switch || masterStateObj.attributes.heat_pump_switch || masterStateObj.attributes.heat_pump_entity;
+    }
+    if (!hpEntity) {
+      hpEntity = Object.keys(this._hass.states).find(k =>
+        (k.startsWith("switch.") || k.startsWith("climate.")) &&
+        (k.includes("heat_pump") || k.includes("pompa_di_calore") || k.includes("_pdc"))
+      ) || null;
+    }
+
+    let isHpSwitchActive = false;
+    if (hpEntity && this._hass.states[hpEntity]) {
+      const hpSt = this._hass.states[hpEntity];
+      isHpSwitchActive = (hpSt.state === "on" || hpSt.state === "heat" || hpSt.attributes?.hvac_action === "heating" || hpSt.attributes?.hvac_action === "cooling");
+    }
+
+    // Also inspect all multizone climate zones for active heating or cooling (including splits/PDC)
+    let activeHeatingZones = 0;
+    let activeCoolingZones = 0;
+    let activeSplits = 0;
+    let activePdcZones = 0;
+
+    for (const key of Object.keys(this._hass.states)) {
+      if (key.startsWith("climate.")) {
+        const st = this._hass.states[key];
+        const attrs = st ? st.attributes || {} : {};
+        if (attrs.hybrid_zone || key.includes("multizone_thermostat_")) {
+          const isZoneHeating = (attrs.hvac_action === "heating" || (st.state === "heat" && attrs.split_active));
+          if (isZoneHeating) {
+            activeHeatingZones++;
+            if (attrs.pdc_active || attrs.hp_active || attrs.heat_pump_active || (attrs.active_heating_source === "electric" && !attrs.split_active)) {
+              activePdcZones++;
+            }
+          }
+          if (attrs.hvac_action === "cooling" || attrs.split_cooling || (st.state === "cool" && attrs.split_active)) {
+            activeCoolingZones++;
+            if (attrs.pdc_active || attrs.hp_active || attrs.heat_pump_active) {
+              activePdcZones++;
+            }
+          }
+          if (attrs.split_active) {
+            activeSplits++;
+          }
+        }
+      }
+    }
+
+    const isCentralHpActive = isHpSwitchActive || activePdcZones > 0 || (activeHeatingZones > 0 && !boilerEntity && Boolean(hpEntity));
+    const hasCentralHp = Boolean(hpEntity || activePdcZones > 0);
+    const hasBoiler = Boolean(boilerEntity);
+
+    const isHeatingSystemActive = isBoilerActive || isCentralHpActive || activeHeatingZones > 0;
+    const isCoolingSystemActive = activeCoolingZones > 0;
+
     const card = this.shadowRoot.getElementById('status-card');
     const iconWrap = this.shadowRoot.getElementById('master-icon-wrap');
     const icon = this.shadowRoot.getElementById('master-icon');
+    const nameEl = this.shadowRoot.getElementById('master-name');
     const pill = this.shadowRoot.getElementById('master-pill');
     const stateText = this.shadowRoot.getElementById('master-state-text');
     const telemetry = this.shadowRoot.getElementById('master-telemetry');
 
+    if (nameEl) {
+      nameEl.textContent = isCoolMode
+        ? (getTranslation(this._hass, 'cooling_active') ? 'Raffrescamento' : 'Raffrescamento')
+        : 'Riscaldamento';
+    }
+
     if (telemetry) {
-      telemetry.textContent = `Caldaia: ${boilerText}`;
+      if (isCoolMode) {
+        telemetry.textContent = activeCoolingZones > 0
+          ? `Zone attive: ${activeCoolingZones}`
+          : `Split / PDC: Standby`;
+      } else if (activeSplits > 0 && !isBoilerActive && !isCentralHpActive) {
+        telemetry.textContent = `Split Elettrico: ON`;
+      } else if (activeSplits > 0 && isBoilerActive && !isCentralHpActive) {
+        telemetry.textContent = `Caldaia: ON + Split`;
+      } else if (activeSplits > 0 && isCentralHpActive && !isBoilerActive) {
+        telemetry.textContent = `PDC: ON + Split`;
+      } else if (activeSplits > 0 && isCentralHpActive && isBoilerActive) {
+        telemetry.textContent = `Caldaia + PDC: ON + Split`;
+      } else if (isCentralHpActive && isBoilerActive) {
+        telemetry.textContent = `Caldaia + PDC: ON`;
+      } else if (isCentralHpActive) {
+        telemetry.textContent = `PDC: ON`;
+      } else if (isBoilerActive) {
+        telemetry.textContent = `Caldaia: ${boilerText}`;
+      } else if (hasCentralHp && hasBoiler) {
+        telemetry.textContent = `Caldaia / PDC: OFF`;
+      } else if (hasCentralHp && !hasBoiler) {
+        telemetry.textContent = `PDC: OFF`;
+      } else if (activeHeatingZones > 0 && !isBoilerActive) {
+        // Heating is active across zones without boiler switch: PDC or integrated central heating
+        telemetry.textContent = hasCentralHp ? `PDC: ON` : `Caldaia / PDC: ON`;
+      } else {
+        telemetry.textContent = `Caldaia: ${boilerText}`;
+      }
     }
 
     const isClassic = (this.getEffectiveStyle() === 'classic');
 
     if (!isMasterOn) {
       if (card && !isClassic) card.className = "";
+      if (icon) {
+        icon.icon = "mdi:power";
+        icon.style.color = "var(--secondary-text-color, #94a3b8)";
+      }
       if (iconWrap) {
         iconWrap.style.background = isClassic ? "var(--secondary-background-color, rgba(255, 255, 255, 0.05))" : "rgba(255, 255, 255, 0.04)";
         iconWrap.style.borderColor = "var(--divider-color, rgba(255, 255, 255, 0.1))";
         iconWrap.style.boxShadow = "none";
       }
-      if (icon) icon.style.color = "var(--secondary-text-color, #94a3b8)";
       if (pill) {
         pill.style.background = isClassic ? "rgba(255, 255, 255, 0.06)" : "rgba(148, 163, 184, 0.12)";
         pill.style.color = "var(--secondary-text-color, #94a3b8)";
         pill.style.borderColor = "var(--divider-color, rgba(148, 163, 184, 0.25))";
       }
       if (stateText) stateText.textContent = "SPENTO";
-    } else {
-      if (isBoilerActive) {
-        if (card && !isClassic) card.className = "heating-aura";
-        if (iconWrap) {
-          iconWrap.style.background = "rgba(249, 115, 22, 0.2)";
-          iconWrap.style.borderColor = "#f97316";
-          iconWrap.style.boxShadow = isClassic ? "none" : "0 0 15px rgba(249, 115, 22, 0.4)";
+    } else if (isCoolMode) {
+      if (isCoolingSystemActive) {
+        if (card && !isClassic) card.className = "cooling-aura";
+        if (icon) {
+          icon.icon = "mdi:snowflake";
+          icon.style.color = "#38bdf8";
         }
-        if (icon) icon.style.color = "#f97316";
+        if (iconWrap) {
+          iconWrap.style.background = "rgba(56, 189, 248, 0.22)";
+          iconWrap.style.borderColor = "#38bdf8";
+          iconWrap.style.boxShadow = isClassic ? "none" : "0 0 18px rgba(56, 189, 248, 0.45)";
+        }
         if (pill) {
-          pill.style.background = "rgba(249, 115, 22, 0.15)";
+          pill.style.background = "rgba(56, 189, 248, 0.18)";
+          pill.style.color = "#38bdf8";
+          pill.style.borderColor = "rgba(56, 189, 248, 0.45)";
+        }
+        if (stateText) stateText.textContent = "RAFFRESCAMENTO ATTIVO";
+      } else {
+        if (card && !isClassic) card.className = "cool-idle-aura";
+        if (icon) {
+          icon.icon = "mdi:snowflake";
+          icon.style.color = "#38bdf8";
+        }
+        if (iconWrap) {
+          iconWrap.style.background = "rgba(56, 189, 248, 0.12)";
+          iconWrap.style.borderColor = "rgba(56, 189, 248, 0.35)";
+          iconWrap.style.boxShadow = isClassic ? "none" : "0 0 12px rgba(56, 189, 248, 0.2)";
+        }
+        if (pill) {
+          pill.style.background = "rgba(56, 189, 248, 0.12)";
+          pill.style.color = "#7dd3fc";
+          pill.style.borderColor = "rgba(56, 189, 248, 0.3)";
+        }
+        if (stateText) stateText.textContent = "STANDBY (FREDDO)";
+      }
+    } else {
+      if (isHeatingSystemActive) {
+        if (card && !isClassic) card.className = "heating-aura";
+        if (icon) {
+          icon.icon = "mdi:fire";
+          icon.style.color = "#f97316";
+        }
+        if (iconWrap) {
+          iconWrap.style.background = "rgba(249, 115, 22, 0.22)";
+          iconWrap.style.borderColor = "#f97316";
+          iconWrap.style.boxShadow = isClassic ? "none" : "0 0 18px rgba(249, 115, 22, 0.45)";
+        }
+        if (pill) {
+          pill.style.background = "rgba(249, 115, 22, 0.18)";
           pill.style.color = "#f97316";
-          pill.style.borderColor = "rgba(249, 115, 22, 0.4)";
+          pill.style.borderColor = "rgba(249, 115, 22, 0.45)";
         }
         if (stateText) stateText.textContent = "RISCALDAMENTO ATTIVO";
       } else {
         if (card && !isClassic) card.className = "idle-aura";
+        if (icon) {
+          icon.icon = "mdi:power";
+          icon.style.color = "#f59e0b";
+        }
         if (iconWrap) {
           iconWrap.style.background = "rgba(245, 158, 11, 0.15)";
           iconWrap.style.borderColor = "#f59e0b";
           iconWrap.style.boxShadow = isClassic ? "none" : "0 0 15px rgba(245, 158, 11, 0.25)";
         }
-        if (icon) icon.style.color = "#f59e0b";
         if (pill) {
           pill.style.background = "rgba(245, 158, 11, 0.15)";
           pill.style.color = "#f59e0b";

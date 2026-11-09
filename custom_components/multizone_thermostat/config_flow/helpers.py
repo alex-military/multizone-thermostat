@@ -75,7 +75,7 @@ def _remove_entity_from_registry(hass: HomeAssistant, entity_id: str) -> None:
 def flatten_zone_user_input(user_input: dict[str, Any]) -> dict[str, Any]:
     """Flatten user_input dictionary across collapsible sections."""
     flattened = dict(user_input)
-    for section_key in ("trv_settings", "valve_settings", "relay_settings", "safety_settings"):
+    for section_key in ("trv_settings", "valve_settings", "relay_settings", "safety_settings", "split_settings"):
         sec = flattened.pop(section_key, None)
         if isinstance(sec, dict):
             flattened.update(sec)

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 from collections import deque
 from datetime import datetime, timedelta, time as dt_time
 import logging
@@ -12,6 +13,7 @@ import homeassistant.util.dt as dt_util
 
 from homeassistant.components.climate import (
     ClimateEntityFeature,
+    HVACMode,
     SERVICE_SET_HVAC_MODE,
     SERVICE_SET_PRESET_MODE,
     SERVICE_SET_TEMPERATURE,
@@ -53,6 +55,8 @@ from .const import (
     CONF_ZONE_TRV_SYNC,
     CONF_ZONE_ANTI_SEIZE,
     CONF_ZONE_CLIMATES,
+    CONF_ZONE_SWITCHES,
+    CONF_ZONE_VALVES,
     DOMAIN,
     GLOBAL_PRESET_MANUAL,
     HVAC_ACTION_HEATING,
@@ -91,11 +95,46 @@ from .const import (
     CONF_WEATHER_SENSOR,
     KEY_WEATHER_CURVE,
     KEY_DEMAND_STRATEGY,
+    CONF_ENABLE_GAS_HEATER,
+    CONF_ENABLE_HEAT_PUMP,
+    CONF_HEAT_PUMP_TYPE,
+    HP_TYPE_CLIMATE,
+    CONF_HEAT_PUMP_ENTITY,
+    CONF_HEAT_PUMP_MIN_TEMP,
+    CONF_HEAT_PUMP_MAX_TEMP,
+    CONF_HEAT_PUMP_CH_SWITCH,
+    CONF_ENERGY_MANAGEMENT_ENABLED,
+    CONF_SOLAR_POWER_SENSOR,
+    CONF_GRID_EXPORT_SENSOR,
+    CONF_BATTERY_SOC_SENSOR,
+    CONF_EXTERNAL_SOLAR_OVERRIDE_ENTITY,
+    CONF_SOLAR_EXPORT_THRESHOLD,
+    DEFAULT_SOLAR_EXPORT_THRESHOLD,
+    CONF_BATTERY_MIN_RESERVE_SOC,
+    DEFAULT_BATTERY_MIN_RESERVE_SOC,
+    KEY_ALLOW_SPLIT_HEATING,
+    KEY_ALLOW_SPLIT_COOLING,
+    KEY_HEAT_SOURCE_PRIORITY,
+    DEFAULT_HEAT_SOURCE_PRIORITY,
+    HVAC_MODE_COOL,
+    CONF_MASTER_HVAC_MODE,
+    CONF_HEAT_PUMP_COOLING,
+    DEFAULT_HEAT_PUMP_COOLING,
+    DEFAULT_MASTER_OPERATION_MODE,
+    CONF_ZONE_SPLIT_CLIMATE,
+    CONF_ZONE_SPLIT_ROLE,
+    SPLIT_ROLE_HEAT_COOL,
+    SPLIT_ROLE_COOLING_ONLY,
+    DEFAULT_SPLIT_ROLE,
 )
 from .demand_aggregator import VALID_DEMAND_STRATEGIES
 from .pwm_engine import PWMEngine
 from .thermal_model import ThermalObserver
 from .calendar_parser import parse_calendar_event, CalendarOverride
+try:
+    from .custom_types import PreWindowState
+except ImportError:
+    from .zone_manager import PreWindowState
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -134,6 +173,26 @@ class MultizoneCoordinator:
         self.presence_sensor = config.get(CONF_PRESENCE_SENSOR)
         self.weather_sensor_id = config.get(CONF_WEATHER_SENSOR)
         self.global_calendar_id = config.get(CONF_GLOBAL_CALENDAR)
+        
+        # Phase 11 — Heating Plants & Multi-Generator
+        self.enable_gas_heater = config.get(CONF_ENABLE_GAS_HEATER, True)
+        self.enable_heat_pump = config.get(CONF_ENABLE_HEAT_PUMP, False)
+        self.heat_pump_type = config.get(CONF_HEAT_PUMP_TYPE, HP_TYPE_CLIMATE)
+        self.heat_pump_entity = config.get(CONF_HEAT_PUMP_ENTITY)
+        self.heat_pump_min_temp = config.get(CONF_HEAT_PUMP_MIN_TEMP, 25.0)
+        self.heat_pump_max_temp = config.get(CONF_HEAT_PUMP_MAX_TEMP, 55.0)
+        self.heat_pump_ch_switch = config.get(CONF_HEAT_PUMP_CH_SWITCH)
+        self.heat_pump_cooling = config.get(CONF_HEAT_PUMP_COOLING, DEFAULT_HEAT_PUMP_COOLING)
+        self.master_hvac_mode: str = DEFAULT_MASTER_OPERATION_MODE
+
+        # Phase 11 — Solar Self-Consumption & Energy Management
+        self.energy_management_enabled = config.get(CONF_ENERGY_MANAGEMENT_ENABLED, False)
+        self.solar_power_sensor = config.get(CONF_SOLAR_POWER_SENSOR)
+        self.grid_export_sensor = config.get(CONF_GRID_EXPORT_SENSOR)
+        self.battery_soc_sensor = config.get(CONF_BATTERY_SOC_SENSOR)
+        self.external_solar_override_entity = config.get(CONF_EXTERNAL_SOLAR_OVERRIDE_ENTITY)
+        self.solar_export_threshold = float(config.get(CONF_SOLAR_EXPORT_THRESHOLD, DEFAULT_SOLAR_EXPORT_THRESHOLD))
+        self.battery_min_reserve_soc = float(config.get(CONF_BATTERY_MIN_RESERVE_SOC, DEFAULT_BATTERY_MIN_RESERVE_SOC))
         self.master_device_id: str | None = None
         
         # Internal state tracking
@@ -157,6 +216,12 @@ class MultizoneCoordinator:
 
         from .zone_controller import ZoneController
         self.zone_controller = ZoneController(hass, self)
+
+        from .split.split_controller import SplitZoneManager
+        self.split_manager = SplitZoneManager(hass, self)
+
+        from .energy.energy_manager import EnergyManager
+        self.energy_manager = EnergyManager(hass, self, config)
 
         from .storage.storage_manager import StorageManager
         self.storage = StorageManager(hass, self.entry_id)
@@ -232,8 +297,29 @@ class MultizoneCoordinator:
         self._climate_entities: dict[str, Any] = {}
         self._boiler_status_reason: str = "OFF - Initializing"
 
+        from .boiler.heat_pump_backend import CentralHeatPumpBackend
+        self.heat_pump_backend = (
+            CentralHeatPumpBackend(
+                hass,
+                self,
+                self.heat_pump_type,
+                self.heat_pump_entity,
+                self.heat_pump_min_temp,
+                self.heat_pump_max_temp,
+                self.heat_pump_ch_switch,
+                self.heat_pump_cooling,
+                config.get("hp_cool_min_temp", config.get("heat_pump_cool_min_temp", 7.0)),
+                config.get("hp_cool_max_temp", config.get("heat_pump_cool_max_temp", 18.0)),
+                int(self._valve_delay),
+            )
+            if self.enable_heat_pump and self.heat_pump_entity
+            else None
+        )
+
         from .boiler.plant_orchestrator import PlantOrchestrator
-        self.plant_orchestrator = PlantOrchestrator(hass, self.demand_aggregator, self.boiler_backend, self)
+        self.plant_orchestrator = PlantOrchestrator(
+            hass, self.demand_aggregator, self.boiler_backend, self, self.heat_pump_backend
+        )
 
 
     def register_master_switch(self, switch_entity) -> None:
@@ -292,10 +378,13 @@ class MultizoneCoordinator:
         if hasattr(self, "plant_diagnostics"):
             return self.plant_diagnostics.get_opentherm_diagnostics().get("dhw_active", False)
         return False
+
                     
     @property
     def boiler_status_reason(self) -> str:
         """Return human-readable explanation of why the boiler is currently in its state."""
+        if not getattr(self, "enable_gas_heater", True) and getattr(self, "enable_heat_pump", False) and getattr(self, "heat_pump_backend", None):
+            return getattr(self.heat_pump_backend, "status_reason", "unknown")
         return getattr(self.boiler_backend, "status_reason", "unknown")
                     
     @property
@@ -351,23 +440,38 @@ class MultizoneCoordinator:
                 _LOGGER.info("Migrating legacy window states to entry storage")
                 await self._store.async_save(stored)
         if stored and isinstance(stored, dict):
+            parsed_stored = {
+                k: PreWindowState(v) if isinstance(v, dict) else v
+                for k, v in stored.items()
+            }
             self.zone_manager._pre_window_state.clear()
-            self.zone_manager._pre_window_state.update(stored)
+            self.zone_manager._pre_window_state.update(parsed_stored)
             self.storage._pre_window_state.clear()
-            self.storage._pre_window_state.update(stored)
+            self.storage._pre_window_state.update(parsed_stored)
             _LOGGER.debug("Loaded pre_window_state from storage: %s", self.zone_manager._pre_window_state)
-            
-        preset_stored = await self._preset_store.async_load()
-        if preset_stored and isinstance(preset_stored, dict):
-            self._presets.clear()
-            self._presets.update(preset_stored)
-            _LOGGER.debug("Loaded presets from storage: %s", self._presets)
             
         settings_stored = await self._settings_store.async_load()
         if settings_stored and isinstance(settings_stored, dict):
             self._settings.clear()
             self._settings.update(settings_stored)
             _LOGGER.debug("Loaded settings from storage: %s", self._settings)
+
+        saved_hvac_mode = self._settings.get(CONF_MASTER_HVAC_MODE)
+        if saved_hvac_mode in (HVAC_MODE_HEAT, HVAC_MODE_COOL):
+            self.master_hvac_mode = saved_hvac_mode
+
+        preset_stored = await self._preset_store.async_load()
+        if preset_stored and isinstance(preset_stored, dict):
+            if "presets_heat" in preset_stored or "presets_cool" in preset_stored:
+                self.storage._presets_heat.clear()
+                self.storage._presets_heat.update(preset_stored.get("presets_heat", {}))
+                self.storage._presets_cool.clear()
+                self.storage._presets_cool.update(preset_stored.get("presets_cool", {}))
+            else:
+                self.storage._presets_heat.clear()
+                self.storage._presets_heat.update(preset_stored)
+                self.storage._presets_cool.clear()
+            _LOGGER.debug("Loaded presets from storage: heat=%s, cool=%s", self.storage.presets_heat, self.storage.presets_cool)
 
         if self._settings.get(KEY_DEMAND_STRATEGY) in VALID_DEMAND_STRATEGIES:
             self.demand_aggregator.strategy = self._settings[KEY_DEMAND_STRATEGY]
@@ -376,31 +480,28 @@ class MultizoneCoordinator:
         saved_zone_modes = self._settings.get("zone_modes", {})
         self.zone_manager.load_state(
             self.zone_manager._pre_window_state,
-            self._presets,
-            saved_zone_modes
+            self.storage.presets_heat,
+            saved_zone_modes,
+            self.storage.presets_cool
         )
         for cid, mode in saved_zone_modes.items():
             if cid in self._climate_callbacks:
                 self._climate_callbacks[cid]()
         
-        # Load autotuner states
+        # Load autotuner and thermal models states via ZoneController
         autotune_data = self._settings.get("autotuners", {})
-        for climate_id, tuner in self._autotuners.items():
-            if climate_id in autotune_data:
-                tuner.load_state(autotune_data[climate_id])
-                # If already completed, apply the calculated PID parameters!
-                if tuner.state == tuner.STATE_COMPLETED:
-                    self._pids[climate_id].set_pid_param(kp=tuner.kp, ki=tuner.ki, kd=tuner.kd)
-                    _LOGGER.info("Restored Smart PID for %s: Kp=%.1f, Ki=%.4f, Kd=%.1f", 
-                                 climate_id, tuner.kp, tuner.ki, tuner.kd)
-
-        # Load thermal models states
         thermal_data = self._settings.get("thermal_models", {})
-        for climate_id, model in self._thermal_models.items():
-            if climate_id in thermal_data:
-                model.load_state(thermal_data[climate_id])
-                _LOGGER.info("Restored Thermal Model for %s: Heating=%.2f, Cooling=%.2f, Inertia=%.2f", 
-                             climate_id, model.heating_rate, model.cooling_rate, model.thermal_inertia)
+        if hasattr(self, "zone_controller"):
+            self.zone_controller.load_state(autotune_data, thermal_data)
+        else:
+            for climate_id, tuner in self._autotuners.items():
+                if climate_id in autotune_data:
+                    tuner.load_state(autotune_data[climate_id])
+                    if tuner.state == tuner.STATE_COMPLETED:
+                        self._pids[climate_id].set_pid_param(kp=tuner.kp, ki=tuner.ki, kd=tuner.kd)
+            for climate_id, model in self._thermal_models.items():
+                if climate_id in thermal_data:
+                    model.load_state(thermal_data[climate_id])
 
         saved_wall_time = self._settings.get("last_active_wall_time")
         if saved_wall_time is not None:
@@ -417,13 +518,22 @@ class MultizoneCoordinator:
     async def async_save_storage(self) -> None:
         """Save window states, presets and settings to storage."""
         await self._store.async_save(self.zone_manager._pre_window_state)
-        await self._preset_store.async_save(self.zone_manager._presets)
+        if self.storage._presets_heat is not self.zone_manager._presets_heat:
+            self.storage._presets_heat.clear()
+            self.storage._presets_heat.update(self.zone_manager._presets_heat)
+        if self.storage._presets_cool is not self.zone_manager._presets_cool:
+            self.storage._presets_cool.clear()
+            self.storage._presets_cool.update(self.zone_manager._presets_cool)
+        await self._preset_store.async_save(self.storage._get_preset_data())
         await self._settings_store.async_save(self._settings)
 
     async def _async_save_autotuner_states(self) -> None:
         """Save autotuner learning progress to storage."""
-        data = {climate_id: tuner.dump_state() for climate_id, tuner in self._autotuners.items()}
-        await self.async_set_persistent_data("autotuners", data)
+        if hasattr(self, "zone_controller"):
+            await self.zone_controller.async_save_autotuner_states()
+        else:
+            data = {climate_id: tuner.dump_state() for climate_id, tuner in self._autotuners.items()}
+            await self.async_set_persistent_data("autotuners", data)
 
     async def _async_save_thermal_states(self) -> None:
         """Save thermal model learning progress to storage."""
@@ -432,8 +542,13 @@ class MultizoneCoordinator:
 
     async def _async_save_presets_storage(self) -> None:
         """Save presets to storage."""
-        # Save the dictionary maintained by the zone manager
-        await self._preset_store.async_save(self.zone_manager._presets)
+        if self.storage._presets_heat is not self.zone_manager._presets_heat:
+            self.storage._presets_heat.clear()
+            self.storage._presets_heat.update(self.zone_manager._presets_heat)
+        if self.storage._presets_cool is not self.zone_manager._presets_cool:
+            self.storage._presets_cool.clear()
+            self.storage._presets_cool.update(self.zone_manager._presets_cool)
+        await self._preset_store.async_save(self.storage._get_preset_data())
 
     def register_select(self, key: str, select_entity: Any) -> None:
         """Register a select entity."""
@@ -454,6 +569,8 @@ class MultizoneCoordinator:
         self._valve_delay = value
         if hasattr(self, "boiler_backend") and hasattr(self.boiler_backend, "set_valve_delay"):
             self.boiler_backend.set_valve_delay(int(value))
+        if hasattr(self, "heat_pump_backend") and hasattr(self.heat_pump_backend, "set_valve_delay"):
+            self.heat_pump_backend.set_valve_delay(int(value))
 
     @property
     def master_enabled(self) -> bool:
@@ -468,6 +585,16 @@ class MultizoneCoordinator:
     def set_master_state(self, state: bool) -> None:
         """Set master state (called by master switch entity)."""
         self._master_state = state
+        if state and hasattr(self, "split_manager") and self.split_manager:
+            self.split_manager.reset_all_local_manual_overrides()
+
+    async def async_set_master_enable(self, state: bool) -> None:
+        """Set master enable state asynchronously and apply actions."""
+        self.set_master_state(state)
+        if state:
+            await self.async_apply_master_on()
+        else:
+            await self.async_apply_master_off()
 
     def get_master_state(self) -> bool:
         """Get current master state."""
@@ -537,6 +664,10 @@ class MultizoneCoordinator:
             )
         )
         
+        # Phase 11: Start EnergyManager tracking
+        if hasattr(self, "energy_manager") and self.energy_manager:
+            self.hass.async_create_task(self.energy_manager.async_start())
+
         # Listen every 5 minutes for Calendar API checks
         if self.global_calendar_id:
             self._unsub_listeners.append(
@@ -562,6 +693,9 @@ class MultizoneCoordinator:
         if backend_task and not backend_task.done():
             backend_task.cancel()
             self.boiler_backend._pending_boiler_task = None
+
+        if hasattr(self, "energy_manager") and self.energy_manager:
+            self.energy_manager.async_stop()
 
         for unsub in self._unsub_listeners:
             unsub()
@@ -600,18 +734,193 @@ class MultizoneCoordinator:
         if hasattr(self, "frost_manager") and self.frost_manager:
             return self.frost_manager.is_zone_in_frost_emergency(climate_id)
         return False
+
+    def is_split_heating_allowed(self) -> bool:
+        """Return True if split heating is allowed by master switch."""
+        return bool(self.get_persistent_data(KEY_ALLOW_SPLIT_HEATING, True))
+
+    def is_split_cooling_allowed(self) -> bool:
+        """Return True if split cooling is allowed by master switch."""
+        return bool(self.get_persistent_data(KEY_ALLOW_SPLIT_COOLING, True))
+
+    def get_heat_source_priority(self) -> str:
+        """Return current heat source priority (Gas Priority, Electric Priority, etc.)."""
+        return str(self.get_persistent_data(KEY_HEAT_SOURCE_PRIORITY, DEFAULT_HEAT_SOURCE_PRIORITY))
         
-    async def async_apply_master_on(self) -> None:
-        """Master turned ON: set heat mode for enabled zones, off for disabled."""
-        _LOGGER.debug("Master ON → applying to all zones")
+    def can_central_cool(self) -> bool:
+        """Return True if central plant supports cooling (Heat pump with cooling enabled)."""
+        hp_enabled = bool(getattr(self, "enable_heat_pump", False))
+        hp_cooling = bool(getattr(self, "heat_pump_cooling", True))
+        return hp_enabled and hp_cooling
+
+    def can_zone_cool(self, climate_id: str) -> bool:
+        """Return True if zone has cooling capabilities (Split AC or Central Heat Pump Cooling)."""
+        if hasattr(self, "split_manager") and self.split_manager.has_split(climate_id):
+            split_info = self.split_manager.get_split_info(climate_id)
+            if split_info:
+                role = split_info.get("split_role", DEFAULT_SPLIT_ROLE)
+                if role in (SPLIT_ROLE_HEAT_COOL, SPLIT_ROLE_COOLING_ONLY):
+                    return True
+
+        if not self.can_central_cool():
+            return False
+
+        # Central cooling is active: verify that the zone has hydronic actuators suitable for cooling
+        zone_conf = None
+        for z in getattr(self, "zones", []):
+            if make_zone_entity_id(z.get(CONF_ZONE_NAME, "")) == climate_id:
+                zone_conf = z
+                break
+
+        if zone_conf:
+            if zone_conf.get("allow_cooling") is True:
+                return True
+            if zone_conf.get("allow_cooling") is False or zone_conf.get("emitter_type") == "radiator":
+                return False
+
+            is_fancoil = bool(
+                zone_conf.get("fancoil")
+                or zone_conf.get("is_fancoil")
+                or zone_conf.get("emitter_type") == "fancoil"
+            )
+            if is_fancoil:
+                return True
+
+            climates = zone_conf.get(CONF_ZONE_CLIMATES, []) or zone_conf.get("climate_entities", []) or zone_conf.get("climates", [])
+            switches = zone_conf.get(CONF_ZONE_SWITCHES, []) or zone_conf.get("switch_entities", []) or zone_conf.get("switches", [])
+            valves = zone_conf.get(CONF_ZONE_VALVES, []) or zone_conf.get("valve_entities", []) or zone_conf.get("valves", [])
+            has_trv_sync = bool(zone_conf.get(CONF_ZONE_TRV_SYNC, zone_conf.get("trv_preset_sync", False)))
+
+            if switches or valves:
+                return True
+
+            if climates and has_trv_sync:
+                return False
+
+        return True
+
+    def get_zone_cooling_rate(self, climate_id: str) -> float:
+        """Return cooling rate for a zone from schedule_manager or thermal observer."""
+        if hasattr(self, "schedule_manager") and hasattr(self.schedule_manager, "_get_zone_cooling_rate"):
+            return float(self.schedule_manager._get_zone_cooling_rate(climate_id) or 0.0)
+        if hasattr(self, "thermal_model_mgr") and hasattr(self.thermal_model_mgr, "get_observer"):
+            obs = self.thermal_model_mgr.get_observer(climate_id)
+            if obs:
+                return float(getattr(obs, "cooling_rate", 0.0))
+        return 0.0
+
+    async def async_set_master_hvac_mode(self, mode: str) -> None:
+        """Set master operation mode ('heat' or 'cool') and coordinate whole-house operation."""
+        if mode not in (HVAC_MODE_HEAT, HVAC_MODE_COOL):
+            _LOGGER.warning("Invalid master HVAC mode: %s", mode)
+            return
+
+        self.master_hvac_mode = mode
+        await self.async_set_persistent_data(CONF_MASTER_HVAC_MODE, mode)
+        _LOGGER.info("Master HVAC mode set to '%s'", mode)
+
+        if "master_operation_mode" in self._select_entities:
+            self._select_entities["master_operation_mode"].async_write_ha_state()
+
+        if "global_preset" in self._select_entities:
+            self._select_entities["global_preset"].async_write_ha_state()
+
         for zone in self.zones:
-            climate_id = make_zone_entity_id(zone[CONF_ZONE_NAME])
-            mode = self.zone_manager.get_zone_mode(climate_id)
-            zone_enabled = (mode != ZONE_MODE_BYPASS)
-            if zone_enabled:
-                await self._async_set_hvac_mode(climate_id, HVAC_MODE_HEAT)
+            name = zone.get(CONF_ZONE_NAME)
+            if not name:
+                continue
+            cid = make_zone_entity_id(name)
+            t = self.zone_manager.get_preset_temperature(self.zone_manager.current_global_preset, cid, mode)
+            if t is not None and (mode != HVAC_MODE_COOL or self.can_zone_cool(cid)):
+                t_val = float(t)
+                climate_ent = getattr(self, "_climate_entities", {}).get(cid)
+                if climate_ent is not None and hasattr(climate_ent, "_target_temperature"):
+                    climate_ent._target_temperature = t_val
+                sched_mgr = getattr(self, "schedule_manager", None)
+                if sched_mgr and getattr(sched_mgr, "scheduler_enabled", False) is True:
+                    if self.zone_manager.current_global_preset == "manual":
+                        sched_mgr.record_manual_override(cid, t_val)
+
+        if self.get_master_state():
+            if mode == HVAC_MODE_COOL:
+                for zone in self.zones:
+                    name = zone.get(CONF_ZONE_NAME)
+                    if not name:
+                        continue
+                    cid = make_zone_entity_id(name)
+                    z_mode = self.zone_manager.get_zone_mode(cid)
+                    if self.can_zone_cool(cid) and z_mode != ZONE_MODE_BYPASS:
+                        await self._async_set_hvac_mode(cid, HVAC_MODE_COOL)
+                        t = self.zone_manager.get_preset_temperature(self.zone_manager.current_global_preset, cid, HVAC_MODE_COOL)
+                        if t is not None:
+                            await self.hass.services.async_call(
+                                CLIMATE_DOMAIN,
+                                SERVICE_SET_TEMPERATURE,
+                                {ATTR_ENTITY_ID: cid, ATTR_TEMPERATURE: float(t)},
+                                blocking=True,
+                            )
+                    else:
+                        await self._async_set_hvac_mode(cid, HVAC_MODE_OFF)
             else:
-                await self._async_set_hvac_mode(climate_id, HVAC_MODE_OFF)
+                for zone in self.zones:
+                    name = zone.get(CONF_ZONE_NAME)
+                    if not name:
+                        continue
+                    cid = make_zone_entity_id(name)
+                    z_mode = self.zone_manager.get_zone_mode(cid)
+                    if z_mode != ZONE_MODE_BYPASS:
+                        await self._async_set_hvac_mode(cid, HVAC_MODE_HEAT)
+                        t = self.zone_manager.get_preset_temperature(self.zone_manager.current_global_preset, cid, HVAC_MODE_HEAT)
+                        if t is not None:
+                            await self.hass.services.async_call(
+                                CLIMATE_DOMAIN,
+                                SERVICE_SET_TEMPERATURE,
+                                {ATTR_ENTITY_ID: cid, ATTR_TEMPERATURE: float(t)},
+                                blocking=True,
+                            )
+                    else:
+                        await self._async_set_hvac_mode(cid, HVAC_MODE_OFF)
+
+        if hasattr(self, "_master_switch") and self._master_switch:
+            self._master_switch.async_write_ha_state()
+
+        await self.async_update_all_climates()
+
+    async def async_apply_master_on(self) -> None:
+        """Master turned ON: set current master HVAC mode (heat or cool) for capable enabled zones."""
+        _LOGGER.debug("Master ON (mode: %s) → applying to all zones", self.master_hvac_mode)
+        if self.master_hvac_mode == HVAC_MODE_COOL:
+            for zone in self.zones:
+                cid = make_zone_entity_id(zone[CONF_ZONE_NAME])
+                mode = self.zone_manager.get_zone_mode(cid)
+                if self.can_zone_cool(cid) and mode != ZONE_MODE_BYPASS:
+                    await self._async_set_hvac_mode(cid, HVAC_MODE_COOL)
+                    t = self.zone_manager.get_preset_temperature(self.zone_manager.current_global_preset, cid, HVAC_MODE_COOL)
+                    if t is not None:
+                        await self.hass.services.async_call(
+                            CLIMATE_DOMAIN,
+                            SERVICE_SET_TEMPERATURE,
+                            {ATTR_ENTITY_ID: cid, ATTR_TEMPERATURE: float(t)},
+                            blocking=True,
+                        )
+                else:
+                    await self._async_set_hvac_mode(cid, HVAC_MODE_OFF)
+        else:
+            for zone in self.zones:
+                cid = make_zone_entity_id(zone[CONF_ZONE_NAME])
+                mode = self.zone_manager.get_zone_mode(cid)
+                if mode != ZONE_MODE_BYPASS:
+                    await self._async_set_hvac_mode(cid, HVAC_MODE_HEAT)
+                    t = self.zone_manager.get_preset_temperature(self.zone_manager.current_global_preset, cid, HVAC_MODE_HEAT)
+                    if t is not None:
+                        await self.hass.services.async_call(
+                            CLIMATE_DOMAIN,
+                            SERVICE_SET_TEMPERATURE,
+                            {ATTR_ENTITY_ID: cid, ATTR_TEMPERATURE: float(t)},
+                            blocking=True,
+                        )
+                else:
+                    await self._async_set_hvac_mode(cid, HVAC_MODE_OFF)
 
     async def async_apply_master_off(self) -> None:
         """Master turned OFF: turn off all zones and boiler."""
@@ -622,11 +931,21 @@ class MultizoneCoordinator:
         # Boiler will auto-turn off via state change listener,
         # but we also force it off here for safety ignoring locks
         await self.plant_orchestrator.boiler_backend.async_emergency_off()
+        hp_backend = getattr(self, "heat_pump_backend", None) or getattr(self.plant_orchestrator, "heat_pump_backend", None)
+        if hp_backend is not None and hasattr(hp_backend, "async_emergency_off"):
+            await hp_backend.async_emergency_off()
 
 
 
     async def _async_set_hvac_mode(self, climate_entity: str, mode: str) -> None:
         """Set HVAC mode on a climate entity."""
+        climate_ent = getattr(self, "_climate_entities", {}).get(climate_entity)
+        if climate_ent is not None:
+            if hasattr(HVACMode, mode.upper()):
+                climate_ent._hvac_mode = HVACMode(mode)
+            else:
+                climate_ent._hvac_mode = mode
+
         state = self.hass.states.get(climate_entity)
         if state is None:
             _LOGGER.warning("Climate entity %s not found, skipping", climate_entity)
@@ -640,6 +959,18 @@ class MultizoneCoordinator:
             CLIMATE_DOMAIN,
             SERVICE_SET_HVAC_MODE,
             {ATTR_ENTITY_ID: climate_entity, ATTR_HVAC_MODE: mode},
-            blocking=False,
+            blocking=True,
         )
 
+
+
+    async def async_update_all_climates(self) -> None:
+        """Trigger zone controller re-evaluation and state write on all registered zones."""
+        for entity_id, cb in list(self._climate_callbacks.items()):
+            if hasattr(self, "zone_controller") and self.zone_controller and hasattr(self, "hass") and self.hass:
+                st = self.hass.states.get(entity_id) if hasattr(self.hass, "states") else None
+                if st is not None:
+                    coro = self.zone_controller.async_update_zone(entity_id, st)
+                    if inspect.iscoroutine(coro):
+                        await coro
+            cb()

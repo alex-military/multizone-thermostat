@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import inspect
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -13,8 +14,10 @@ from .const import (
     CONF_ZONE_TEMP_SENSOR,
     make_zone_entity_id,
     HVAC_MODE_HEAT,
+    HVAC_MODE_COOL,
     ZONE_MODE_BYPASS,
     KEY_WEATHER_CURVE,
+    SOURCE_PRIORITY_ELECTRIC_ONLY,
 )
 from .pid_wrapper import MultizonePID
 from .autotune import PassiveAutotuneObserver
@@ -24,7 +27,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class ZoneController:
-    """Orchestrates PID controllers, autotuning, and thermal models for all zones."""
+    """Orchestrates PID controllers, autotuning, and thermal models for all zones in heating and cooling modes."""
 
     def __init__(self, hass: HomeAssistant, coordinator: Any) -> None:
         """Initialize the Zone Controller."""
@@ -32,8 +35,12 @@ class ZoneController:
         self.coordinator = coordinator
         self.zones = coordinator.zones
 
-        self._pids: dict[str, MultizonePID] = {}
-        self._autotuners: dict[str, PassiveAutotuneObserver] = {}
+        # Dual-track PIDs and Autotuners for seasonal optimization (heat vs cool)
+        self._pids_heat: dict[str, MultizonePID] = {}
+        self._pids_cool: dict[str, MultizonePID] = {}
+        self._autotuners_heat: dict[str, PassiveAutotuneObserver] = {}
+        self._autotuners_cool: dict[str, PassiveAutotuneObserver] = {}
+
         self._thermal_models: dict[str, ThermalObserver] = {}
         self._last_seen_temps: dict[str, float] = {}
         self._last_sensor_reports: dict[str, Any] = {}
@@ -43,37 +50,61 @@ class ZoneController:
             if not name:
                 continue
             climate_id = make_zone_entity_id(name)
-            # Default Kp=100, Ki=0, Kd=0 (will be overridden by Autolearning later)
-            self._pids[climate_id] = MultizonePID(
-                kp=100.0, ki=0.0, kd=0.0, out_min=0.0, out_max=100.0, sensor_timeout=7200.0, zone_id=climate_id
+            # Heating PID & Autotuner
+            self._pids_heat[climate_id] = MultizonePID(
+                kp=100.0, ki=0.0, kd=0.0, out_min=0.0, out_max=100.0, sensor_timeout=7200.0, zone_id=climate_id, action="heat"
             )
-            self._autotuners[climate_id] = PassiveAutotuneObserver(climate_id, required_cycles=3)
+            self._autotuners_heat[climate_id] = PassiveAutotuneObserver(climate_id, required_cycles=3, mode="heat")
+
+            # Cooling PID & Autotuner
+            self._pids_cool[climate_id] = MultizonePID(
+                kp=100.0, ki=0.0, kd=0.0, out_min=0.0, out_max=100.0, sensor_timeout=7200.0, zone_id=climate_id, action="cool"
+            )
+            self._autotuners_cool[climate_id] = PassiveAutotuneObserver(climate_id, required_cycles=3, mode="cool")
+
             self._thermal_models[climate_id] = ThermalObserver(climate_id)
 
+        # Backward compatibility aliases
+        self._pids = self._pids_heat
+        self._autotuners = self._autotuners_heat
         self._was_dhw_active: bool = False
 
     @property
     def pids(self) -> dict[str, MultizonePID]:
-        """Return dict of zone PIDs."""
-        return self._pids
+        """Return dict of zone heating PIDs (backward-compatible)."""
+        return self._pids_heat
+
+    @property
+    def pids_cool(self) -> dict[str, MultizonePID]:
+        """Return dict of zone cooling PIDs."""
+        return self._pids_cool
 
     @property
     def autotuners(self) -> dict[str, PassiveAutotuneObserver]:
-        """Return dict of zone autotuners."""
-        return self._autotuners
+        """Return dict of zone heating autotuners (backward-compatible)."""
+        return self._autotuners_heat
+
+    @property
+    def autotuners_cool(self) -> dict[str, PassiveAutotuneObserver]:
+        """Return dict of zone cooling autotuners."""
+        return self._autotuners_cool
 
     @property
     def thermal_models(self) -> dict[str, ThermalObserver]:
         """Return dict of zone thermal models."""
         return self._thermal_models
 
-    def get_pid(self, climate_id: str) -> MultizonePID | None:
-        """Get PID controller for a zone."""
-        return self._pids.get(climate_id)
+    def get_pid(self, climate_id: str, mode: str = "heat") -> MultizonePID | None:
+        """Get PID controller for a zone in specified mode."""
+        if mode == "cool":
+            return self._pids_cool.get(climate_id)
+        return self._pids_heat.get(climate_id)
 
-    def get_autotuner(self, climate_id: str) -> PassiveAutotuneObserver | None:
-        """Get autotuner for a zone."""
-        return self._autotuners.get(climate_id)
+    def get_autotuner(self, climate_id: str, mode: str = "heat") -> PassiveAutotuneObserver | None:
+        """Get autotuner for a zone in specified mode."""
+        if mode == "cool":
+            return self._autotuners_cool.get(climate_id)
+        return self._autotuners_heat.get(climate_id)
 
     def get_thermal_model(self, climate_id: str) -> ThermalObserver | None:
         """Get thermal model for a zone."""
@@ -81,18 +112,40 @@ class ZoneController:
 
     def load_state(self, autotune_data: dict[str, Any], thermal_data: dict[str, Any]) -> None:
         """Restore autotuner and thermal model states from persistent storage."""
-        if autotune_data:
-            for climate_id, tuner in self._autotuners.items():
-                if climate_id in autotune_data:
-                    tuner.load_state(autotune_data[climate_id])
-                    if tuner.state == tuner.STATE_COMPLETED:
-                        self._pids[climate_id].set_pid_param(kp=tuner.kp, ki=tuner.ki, kd=tuner.kd)
-                        _LOGGER.info(
-                            "Restored Smart PID for %s: Kp=%.1f, Ki=%.4f, Kd=%.1f",
-                            climate_id, tuner.kp, tuner.ki, tuner.kd,
-                        )
+        if autotune_data and isinstance(autotune_data, dict):
+            # Check for dual-track seasonal format {"heat": {...}, "cool": {...}} vs legacy flat dict
+            if "heat" in autotune_data or "cool" in autotune_data:
+                heat_data = autotune_data.get("heat", {})
+                cool_data = autotune_data.get("cool", {})
+            else:
+                heat_data = autotune_data
+                cool_data = {}
 
-        if thermal_data:
+            # Restore heating autotuners
+            if isinstance(heat_data, dict):
+                for climate_id, tuner in self._autotuners_heat.items():
+                    if climate_id in heat_data:
+                        tuner.load_state(heat_data[climate_id])
+                        if tuner.state == tuner.STATE_COMPLETED:
+                            self._pids_heat[climate_id].set_pid_param(kp=tuner.kp, ki=tuner.ki, kd=tuner.kd)
+                            _LOGGER.info(
+                                "Restored Smart Heating PID for %s: Kp=%.1f, Ki=%.4f, Kd=%.1f",
+                                climate_id, tuner.kp, tuner.ki, tuner.kd,
+                            )
+
+            # Restore cooling autotuners
+            if isinstance(cool_data, dict):
+                for climate_id, tuner in self._autotuners_cool.items():
+                    if climate_id in cool_data:
+                        tuner.load_state(cool_data[climate_id])
+                        if tuner.state == tuner.STATE_COMPLETED:
+                            self._pids_cool[climate_id].set_pid_param(kp=tuner.kp, ki=tuner.ki, kd=tuner.kd)
+                            _LOGGER.info(
+                                "Restored Smart Cooling PID for %s: Kp=%.1f, Ki=%.4f, Kd=%.1f",
+                                climate_id, tuner.kp, tuner.ki, tuner.kd,
+                            )
+
+        if thermal_data and isinstance(thermal_data, dict):
             for climate_id, model in self._thermal_models.items():
                 if climate_id in thermal_data:
                     model.load_state(thermal_data[climate_id])
@@ -104,7 +157,7 @@ class ZoneController:
     async def async_save_autotuner_states(self) -> None:
         """Save autotuner learning progress to storage."""
         if hasattr(self.coordinator, "storage"):
-            await self.coordinator.storage.async_save_autotuner_states(self._autotuners)
+            await self.coordinator.storage.async_save_autotuner_states(self._autotuners_heat, self._autotuners_cool)
 
     async def async_save_thermal_states(self) -> None:
         """Save thermal model learning progress to storage."""
@@ -112,7 +165,7 @@ class ZoneController:
             await self.coordinator.storage.async_save_thermal_states(self._thermal_models)
 
     async def async_update_zone(self, entity_id: str, new_state: Any) -> float:
-        """Calculate and update PID demand, autotuner and thermal model for a zone."""
+        """Calculate and update PID demand, autotuner and thermal model for a zone in HEAT or COOL mode."""
         current_temp = new_state.attributes.get("current_temperature")
         target_temp = new_state.attributes.get("temperature")
 
@@ -127,9 +180,9 @@ class ZoneController:
             self.coordinator.demand_aggregator.set_zone_demand(entity_id, 0.0)
             return 0.0
 
-        if entity_id not in self._thermal_models or entity_id not in self._autotuners or entity_id not in self._pids:
+        if entity_id not in self._thermal_models or entity_id not in self._pids_heat:
             _LOGGER.warning(
-                "Unknown zone entity '%s' not registered in thermal models, autotuners, or PIDs. Unable to calculate demand.",
+                "Unknown zone entity '%s' not registered in thermal models or PIDs. Unable to calculate demand.",
                 entity_id,
             )
             return 0.0
@@ -140,7 +193,6 @@ class ZoneController:
             self._last_seen_temps[entity_id] = current_temp
             sensor_fresh = True
         else:
-            # Numeric temperature unchanged: check actual report freshness
             zone_conf = next(
                 (z for z in self.zones if (z.get("climate_id") == entity_id or make_zone_entity_id(z.get(CONF_ZONE_NAME, "")) == entity_id)),
                 None,
@@ -172,25 +224,29 @@ class ZoneController:
                     sensor_fresh = True
 
         if sensor_fresh:
-            self._pids[entity_id].update_sensor_timestamp()
+            self._pids_heat[entity_id].update_sensor_timestamp()
+            self._pids_cool[entity_id].update_sensor_timestamp()
 
         # Check mode (don't calculate if off/bypass)
         hvac_mode = new_state.state
         zone_mode = self.coordinator.zone_manager.get_zone_mode(entity_id)
 
-        if hvac_mode == HVAC_MODE_HEAT and zone_mode != ZONE_MODE_BYPASS:
+        demand = 0.0
+
+        if zone_mode == ZONE_MODE_BYPASS or hvac_mode not in (HVAC_MODE_HEAT, HVAC_MODE_COOL):
+            demand = 0.0
+        elif hvac_mode == HVAC_MODE_HEAT:
             is_faulty = (
                 self.coordinator.plant_diagnostics.has_critical_sensor_fault(entity_id)
                 if hasattr(self.coordinator, "plant_diagnostics")
                 else False
             )
             if is_faulty:
-                demand = 0.0
                 _LOGGER.warning(
                     "Zone %s: Heating demand forced to 0%% due to critical sensor fault/low battery",
                     entity_id,
                 )
-                self.coordinator.demand_aggregator.set_zone_demand(entity_id, demand)
+                self.coordinator.demand_aggregator.set_zone_demand(entity_id, 0.0)
                 return 0.0
 
             is_dhw = bool(getattr(self.coordinator, "is_dhw_active", False))
@@ -198,7 +254,7 @@ class ZoneController:
                 _LOGGER.info(
                     "Domestic Hot Water (DHW) production ended: resetting PID integrals, dt and timestamps for all zones."
                 )
-                for p in self._pids.values():
+                for p in self._pids_heat.values():
                     p.clear_samples()
             self._was_dhw_active = is_dhw
 
@@ -207,19 +263,46 @@ class ZoneController:
                     "Zone %s: PID frozen, boiler is currently producing Domestic Hot Water (DHW Active).",
                     entity_id,
                 )
-                if entity_id in self._pids:
-                    self._pids[entity_id].clear_samples()
+                if entity_id in self._pids_heat:
+                    self._pids_heat[entity_id].clear_samples()
                 return self.coordinator.demand_aggregator.get_zone_demand(entity_id)
 
             # Smart Stop: Calculate Effective Target based on learned Inertia
             thermal_model = self._thermal_models[entity_id]
-            effective_target = target_temp
-            if thermal_model.thermal_inertia > 0.05:
-                effective_target = target_temp - thermal_model.thermal_inertia
-                # Limit to avoid lowering it too much if inertia is crazy high
-                effective_target = max(target_temp - 1.0, effective_target)
+            target = target_temp
+            c = self.coordinator
+            is_solar_surplus = (
+                getattr(c, "solar_surplus", False) is True
+                or (
+                    hasattr(c, "energy_manager")
+                    and c.energy_manager is not None
+                    and callable(getattr(c.energy_manager, "is_solar_surplus", None))
+                    and getattr(c.energy_manager, "is_solar_surplus")() is True
+                )
+            )
+            energy_mgmt = (
+                getattr(c, "enable_energy_management", False) is True
+                or getattr(c, "energy_management_enabled", False) is True
+            )
+            if is_solar_surplus and energy_mgmt:
+                raw_offset = getattr(c, "solar_overheat_offset", None)
+                if not isinstance(raw_offset, (int, float)) or isinstance(raw_offset, bool):
+                    if hasattr(c, "energy_manager") and c.energy_manager is not None:
+                        raw_offset = getattr(c.energy_manager, "solar_overheat_offset", None)
+                solar_offset = (
+                    float(raw_offset)
+                    if isinstance(raw_offset, (int, float)) and not isinstance(raw_offset, bool)
+                    else 0.0
+                )
+                if getattr(c, "enable_heat_pump", False) is True:
+                    target += solar_offset
 
-            tuner = self._autotuners[entity_id]
+            effective_target = target
+            if thermal_model.thermal_inertia > 0.05:
+                effective_target = target - thermal_model.thermal_inertia
+                effective_target = max(target - 1.0, effective_target)
+
+            tuner = self._autotuners_heat[entity_id]
 
             if tuner.state != tuner.STATE_COMPLETED:
                 # Hysteresis Fallback Mode (Learning phase)
@@ -230,10 +313,10 @@ class ZoneController:
                 elif current_temp >= effective_target + tolerance:
                     demand = 0.0
                 else:
-                    demand = current_demand  # Keep previous demand inside the hysteresis band
+                    demand = current_demand
             else:
                 # Smart PID Mode
-                demand = self._pids[entity_id].calc(current_temp, effective_target)
+                demand = self._pids_heat[entity_id].calc(current_temp, effective_target)
 
                 # Apply Weather Compensation (Feed Forward)
                 try:
@@ -257,17 +340,12 @@ class ZoneController:
                                 outdoor_temp = float(weather_state.state)
 
                             if outdoor_temp is not None:
-                                # Adaptive Curve Calculation (SAT Math)
                                 curve_val = thermal_model.get_weather_multiplier(manual_base_curve=curve_val)
-
-                                # (Target - OutdoorTemp) * Ke
                                 delta_t = effective_target - outdoor_temp
                                 if delta_t > 0.0 and curve_val > 0.0:
                                     ff_demand = delta_t * curve_val
-                                    # Clamp the weather bonus to a max of +40% to avoid it dominating the PID
                                     ff_demand = min(40.0, ff_demand)
                                     
-                                    # Scale down FF as we approach or exceed effective_target to prevent ghost heating
                                     overheat = current_temp - effective_target
                                     if overheat >= 0:
                                         ff_demand = 0.0
@@ -276,49 +354,180 @@ class ZoneController:
                                         ff_demand *= ff_factor
                                         
                                     demand = min(100.0, max(0.0, demand + ff_demand))
-                                    _LOGGER.debug(
-                                        "[%s] SAT Weather Comp: Target=%.1f, Outdoor=%.1f, Ke=%.2f, FF=+%.1f%%, Final=%.1f%%",
-                                        entity_id,
-                                        effective_target,
-                                        outdoor_temp,
-                                        curve_val,
-                                        ff_demand,
-                                        demand,
-                                    )
                         except (ValueError, TypeError):
                             pass
-        else:
-            demand = 0.0
+
+        elif hvac_mode == HVAC_MODE_COOL:
+            is_faulty = (
+                self.coordinator.plant_diagnostics.has_critical_sensor_fault(entity_id)
+                if hasattr(self.coordinator, "plant_diagnostics")
+                else False
+            )
+            if is_faulty:
+                _LOGGER.warning(
+                    "Zone %s: Cooling demand forced to 0%% due to critical sensor fault/low battery",
+                    entity_id,
+                )
+                self.coordinator.demand_aggregator.set_zone_demand(entity_id, 0.0)
+                return 0.0
+
+            target = target_temp
+            c = self.coordinator
+            is_solar_surplus = (
+                getattr(c, "solar_surplus", False) is True
+                or (
+                    hasattr(c, "energy_manager")
+                    and c.energy_manager is not None
+                    and callable(getattr(c.energy_manager, "is_solar_surplus", None))
+                    and getattr(c.energy_manager, "is_solar_surplus")() is True
+                )
+            )
+            energy_mgmt = (
+                getattr(c, "enable_energy_management", False) is True
+                or getattr(c, "energy_management_enabled", False) is True
+            )
+            if is_solar_surplus and energy_mgmt:
+                raw_offset = getattr(c, "solar_overheat_offset", None)
+                if not isinstance(raw_offset, (int, float)) or isinstance(raw_offset, bool):
+                    if hasattr(c, "energy_manager") and c.energy_manager is not None:
+                        raw_offset = getattr(c.energy_manager, "solar_overheat_offset", None)
+                solar_offset = (
+                    float(raw_offset)
+                    if isinstance(raw_offset, (int, float)) and not isinstance(raw_offset, bool)
+                    else 0.0
+                )
+                if (
+                    getattr(c, "enable_heat_pump", False) is True
+                    and getattr(c, "heat_pump_cooling", False) is True
+                ):
+                    target -= solar_offset
+
+            effective_target = target
+            tuner = self._autotuners_cool[entity_id]
+
+            if tuner.state != tuner.STATE_COMPLETED:
+                # Hysteresis Cooling Fallback Mode (Learning phase)
+                tolerance = 0.3
+                current_demand = self.coordinator.demand_aggregator.get_zone_demand(entity_id)
+                if current_temp >= effective_target + tolerance:
+                    demand = 100.0
+                elif current_temp <= effective_target - tolerance:
+                    demand = 0.0
+                else:
+                    demand = current_demand
+            else:
+                # Smart PID Cooling Mode
+                demand = self._pids_cool[entity_id].calc(current_temp, effective_target)
+
+        # Evaluate and update secondary room split unit
+        split_mgr = getattr(self.coordinator, 'split_manager', None)
+        if split_mgr is not None and hasattr(split_mgr, 'has_split') and split_mgr.has_split(entity_id) is True:
+            solar_surplus = False
+            energy_mgr = getattr(self.coordinator, 'energy_manager', None)
+            if energy_mgr is not None:
+                surplus_fn = getattr(energy_mgr, 'is_solar_surplus', None)
+                if callable(surplus_fn):
+                    solar_surplus = bool(surplus_fn())
+                elif surplus_fn is True:
+                    solar_surplus = True
+            
+            update_fn = getattr(split_mgr, 'async_update_zone_split', None)
+            if callable(update_fn):
+                coro = update_fn(
+                    climate_id=entity_id,
+                    current_temp=current_temp,
+                    target_temp=target_temp,
+                    zone_hvac_mode=hvac_mode,
+                    solar_surplus=solar_surplus,
+                )
+                if inspect.iscoroutine(coro):
+                    await coro
+
+            # Decouple hydronic demand if split is carrying the load in solar/electric mode
+            if hasattr(split_mgr, 'should_suppress_hydronic_demand') and split_mgr.should_suppress_hydronic_demand(entity_id) is True:
+                demand = 0.0
+                _LOGGER.debug(
+                    '[%s] Hydronic demand suppressed to 0.0%% (split is actively conditioning zone)',
+                    entity_id,
+                )
+
+        # Electric Only priority: blocks hydronic demand only if NO central heat pump exists
+        if hvac_mode == HVAC_MODE_HEAT:
+            energy_mgr = getattr(self.coordinator, 'energy_manager', None)
+            if energy_mgr is not None and getattr(energy_mgr, 'get_heat_source_priority', None):
+                if energy_mgr.get_heat_source_priority() == SOURCE_PRIORITY_ELECTRIC_ONLY:
+                    hp_enabled = bool(getattr(self.coordinator, "enable_heat_pump", False))
+                    if not hp_enabled:
+                        demand = 0.0
+                        _LOGGER.debug(
+                            '[%s] Hydronic boiler demand forced to 0.0%% (Heat source priority is electric_only and no central heat pump)',
+                            entity_id,
+                        )
+
+        # Cooling validation: if no central Heat Pump with cooling enabled and no split, hydronic cooling demand is 0
+        if hvac_mode == HVAC_MODE_COOL:
+            hp_cooling = bool(
+                getattr(self.coordinator, "enable_heat_pump", False)
+                and getattr(self.coordinator, "heat_pump_cooling", True)
+            )
+            has_split = split_mgr and split_mgr.has_split(entity_id)
+            if not hp_cooling and not has_split:
+                demand = 0.0
 
         self.coordinator.demand_aggregator.set_zone_demand(entity_id, demand)
 
-        tuner = self._autotuners[entity_id]
-        if tuner.state != tuner.STATE_COMPLETED:
-            tuner.update(current_temp, demand > 0)
-            # Check if this update just completed the learning phase
-            if tuner.state == tuner.STATE_COMPLETED:
-                self._pids[entity_id].set_pid_param(kp=tuner.kp, ki=tuner.ki, kd=tuner.kd)
-                _LOGGER.info(
-                    "Autotuning just completed for %s! Smart PID activated. Kp=%.1f, Ki=%.4f, Kd=%.1f",
-                    entity_id,
-                    tuner.kp,
-                    tuner.ki,
-                    tuner.kd,
-                )
-                await self.async_save_autotuner_states()
+        # Learning update for the active seasonal track
+        if hvac_mode == HVAC_MODE_HEAT:
+            tuner = self._autotuners_heat[entity_id]
+            if tuner.state != tuner.STATE_COMPLETED:
+                prev_cycles = len(tuner.completed_cycles)
+                tuner.update(current_temp, demand > 0)
+                if len(tuner.completed_cycles) > prev_cycles or tuner.state == tuner.STATE_COMPLETED:
+                    if tuner.state == tuner.STATE_COMPLETED:
+                        self._pids_heat[entity_id].set_pid_param(kp=tuner.kp, ki=tuner.ki, kd=tuner.kd)
+                        _LOGGER.info(
+                            "Heating Autotuning completed for %s! Smart PID activated. Kp=%.1f, Ki=%.4f, Kd=%.1f",
+                            entity_id, tuner.kp, tuner.ki, tuner.kd,
+                        )
+                    else:
+                        _LOGGER.info(
+                            "Heating Autotuning cycle %d/%d recorded for %s. Saving progress.",
+                            len(tuner.completed_cycles), tuner.required_cycles, entity_id,
+                        )
+                    await self.async_save_autotuner_states()
+        elif hvac_mode == HVAC_MODE_COOL:
+            tuner = self._autotuners_cool[entity_id]
+            if tuner.state != tuner.STATE_COMPLETED:
+                prev_cycles = len(tuner.completed_cycles)
+                tuner.update(current_temp, demand > 0)
+                if len(tuner.completed_cycles) > prev_cycles or tuner.state == tuner.STATE_COMPLETED:
+                    if tuner.state == tuner.STATE_COMPLETED:
+                        self._pids_cool[entity_id].set_pid_param(kp=tuner.kp, ki=tuner.ki, kd=tuner.kd)
+                        _LOGGER.info(
+                            "Cooling Autotuning completed for %s! Smart PID activated. Kp=%.1f, Ki=%.4f, Kd=%.1f",
+                            entity_id, tuner.kp, tuner.ki, tuner.kd,
+                        )
+                    else:
+                        _LOGGER.info(
+                            "Cooling Autotuning cycle %d/%d recorded for %s. Saving progress.",
+                            len(tuner.completed_cycles), tuner.required_cycles, entity_id,
+                        )
+                    await self.async_save_autotuner_states()
 
         # Feed Thermal Observer
-        self._thermal_models[entity_id].update(current_temp, demand > 0)
-        # Debounced save: avoid writing to disk on every state change (SD card wear)
-        if hasattr(self.coordinator, "storage"):
-            self.coordinator.debounced_save_thermal_states(self._thermal_models)
+        if hvac_mode != HVAC_MODE_COOL and hvac_mode != "cool":
+            self._thermal_models[entity_id].update(current_temp, demand > 0, hvac_mode=hvac_mode)
+            if hasattr(self.coordinator, "storage"):
+                self.coordinator.debounced_save_thermal_states(self._thermal_models)
 
+        active_tuner = self._autotuners_cool[entity_id] if hvac_mode == HVAC_MODE_COOL else self._autotuners_heat[entity_id]
         _LOGGER.debug(
-            "Zone '%s' Demand updated: %.1f%% (Temp: %s, Target: %s, Mode: %s)",
+            "Zone '%s' Demand updated: %.1f%% (Temp: %s, Target: %s, Mode: %s, Track: %s)",
             entity_id,
             demand,
             current_temp,
             target_temp,
-            "PID" if tuner.state == tuner.STATE_COMPLETED else "Hysteresis",
+            "PID" if active_tuner.state == active_tuner.STATE_COMPLETED else "Hysteresis",
+            hvac_mode,
         )
         return demand

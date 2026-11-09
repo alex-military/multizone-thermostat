@@ -395,29 +395,41 @@ def evaluate_zone_anomalies(
             state["anomaly_details"] = ANOMALY_LABELS[ANOMALY_STALE_SENSOR]
             return ANOMALY_STALE_SENSOR, state["anomaly_details"]
 
+        # Check master operation mode
+        master_mode = str(getattr(coordinator, "master_hvac_mode", "heat")).lower()
+        is_cool = (master_mode == "cool")
+
         # Update last heating time
-        if boiler_on and demand > 0.0:
+        if not is_cool and boiler_on and demand > 0.0:
             state["last_heating_time"] = now_mono
 
         # 2. Overshoot Check: Only if heating was active recently (within the last 2 ore)
         # If the heating wasn't active recently, warm room temperature is natural ambient/solar heat.
         heated_recently = state.get("last_heating_time") is not None and (now_mono - state.get("last_heating_time", 0)) < 7200
-        if heated_recently and target_temp is not None and current_temp > (float(target_temp) + 1.5):
+        if not is_cool and heated_recently and target_temp is not None and current_temp > (float(target_temp) + 1.5):
             state["active_anomaly"] = ANOMALY_OVERSHOOT
             state["anomaly_details"] = f"Current temperature ({current_temp}°C) exceeds target ({target_temp}°C) by >1.5°C from residual heat"
             return ANOMALY_OVERSHOOT, state["anomaly_details"]
 
-        # 3. Stuck Closed Valve: Demand == 100% for > 75 min, but temperature did not rise >= 0.2°C
+        # 3. Stuck Closed Valve: Demand == 100% for > 75 min, but temperature did not rise/fall >= 0.2°C
         if demand >= 99.0 and boiler_on:
             if state.get("high_demand_start_time") is None:
                 state["high_demand_start_time"] = now_mono
                 state["high_demand_start_temp"] = current_temp
             elif (now_mono - (state.get("high_demand_start_time") or 0)) > 4500:  # 75 minutes
                 start_t = state.get("high_demand_start_temp")
-                if start_t is not None and (current_temp - start_t) < 0.2:
-                    state["active_anomaly"] = ANOMALY_VALVE_STUCK_CLOSED
-                    state["anomaly_details"] = f"Heating active at 100% for >75 min but temperature is not rising ({start_t}°C → {current_temp}°C)"
-                    return ANOMALY_VALVE_STUCK_CLOSED, state["anomaly_details"]
+                if start_t is not None:
+                    if is_cool:
+                        # In cool mode, temperature must fall. Do not flag if temperature is falling!
+                        if (start_t - current_temp) < 0.2:
+                            state["active_anomaly"] = ANOMALY_VALVE_STUCK_CLOSED
+                            state["anomaly_details"] = f"Cooling active at 100% for >75 min but temperature is not falling ({start_t}°C → {current_temp}°C)"
+                            return ANOMALY_VALVE_STUCK_CLOSED, state["anomaly_details"]
+                    else:
+                        if (current_temp - start_t) < 0.2:
+                            state["active_anomaly"] = ANOMALY_VALVE_STUCK_CLOSED
+                            state["anomaly_details"] = f"Heating active at 100% for >75 min but temperature is not rising ({start_t}°C → {current_temp}°C)"
+                            return ANOMALY_VALVE_STUCK_CLOSED, state["anomaly_details"]
         elif demand < 80.0:
             # Reset stuck-closed tracker if demand dropped below 80%
             state["high_demand_start_time"] = None
@@ -427,7 +439,7 @@ def evaluate_zone_anomalies(
         allow_passive_heat = coordinator.zone_manager.is_passive_heat_allowed(climate_id)
 
         # 4. Ghost Heating / Stuck Open: Zone is OFF or demand is 0, but room temp rose > 0.8°C while boiler running
-        if demand <= 0.0 and boiler_on:
+        if not is_cool and demand <= 0.0 and boiler_on:
             if allow_passive_heat:
                 # Passive heat allowed (fan coil without shut-off valve, open mezzanine, etc.)
                 state["ghost_heat_start_temp"] = None

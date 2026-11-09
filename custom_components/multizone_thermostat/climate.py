@@ -1,6 +1,8 @@
 """Climate platform for Multizone Thermostat: Hybrid Master Virtual Thermostats."""
 from __future__ import annotations
 
+import inspect
+
 import asyncio
 from datetime import timedelta
 import logging
@@ -40,6 +42,11 @@ from .const import (
     CONF_ZONE_TEMP_SENSOR,
     CONF_ZONE_TARGET_TEMP,
     CONF_ZONE_CALIBRATIONS,
+    CONF_ZONE_SPLIT_CLIMATE,
+    CONF_ZONE_SPLIT_ROLE,
+    SPLIT_ROLE_HEAT_COOL,
+    SPLIT_ROLE_COOLING_ONLY,
+    DEFAULT_SPLIT_ROLE,
     CONF_ZONE_ALLOW_PASSIVE_HEAT,
     CONF_ZONE_SENSOR_TIMEOUT,
     DEFAULT_SENSOR_TIMEOUT_MIN,
@@ -50,6 +57,7 @@ from .const import (
     DOMAIN,
     make_zone_entity_id,
     make_via_device_kwargs,
+    make_zone_device_info,
 )
 from .sync_manager import ZoneSyncManager
 from .state_restorer import ZoneStateRestorer
@@ -85,7 +93,37 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
     """A Hybrid Master Virtual Thermostat that controls sub-slave TRVs and Switches."""
 
     _attr_has_entity_name = False
-    _attr_hvac_modes = [HVACMode.HEAT, HVACMode.OFF]
+    @property
+    def can_cool(self) -> bool:
+        """Return True if this zone has cooling capabilities."""
+        if hasattr(self, "_coordinator") and hasattr(self._coordinator, "can_zone_cool"):
+            return bool(self._coordinator.can_zone_cool(self.entity_id))
+        return False
+
+    @property
+    def hvac_modes(self) -> list[HVACMode]:
+        """Return supported HVAC modes based on zone split configuration and central plant."""
+        zone_conf = getattr(self, "_zone_conf", None) or getattr(self, "_zone_data", {})
+        if zone_conf:
+            split_entity = zone_conf.get(CONF_ZONE_SPLIT_CLIMATE)
+            if split_entity and str(split_entity).lower() != "none":
+                role = zone_conf.get(CONF_ZONE_SPLIT_ROLE, DEFAULT_SPLIT_ROLE)
+                if role == SPLIT_ROLE_COOLING_ONLY:
+                    climates = zone_conf.get("climates") or zone_conf.get(CONF_ZONE_CLIMATES) or getattr(self, "_climates", None)
+                    switches = zone_conf.get("switches") or zone_conf.get(CONF_ZONE_SWITCHES) or getattr(self, "_switches", None)
+                    valves = zone_conf.get("valves") or zone_conf.get(CONF_ZONE_VALVES) or getattr(self, "_valves", None)
+                    has_hydronic = bool(climates or switches or valves)
+                    central_heat_enabled = (
+                        bool(getattr(self._coordinator, "enable_gas_heater", True))
+                        or bool(getattr(self._coordinator, "enable_heat_pump", False))
+                    )
+                    if not has_hydronic and not central_heat_enabled:
+                        return [HVACMode.COOL, HVACMode.OFF]
+                elif role == SPLIT_ROLE_HEAT_COOL:
+                    return [HVACMode.HEAT, HVACMode.COOL, HVACMode.OFF]
+        if self.can_cool:
+            return [HVACMode.HEAT, HVACMode.COOL, HVACMode.OFF]
+        return [HVACMode.HEAT, HVACMode.OFF]
     _attr_supported_features = ClimateEntityFeature.TARGET_TEMPERATURE
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_min_temp = 5.0
@@ -100,6 +138,8 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
     ) -> None:
         """Initialize the virtual thermostat."""
         self.hass = hass
+        self._zone_data = zone_data
+        self._zone_conf = zone_data
         self._name = zone_data[CONF_ZONE_NAME]
         self._attr_name = self._name
         self._temp_sensor = zone_data.get(CONF_ZONE_TEMP_SENSOR)
@@ -127,13 +167,7 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         self._attr_unique_id = f"{DOMAIN}_{entry_id}_zone_{safe_name}"
         
         master_dev_id = getattr(self._coordinator, "master_device_id", None)
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, f"{entry_id}_zones")},
-            name="Heating Zones",
-            manufacturer="Multizone Thermostat",
-            model="Hybrid Zone Controller",
-            **make_via_device_kwargs(entry_id, master_dev_id),
-        )
+        self._attr_device_info = make_zone_device_info(entry_id, self._name, master_dev_id)
 
         self.entity_id = vt_entity_id
         self._unsub_listeners: list = []
@@ -164,9 +198,34 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         if self._hvac_mode == HVACMode.OFF:
             return HVACAction.OFF
             
-        demand = self._coordinator.get_zone_demand(self.entity_id)
-        if demand > 0:
+        if self._hvac_mode == HVACMode.COOL:
+            master_on = self._coordinator.get_master_state() if hasattr(self._coordinator, "get_master_state") else True
+            if not master_on or not self.can_cool:
+                return HVACAction.IDLE
+            split_mgr = getattr(self._coordinator, "split_manager", None)
+            if split_mgr and (split_mgr.is_split_active(self.entity_id) or split_mgr.is_local_manual_on(self.entity_id)):
+                return HVACAction.COOLING
+            if self._current_temperature is not None and self.target_temperature is not None:
+                if self._current_temperature > self.target_temperature + 0.2:
+                    return HVACAction.COOLING
+            return HVACAction.IDLE
+
+        # Heating mode
+        split_mgr = getattr(self._coordinator, "split_manager", None)
+        split_is_active = (
+            (split_mgr.is_split_active(self.entity_id) or split_mgr.is_local_manual_on(self.entity_id))
+            if (split_mgr and hasattr(split_mgr, "is_split_active"))
+            else False
+        )
+        if split_is_active:
             return HVACAction.HEATING
+
+        master_on = self._coordinator.get_master_state() if hasattr(self._coordinator, "get_master_state") else True
+        if master_on:
+            demand = self._coordinator.get_zone_demand(self.entity_id)
+            if demand > 0:
+                return HVACAction.HEATING
+
         return HVACAction.IDLE
 
     @property
@@ -207,6 +266,8 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             "allow_passive_heat": self._coordinator.zone_manager.is_passive_heat_allowed(self.entity_id),
             "safety_fallback_active": self._safety_fallback_active,
             "sensor_timeout_min": self._sensor_timeout_min,
+            "can_cool": self.can_cool,
+            "master_hvac_mode": getattr(self._coordinator, "master_hvac_mode", "heat"),
         }
         if hasattr(self._coordinator, "plant_diagnostics"):
             bat = self._coordinator.plant_diagnostics.get_zone_battery_level(self.entity_id)
@@ -225,18 +286,79 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
                 hr = sched_manager._get_zone_heating_rate(self.entity_id)
                 if isinstance(hr, (int, float)):
                     attrs["heating_rate"] = hr
+
+        if hasattr(self._coordinator, "get_zone_cooling_rate"):
+            attrs["cooling_rate"] = self._coordinator.get_zone_cooling_rate(self.entity_id)
+        elif sched_manager and hasattr(sched_manager, "_get_zone_cooling_rate"):
+            cr = sched_manager._get_zone_cooling_rate(self.entity_id)
+            if isinstance(cr, (int, float)):
+                attrs["cooling_rate"] = cr
+
+        split_is_heating = False
+        hydronic_suppressed = False
+        if hasattr(self._coordinator, "split_manager") and self._coordinator.split_manager.has_split(self.entity_id):
+            split_info = self._coordinator.split_manager.get_split_info(self.entity_id) or {}
+            attrs["split_climate_entity"] = split_info.get("split_entity_id")
+            split_is_active = bool(self._coordinator.split_manager.is_split_active(self.entity_id))
+            attrs["split_active"] = split_is_active
+            attrs["split_manual_on"] = bool(self._coordinator.split_manager.is_local_manual_on(self.entity_id))
+            split_is_heating = (self._hvac_mode == HVACMode.HEAT and split_is_active)
+            split_is_cooling = (self._hvac_mode == HVACMode.COOL and split_is_active)
+            attrs["split_cooling"] = split_is_cooling
+            attrs["split_quick_boost_active"] = bool(self._coordinator.split_manager.is_quick_boost_active(self.entity_id))
+            hydronic_suppressed = bool(self._coordinator.split_manager.should_suppress_hydronic_demand(self.entity_id))
+            attrs["split_hydronic_suppressed"] = hydronic_suppressed
+
+        # Determine real-time active heating source: gas, electric, dual, or none
+        master_on = bool(self._coordinator.get_master_state()) if hasattr(self._coordinator, "get_master_state") else True
+        split_mgr = getattr(self._coordinator, "split_manager", None)
+        is_local_manual = bool(split_mgr.is_local_manual_on(self.entity_id)) if split_mgr else False
+
+        is_heating = (self._hvac_mode == HVACMode.HEAT) and (self.hvac_action == HVACAction.HEATING or split_is_heating or is_local_manual)
+        if not is_heating:
+            attrs["active_heating_source"] = "none"
+        else:
+            gas_enabled = getattr(self._coordinator, "enable_gas_heater", True)
+            hp_enabled = getattr(self._coordinator, "enable_heat_pump", False)
+            hydronic_is_heating = master_on and (self.hvac_action == HVACAction.HEATING and not hydronic_suppressed)
+            central_is_electric = hp_enabled and not gas_enabled
+
+            if split_is_heating and hydronic_is_heating:
+                attrs["active_heating_source"] = "electric" if central_is_electric else "dual"
+            elif split_is_heating or is_local_manual:
+                attrs["active_heating_source"] = "electric"
+            elif hydronic_is_heating:
+                attrs["active_heating_source"] = "electric" if central_is_electric else "gas"
+            else:
+                attrs["active_heating_source"] = "electric" if is_local_manual else "none"
+
         return attrs
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         """Set HVAC mode."""
         self._hvac_mode = hvac_mode
+        master_on = self._coordinator.get_master_state() if hasattr(self._coordinator, "get_master_state") else True
+        split_mgr = getattr(self._coordinator, "split_manager", None)
+
         if hvac_mode == HVACMode.OFF:
             self._sync_manager._local_pwm_state = False
             self._coordinator.set_zone_demand(self.entity_id, 0.0)
+            if split_mgr and hasattr(split_mgr, "set_local_manual_on"):
+                split_mgr.set_local_manual_on(self.entity_id, False)
+        else:
+            if not master_on and split_mgr and hasattr(split_mgr, "has_split") and split_mgr.has_split(self.entity_id):
+                split_mgr.set_local_manual_on(self.entity_id, True)
+
         self.async_write_ha_state()
         await self._trigger_trv_sync()
         await self._sync_manager.async_sync_switches()
         await self._sync_manager.async_sync_proportional_valves(self._hvac_mode)
+        if hasattr(self._coordinator, "zone_controller") and self._coordinator.zone_controller:
+            st = self.hass.states.get(self.entity_id) if hasattr(self, "hass") and self.hass and hasattr(self.hass, "states") else None
+            if st is not None:
+                coro = self._coordinator.zone_controller.async_update_zone(self.entity_id, st)
+                if inspect.iscoroutine(coro):
+                    await coro
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
         """Set target temperature."""
@@ -257,13 +379,27 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             sched_manager.record_manual_override(self.entity_id, temperature)
             if hasattr(self.hass, "async_create_task"):
                 self.hass.async_create_task(sched_manager.async_save_to_storage())
-        else:
-            current_preset = self._coordinator.get_global_preset()
-            if current_preset and current_preset != "none":
-                self._coordinator.zone_manager.update_preset_temperature(current_preset, self.entity_id, temperature)
+
+        current_preset = self._coordinator.get_global_preset()
+        if current_preset and current_preset != "none":
+            mode_val = str(self._hvac_mode.value if hasattr(self._hvac_mode, "value") else self._hvac_mode)
+            if mode_val == "cool":
+                self._coordinator.zone_manager.update_preset_temperature(
+                    current_preset, self.entity_id, temperature, hvac_mode="cool"
+                )
+            else:
+                self._coordinator.zone_manager.update_preset_temperature(
+                    current_preset, self.entity_id, temperature
+                )
 
         self.async_write_ha_state()
         await self._trigger_trv_sync()
+        if hasattr(self._coordinator, "zone_controller") and self._coordinator.zone_controller:
+            st = self.hass.states.get(self.entity_id) if hasattr(self, "hass") and self.hass and hasattr(self.hass, "states") else None
+            if st is not None:
+                coro = self._coordinator.zone_controller.async_update_zone(self.entity_id, st)
+                if inspect.iscoroutine(coro):
+                    await coro
 
     async def async_added_to_hass(self) -> None:
         """Run when entity about to be added."""
@@ -453,8 +589,14 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
                     and self.entity_id in self._coordinator.calendar_manager.temp_overrides
                 ):
                     self._coordinator.calendar_manager.temp_overrides[self.entity_id] = self._target_temperature
-                current_preset = self._coordinator.get_global_preset()
-                if current_preset and current_preset != "none":
+            current_preset = self._coordinator.get_global_preset()
+            if current_preset and current_preset != "none":
+                mode_val = str(self._hvac_mode.value if hasattr(self._hvac_mode, "value") else self._hvac_mode)
+                if mode_val == "cool":
+                    self._coordinator.zone_manager.update_preset_temperature(
+                        current_preset, self.entity_id, self._target_temperature, hvac_mode="cool"
+                    )
+                else:
                     self._coordinator.zone_manager.update_preset_temperature(
                         current_preset, self.entity_id, self._target_temperature
                     )

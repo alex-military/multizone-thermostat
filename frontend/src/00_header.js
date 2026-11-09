@@ -56,4 +56,22 @@ window.customCards.push({
   description: "Navigation button card displaying active schedule profile and linking to the Scheduler view.",
   preview: true,
 });
+window.customCards.push({
+  type: "multizone-thermostat-health-summary-card",
+  name: "Multizone Thermostat Health Summary Button",
+  description: "Navigation button card displaying system health/anomaly status and linking to Diagnostics view.",
+  preview: true,
+});
+window.customCards.push({
+  type: "multizone-thermostat-nav-card",
+  name: "Multizone Thermostat Navigation Card",
+  description: "Navigation button card with icon, title, subtitle and badge linking to views.",
+  preview: true,
+});
+window.customCards.push({
+  type: "multizone-thermostat-responsive-grid",
+  name: "Multizone Thermostat Responsive Grid",
+  description: "Responsive auto-fitting grid container for multizone cards.",
+  preview: true,
+});
 

@@ -23,6 +23,13 @@ from .const import (
     KEY_DEMAND_STRATEGY,
     make_zone_entity_id,
     make_via_device_kwargs,
+    make_zone_device_info,
+    HEAT_SOURCE_PRIORITIES,
+    DEFAULT_HEAT_SOURCE_PRIORITY,
+    MASTER_OPERATION_MODES,
+    DEFAULT_MASTER_OPERATION_MODE,
+    HVAC_MODE_HEAT,
+    HVAC_MODE_COOL,
 )
 from .coordinator import MultizoneCoordinator
 from .demand_aggregator import VALID_DEMAND_STRATEGIES, DEMAND_STRATEGY_MAX
@@ -42,6 +49,8 @@ async def async_setup_entry(
         MultizoneGlobalPresetSelect(coordinator, entry.entry_id),
         MultizoneDemandStrategySelect(coordinator, entry.entry_id),
         MultizoneScheduleProfileSelect(coordinator, entry.entry_id),
+        MultizoneHeatSourcePrioritySelect(coordinator, entry.entry_id),
+        MultizoneMasterOperationModeSelect(coordinator, entry.entry_id),
     ]
     
     for zone in coordinator.zones:
@@ -189,7 +198,7 @@ class MultizoneZoneSelect(RestoreEntity, SelectEntity):
         self._zone_name = zone_name
         self._climate_id = make_zone_entity_id(zone_name)
         self._attr_unique_id = f"{DOMAIN}_{entry_id}_zone_mode_{self._climate_id.replace('.', '_')}"
-        self._attr_name = f"{zone_name} Mode"
+        self._attr_name = "Mode"
         
         self._attr_options = ZONE_MODES
         self._attr_extra_state_attributes = {
@@ -201,13 +210,12 @@ class MultizoneZoneSelect(RestoreEntity, SelectEntity):
     def device_info(self) -> DeviceInfo:
         """Return device info."""
         master_dev_id = getattr(self._coordinator, "master_device_id", None)
-        return DeviceInfo(
-            identifiers={(DOMAIN, f"{self._entry_id}_zone_modes")},
-            name="Zone Modes",
-            manufacturer="Custom Integration",
-            model="Zone Modes",
-            **make_via_device_kwargs(self._entry_id, master_dev_id),
-        )
+        return make_zone_device_info(self._entry_id, self._zone_name, master_dev_id)
+
+    @property
+    def options(self) -> list[str]:
+        """Return available zone modes."""
+        return list(ZONE_MODES)
 
     @property
     def icon(self) -> str:
@@ -259,16 +267,19 @@ class MultizoneZoneSelect(RestoreEntity, SelectEntity):
                 except Exception as ex:
                     _LOGGER.warning("Could not turn off climate %s: %s", self._climate_id, ex)
         else:
-            if self._coordinator.get_master_state() and climate_state and climate_state.state != HVACMode.HEAT:
+            is_cool_master = getattr(self._coordinator, "master_hvac_mode", HVAC_MODE_HEAT) == HVAC_MODE_COOL
+            can_cool_zone = hasattr(self._coordinator, "can_zone_cool") and self._coordinator.can_zone_cool(self._climate_id)
+            target_hvac = HVACMode.COOL if (is_cool_master and can_cool_zone) else (HVACMode.OFF if is_cool_master else HVACMode.HEAT)
+            if self._coordinator.get_master_state() and climate_state and climate_state.state != target_hvac:
                 try:
                     await self.hass.services.async_call(
                         "climate",
                         "set_hvac_mode",
-                        {"entity_id": self._climate_id, "hvac_mode": HVACMode.HEAT},
+                        {"entity_id": self._climate_id, "hvac_mode": target_hvac},
                         blocking=False,
                     )
                 except Exception as ex:
-                    _LOGGER.warning("Could not turn on climate %s: %s", self._climate_id, ex)
+                    _LOGGER.warning("Could not set climate %s to %s: %s", self._climate_id, target_hvac, ex)
 
     async def async_will_remove_from_hass(self) -> None:
         """Unregister from coordinator on removal."""
@@ -283,7 +294,6 @@ class MultizoneScheduleProfileSelect(RestoreEntity, SelectEntity):
 
     _attr_has_entity_name = True
     _attr_translation_key = "schedule_profile"
-    _attr_name = "Schedule Profile"
     _attr_icon = "mdi:calendar-multiselect"
 
     def __init__(self, coordinator: MultizoneCoordinator, entry_id: str) -> None:
@@ -339,3 +349,115 @@ class MultizoneScheduleProfileSelect(RestoreEntity, SelectEntity):
             if isinstance(reg, dict):
                 reg.pop("schedule_profile", None)
 
+
+
+
+class MultizoneHeatSourcePrioritySelect(RestoreEntity, SelectEntity):
+    """Select entity to arbitrate primary heat source priority between Gas and Electric."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "master_heat_source_priority"
+    _attr_icon = "mdi:swap-horizontal-bold"
+
+    def __init__(self, coordinator: Any, entry_id: str) -> None:
+        """Initialize heat source priority selector."""
+        self._coordinator = coordinator
+        self._entry_id = entry_id
+        self._attr_unique_id = f"{DOMAIN}_{entry_id}_heat_source_priority"
+        self._attr_options = list(HEAT_SOURCE_PRIORITIES)
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device info."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._entry_id)},
+            name="Master Control",
+            manufacturer="Custom Integration",
+            model="Master Control",
+        )
+
+    @property
+    def current_option(self) -> str:
+        """Return current heat source priority."""
+        energy_mgr = getattr(self._coordinator, "energy_manager", None)
+        if energy_mgr is not None:
+            return energy_mgr.get_heat_source_priority()
+        return DEFAULT_HEAT_SOURCE_PRIORITY
+
+    async def async_added_to_hass(self) -> None:
+        """Restore previous state."""
+        await super().async_added_to_hass()
+        last_state = await self.async_get_last_state()
+        if last_state is not None and last_state.state in self.options:
+            energy_mgr = getattr(self._coordinator, "energy_manager", None)
+            if energy_mgr is not None:
+                await energy_mgr.async_set_heat_source_priority(last_state.state)
+
+    async def async_select_option(self, option: str) -> None:
+        """Change heat source priority option."""
+        if option not in self.options:
+            _LOGGER.warning("Invalid heat source priority: %s", option)
+            return
+        energy_mgr = getattr(self._coordinator, "energy_manager", None)
+        if energy_mgr is not None:
+            await energy_mgr.async_set_heat_source_priority(option)
+        self.async_write_ha_state()
+
+
+class MultizoneMasterOperationModeSelect(RestoreEntity, SelectEntity):
+    """Select entity to control Master operation mode (heat vs cool)."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "master_operation_mode"
+
+    def __init__(self, coordinator: Any, entry_id: str) -> None:
+        """Initialize master operation mode selector."""
+        self._coordinator = coordinator
+        self._entry_id = entry_id
+        self._attr_unique_id = f"{DOMAIN}_{entry_id}_master_operation_mode"
+        self._attr_options = list(MASTER_OPERATION_MODES)
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device info."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._entry_id)},
+            name="Master Control",
+            manufacturer="Custom Integration",
+            model="Master Control",
+        )
+
+    @property
+    def icon(self) -> str:
+        """Return icon based on active mode."""
+        if self.current_option == HVAC_MODE_COOL:
+            return "mdi:snowflake"
+        return "mdi:fire"
+
+    @property
+    def current_option(self) -> str:
+        """Return current master operation mode."""
+        return getattr(self._coordinator, "master_hvac_mode", DEFAULT_MASTER_OPERATION_MODE)
+
+    async def async_added_to_hass(self) -> None:
+        """Restore previous state."""
+        await super().async_added_to_hass()
+        last_state = await self.async_get_last_state()
+        if last_state is not None and last_state.state in self.options:
+            await self._coordinator.async_set_master_hvac_mode(last_state.state)
+        self._coordinator.register_select("master_operation_mode", self)
+
+    async def async_select_option(self, option: str) -> None:
+        """Change master operation mode option."""
+        if option not in self.options:
+            _LOGGER.warning("Invalid master operation mode: %s", option)
+            return
+        await self._coordinator.async_set_master_hvac_mode(option)
+        self.async_write_ha_state()
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Unregister on removal."""
+        for attr in ("_select_entities", "_selects"):
+            reg = getattr(self._coordinator, attr, None)
+            if isinstance(reg, dict):
+                reg.pop("master_operation_mode", None)

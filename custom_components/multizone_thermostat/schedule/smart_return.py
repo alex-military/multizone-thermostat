@@ -47,14 +47,58 @@ class SmartReturnPlanner:
             return dt.replace(tzinfo=local_tz)
         return dt_util.as_local(dt)
 
-    def _resolve_preset_temp(self, preset: str, climate_id: str) -> float:
-        """Resolve preset temperature for a zone."""
+    def _resolve_preset_temp(
+        self,
+        preset: str,
+        hvac_mode: str = "heat",
+        climate_id: str | None = None,
+    ) -> float:
+        """Resolve preset temperature for a preset and hvac_mode."""
+        actual_hvac_mode = hvac_mode
+        actual_cid = climate_id
+        if actual_hvac_mode not in ("heat", "cool", "off") and actual_cid is None:
+            actual_cid = actual_hvac_mode
+            actual_hvac_mode = "heat"
+
         if self._resolve_preset_temp_fn:
-            return float(self._resolve_preset_temp_fn(preset, climate_id))
+            try:
+                if actual_cid is not None:
+                    return float(self._resolve_preset_temp_fn(preset, actual_cid))
+                return float(self._resolve_preset_temp_fn(preset, actual_hvac_mode))
+            except TypeError:
+                try:
+                    return float(self._resolve_preset_temp_fn(preset))
+                except Exception:
+                    pass
+
+        if hasattr(self.coordinator, "get_DynamicPresets") and callable(self.coordinator.get_DynamicPresets):
+            dyn = self.coordinator.get_DynamicPresets()
+            if isinstance(dyn, dict):
+                if actual_hvac_mode == "cool":
+                    if f"{preset}_cool" in dyn:
+                        val = dyn[f"{preset}_cool"]
+                        if isinstance(val, (int, float)):
+                            return float(val)
+                    if preset in dyn:
+                        val = dyn[preset]
+                        if isinstance(val, (int, float)):
+                            return float(val)
+                else:
+                    if preset in dyn:
+                        val = dyn[preset]
+                        if isinstance(val, (int, float)):
+                            return float(val)
+
         zm = getattr(self.coordinator, "zone_manager", None)
-        if zm is not None and hasattr(zm, "get_preset_temperature"):
-            return float(zm.get_preset_temperature(preset, climate_id))
-        return 21.0 if preset == "comfort" else 18.0
+        if zm is not None and hasattr(zm, "get_preset_temperature") and actual_cid:
+            try:
+                val = zm.get_preset_temperature(preset, actual_cid, hvac_mode=actual_hvac_mode)
+            except TypeError:
+                val = zm.get_preset_temperature(preset, actual_cid)
+            if val is not None:
+                return float(val)
+
+        return 24.0 if actual_hvac_mode == "cool" else 20.0
 
     def get_zone_current_temp(self, climate_id: str) -> float | None:
         """Get current temperature for zone from climate entity or HA state."""
@@ -80,6 +124,17 @@ class SmartReturnPlanner:
             model = models.get(climate_id)
             if model is not None:
                 rate = getattr(model, "heating_rate", None)
+                if isinstance(rate, (int, float)) and rate > 0.05:
+                    return float(rate)
+        return float(DEFAULT_SMART_START_HEATING_RATE)
+
+    def get_zone_cooling_rate(self, climate_id: str) -> float:
+        """Get zone cooling rate from thermal model or default fallback."""
+        models = getattr(self.coordinator, "_thermal_models", None)
+        if isinstance(models, dict):
+            model = models.get(climate_id)
+            if model is not None:
+                rate = getattr(model, "cooling_rate", None)
                 if isinstance(rate, (int, float)) and rate > 0.05:
                     return float(rate)
         return float(DEFAULT_SMART_START_HEATING_RATE)
@@ -117,8 +172,9 @@ class SmartReturnPlanner:
         preset: str = "comfort",
         zones: list[str] | None = None,
         now: datetime | None = None,
+        hvac_mode: str | None = None,
     ) -> dict[str, dict[str, Any]]:
-        """Calculate the Thermal Radar plan with staggered preheating start times."""
+        """Calculate the Thermal Radar plan with staggered preheating or precooling start times."""
         now = self._as_local(now)
         arrival_dt = self.parse_arrival_time(arrival_time, now)
 
@@ -129,22 +185,46 @@ class SmartReturnPlanner:
         plan: dict[str, dict[str, Any]] = {}
         all_zones = getattr(self.coordinator, "zones", [])
 
+        if hvac_mode is not None:
+            active_hvac_mode = str(hvac_mode).lower()
+        else:
+            active_hvac_mode = str(getattr(self.coordinator, "master_hvac_mode", "heat")).lower()
+
+        target_preset = preset
         for zone in all_zones:
             zone_name = zone.get(CONF_ZONE_NAME, "")
             climate_id = zone.get("climate_id") or make_zone_entity_id(zone_name)
             if norm_filter and climate_id not in norm_filter:
                 continue
 
-            current_temp = self.get_zone_current_temp(climate_id)
-            target_temp = self._resolve_preset_temp(preset, climate_id)
-            heating_rate = self.get_zone_heating_rate(climate_id)
+            if active_hvac_mode == "cool" and hasattr(self.coordinator, "can_zone_cool") and not self.coordinator.can_zone_cool(climate_id):
+                continue
 
-            if current_temp is not None and current_temp < target_temp:
-                hours_needed = min(
-                    MAX_SMART_START_HOURS, (target_temp - current_temp) / heating_rate
+            current_temp = self.get_zone_current_temp(climate_id)
+            target_temp = self._resolve_preset_temp(target_preset, active_hvac_mode, climate_id=climate_id)
+
+            if active_hvac_mode == "cool":
+                rate = self.get_zone_cooling_rate(climate_id)
+                if current_temp is not None and current_temp > target_temp:
+                    hours_needed = min(
+                        MAX_SMART_START_HOURS, (current_temp - target_temp) / rate
+                    )
+                else:
+                    hours_needed = 0.0
+                already_at_target = bool(
+                    current_temp is not None and current_temp <= target_temp
                 )
             else:
-                hours_needed = 0.0
+                rate = self.get_zone_heating_rate(climate_id)
+                if current_temp is not None and current_temp < target_temp:
+                    hours_needed = min(
+                        MAX_SMART_START_HOURS, (target_temp - current_temp) / rate
+                    )
+                else:
+                    hours_needed = 0.0
+                already_at_target = bool(
+                    current_temp is not None and current_temp >= target_temp
+                )
 
             ignition_dt = arrival_dt - timedelta(hours=hours_needed)
             plan[climate_id] = {
@@ -152,13 +232,14 @@ class SmartReturnPlanner:
                 "climate_id": climate_id,
                 "current_temp": current_temp,
                 "target_temp": target_temp,
-                "heating_rate": round(heating_rate, 2),
+                "heating_rate": round(rate, 2),
+                "cooling_rate": round(rate, 2),
                 "minutes_needed": int(round(hours_needed * 60)),
                 "ignition_time": ignition_dt.isoformat(),
                 "arrival_time": arrival_dt.isoformat(),
-                "already_at_target": bool(
-                    current_temp is not None and current_temp >= target_temp
-                ),
+                "already_at_target": already_at_target,
             }
 
         return plan
+
+    evaluate = calculate_plan

@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Multizone Thermostat — Home Assistant Live Dashboard</title>
+  
+  <!-- Material Design Icons Font -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css">
+
+  <style>
+    :root {
+      /* Home Assistant Theme Matching Image 1 */
+      --primary-color: #03a9f4;
+      --accent-color: #ff9800;
+      --primary-text-color: #ffffff;
+      --secondary-text-color: #94a3b8;
+      --text-primary-color: #ffffff;
+      --card-background-color: #101726;
+      --ha-card-background: #101726;
+      --ha-card-border-color: rgba(255, 255, 255, 0.08);
+      --ha-card-border-width: 1px;
+      --ha-card-border-radius: 20px;
+      --ha-card-box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+      --divider-color: rgba(255, 255, 255, 0.08);
+      --state-climate-heat-color: #f97316;
+      --state-climate-cool-color: #0284c7;
+      --state-climate-idle-color: #64748b;
+      --state-climate-off-color: #334155;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: #090d16;
+      color: #e1e8f5;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* Top Bar: Home Assistant Header Style */
+    .ha-topbar {
+      background-color: #0f1422;
+      border-bottom: 1px solid #1c2438;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .ha-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #ffffff;
+    }
+    .ha-brand i {
+      color: #03a9f4;
+      font-size: 1.3rem;
+    }
+
+    /* View Navigation Tabs */
+    .ha-tabs {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      height: 100%;
+    }
+    .ha-tab {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      height: 100%;
+      padding: 0 18px;
+      background: none;
+      border: none;
+      border-bottom: 3px solid transparent;
+      color: #94a3b8;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-decoration: none;
+    }
+    .ha-tab:hover {
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.04);
+    }
+    .ha-tab.active {
+      color: #03a9f4;
+      border-bottom-color: #03a9f4;
+      background: rgba(3, 169, 244, 0.08);
+    }
+    .ha-tab i {
+      font-size: 1.15rem;
+    }
+
+    /* Style Switcher Action */
+    .ha-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .style-pill-btn {
+      background: #172033;
+      border: 1px solid #2a3754;
+      color: #cbd5e1;
+      padding: 5px 13px;
+      border-radius: 20px;
+      font-size: 0.80rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+    .style-pill-btn:hover {
+      background: #202c46;
+      border-color: #03a9f4;
+      color: #ffffff;
+    }
+    .style-pill-btn.luxury-active {
+      background: linear-gradient(135deg, #0284c7, #38bdf8);
+      border-color: #7dd3fc;
+      color: #ffffff;
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
+    }
+
+    /* Main Dashboard Area (Matches Home Assistant Grid Width) */
+    .dashboard-container {
+      width: 100%;
+      max-width: 1360px;
+      margin: 0 auto;
+      padding: 16px 12px;
+      flex: 1;
+    }
+
+    .dashboard-view {
+      display: none;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .dashboard-view.active {
+      display: flex;
+    }
+
+    /* TOP ROW: EXACT 4-COLUMN RATIO AS HOME ASSISTANT */
+    .ha-top-row-grid {
+      display: grid;
+      grid-template-columns: 1.35fr 1.35fr 0.65fr 0.65fr;
+      gap: 12px;
+      width: 100%;
+      align-items: stretch;
+    }
+    @media (max-width: 1100px) {
+      .ha-top-row-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+    @media (max-width: 700px) {
+      .ha-top-row-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* ZONES GRID: 2 COLUMNS DEFAULT AS IN HOME ASSISTANT SCREENSHOT */
+    .ha-zones-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      width: 100%;
+    }
+    .ha-zones-grid.cols-3 {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    @media (max-width: 800px) {
+      .ha-zones-grid, .ha-zones-grid.cols-3 {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+
+  <!-- Web Component Stubs for HA Architecture -->
+  <script>
+    if (!customElements.get('ha-card')) {
+      class HaCard extends HTMLElement {
+        constructor() { super(); }
+      }
+      customElements.define('ha-card', HaCard);
+    }
+
+    // Material Design SVG paths for guaranteed zero-dependency rendering in Shadow DOMs
+    const MDI_SVG_MAP = {
+      'minus': 'M19,13H5V11H19V13Z',
+      'plus': 'M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z',
+      'power': 'M16.56,5.44L15.11,6.89C16.84,7.94 18,9.83 18,12A6,6 0 0,1 12,18A6,6 0 0,1 6,12C6,9.83 7.16,7.94 8.88,6.88L7.44,5.44C5.36,6.88 4,9.28 4,12A8,8 0 0,0 12,20A8,8 0 0,0 20,12C20,9.28 18.64,6.88 16.56,5.44M13,3H11V13H13',
+      'target': 'M12,8A4,4 0 0,1 16,12A4,4 0 0,1 12,16A4,4 0 0,1 8,12A4,4 0 0,1 12,8M3.05,13H1V11H3.05C3.5,6.83 6.83,3.5 11,3.05V1H13V3.05C17.17,3.5 20.5,6.83 20.95,11H23V13H20.95C20.5,17.17 17.17,20.5 13,20.95V23H11V20.95C6.83,20.5 3.5,17.17 3.05,13M12,5A7,7 0 0,0 5,12A7,7 0 0,0 12,19A7,7 0 0,0 19,12A7,7 0 0,0 12,5Z',
+      'crosshairs-gps': 'M12,8A4,4 0 0,1 16,12A4,4 0 0,1 12,16A4,4 0 0,1 8,12A4,4 0 0,1 12,8M3.05,13H1V11H3.05C3.5,6.83 6.83,3.5 11,3.05V1H13V3.05C17.17,3.5 20.5,6.83 20.95,11H23V13H20.95C20.5,17.17 17.17,20.5 13,20.95V23H11V20.95C6.83,20.5 3.5,17.17 3.05,13M12,5A7,7 0 0,0 5,12A7,7 0 0,0 12,19A7,7 0 0,0 19,12A7,7 0 0,0 12,5Z',
+      'link-variant': 'M10.59,13.41C11,13.8 11,14.44 10.59,14.83C10.2,15.22 9.56,15.22 9.17,14.83C7.22,12.88 7.22,9.71 9.17,7.76V7.76L12.71,4.22C14.66,2.27 17.83,2.27 19.78,4.22C21.73,6.17 21.73,9.34 19.78,11.29L18.29,12.78C18.3,11.96 18.17,11.14 17.89,10.36L18.36,9.88C19.54,8.71 19.54,6.81 18.36,5.64C17.19,4.46 15.29,4.46 14.12,5.64L10.59,9.17C9.41,10.34 9.41,12.24 10.59,13.41M13.41,9.17C13,8.78 13,8.14 13.41,7.75C13.8,7.36 14.44,7.36 14.83,7.75C16.78,9.7 16.78,12.87 14.83,14.82L11.29,18.36C9.34,20.31 6.17,20.31 4.22,18.36C2.27,16.41 2.27,13.24 4.22,11.29L5.71,9.8C5.7,10.62 5.83,11.44 6.11,12.22L5.64,12.7C4.46,13.87 4.46,15.77 5.64,16.95C6.81,18.12 8.71,18.12 9.88,16.95L13.41,13.41C14.59,12.24 14.59,10.34 13.41,9.17Z',
+      'close-circle-outline': 'M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4M16,8.4L14.6,7L12,9.6L9.4,7L8,8.4L10.6,11L8,13.6L9.4,15L12,12.4L14.6,15L16,13.6L13.4,11L16,8.4Z',
+      'fire': 'M12 2C12 2 7 7 7 12C7 15.31 9.69 18 13 18C16.31 18 19 15.31 19 12C19 7 14 2 14 2C14 2 13 4 11 6C10 7 10 9 11 10C12 11 13 11 13 12C13 12.55 12.55 13 12 13C11.45 13 11 12.55 11 12C11 10.5 12 9 12 9C12 9 9 11 9 14C9 16.21 10.79 18 13 18C13.5 18 14 17.9 14.45 17.75C13.58 17.28 13 16.21 13 15C13 13.5 14 12 14 12C14 12 16 14 16 16C16 17.66 14.66 19 13 19C9.13 19 6 15.87 6 12C6 7.5 10 4 12 2Z',
+      'snowflake': 'M12,2A1,1 0 0,1 13,3V6.17L14.71,4.46A1,1 0 0,1 16.12,5.88L13.59,8.41L13,9V11H15L15.59,10.41L18.12,7.88A1,1 0 0,1 19.54,9.29L17.83,11H21A1,1 0 0,1 22,12A1,1 0 0,1 21,13H17.83L19.54,14.71A1,1 0 0,1 18.12,16.12L15.59,13.59L15,13H13V15L13.59,15.59L16.12,18.12A1,1 0 0,1 14.71,19.54L13,17.83V21A1,1 0 0,1 12,22A1,1 0 0,1 11,21V17.83L9.29,19.54A1,1 0 0,1 7.88,18.12L10.41,15.59L11,15V13H9L8.41,13.59L5.88,16.12A1,1 0 0,1 4.46,14.71L6.17,13H3A1,1 0 0,1 2,12A1,1 0 0,1 3,11H6.17L4.46,9.29A1,1 0 0,1 5.88,7.88L8.41,10.41L9,11H11V9L10.41,8.41L7.88,5.88A1,1 0 0,1 9.29,4.46L11,6.17V3A1,1 0 0,1 12,2Z',
+      'calendar-clock': 'M15,13H16.5V15.82L18.9,17.25L18.15,18.5L15,16.69V13M19,8H5V19H9.67C10.24,20.12 11.13,21.05 12.25,21.69C12.17,21.79 12.09,21.9 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2A10,10 0 0,1 22,12C22,12.5 21.96,13 21.88,13.5C21.19,12.68 20.32,12.03 19.33,11.61C19.86,10.49 20,9.26 20,8A1,1 0 0,0 19,7M19,3H18V1H16V3H8V1H6V3H5C3.89,3 3,3.89 3,5V7H21V5C21,3.89 20.1,3 19,3M16.5,11A5.5,5.5 0 0,0 11,16.5A5.5,5.5 0 0,0 16.5,22A5.5,5.5 0 0,0 22,16.5A5.5,5.5 0 0,0 16.5,11Z',
+      'shield-check': 'M10,17L6.5,13.5L7.91,12.08L10,14.17L15.18,9L16.6,10.41M12,1L3,5V11C3,16.55 6.84,21.74 12,23C17.16,21.74 21,16.55 21,11V5L12,1Z',
+      'leaf': 'M17,8C8,10 5.9,16.17 3.82,21.34L5.71,22L6.66,19.7C7.14,19.87 7.64,20 8,20C19,20 22,3 22,3C21,5 14,5.25 9,6.25C4,7.25 2,11.5 2,13.5C2,15.5 3.75,17.25 3.75,17.25C7,8 17,8 17,8Z',
+      'sofa': 'M20,9V15H4V9H20M20,7H4A2,2 0 0,0 2,9V17H4V20H6V17H18V20H20V17H22V9A2,2 0 0,0 20,7Z',
+      'bed': 'M19,7H11V14H3V5H1V20H3V17H21V20H23V11A4,4 0 0,0 19,7M7,13A3,3 0 0,0 10,10A3,3 0 0,0 7,7A3,3 0 0,0 4,10A3,3 0 0,0 7,13Z',
+      'car': 'M18.92 6.01C18.72 5.42 18.16 5 17.5 5H6.5C5.84 5 5.28 5.42 5.08 6.01L3 12V20C3 20.55 3.45 21 4 21H5C5.55 21 6 20.55 6 20V19H18V20C18 20.55 18.45 21 19 21H20C20.55 21 21 20.55 21 20V12L18.92 6.01M6.85 7H17.14L18.22 10H5.78L6.85 7M19 17H5V12H19V17M7.5 13C6.67 13 6 13.67 6 14.5S6.67 16 7.5 16 9 15.33 9 14.5 8.33 13 7.5 13M16.5 13C15.67 13 15 13.67 15 14.5S15.67 16 16.5 16 18 15.33 18 14.5 17.33 13 16.5 13Z',
+      'radiator': 'M3,3V21H5V18H7V21H9V18H11V21H13V18H15V21H17V18H19V21H21V3H19V6H17V3H15V6H13V3H11V6H9V3H7V6H5V3H3M5,8H7V16H5V8M9,8H11V16H9V8M13,8H15V16H13V8M17,8H19V16H17V8Z',
+      'thermometer': 'M15 13V5A3 3 0 0 0 9 5V13A5 5 0 1 0 15 13M12 4A1 1 0 0 1 13 5V8H11V5A1 1 0 0 1 12 4Z',
+      'home-thermometer-outline': 'M12 2L2 12H5V20H19V12H22L12 2M12 4.5L17 9.5V18H15V15.5C15.6 15 16 14.3 16 13.5C16 12.1 14.9 11 13.5 11S11 12.1 11 13.5C11 14.3 11.4 15 12 15.5V18H7V9.5L12 4.5M13.5 12C14.3 12 15 12.7 15 13.5C15 14.1 14.6 14.6 14 14.9V13H13V14.9C12.4 14.6 12 14.1 12 13.5C12 12.7 12.7 12 13.5 12Z'
+    };
+
+    if (!customElements.get('ha-icon')) {
+      class HaIcon extends HTMLElement {
+        static get observedAttributes() { return ['icon']; }
+        attributeChangedCallback() { this.render(); }
+        connectedCallback() { this.render(); }
+        render() {
+          const icon = this.getAttribute('icon') || '';
+          const name = icon.replace(/^mdi:/, '');
+          const path = MDI_SVG_MAP[name];
+          if (path) {
+            this.innerHTML = `<svg viewBox="0 0 24 24" style="width:100%;height:100%;display:inline-block;vertical-align:middle;fill:currentColor;pointer-events:none;"><path d="${path}"/></svg>`;
+          } else {
+            this.innerHTML = `<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css"><i class="mdi mdi-${name}" style="font-size:inherit; color:inherit; display:inline-block; vertical-align:middle;"></i>`;
+          }
+        }
+      }
+      customElements.define('ha-icon', HaIcon);
+    }
+  </script>
+
+  <!-- Load Official Card Bundle with cache bust -->
+  <script src="multizone-thermostat-card.js?v=beta11_rev3"></script>
+</head>
+<body>
+
+  <!-- TOP APP BAR -->
+  <header class="ha-topbar">
+    <div class="ha-brand">
+      <i class="mdi mdi-home-thermometer-outline"></i>
+      <span>Multizone Thermostat</span>
+    </div>
+
+    <!-- TABS -->
+    <nav class="ha-tabs">
+      <button class="ha-tab active" id="tabBtnHome" onclick="switchView('view-home')">
+        <i class="mdi mdi-radiator"></i>
+        <span>Termostati</span>
+      </button>
+      <button class="ha-tab" id="tabBtnSched" onclick="switchView('view-sched')">
+        <i class="mdi mdi-calendar-clock"></i>
+        <span>Programmazione</span>
+      </button>
+      <button class="ha-tab" id="tabBtnDiag" onclick="switchView('view-diag')">
+        <i class="mdi mdi-chart-box-outline"></i>
+        <span>Diagnostica</span>
+      </button>
+    </nav>
+
+    <!-- RIGHT: LUXURY / CLASSIC STYLE TOGGLE & COLUMNS TOGGLE -->
+    <div class="ha-actions">
+      <button class="style-pill-btn" id="colSwitcherBtn" onclick="toggleCols()">
+        <span id="colBtnIcon">📐</span> <span id="colBtnText">Griglia: 2 Colonne</span>
+      </button>
+      <button class="style-pill-btn luxury-active" id="styleSwitcherBtn" onclick="toggleStyle()">
+        <span id="styleBtnIcon">💎</span> <span id="styleBtnText">Stile: Luxury</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- DASHBOARD CONTAINER -->
+  <main class="dashboard-container">
+
+    <!-- ============================================== -->
+    <!-- VIEW 1: TERMOSTATI (IDENTICA A SCREENSHOT 1)  -->
+    <!-- ============================================== -->
+    <div class="dashboard-view active" id="view-home">
+      
+      <!-- TOP ROW: [ PRESET CARD ] [ STATUS CARD ] [ PROGRAMMAZIONE ] [ DIAGNOSTICA ] -->
+      <div class="ha-top-row-grid">
+        <div id="host-preset-card"></div>
+        <div id="host-status-card"></div>
+        <div id="host-schedule-summary"></div>
+        <div id="host-health-summary"></div>
+      </div>
+
+      <!-- ZONES ROW: [ ZONA 1 (SPLIT) ] [ ZONA 2 (STANDARD) ] [ ZONA 3 (STUDIO) ] -->
+      <div class="ha-zones-grid">
+        <div id="host-dial-1"></div>
+        <div id="host-dial-2"></div>
+        <div id="host-dial-3"></div>
+      </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- VIEW 2: PROGRAMMAZIONE SETTIMANALE             -->
+    <!-- ============================================== -->
+    <div class="dashboard-view" id="view-sched">
+      <div id="host-scheduler-card"></div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- VIEW 3: DIAGNOSTICA & EFFICIENZA               -->
+    <!-- ============================================== -->
+    <div class="dashboard-view" id="view-diag">
+      <div id="host-plant-card" style="margin-bottom: 12px;"></div>
+      <div class="ha-zones-grid">
+        <div id="host-energy-1"></div>
+        <div id="host-energy-2"></div>
+        <div id="host-energy-3"></div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- MOCK HASS STATE (EXACT STATE AS IN SCREENSHOT 1) -->
+  <script>
+    const MOCK_HASS = {
+      language: 'it',
+      states: {
+        // --- MASTER SWITCH (SPENTO COME IN SCREENSHOT 1) ---
+        'switch.master_control_heating_master': {
+          entity_id: 'switch.master_control_heating_master',
+          state: 'off',
+          attributes: {
+            friendly_name: 'Master Heating Switch',
+            multizone_type: 'master',
+            boiler_switch: 'switch.caldaia',
+            active_zones_count: 0
+          }
+        },
+        'switch.caldaia': {
+          entity_id: 'switch.caldaia',
+          state: 'off',
+          attributes: { friendly_name: 'Caldaia a Gas' }
+        },
+
+        // --- PRESET & PRIORITÀ (GAS SELEZIONATO + COMFORT ATTIVO) ---
+        'select.master_control_global_preset': {
+          entity_id: 'select.master_control_global_preset',
+          state: 'comfort',
+          attributes: {
+            options: ['manual', 'eco', 'comfort', 'sleep', 'away'],
+            friendly_name: 'Preset Globale'
+          }
+        },
+        'select.master_control_heat_source_priority': {
+          entity_id: 'select.master_control_heat_source_priority',
+          state: 'gas_only',
+          attributes: {
+            options: ['auto', 'hybrid', 'combined', 'electric_only', 'gas_only'],
+            friendly_name: 'Priorità Sorgente'
+          }
+        },
+        'select.master_control_master_operation_mode': {
+          entity_id: 'select.master_control_master_operation_mode',
+          state: 'heat',
+          attributes: {
+            options: ['heat', 'cool'],
+            friendly_name: 'Modalità Stagionale'
+          }
+        },
+
+        // --- ZONA 1: CON CLIMATIZZATORE SPLIT (ESATTAMENTE COME IN FOTO 1) ---
+        'climate.multizone_thermostat_zona_test_1': {
+          entity_id: 'climate.multizone_thermostat_zona_test_1',
+          state: 'heat',
+          attributes: {
+            friendly_name: 'Zona test 1 Zone test 1',
+            current_temperature: 19.5,
+            temperature: 20.5,
+            target_temp_step: 0.5,
+            min_temp: 10,
+            max_temp: 30,
+            hvac_action: 'off', // 'Spento' sul dial
+            active_heating_source: 'gas',
+            zone_mode: 'primary',
+            can_cool: true, // ABILITA IL PULSANTE SPLIT CENTRALE!
+            split_climate_entity: 'climate.split_test_1',
+            split_active: false,
+            split_manual_on: false,
+            split_hydronic_suppressed: false,
+            heating_rate: 1.5,
+            cooling_rate: 0.3,
+            battery_level: 92
+          }
+        },
+        'climate.split_test_1': {
+          entity_id: 'climate.split_test_1',
+          state: 'off',
+          attributes: { friendly_name: 'Split Zona 1', temperature: 20.5 }
+        },
+        'select.multizone_thermostat_zona_test_1_zone_mode': {
+          entity_id: 'select.multizone_thermostat_zona_test_1_zone_mode',
+          state: 'primary',
+          attributes: {
+            options: ['primary', 'secondary', 'bypass'],
+            friendly_name: 'Modalità Zona test 1'
+          }
+        },
+
+        // --- ZONA 2: RADIATORI GAS (SENZA SPLIT, COME IN FOTO 1) ---
+        'climate.multizone_thermostat_zona_test_2': {
+          entity_id: 'climate.multizone_thermostat_zona_test_2',
+          state: 'heat',
+          attributes: {
+            friendly_name: 'Zona test 2 Zone test 2',
+            current_temperature: 18.0,
+            temperature: 20.5,
+            target_temp_step: 0.5,
+            min_temp: 10,
+            max_temp: 30,
+            hvac_action: 'off', // 'Spento' sul dial
+            active_heating_source: 'gas',
+            zone_mode: 'primary',
+            can_cool: false, // NO SPLIT -> NESSUN PULSANTE CENTRALE
+            heating_rate: 1.2,
+            cooling_rate: 0.25,
+            battery_level: 85
+          }
+        },
+        'select.multizone_thermostat_zona_test_2_zone_mode': {
+          entity_id: 'select.multizone_thermostat_zona_test_2_zone_mode',
+          state: 'primary',
+          attributes: {
+            options: ['primary', 'secondary', 'bypass'],
+            friendly_name: 'Modalità Zona test 2'
+          }
+        },
+
+        // --- ZONA 3: STUDIO (PAVIMENTO RADIANTE IDRONICO) ---
+        'climate.multizone_thermostat_zona_test_3': {
+          entity_id: 'climate.multizone_thermostat_zona_test_3',
+          state: 'heat',
+          attributes: {
+            friendly_name: 'Studio',
+            current_temperature: 19.0,
+            temperature: 20.0,
+            target_temp_step: 0.5,
+            min_temp: 10,
+            max_temp: 30,
+            hvac_action: 'off',
+            active_heating_source: 'gas',
+            zone_mode: 'secondary',
+            can_cool: false,
+            heating_rate: 0.9,
+            cooling_rate: 0.4,
+            battery_level: 70
+          }
+        },
+        'select.multizone_thermostat_zona_test_3_zone_mode': {
+          entity_id: 'select.multizone_thermostat_zona_test_3_zone_mode',
+          state: 'secondary',
+          attributes: {
+            options: ['primary', 'secondary', 'bypass'],
+            friendly_name: 'Modalità Studio'
+          }
+        },
+
+        // --- DIAGNOSTICA CENTRALE ---
+        'sensor.master_control_stato_salute_impianto': {
+          entity_id: 'sensor.master_control_stato_salute_impianto',
+          state: '100',
+          attributes: { unit_of_measurement: '%' }
+        },
+        'sensor.master_control_frequenza_accensioni_caldaia': {
+          entity_id: 'sensor.master_control_frequenza_accensioni_caldaia',
+          state: '1.2',
+          attributes: { unit_of_measurement: 'cicli/h' }
+        },
+        'sensor.master_control_ore_funzionamento_caldaia_24h': {
+          entity_id: 'sensor.master_control_ore_funzionamento_caldaia_24h',
+          state: '3.8',
+          attributes: { unit_of_measurement: 'h' }
+        },
+        'binary_sensor.master_control_plant_anomaly': {
+          entity_id: 'binary_sensor.master_control_plant_anomaly',
+          state: 'off',
+          attributes: { active_anomalies: [] }
+        },
+
+        // --- ZONE ENERGY SENSORS ---
+        'sensor.multizone_brain_zona_test_1_classe_energetica': {
+          entity_id: 'sensor.multizone_brain_zona_test_1_classe_energetica',
+          state: 'A'
+        },
+        'sensor.multizone_brain_zona_test_1_tempo_ritenzione_termica': {
+          entity_id: 'sensor.multizone_brain_zona_test_1_tempo_ritenzione_termica',
+          state: '7.5',
+          attributes: { unit_of_measurement: 'h' }
+        },
+        'sensor.multizone_brain_zona_test_1_dimensionamento_radiatore': {
+          entity_id: 'sensor.multizone_brain_zona_test_1_dimensionamento_radiatore',
+          state: 'Ottimale'
+        },
+
+        'sensor.multizone_brain_zona_test_2_classe_energetica': {
+          entity_id: 'sensor.multizone_brain_zona_test_2_classe_energetica',
+          state: 'B'
+        },
+        'sensor.multizone_brain_zona_test_2_tempo_ritenzione_termica': {
+          entity_id: 'sensor.multizone_brain_zona_test_2_tempo_ritenzione_termica',
+          state: '5.2',
+          attributes: { unit_of_measurement: 'h' }
+        },
+        'sensor.multizone_brain_zona_test_2_dimensionamento_radiatore': {
+          entity_id: 'sensor.multizone_brain_zona_test_2_dimensionamento_radiatore',
+          state: 'Ottimale'
+        },
+
+        'sensor.multizone_brain_zona_test_3_classe_energetica': {
+          entity_id: 'sensor.multizone_brain_zona_test_3_classe_energetica',
+          state: 'C'
+        },
+        'sensor.multizone_brain_zona_test_3_tempo_ritenzione_termica': {
+          entity_id: 'sensor.multizone_brain_zona_test_3_tempo_ritenzione_termica',
+          state: '4.1',
+          attributes: { unit_of_measurement: 'h' }
+        },
+        'sensor.multizone_brain_zona_test_3_dimensionamento_radiatore': {
+          entity_id: 'sensor.multizone_brain_zona_test_3_dimensionamento_radiatore',
+          state: 'Sottodimensionato'
+        }
+      },
+
+      // CALLSERVICE REALE
+      callService: function(domain, service, data) {
+        console.log(`[HA SERVICE] ${domain}.${service}`, data);
+
+        // 1. Modifica Temperatura
+        if (domain === 'climate' && service === 'set_temperature') {
+          const eid = data.entity_id;
+          if (MOCK_HASS.states[eid]) {
+            MOCK_HASS.states[eid].attributes.temperature = data.temperature;
+            const cur = MOCK_HASS.states[eid].attributes.current_temperature;
+            const isMasterOn = MOCK_HASS.states['switch.master_control_heating_master'].state === 'on';
+            if (isMasterOn) {
+              MOCK_HASS.states[eid].attributes.hvac_action = data.temperature > cur ? 'heating' : 'idle';
+            }
+          }
+        }
+
+        // 2. Modifica Preset o Priorità o Modalità Stagionale
+        else if (domain === 'select' && service === 'select_option') {
+          const eid = data.entity_id;
+          if (MOCK_HASS.states[eid]) {
+            MOCK_HASS.states[eid].state = data.option;
+
+            if (eid.includes('global_preset')) {
+              const presets = {
+                comfort: { z1: 20.5, z2: 20.5, z3: 20.0 },
+                eco: { z1: 18.5, z2: 18.0, z3: 18.0 },
+                sleep: { z1: 17.5, z2: 18.0, z3: 17.0 },
+                away: { z1: 16.0, z2: 16.0, z3: 16.0 },
+                manual: {}
+              };
+              if (presets[data.option]) {
+                const p = presets[data.option];
+                if (p.z1) MOCK_HASS.states['climate.multizone_thermostat_zona_test_1'].attributes.temperature = p.z1;
+                if (p.z2) MOCK_HASS.states['climate.multizone_thermostat_zona_test_2'].attributes.temperature = p.z2;
+                if (p.z3) MOCK_HASS.states['climate.multizone_thermostat_zona_test_3'].attributes.temperature = p.z3;
+              }
+            }
+
+            if (eid.includes('heat_source_priority')) {
+              if (data.option === 'electric_only') {
+                MOCK_HASS.states['climate.multizone_thermostat_zona_test_1'].attributes.active_heating_source = 'electric';
+              } else if (data.option === 'combined') {
+                MOCK_HASS.states['climate.multizone_thermostat_zona_test_1'].attributes.active_heating_source = 'gas_and_electric';
+              } else {
+                MOCK_HASS.states['climate.multizone_thermostat_zona_test_1'].attributes.active_heating_source = 'gas';
+              }
+            }
+
+            // Selezione Modalità Zona (Primaria, Secondaria, Bypass)
+            if (eid.includes('zone_mode')) {
+              const zoneMap = {
+                'select.multizone_thermostat_zona_test_1_zone_mode': 'climate.multizone_thermostat_zona_test_1',
+                'select.multizone_thermostat_zona_test_2_zone_mode': 'climate.multizone_thermostat_zona_test_2',
+                'select.multizone_thermostat_zona_test_3_zone_mode': 'climate.multizone_thermostat_zona_test_3'
+              };
+              const targetClimate = zoneMap[eid];
+              if (targetClimate && MOCK_HASS.states[targetClimate]) {
+                MOCK_HASS.states[targetClimate].attributes.zone_mode = data.option;
+              }
+            }
+          }
+        }
+
+        // 3. Modifica Interruttore (Master ON / OFF / TOGGLE o Caldaia)
+        else if (domain === 'switch') {
+          const eid = data.entity_id;
+          if (MOCK_HASS.states[eid]) {
+            let turnOn;
+            if (service === 'toggle') {
+              turnOn = (MOCK_HASS.states[eid].state !== 'on');
+            } else {
+              turnOn = (service === 'turn_on');
+            }
+            MOCK_HASS.states[eid].state = turnOn ? 'on' : 'off';
+
+            if (eid.includes('master_control_heating_master') || eid.includes('master')) {
+              MOCK_HASS.states['switch.caldaia'].state = turnOn ? 'on' : 'off';
+              ['climate.multizone_thermostat_zona_test_1', 'climate.multizone_thermostat_zona_test_2', 'climate.multizone_thermostat_zona_test_3'].forEach(zid => {
+                const z = MOCK_HASS.states[zid];
+                if (z) {
+                  if (turnOn) {
+                    z.attributes.hvac_action = z.attributes.temperature > z.attributes.current_temperature ? 'heating' : 'idle';
+                  } else {
+                    z.attributes.hvac_action = z.attributes.split_active ? 'heating' : 'off';
+                  }
+                }
+              });
+            }
+          }
+        }
+
+        // 4. Modifica HVAC Mode (Split Locale Climatizzazione o Termostato)
+        else if (domain === 'climate' && service === 'set_hvac_mode') {
+          const eid = data.entity_id;
+          const hvacMode = data.hvac_mode;
+          if (MOCK_HASS.states[eid]) {
+            MOCK_HASS.states[eid].state = hvacMode;
+            if (eid === 'climate.multizone_thermostat_zona_test_1' || eid === 'climate.split_test_1') {
+              const isSplitActive = (hvacMode !== 'off');
+              const z1 = MOCK_HASS.states['climate.multizone_thermostat_zona_test_1'];
+              const sp1 = MOCK_HASS.states['climate.split_test_1'];
+              if (z1) {
+                z1.attributes.split_active = isSplitActive;
+                z1.attributes.split_manual_on = isSplitActive;
+                z1.attributes.active_heating_source = isSplitActive ? 'electric' : 'gas';
+                const isMasterOn = MOCK_HASS.states['switch.master_control_heating_master'].state === 'on';
+                if (isSplitActive) {
+                  z1.attributes.hvac_action = 'heating';
+                } else {
+                  z1.attributes.hvac_action = isMasterOn ? (z1.attributes.temperature > z1.attributes.current_temperature ? 'heating' : 'idle') : 'off';
+                }
+              }
+              if (sp1) {
+                sp1.state = hvacMode;
+              }
+            }
+          }
+        }
+
+        // Aggiorna tutte le card registrate
+        updateAllCards();
+      }
+    };
+
+    let activeCards = [];
+
+    function mountCards() {
+      activeCards = [];
+
+      // 1. TOP ROW CARDS
+      // Card 1: Preset Card
+      const presetCard = document.createElement('multizone-thermostat-preset-card');
+      presetCard.setConfig({ border_radius: '20px' });
+      document.getElementById('host-preset-card').appendChild(presetCard);
+      activeCards.push(presetCard);
+
+      // Card 2: Status Card
+      const statusCard = document.createElement('multizone-thermostat-status-card');
+      statusCard.setConfig({ border_radius: '20px' });
+      document.getElementById('host-status-card').appendChild(statusCard);
+      activeCards.push(statusCard);
+
+      // Card 3: Schedule Summary Card (Programmazione)
+      const schedSummary = document.createElement('multizone-thermostat-schedule-summary-card');
+      schedSummary.setConfig({ border_radius: '20px', navigation_path: 'programmazione' });
+      document.getElementById('host-schedule-summary').appendChild(schedSummary);
+      activeCards.push(schedSummary);
+
+      // Card 4: Health Summary Card (Diagnostica)
+      const healthSummary = document.createElement('multizone-thermostat-health-summary-card');
+      healthSummary.setConfig({ border_radius: '20px', navigation_path: 'diagnostica' });
+      document.getElementById('host-health-summary').appendChild(healthSummary);
+      activeCards.push(healthSummary);
+
+      // 2. DIAL CARDS ROW
+      // Dial 1: Zona test 1 (Con Split AC)
+      const dial1 = document.createElement('multizone-thermostat-dial-card');
+      dial1.setConfig({
+        entity: 'climate.multizone_thermostat_zona_test_1',
+        switch: 'select.multizone_thermostat_zona_test_1_zone_mode',
+        title: 'Zona test 1 Zone test 1',
+        border_radius: '20px'
+      });
+      document.getElementById('host-dial-1').appendChild(dial1);
+      activeCards.push(dial1);
+
+      // Dial 2: Zona test 2 (Standard Gas)
+      const dial2 = document.createElement('multizone-thermostat-dial-card');
+      dial2.setConfig({
+        entity: 'climate.multizone_thermostat_zona_test_2',
+        switch: 'select.multizone_thermostat_zona_test_2_zone_mode',
+        title: 'Zona test 2 Zone test 2',
+        border_radius: '20px'
+      });
+      document.getElementById('host-dial-2').appendChild(dial2);
+      activeCards.push(dial2);
+
+      // Dial 3: Zona test 3 (Studio - Pavimento Radiante)
+      const dial3 = document.createElement('multizone-thermostat-dial-card');
+      dial3.setConfig({
+        entity: 'climate.multizone_thermostat_zona_test_3',
+        switch: 'select.multizone_thermostat_zona_test_3_zone_mode',
+        title: 'Studio',
+        border_radius: '20px'
+      });
+      document.getElementById('host-dial-3').appendChild(dial3);
+      activeCards.push(dial3);
+
+      // 3. VISTA PROGRAMMAZIONE
+      const schedulerCard = document.createElement('multizone-thermostat-scheduler-card');
+      schedulerCard.setConfig({});
+      document.getElementById('host-scheduler-card').appendChild(schedulerCard);
+      activeCards.push(schedulerCard);
+
+      // 4. VISTA DIAGNOSTICA
+      const plantCard = document.createElement('multizone-thermostat-plant-card');
+      plantCard.setConfig({ border_radius: '20px' });
+      document.getElementById('host-plant-card').appendChild(plantCard);
+      activeCards.push(plantCard);
+
+      const energy1 = document.createElement('multizone-thermostat-zone-energy-card');
+      energy1.setConfig({ entity: 'climate.multizone_thermostat_zona_test_1', border_radius: '20px' });
+      document.getElementById('host-energy-1').appendChild(energy1);
+      activeCards.push(energy1);
+
+      const energy2 = document.createElement('multizone-thermostat-zone-energy-card');
+      energy2.setConfig({ entity: 'climate.multizone_thermostat_zona_test_2', border_radius: '20px' });
+      document.getElementById('host-energy-2').appendChild(energy2);
+      activeCards.push(energy2);
+
+      const energy3 = document.createElement('multizone-thermostat-zone-energy-card');
+      energy3.setConfig({ entity: 'climate.multizone_thermostat_zona_test_3', border_radius: '20px' });
+      document.getElementById('host-energy-3').appendChild(energy3);
+      activeCards.push(energy3);
+
+      // Invia stato iniziale
+      updateAllCards();
+    }
+
+    function updateAllCards() {
+      const hassCopy = {
+        language: MOCK_HASS.language,
+        states: Object.assign({}, MOCK_HASS.states),
+        callService: MOCK_HASS.callService
+      };
+
+      activeCards.forEach(c => {
+        try { c.hass = hassCopy; } catch (e) { console.error(e); }
+      });
+    }
+
+    // Navigazione Viste
+    function switchView(viewId) {
+      document.querySelectorAll('.dashboard-view').forEach(v => v.classList.remove('active'));
+      document.querySelectorAll('.ha-tab').forEach(t => t.classList.remove('active'));
+
+      const target = document.getElementById(viewId);
+      if (target) target.classList.add('active');
+
+      if (viewId === 'view-home') document.getElementById('tabBtnHome').classList.add('active');
+      if (viewId === 'view-sched') document.getElementById('tabBtnSched').classList.add('active');
+      if (viewId === 'view-diag') document.getElementById('tabBtnDiag').classList.add('active');
+
+      setTimeout(updateAllCards, 40);
+    }
+
+    // Ascolto eventi di navigazione nativi dalle card di riepilogo
+    window.addEventListener('hass-navigate', (e) => {
+      const path = e.detail?.path;
+      if (path === 'programmazione' || path === 'scheduler') {
+        switchView('view-sched');
+      } else if (path === 'diagnostica' || path === 'diagnostics') {
+        switchView('view-diag');
+      } else {
+        switchView('view-home');
+      }
+    });
+
+    // Toggle Colonne Griglia (2 o 3 colonne)
+    let currentCols = 2;
+    function toggleCols() {
+      currentCols = currentCols === 2 ? 3 : 2;
+      document.querySelectorAll('.ha-zones-grid').forEach(g => {
+        if (currentCols === 3) {
+          g.classList.add('cols-3');
+        } else {
+          g.classList.remove('cols-3');
+        }
+      });
+      document.getElementById('colBtnText').textContent = `Griglia: ${currentCols} Colonne`;
+    }
+
+    // Style Switcher
+    let isLuxury = localStorage.getItem('mz_card_style') !== 'classic';
+
+    function toggleStyle() {
+      isLuxury = !isLuxury;
+      const newStyle = isLuxury ? 'luxury' : 'classic';
+      localStorage.setItem('mz_card_style', newStyle);
+
+      const btn = document.getElementById('styleSwitcherBtn');
+      const icon = document.getElementById('styleBtnIcon');
+      const text = document.getElementById('styleBtnText');
+
+      if (isLuxury) {
+        btn.classList.add('luxury-active');
+        icon.textContent = '💎';
+        text.textContent = 'Stile: Luxury';
+      } else {
+        btn.classList.remove('luxury-active');
+        icon.textContent = '🏛️';
+        text.textContent = 'Stile: Classic';
+      }
+
+      window.dispatchEvent(new CustomEvent('mz-style-changed', { detail: { style: newStyle } }));
+    }
+
+    // Inizializzazione
+    window.addEventListener('DOMContentLoaded', () => {
+      const saved = localStorage.getItem('mz_card_style') || 'luxury';
+      if (saved === 'classic') {
+        isLuxury = false;
+        const btn = document.getElementById('styleSwitcherBtn');
+        btn.classList.remove('luxury-active');
+        document.getElementById('styleBtnIcon').textContent = '🏛️';
+        document.getElementById('styleBtnText').textContent = 'Stile: Classic';
+      }
+
+      mountCards();
+    });
+  </script>
+</body>
+</html>

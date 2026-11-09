@@ -1,355 +1,537 @@
 {
-    "config": {
-        "step": {
-            "user": {
-                "title": "Многозонный термостат — Режим котла",
-                "description": "Выберите, как вы хотите управлять вашей системой центрального отопления (Реле ВКЛ/ВЫКЛ или OpenTherm Модуляция).",
-                "data": {
-                    "boiler_mode": "Режим управления котлом"
-                }
-            },
-            "weather": {
-                "title": "Погодная компенсация",
-                "description": "Выберите датчик наружной температуры или погоды для включения погодной компенсации. Это позволит динамически корректировать логику отопления в зависимости от погоды на улице.",
-                "data": {
-                    "weather_sensor": "Датчик наружной температуры"
-                }
-            },
-            "calendar": {
-                "title": "Глобальный календарь",
-                "description": "Выберите локальный календарь для управления расписанием многозонной системы.",
-                "data": {
-                    "global_calendar": "Объект календаря"
-                }
-            },
-            "add_zone": {
-                "title": "Добавить зону отопления ({zone_number})",
-                "description": "Настройте зону отопления. Добавлено зон: {zones_added}.",
-                "data": {
-                    "name": "Имя зоны",
-                    "temp_sensor": "Датчик температуры зоны",
-                    "target_temperature": "Базовая целевая температура"
-                },
-                "sections": {
-                    "trv_settings": {
-                        "name": "Термостатические клапаны радиаторов (TRV)",
-                        "description": "Стандартные умные термостатические головки с регулировкой температуры.",
-                        "data": {
-                            "climate_entities": "Объект климата",
-                            "trv_preset_sync": "Включить синхронизацию пресетов TRV",
-                            "authoritative_climate_sync": "Приоритетная синхронизация настенного термостата"
-                        }
-                    },
-                    "valve_settings": {
-                        "name": "Пропорциональные и 0-10В клапаны",
-                        "description": "Прямое управление процентом открытия или аналоговое напряжение 0-10В.",
-                        "data": {
-                            "valve_entities": "Объекты клапанов / приводов",
-                            "valve_scale": "Режим шкалы вывода"
-                        }
-                    },
-                    "relay_settings": {
-                        "name": "Релейные приводы (ШИМ)",
-                        "description": "Переключатели ВКЛ/ВЫКЛ и термоэлектрические приводы с широтно-импульсной модуляцией.",
-                        "data": {
-                            "switch_entities": "Реле / Переключатели зоны"
-                        }
-                    },
-                    "safety_settings": {
-                        "name": "Защита и расширенные настройки",
-                        "description": "Обход по открытию окон, сторожевой таймер и летняя защита от заклинивания.",
-                        "data": {
-                            "window_sensor": "Датчик окна (опционально)",
-                            "sensor_timeout_min": "Тайм-аут сторожевого таймера датчика (минуты)",
-                            "anti_seize_zone_enable": "Включить защиту от заклинивания (летняя защита) для этой зоны",
-                            "allow_passive_heat": "Разрешить пассивный нагрев (фанкойл без клапана / мезонин)",
-                            "weight": "Тепловой вес зоны (Площадь / Мощность радиаторов)"
-                        }
-                    }
-                },
-                "data_description": {
-                    "name": "Понятное имя для этой зоны",
-                    "temp_sensor": "Основной датчик температуры окружающей среды зоны",
-                    "target_temperature": "Целевая температура по умолчанию для этой зоны"
-                }
-            },
-            "trv_calibration": {
-                "title": "Настройка TRV (датчик смещения)",
-                "description": "Выберите объекты смещения температуры (калибровки) для каждого TRV в зоне {zone_name}. Обычно это сущности `number`, предоставляемые интеграцией TRV (например, Better Thermostat, Z2M, ZHA). Если оставить пустым, будет использоваться компенсация целевой температуры."
-            },
-            "another_zone": {
-                "title": "Добавить еще одну зону?",
-                "description": "Вы добавили {zones_added} зон(ы): {zones_list}.",
-                "data": {
-                    "add_another": "Добавить еще одну зону"
-                }
-            },
-            "geofencing": {
-                "title": "Геозоны и умное расписание",
-                "description": "Включить геозоны и режим авто-ночь? Если включено, выберите датчик присутствия (например, zone.home или объект персоны).",
-                "data": {
-                    "geofencing_enabled": "Включить геозоны и режим авто-ночь",
-                    "presence_sensor": "Датчик присутствия"
-                }
-            },
-            "confirm": {
-                "title": "Подтверждение конфигурации",
-                "description": "Готово к настройке Multizone Thermostat.\n\n**Зоны ({zones_count}):**\n{zones_list}\n\nНажмите «Отправить», чтобы создать интеграцию."
-            },
-            "boiler_relay": {
-                "title": "Настройка реле котла",
-                "description": "Выберите переключатель, который управляет реле котла.",
-                "data": {
-                    "boiler_switch": "Выключатель котла"
-                },
-                "data_description": {
-                    "boiler_switch": "Переключатель/реле, который управляет циркуляционным насосом котла"
-                }
-            },
-            "boiler_opentherm": {
-                "title": "Настройка OpenTherm",
-                "description": "Настройте OpenTherm через двухпутевой режим (Dual-Path): Вариант 1 (Climate Gateway): сущность climate с автоматической телеметрией атрибутов; Вариант 2 (Раздельный): числовая уставка (number) и опциональный переключатель CH. Задайте минимальную и максимальную температуру воды.",
-                "data": {
-                    "opentherm_entity": "Объект OpenTherm (Климат / Водонагреватель)",
-                    "opentherm_min_temp": "Минимальная температура воды (°C)",
-                    "opentherm_max_temp": "Максимальная температура воды (°C)",
-                    "opentherm_ch_switch": "Переключатель активации отопления CH (опционально)"
-                }
-            }
-        },
-        "abort": {
-            "already_configured": "Multizone Thermostat уже настроен. Используйте меню параметров (Options) для изменения зон.",
-            "no_switches_found": "В Home Assistant не найдено сущностей переключателей. Сначала добавьте переключатель/реле.",
-            "no_zones_configured": "Ни одной зоны не было настроено. Пожалуйста, добавьте хотя бы одну зону.",
-            "no_temp_sensors_found": "В Home Assistant не найдено датчиков температуры."
-        },
-        "error": {
-            "zone_name_required": "Имя зоны не может быть пустым.",
-            "presence_sensor_required": "Датчик присутствия обязателен при включённом геофенсинге.",
-            "invalid_temp_range": "Минимальная температура должна быть ниже максимальной.",
-            "no_actuators_selected": "Необходимо выбрать хотя бы одну сущность climate или switch для зоны.",
-            "zone_name_exists": "Зона с таким именем уже существует."
+  "config": {
+    "step": {
+      "user": {
+        "title": "Многозонный термостат — Режим котла",
+        "description": "Выберите, как вы хотите управлять вашей системой центрального отопления (Реле ВКЛ/ВЫКЛ или OpenTherm Модуляция).",
+        "data": {
+          "enable_gas_heater": "Gas / Combustion Boiler",
+          "enable_heat_pump": "Electric Heat Pump (PDC)"
         }
+      },
+      "weather": {
+        "title": "Погодная компенсация",
+        "description": "Выберите датчик наружной температуры или погоды для включения погодной компенсации. Это позволит динамически корректировать логику отопления в зависимости от погоды на улице.",
+        "data": {
+          "weather_sensor": "Датчик наружной температуры"
+        }
+      },
+      "calendar": {
+        "title": "Глобальный календарь",
+        "description": "Выберите локальный календарь для управления расписанием многозонной системы.",
+        "data": {
+          "global_calendar": "Объект календаря"
+        }
+      },
+      "add_zone": {
+        "title": "Добавить зону отопления ({zone_number})",
+        "description": "Настройте зону отопления. Добавлено зон: {zones_added}.",
+        "data": {
+          "name": "Имя зоны",
+          "temp_sensor": "Датчик температуры зоны",
+          "target_temperature": "Базовая целевая температура"
+        },
+        "sections": {
+          "trv_settings": {
+            "name": "Термостатические клапаны радиаторов (TRV)",
+            "description": "Стандартные умные термостатические головки с регулировкой температуры.",
+            "data": {
+              "climate_entities": "Объект климата",
+              "trv_preset_sync": "Включить синхронизацию пресетов TRV",
+              "authoritative_climate_sync": "Приоритетная синхронизация настенного термостата"
+            }
+          },
+          "valve_settings": {
+            "name": "Пропорциональные и 0-10В клапаны",
+            "description": "Прямое управление процентом открытия или аналоговое напряжение 0-10В.",
+            "data": {
+              "valve_entities": "Объекты клапанов / приводов",
+              "valve_scale": "Режим шкалы вывода"
+            }
+          },
+          "relay_settings": {
+            "name": "Релейные приводы (ШИМ)",
+            "description": "Переключатели ВКЛ/ВЫКЛ и термоэлектрические приводы с широтно-импульсной модуляцией.",
+            "data": {
+              "switch_entities": "Реле / Переключатели зоны"
+            }
+          },
+          "safety_settings": {
+            "name": "Защита и расширенные настройки",
+            "description": "Обход по открытию окон, сторожевой таймер и летняя защита от заклинивания.",
+            "data": {
+              "window_sensor": "Датчик окна (опционально)",
+              "sensor_timeout_min": "Тайм-аут сторожевого таймера датчика (минуты)",
+              "anti_seize_zone_enable": "Включить защиту от заклинивания (летняя защита) для этой зоны",
+              "allow_passive_heat": "Разрешить пассивный нагрев (фанкойл без клапана / мезонин)",
+              "weight": "Тепловой вес зоны (Площадь / Мощность радиаторов)"
+            }
+          },
+          "split_settings": {
+            "name": "Room Air Split Actuators",
+            "description": "Secondary direct-expansion split AC / Heat Pump unit for this room.",
+            "data": {
+              "split_climate_entity": "Split AC / Heat Pump Entity",
+              "split_role": "Operational Role",
+              "split_solar_priority": "Solar Priority (Prefer Split on PV Surplus)",
+              "split_quick_boost": "Thermal Shock / Quick Heat Boost",
+              "split_boost_delta": "Boost Delta-T Threshold (°C)",
+              "split_sensor_injection": "Inject Room Sensor (Bypass Ceiling Probe)"
+            }
+          }
+        },
+        "data_description": {
+          "name": "Понятное имя для этой зоны",
+          "temp_sensor": "Основной датчик температуры окружающей среды зоны",
+          "target_temperature": "Целевая температура по умолчанию для этой зоны"
+        }
+      },
+      "trv_calibration": {
+        "title": "Настройка TRV (датчик смещения)",
+        "description": "Выберите объекты смещения температуры (калибровки) для каждого TRV в зоне {zone_name}. Обычно это сущности `number`, предоставляемые интеграцией TRV (например, Better Thermostat, Z2M, ZHA). Если оставить пустым, будет использоваться компенсация целевой температуры.",
+        "data": {}
+      },
+      "another_zone": {
+        "title": "Добавить еще одну зону?",
+        "description": "Вы добавили {zones_added} зон(ы): {zones_list}.",
+        "data": {
+          "add_another": "Добавить еще одну зону"
+        }
+      },
+      "geofencing": {
+        "title": "Геозоны и умное расписание",
+        "description": "Включить геозоны и режим авто-ночь? Если включено, выберите датчик присутствия (например, zone.home или объект персоны).",
+        "data": {
+          "geofencing_enabled": "Включить геозоны и режим авто-ночь",
+          "presence_sensor": "Датчик присутствия"
+        }
+      },
+      "confirm": {
+        "title": "Подтверждение конфигурации",
+        "description": "Готово к настройке Multizone Thermostat.\n\n**Зоны ({zones_count}):**\n{zones_list}\n\nНажмите «Отправить», чтобы создать интеграцию.",
+        "data": {}
+      },
+      "boiler_relay": {
+        "title": "Настройка реле котла",
+        "description": "Выберите переключатель, который управляет реле котла.",
+        "data": {
+          "boiler_switch": "Выключатель котла"
+        },
+        "data_description": {
+          "boiler_switch": "Переключатель/реле, который управляет циркуляционным насосом котла"
+        }
+      },
+      "boiler_opentherm": {
+        "title": "Настройка OpenTherm",
+        "description": "Настройте OpenTherm через двухпутевой режим (Dual-Path): Вариант 1 (Climate Gateway): сущность climate с автоматической телеметрией атрибутов; Вариант 2 (Раздельный): числовая уставка (number) и опциональный переключатель CH. Задайте минимальную и максимальную температуру воды.",
+        "data": {
+          "opentherm_entity": "Объект OpenTherm (Климат / Водонагреватель)",
+          "opentherm_min_temp": "Минимальная температура воды (°C)",
+          "opentherm_max_temp": "Максимальная температура воды (°C)",
+          "opentherm_ch_switch": "Переключатель активации отопления CH (опционально)"
+        }
+      },
+      "boiler_mode": {
+        "title": "Gas Boiler Mode",
+        "description": "Select how you want to control your gas boiler (Relay ON/OFF or OpenTherm Modulating).",
+        "data": {
+          "boiler_mode": "Boiler Control Mode"
+        }
+      },
+      "heat_pump": {
+        "title": "Central Heat Pump (PDC) Setup",
+        "description": "Configure your central hydronic heat pump entity and temperature limits.",
+        "data": {
+          "heat_pump_type": "Heat Pump Control Type",
+          "heat_pump_entity": "Heat Pump Entity",
+          "heat_pump_min_temp": "Minimum Flow Water Temperature (°C)",
+          "heat_pump_max_temp": "Maximum Flow Water Temperature (°C)",
+          "heat_pump_ch_switch": "Heating Enable Switch (Optional)",
+          "heat_pump_cooling": "Включить режим охлаждения",
+          "hp_cool_min_temp": "Минимальная температура воды на охлаждение (°C)",
+          "hp_cool_max_temp": "Максимальная температура воды на охлаждение (°C)"
+        }
+      },
+      "energy_management": {
+        "title": "Solar Self-Consumption & Energy Management",
+        "description": "Configure solar PV surplus detection, battery protection, or external signals from EMHASS/Predbat.",
+        "data": {
+          "energy_management_enabled": "Enable Solar Energy Management",
+          "solar_power_sensor": "Solar Production Power Sensor (W)",
+          "grid_export_sensor": "Grid Export Power Sensor (W)",
+          "battery_soc_sensor": "Battery State of Charge (SOC) Sensor (%)",
+          "external_solar_override_entity": "External Solar Signal / Switch (EMHASS/Predbat)",
+          "solar_export_threshold": "Surplus Export Threshold (W)",
+          "battery_min_reserve_soc": "Battery Safety Reserve Minimum SOC (%)",
+          "solar_min_run_time": "Мин. время солнечного цикла анти-тактования (мин)",
+          "solar_overheat_offset": "Смещение теплового накопления Solar / EMHASS (+°C)",
+          "battery_power_sensor": "Battery Power Sensor (W, optional)",
+          "solar_forecast_sensor": "Solar Forecast Sensor (W or kWh, optional)",
+          "solar_irradiance_sensor": "Solar Irradiance Sensor (W/m² or lux, optional)",
+          "battery_max_discharge_time": "Max Allowed Battery Discharge Time (minutes)",
+          "battery_power_inverted": "Invert Battery Power Sign (if positive = discharge)"
+        }
+      }
     },
-    "options": {
-        "step": {
-            "init": {
-                "title": "Настройки Multizone Thermostat",
-                "description": "Настроено зон: **{zones_count}**\n\nЧто бы вы хотели изменить?",
-                "data": {
-                    "action": "Действие"
-                }
-            },
-            "change_boiler": {
-                "title": "Изменить режим котла",
-                "data": {
-                    "boiler_mode": "Режим управления котлом"
-                }
-            },
-            "edit_calendar": {
-                "title": "Глобальный календарь",
-                "description": "Выберите объект локального календаря для управления расписанием многозонной системы.",
-                "data": {
-                    "global_calendar": "Объект календаря"
-                }
-            },
-            "add_zone": {
-                "title": "Добавить новую зону",
-                "data": {
-                    "climate_entities": "Объект климата",
-                    "anti_seize_zone_enable": "Включить защиту от заклинивания (летняя защита) для этой зоны",
-                    "allow_passive_heat": "Разрешить пассивный нагрев",
-                    "window_sensor": "Датчик окна (опционально)",
-                    "name": "Имя зоны",
-                    "trv_preset_sync": "Включить синхронизацию пресетов TRV",
-                    "switch_entities": "Zone Switches / Relays",
-                    "temp_sensor": "Zone Temperature Sensor",
-                    "target_temperature": "Base Target Temperature",
-                    "sensor_timeout_min": "Тайм-аут сторожевого таймера датчика (минуты)"
-                },
-                "sections": {
-                    "trv_settings": {
-                        "name": "Термостатические клапаны радиаторов (TRV)",
-                        "description": "Стандартные умные термостатические головки с регулировкой температуры.",
-                        "data": {
-                            "climate_entities": "Объект климата",
-                            "trv_preset_sync": "Включить синхронизацию пресетов TRV",
-                            "authoritative_climate_sync": "Приоритетная синхронизация настенного термостата"
-                        }
-                    },
-                    "valve_settings": {
-                        "name": "Пропорциональные и 0-10В клапаны",
-                        "description": "Прямое управление процентом открытия или аналоговое напряжение 0-10В.",
-                        "data": {
-                            "valve_entities": "Объекты клапанов / приводов",
-                            "valve_scale": "Режим шкалы вывода"
-                        }
-                    },
-                    "relay_settings": {
-                        "name": "Релейные приводы (ШИМ)",
-                        "description": "Переключатели ВКЛ/ВЫКЛ и термоэлектрические приводы с широтно-импульсной модуляцией.",
-                        "data": {
-                            "switch_entities": "Реле / Переключатели зоны"
-                        }
-                    },
-                    "safety_settings": {
-                        "name": "Защита и расширенные настройки",
-                        "description": "Обход по открытию окон, сторожевой таймер и летняя защита от заклинивания.",
-                        "data": {
-                            "window_sensor": "Датчик окна (опционально)",
-                            "sensor_timeout_min": "Тайм-аут сторожевого таймера датчика (минуты)",
-                            "anti_seize_zone_enable": "Включить защиту от заклинивания (летняя защита) для этой зоны",
-                            "allow_passive_heat": "Разрешить пассивный нагрев (фанкойл без клапана / мезонин)",
-                            "weight": "Тепловой вес зоны (Площадь / Мощность радиаторов)"
-                        }
-                    }
-                },
-                "data_description": {
-                    "climate_entities": "Объект климата для этой комнаты/зоны",
-                    "allow_passive_heat": "Отключает обнаружение паразитного нагрева, если эта зона естественным образом поглощает тепло в режиме ожидания (например, открытый мезонин или фанкойл без зонального клапана).",
-                    "window_sensor": "Автоматически пропускать зону, когда этот датчик открыт",
-                    "sensor_timeout_min": "Максимальное время без обновлений перед переходом в безопасный режим",
-                    "name": "Понятное имя для этой зоны (заполняется из имени объекта климата)",
-                    "trv_preset_sync": "Автоматически синхронизировать режим пресета при изменении режима HVAC (для физических клапанов TRV)"
-                }
-            },
-            "remove_zone": {
-                "title": "Удалить зону",
-                "description": "Выберите зону для удаления. Переключатель для этой зоны также будет удален.",
-                "data": {
-                    "zone_name": "Зона для удаления"
-                }
-            },
-            "edit_zone": {
-                "title": "Редактировать настройки зоны",
-                "description": "Изменить настройки зоны.",
-                "data": {
-                    "zone_name": "Зона",
-                    "temp_sensor": "Zone Temperature Sensor",
-                    "target_temperature": "Base Target Temperature"
-                },
-                "sections": {
-                    "trv_settings": {
-                        "name": "Термостатические клапаны радиаторов (TRV)",
-                        "description": "Стандартные умные термостатические головки с регулировкой температуры.",
-                        "data": {
-                            "climate_entities": "TRV / Термостаты зоны",
-                            "trv_preset_sync": "Включить синхронизацию пресетов TRV",
-                            "authoritative_climate_sync": "Приоритетная синхронизация настенного термостата"
-                        }
-                    },
-                    "valve_settings": {
-                        "name": "Пропорциональные и 0-10В клапаны",
-                        "description": "Прямое управление процентом открытия или аналоговое напряжение 0-10В.",
-                        "data": {
-                            "valve_entities": "Объекты клапанов / приводов",
-                            "valve_scale": "Режим шкалы вывода"
-                        }
-                    },
-                    "relay_settings": {
-                        "name": "Релейные приводы (ШИМ)",
-                        "description": "Переключатели ВКЛ/ВЫКЛ и термоэлектрические приводы с широтно-импульсной модуляцией.",
-                        "data": {
-                            "switch_entities": "Реле / Переключатели зоны"
-                        }
-                    },
-                    "safety_settings": {
-                        "name": "Защита и расширенные настройки",
-                        "description": "Обход по открытию окон, сторожевой таймер и летняя защита от заклинивания.",
-                        "data": {
-                            "window_sensor": "Датчик окна (опционально)",
-                            "sensor_timeout_min": "Тайм-аут сторожевого таймера датчика (минуты)",
-                            "anti_seize_zone_enable": "Включить защиту от заклинивания (летняя защита) для этой зоны",
-                            "allow_passive_heat": "Разрешить пассивный нагрев (фанкойл без клапана / мезонин)",
-                            "weight": "Тепловой вес зоны (Площадь / Мощность радиаторов)"
-                        }
-                    }
-                }
-            },
-            "edit_geofencing": {
-                "title": "Геозоны и умное расписание",
-                "description": "Включить или отключить Геозоны и выбрать датчик присутствия.",
-                "data": {
-                    "geofencing_enabled": "Включить Геозоны и авто-ночной режим",
-                    "presence_sensor": "Датчик присутствия"
-                }
-            },
-            "trv_calibration_add": {
-                "title": "Настройка TRV (Датчик смещения) (Добавление)",
-                "description": "Выберите объекты смещения температуры (калибровки) для каждого TRV в зоне {zone_name}. Обычно это сущности `number`, предоставляемые интеграцией TRV (например, Better Thermostat, Z2M, ZHA). Если оставить пустым, будет использоваться компенсация целевой температуры."
-            },
-            "trv_calibration_edit": {
-                "title": "Настройка TRV (Датчик смещения) (Редактирование)",
-                "description": "Выберите объекты смещения температуры (калибровки) для каждого TRV в зоне {zone_name}. Обычно это сущности `number`, предоставляемые интеграцией TRV (например, Better Thermostat, Z2M, ZHA). Если оставить пустым, будет использоваться компенсация целевой температуры."
-            },
-            "edit_weather_comp": {
-                "title": "Редактировать погодную компенсацию",
-                "description": "Выберите датчик наружной температуры, чтобы включить автоматическую погодную компенсацию.",
-                "data": {
-                    "weather_sensor": "Датчик наружной температуры"
-                }
-            },
-            "boiler_relay": {
-                "title": "Настройка реле котла",
-                "description": "Выберите переключатель, который управляет реле котла.",
-                "data": {
-                    "boiler_switch": "Выключатель котла"
-                },
-                "data_description": {
-                    "boiler_switch": "Переключатель/реле, который управляет циркуляционным насосом котла"
-                }
-            },
-            "boiler_opentherm": {
-                "title": "Настройка OpenTherm",
-                "description": "Настройте OpenTherm через двухпутевой режим (Dual-Path): Вариант 1 (Climate Gateway): сущность climate с автоматической телеметрией атрибутов; Вариант 2 (Раздельный): числовая уставка (number) и опциональный переключатель CH. Задайте минимальную и максимальную температуру воды.",
-                "data": {
-                    "opentherm_entity": "Объект OpenTherm (Климат / Водонагреватель)",
-                    "opentherm_min_temp": "Минимальная температура воды (°C)",
-                    "opentherm_max_temp": "Максимальная температура воды (°C)",
-                    "opentherm_ch_switch": "Переключатель активации отопления CH (опционально)"
-                }
-            }
-        },
-        "abort": {
-            "no_zones_configured": "Зоны не настроены.",
-            "no_climates_available": "Все доступные климатические сущности уже настроены как зоны.",
-            "no_temp_sensors_found": "В Home Assistant не найдено датчиков температуры.",
-            "no_switches_found": "В Home Assistant не найдено сущностей переключателей.",
-            "no_virtual_thermostats": "Виртуальные термостаты не настроены."
-        },
-        "error": {
-            "zone_name_required": "Имя зоны не может быть пустым.",
-            "presence_sensor_required": "Датчик присутствия обязателен при включённом геофенсинге.",
-            "invalid_temp_range": "Минимальная температура должна быть ниже максимальной.",
-            "no_actuators_selected": "Необходимо выбрать хотя бы одну сущность climate или switch для зоны.",
-            "zone_name_exists": "Зона с таким именем уже существует."
-        }
+    "abort": {
+      "already_configured": "Multizone Thermostat уже настроен. Используйте меню параметров (Options) для изменения зон.",
+      "no_switches_found": "В Home Assistant не найдено сущностей переключателей. Сначала добавьте переключатель/реле.",
+      "no_zones_configured": "Ни одной зоны не было настроено. Пожалуйста, добавьте хотя бы одну зону.",
+      "no_temp_sensors_found": "В Home Assistant не найдено датчиков температуры."
     },
-    "entity": {
-        "switch": {
-            "master": {
-                "name": "Главный выключатель отопления (Heating Master)"
-            }
-        },
-        "select": {
-            "global_preset": {
-                "name": "Глобальный пресет (Global Preset)",
-                "state": {
-                    "manual": "Ручной (Manual)",
-                    "eco": "Эко (Eco)",
-                    "comfort": "Комфорт (Comfort)",
-                    "sleep": "Сон (Sleep)",
-                    "away": "Вне дома (Away)"
-                }
-            },
-            "demand_strategy": {
-                "name": "Стратегия агрегации запроса тепла",
-                "state": {
-                    "max": "Максимальный запрос среди зон (MAX)",
-                    "weighted_average": "Взвешенное среднее",
-                    "sum_capped": "Кумулятивная сумма (ограничено 100%)"
-                }
-            }
-        }
+    "error": {
+      "zone_name_required": "Имя зоны не может быть пустым.",
+      "presence_sensor_required": "Датчик присутствия обязателен при включённом геофенсинге.",
+      "invalid_temp_range": "Минимальная температура должна быть ниже максимальной.",
+      "no_actuators_selected": "Необходимо выбрать хотя бы одну сущность climate или switch для зоны.",
+      "zone_name_exists": "Зона с таким именем уже существует.",
+      "no_plants_selected": "You must select at least one central heating plant (Gas boiler or Heat pump)."
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Настройки Multizone Thermostat",
+        "description": "Настроено зон: **{zones_count}**\n\nЧто бы вы хотели изменить?",
+        "data": {
+          "action": "Действие"
+        },
+        "menu_options": {
+          "change_boiler": "Изменить котел / режим системы",
+          "edit_heat_pump": "Настроить тепловой насос (ТН)",
+          "edit_energy_management": "Настроить управление солнечной энергией",
+          "add_zone": "Добавить зону",
+          "edit_zone": "Редактировать зону",
+          "remove_zone": "Удалить зону",
+          "edit_weather_comp": "Настроить погодную компенсацию",
+          "edit_geofencing": "Настроить геозоны",
+          "edit_calendar": "Редактировать общий календарь"
+        }
+      },
+      "change_boiler": {
+        "title": "Изменить режим котла",
+        "data": {
+          "boiler_mode": "Режим управления котлом"
+        }
+      },
+      "edit_calendar": {
+        "title": "Глобальный календарь",
+        "description": "Выберите объект локального календаря для управления расписанием многозонной системы.",
+        "data": {
+          "global_calendar": "Объект календаря"
+        }
+      },
+      "add_zone": {
+        "title": "Добавить новую зону",
+        "data": {
+          "climate_entities": "Объект климата",
+          "anti_seize_zone_enable": "Включить защиту от заклинивания (летняя защита) для этой зоны",
+          "allow_passive_heat": "Разрешить пассивный нагрев",
+          "window_sensor": "Датчик окна (опционально)",
+          "name": "Имя зоны",
+          "trv_preset_sync": "Включить синхронизацию пресетов TRV",
+          "switch_entities": "Zone Switches / Relays",
+          "temp_sensor": "Zone Temperature Sensor",
+          "target_temperature": "Base Target Temperature",
+          "sensor_timeout_min": "Тайм-аут сторожевого таймера датчика (минуты)"
+        },
+        "sections": {
+          "trv_settings": {
+            "name": "Термостатические клапаны радиаторов (TRV)",
+            "description": "Стандартные умные термостатические головки с регулировкой температуры.",
+            "data": {
+              "climate_entities": "Объект климата",
+              "trv_preset_sync": "Включить синхронизацию пресетов TRV",
+              "authoritative_climate_sync": "Приоритетная синхронизация настенного термостата"
+            }
+          },
+          "valve_settings": {
+            "name": "Пропорциональные и 0-10В клапаны",
+            "description": "Прямое управление процентом открытия или аналоговое напряжение 0-10В.",
+            "data": {
+              "valve_entities": "Объекты клапанов / приводов",
+              "valve_scale": "Режим шкалы вывода"
+            }
+          },
+          "relay_settings": {
+            "name": "Релейные приводы (ШИМ)",
+            "description": "Переключатели ВКЛ/ВЫКЛ и термоэлектрические приводы с широтно-импульсной модуляцией.",
+            "data": {
+              "switch_entities": "Реле / Переключатели зоны"
+            }
+          },
+          "safety_settings": {
+            "name": "Защита и расширенные настройки",
+            "description": "Обход по открытию окон, сторожевой таймер и летняя защита от заклинивания.",
+            "data": {
+              "window_sensor": "Датчик окна (опционально)",
+              "sensor_timeout_min": "Тайм-аут сторожевого таймера датчика (минуты)",
+              "anti_seize_zone_enable": "Включить защиту от заклинивания (летняя защита) для этой зоны",
+              "allow_passive_heat": "Разрешить пассивный нагрев (фанкойл без клапана / мезонин)",
+              "weight": "Тепловой вес зоны (Площадь / Мощность радиаторов)"
+            }
+          },
+          "split_settings": {
+            "name": "Room Air Split Actuators",
+            "description": "Secondary direct-expansion split AC / Heat Pump unit for this room.",
+            "data": {
+              "split_climate_entity": "Split AC / Heat Pump Entity",
+              "split_role": "Operational Role",
+              "split_solar_priority": "Solar Priority (Prefer Split on PV Surplus)",
+              "split_quick_boost": "Thermal Shock / Quick Heat Boost",
+              "split_boost_delta": "Boost Delta-T Threshold (°C)",
+              "split_sensor_injection": "Inject Room Sensor (Bypass Ceiling Probe)"
+            }
+          }
+        },
+        "data_description": {
+          "climate_entities": "Объект климата для этой комнаты/зоны",
+          "allow_passive_heat": "Отключает обнаружение паразитного нагрева, если эта зона естественным образом поглощает тепло в режиме ожидания (например, открытый мезонин или фанкойл без зонального клапана).",
+          "window_sensor": "Автоматически пропускать зону, когда этот датчик открыт",
+          "sensor_timeout_min": "Максимальное время без обновлений перед переходом в безопасный режим",
+          "name": "Понятное имя для этой зоны (заполняется из имени объекта климата)",
+          "trv_preset_sync": "Автоматически синхронизировать режим пресета при изменении режима HVAC (для физических клапанов TRV)"
+        }
+      },
+      "remove_zone": {
+        "title": "Удалить зону",
+        "description": "Выберите зону для удаления. Переключатель для этой зоны также будет удален.",
+        "data": {
+          "zone_name": "Зона для удаления"
+        }
+      },
+      "edit_zone": {
+        "title": "Редактировать настройки зоны",
+        "description": "Изменить настройки зоны.",
+        "data": {
+          "zone_name": "Зона",
+          "temp_sensor": "Zone Temperature Sensor",
+          "target_temperature": "Base Target Temperature"
+        },
+        "sections": {
+          "trv_settings": {
+            "name": "Термостатические клапаны радиаторов (TRV)",
+            "description": "Стандартные умные термостатические головки с регулировкой температуры.",
+            "data": {
+              "climate_entities": "TRV / Термостаты зоны",
+              "trv_preset_sync": "Включить синхронизацию пресетов TRV",
+              "authoritative_climate_sync": "Приоритетная синхронизация настенного термостата"
+            }
+          },
+          "valve_settings": {
+            "name": "Пропорциональные и 0-10В клапаны",
+            "description": "Прямое управление процентом открытия или аналоговое напряжение 0-10В.",
+            "data": {
+              "valve_entities": "Объекты клапанов / приводов",
+              "valve_scale": "Режим шкалы вывода"
+            }
+          },
+          "relay_settings": {
+            "name": "Релейные приводы (ШИМ)",
+            "description": "Переключатели ВКЛ/ВЫКЛ и термоэлектрические приводы с широтно-импульсной модуляцией.",
+            "data": {
+              "switch_entities": "Реле / Переключатели зоны"
+            }
+          },
+          "safety_settings": {
+            "name": "Защита и расширенные настройки",
+            "description": "Обход по открытию окон, сторожевой таймер и летняя защита от заклинивания.",
+            "data": {
+              "window_sensor": "Датчик окна (опционально)",
+              "sensor_timeout_min": "Тайм-аут сторожевого таймера датчика (минуты)",
+              "anti_seize_zone_enable": "Включить защиту от заклинивания (летняя защита) для этой зоны",
+              "allow_passive_heat": "Разрешить пассивный нагрев (фанкойл без клапана / мезонин)",
+              "weight": "Тепловой вес зоны (Площадь / Мощность радиаторов)"
+            }
+          },
+          "split_settings": {
+            "name": "Room Air Split Actuators",
+            "description": "Secondary direct-expansion split AC / Heat Pump unit for this room.",
+            "data": {
+              "split_climate_entity": "Split AC / Heat Pump Entity",
+              "split_role": "Operational Role",
+              "split_solar_priority": "Solar Priority (Prefer Split on PV Surplus)",
+              "split_quick_boost": "Thermal Shock / Quick Heat Boost",
+              "split_boost_delta": "Boost Delta-T Threshold (°C)",
+              "split_sensor_injection": "Inject Room Sensor (Bypass Ceiling Probe)"
+            }
+          }
+        }
+      },
+      "edit_geofencing": {
+        "title": "Геозоны и умное расписание",
+        "description": "Включить или отключить Геозоны и выбрать датчик присутствия.",
+        "data": {
+          "geofencing_enabled": "Включить Геозоны и авто-ночной режим",
+          "presence_sensor": "Датчик присутствия"
+        }
+      },
+      "trv_calibration_add": {
+        "title": "Настройка TRV (Датчик смещения) (Добавление)",
+        "description": "Выберите объекты смещения температуры (калибровки) для каждого TRV в зоне {zone_name}. Обычно это сущности `number`, предоставляемые интеграцией TRV (например, Better Thermostat, Z2M, ZHA). Если оставить пустым, будет использоваться компенсация целевой температуры.",
+        "data": {}
+      },
+      "trv_calibration_edit": {
+        "title": "Настройка TRV (Датчик смещения) (Редактирование)",
+        "description": "Выберите объекты смещения температуры (калибровки) для каждого TRV в зоне {zone_name}. Обычно это сущности `number`, предоставляемые интеграцией TRV (например, Better Thermostat, Z2M, ZHA). Если оставить пустым, будет использоваться компенсация целевой температуры.",
+        "data": {}
+      },
+      "edit_weather_comp": {
+        "title": "Редактировать погодную компенсацию",
+        "description": "Выберите датчик наружной температуры, чтобы включить автоматическую погодную компенсацию.",
+        "data": {
+          "weather_sensor": "Датчик наружной температуры"
+        }
+      },
+      "boiler_relay": {
+        "title": "Настройка реле котла",
+        "description": "Выберите переключатель, который управляет реле котла.",
+        "data": {
+          "boiler_switch": "Выключатель котла"
+        },
+        "data_description": {
+          "boiler_switch": "Переключатель/реле, который управляет циркуляционным насосом котла"
+        }
+      },
+      "boiler_opentherm": {
+        "title": "Настройка OpenTherm",
+        "description": "Настройте OpenTherm через двухпутевой режим (Dual-Path): Вариант 1 (Climate Gateway): сущность climate с автоматической телеметрией атрибутов; Вариант 2 (Раздельный): числовая уставка (number) и опциональный переключатель CH. Задайте минимальную и максимальную температуру воды.",
+        "data": {
+          "opentherm_entity": "Объект OpenTherm (Климат / Водонагреватель)",
+          "opentherm_min_temp": "Минимальная температура воды (°C)",
+          "opentherm_max_temp": "Максимальная температура воды (°C)",
+          "opentherm_ch_switch": "Переключатель активации отопления CH (опционально)"
+        }
+      },
+      "edit_energy_management": {
+        "title": "Solar Self-Consumption & Energy Management",
+        "description": "Configure solar PV surplus detection, battery protection, or external signals from EMHASS/Predbat.",
+        "data": {
+          "energy_management_enabled": "Enable Solar Energy Management",
+          "solar_power_sensor": "Solar Production Power Sensor (W)",
+          "grid_export_sensor": "Grid Export Power Sensor (W)",
+          "battery_soc_sensor": "Battery State of Charge (SOC) Sensor (%)",
+          "external_solar_override_entity": "External Solar Signal / Switch (EMHASS/Predbat)",
+          "solar_export_threshold": "Surplus Export Threshold (W)",
+          "battery_min_reserve_soc": "Battery Safety Reserve Minimum SOC (%)",
+          "solar_min_run_time": "Мин. время солнечного цикла анти-тактования (мин)",
+          "solar_overheat_offset": "Смещение теплового накопления Solar / EMHASS (+°C)",
+          "battery_power_sensor": "Battery Power Sensor (W, optional)",
+          "solar_forecast_sensor": "Solar Forecast Sensor (W or kWh, optional)",
+          "solar_irradiance_sensor": "Solar Irradiance Sensor (W/m² or lux, optional)",
+          "battery_max_discharge_time": "Max Allowed Battery Discharge Time (minutes)",
+          "battery_power_inverted": "Invert Battery Power Sign (if positive = discharge)"
+        }
+      },
+      "edit_heat_pump": {
+        "title": "Редактировать тепловой насос",
+        "description": "Настройка параметров центрального теплового насоса и температурных пределов.",
+        "data": {
+          "enable_heat_pump": "Включить тепловой насос",
+          "heat_pump_type": "Тип управления тепловым насосом",
+          "heat_pump_entity": "Сущность теплового насоса",
+          "heat_pump_cooling": "Включить режим охлаждения",
+          "heat_pump_min_temp": "Минимальная температура подачи (°C)",
+          "heat_pump_max_temp": "Максимальная температура подачи (°C)",
+          "hp_cool_min_temp": "Минимальная температура воды на охлаждение (°C)",
+          "hp_cool_max_temp": "Максимальная температура воды на охлаждение (°C)",
+          "heat_pump_ch_switch": "Переключатель нагрева (Опционально)"
+        }
+      },
+      "trv_calibration": {
+        "title": "Конфигурация TRV (Датчик смещения)",
+        "description": "Выберите сущности калибровки для каждого TRV в зоне {zone_name}.",
+        "data": {}
+      }
+    },
+    "abort": {
+      "no_zones_configured": "Зоны не настроены.",
+      "no_climates_available": "Все доступные климатические сущности уже настроены как зоны.",
+      "no_temp_sensors_found": "В Home Assistant не найдено датчиков температуры.",
+      "no_switches_found": "В Home Assistant не найдено сущностей переключателей.",
+      "no_virtual_thermostats": "Виртуальные термостаты не настроены."
+    },
+    "error": {
+      "zone_name_required": "Имя зоны не может быть пустым.",
+      "presence_sensor_required": "Датчик присутствия обязателен при включённом геофенсинге.",
+      "invalid_temp_range": "Минимальная температура должна быть ниже максимальной.",
+      "no_actuators_selected": "Необходимо выбрать хотя бы одну сущность climate или switch для зоны.",
+      "zone_name_exists": "Зона с таким именем уже существует.",
+      "hp_temps_invalid": "Минимальная температура отопления/охлаждения ТН должна быть ниже максимальной.",
+      "no_plants_selected": "Необходимо выбрать хотя бы один источник тепла (Газовый котел, Тепловой насос или Сплит-систему)."
+    }
+  },
+  "entity": {
+    "switch": {
+      "master": {
+        "name": "Главный выключатель отопления (Heating Master)"
+      },
+      "master_allow_split_heating": {
+        "name": "Разрешить обогрев сплит-системой"
+      },
+      "master_allow_split_cooling": {
+        "name": "Разрешить охлаждение сплит-системой"
+      }
+    },
+    "select": {
+      "global_preset": {
+        "name": "Глобальный пресет (Global Preset)",
+        "state": {
+          "manual": "Ручной (Manual)",
+          "eco": "Эко (Eco)",
+          "comfort": "Комфорт (Comfort)",
+          "sleep": "Сон (Sleep)",
+          "away": "Вне дома (Away)"
+        }
+      },
+      "demand_strategy": {
+        "name": "Стратегия агрегации запроса тепла",
+        "state": {
+          "max": "Максимальный запрос среди зон (MAX)",
+          "weighted_average": "Взвешенное среднее",
+          "sum_capped": "Кумулятивная сумма (ограничено 100%)"
+        }
+      },
+      "master_heat_source_priority": {
+        "name": "Приоритет источника тепла",
+        "state": {
+          "auto": "Автоматический (Излишки ВИЭ, Буст и ИИ)",
+          "hybrid": "Ручной гибридный (Сплит где есть, Газ для остальных)",
+          "combined": "Ручной комбинированный (Газ + Сплит одновременно)",
+          "gas_only": "Ручной только газ (Сплит заблокирован)",
+          "electric_only": "Ручной только электро (Котёл заблокирован)"
+        }
+      },
+      "master_operation_mode": {
+        "name": "Режим работы Мастер",
+        "state": {
+          "heat": "Отопление",
+          "cool": "Охлаждение"
+        }
+      },
+      "schedule_profile": {
+        "name": "Профиль расписания"
+      }
+    },
+    "sensor": {
+      "energy_class": {
+        "name": "Класс энергоэффективности"
+      }
+    }
+  },
+  "selector": {
+    "action": {
+      "options": {
+        "change_boiler": "Изменить котел / режим системы",
+        "edit_heat_pump": "Настроить тепловой насос (ТН)",
+        "edit_energy_management": "Настроить управление солнечной энергией",
+        "add_zone": "Добавить зону",
+        "edit_zone": "Редактировать зону",
+        "remove_zone": "Удалить зону",
+        "edit_weather_comp": "Настроить погодную компенсацию",
+        "edit_geofencing": "Настроить геозоны",
+        "edit_calendar": "Редактировать общий календарь"
+      }
+    }
+  }
 }

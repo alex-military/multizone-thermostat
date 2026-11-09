@@ -28,6 +28,17 @@ class DeviceRegistry:
     def async_get(self, device_id):
         return self.devices.get(device_id)
 
+    def async_get_device(self, identifiers=None):
+        if not identifiers:
+            return None
+        for dev in self.devices.values():
+            if dev.identifiers and (dev.identifiers & identifiers):
+                return dev
+        return None
+
+    def async_remove_device(self, device_id):
+        self.devices.pop(device_id, None)
+
 _REGISTRY = DeviceRegistry()
 
 def async_get(hass):

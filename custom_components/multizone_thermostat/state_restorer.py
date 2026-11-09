@@ -29,7 +29,7 @@ class ZoneStateRestorer:
 
         last_state = await entity.async_get_last_state()
         if last_state is not None:
-            if last_state.state in (HVACMode.HEAT, HVACMode.OFF):
+            if last_state.state in (HVACMode.HEAT, HVACMode.COOL, HVACMode.OFF, "heat", "cool", "off"):
                 hvac_mode = HVACMode(last_state.state)
             if last_state.attributes.get(ATTR_TEMPERATURE) is not None:
                 try:

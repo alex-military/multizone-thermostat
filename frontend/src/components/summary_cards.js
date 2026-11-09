@@ -484,7 +484,14 @@ class MultizoneThermostatScheduleSummaryCard extends HTMLElement {
     const label = this.shadowRoot.getElementById('label');
     const dot = this.shadowRoot.getElementById('dot');
 
-    const profileState = this._hass.states['select.multizone_thermostat_active_profile'];
+    const profileEntityId = Object.keys(this._hass.states).find(k =>
+      k.startsWith('select.') && (
+        k.includes('schedule_profile') ||
+        k.includes('active_profile') ||
+        k.includes('profilo_programmazione')
+      )
+    );
+    const profileState = profileEntityId ? this._hass.states[profileEntityId] : null;
     const activeProfile = profileState ? profileState.state : 'standard';
 
     if (activeProfile && activeProfile !== 'none') {
@@ -745,7 +752,13 @@ class MultizoneThermostatHealthSummaryCard extends HTMLElement {
     const dot = this.shadowRoot.getElementById('dot');
     const iconBox = this.shadowRoot.getElementById('icon-box');
 
-    const errSensors = ['binary_sensor.multizone_thermostat_anomaly_detected'];
+    const errSensors = Object.keys(this._hass.states).filter(k =>
+      k.startsWith('binary_sensor.') && (
+        k.includes('plant_anomaly') ||
+        k.includes('anomaly_detected') ||
+        k.includes('anomalia_impianto')
+      )
+    );
     let hasAnomaly = false;
     for (const sid of errSensors) {
       if (this._hass.states[sid]?.state === 'on') {

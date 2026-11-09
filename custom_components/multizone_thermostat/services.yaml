@@ -173,3 +173,28 @@ set_preset_temperature:
           min: 5.0
           max: 35.0
           step: 0.5
+    hvac_mode:
+      name: HVAC Mode
+      description: Optional HVAC mode (heat or cool) for season-specific presets.
+      required: false
+      example: heat
+      selector:
+        select:
+          options:
+            - heat
+            - cool
+
+set_master_operation_mode:
+  name: Set Master Operation Mode
+  description: Switch master operation mode between heating (heat) and cooling (cool).
+  fields:
+    operation_mode:
+      name: Operation Mode
+      description: Target operation mode ('heat' or 'cool').
+      required: true
+      example: cool
+      selector:
+        select:
+          options:
+            - heat
+            - cool

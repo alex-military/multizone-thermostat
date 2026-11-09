@@ -15,7 +15,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_time_interval
 
-from .const import DOMAIN, CONF_ZONES, CONF_ZONE_NAME, make_zone_entity_id, make_via_device_kwargs
+from .const import DOMAIN, CONF_ZONES, CONF_ZONE_NAME, make_zone_entity_id, make_via_device_kwargs, make_zone_device_info
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -143,16 +143,10 @@ class MultizoneZoneAnomalyBinarySensor(BinarySensorEntity):
         self._entry_id = entry_id
         self._name = name
         self._climate_id = climate_id
-        self._attr_name = f"{name} Anomaly"
+        self._attr_name = "Anomaly"
         self._attr_unique_id = f"{DOMAIN}_{entry_id}_anomaly_{climate_id}"
         master_dev_id = getattr(coordinator, "master_device_id", None)
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, f"{entry_id}_zones")},
-            name="Heating Zones",
-            manufacturer="Multizone Thermostat",
-            model="Hybrid Zone Controller",
-            **make_via_device_kwargs(entry_id, master_dev_id),
-        )
+        self._attr_device_info = make_zone_device_info(entry_id, self._name, master_dev_id)
 
     @property
     def is_on(self) -> bool:

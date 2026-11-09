@@ -46,7 +46,7 @@ class ZoneSyncManager:
         self._last_valve_positions: dict[str, float] = {}
 
         self._sync_lock = asyncio.Lock()
-        self._trv_event_lock = asyncio.Lock()
+        self._trv_event_lock = self._sync_lock
         self._last_known_trv_targets: dict[str, float] = {}
         self._pending_trv_targets: dict[str, float] = {}
         self._pending_calib: dict[str, tuple[float, float, float]] = {}
@@ -117,7 +117,10 @@ class ZoneSyncManager:
             return
 
         async with self._sync_lock:
-            target_hvac_mode = HVACMode.HEAT if master_hvac_mode != HVACMode.OFF else HVACMode.OFF
+            if master_hvac_mode in (HVACMode.OFF, HVACMode.COOL, "off", "cool"):
+                target_hvac_mode = HVACMode.OFF
+            else:
+                target_hvac_mode = HVACMode.HEAT
 
             for trv in self._climates:
                 try:
@@ -211,7 +214,8 @@ class ZoneSyncManager:
                                     except Exception as calib_err:
                                         _LOGGER.warning("Failed to update calibration entity %s for TRV %s: %s", calib_entity, trv, calib_err)
                                 else:
-                                    trv_target = master_target_temp + (trv_curr_f - master_curr_f)
+                                    temp_offset = max(-3.0, min(3.0, trv_curr_f - master_curr_f))
+                                    trv_target = master_target_temp + temp_offset
                                     trv_target = max(5.0, min(35.0, trv_target))
                         
                         step = st.attributes.get("target_temp_step")
@@ -290,7 +294,12 @@ class ZoneSyncManager:
         self._local_pwm.set_params(min_on=min_on_s, min_off=min_off_s)
 
         now = time.monotonic()
-        if master_hvac_mode == HVACMode.OFF:
+        master_on = self._coordinator.get_master_state() if hasattr(self._coordinator, "get_master_state") else True
+        zone_mode = self._coordinator.get_zone_mode(self._entity_id) if hasattr(self._coordinator, "get_zone_mode") else None
+        is_cooling = master_hvac_mode in (HVACMode.COOL, "cool")
+        hp_cooling_allowed = bool(getattr(self._coordinator, "enable_heat_pump", False) and getattr(self._coordinator, "heat_pump_cooling", True))
+
+        if not master_on or master_hvac_mode in (HVACMode.OFF, "off") or zone_mode == "bypass" or (is_cooling and not hp_cooling_allowed):
             new_pwm_state = False
         else:
             demand = self._coordinator.get_zone_demand(self._entity_id)
@@ -338,8 +347,12 @@ class ZoneSyncManager:
         if not self._valves:
             return
 
+        master_on = self._coordinator.get_master_state() if hasattr(self._coordinator, "get_master_state") else True
         zone_mode = self._coordinator.get_zone_mode(self._entity_id) if hasattr(self._coordinator, "get_zone_mode") else None
-        if master_hvac_mode == HVACMode.OFF or zone_mode == "bypass":
+        is_cooling = master_hvac_mode in (HVACMode.COOL, "cool")
+        hp_cooling_allowed = bool(getattr(self._coordinator, "enable_heat_pump", False) and getattr(self._coordinator, "heat_pump_cooling", True))
+
+        if not master_on or master_hvac_mode in (HVACMode.OFF, "off") or zone_mode == "bypass" or (is_cooling and not hp_cooling_allowed):
             target_pct = 0.0
         else:
             target_pct = float(self._coordinator.get_zone_demand(self._entity_id))
@@ -379,6 +392,7 @@ class ZoneSyncManager:
             except Exception as err:
                 _LOGGER.error("Failed to set proportional valve position for %s: %s", valve_entity, err)
 
+    async_sync_valves = async_sync_proportional_valves
 
     async def process_trv_change(
         self,
@@ -415,7 +429,7 @@ class ZoneSyncManager:
             # 1. Check pending command confirmation FIRST (even if event carries _internal_context!)
             if entity_id in self._pending_trv_targets:
                 pending = self._pending_trv_targets[entity_id]
-                if new_temp is not None and abs(new_temp - pending) < 0.01:
+                if new_temp is not None and abs(new_temp - pending) <= 0.55:
                     self._pending_trv_targets.pop(entity_id, None)
                     self._last_known_trv_targets[entity_id] = new_temp
                     health = self.trv_health.setdefault(entity_id, {})
@@ -435,7 +449,8 @@ class ZoneSyncManager:
                     return None, None
 
             # 2. Ignore self-generated events that were not pending target confirmations
-            if event.context.id in (master_context_id, self._internal_context.id):
+            event_ctx = getattr(event, "context", None)
+            if event_ctx and getattr(event_ctx, "id", None) in (master_context_id, self._internal_context.id):
                 return None, None
 
             if new_state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
@@ -470,6 +485,8 @@ class ZoneSyncManager:
                     if new_state.state in (HVACMode.HEAT, "idle", "auto") and master_hvac_mode == HVACMode.OFF:
                         if new_temp is not None and new_temp > 7.0:
                             self._last_known_trv_targets[entity_id] = new_temp
+                        if master_hvac_mode in (HVACMode.COOL, "cool"):
+                            return None, None
                         return HVACMode.HEAT, None
                 if new_temp is not None and new_temp > 7.0:
                     self._last_known_trv_targets[entity_id] = new_temp
@@ -489,6 +506,18 @@ class ZoneSyncManager:
             if eff_new_mode == HVACMode.HEAT and eff_old_mode == HVACMode.OFF:
                 if new_temp is not None and new_temp > 7.0:
                     self._last_known_trv_targets[entity_id] = new_temp
+                if master_hvac_mode in (HVACMode.COOL, "cool"):
+                    # TRV turned on during cooling season: force it back to OFF and never switch zone to heat
+                    try:
+                        await self.hass.services.async_call(
+                            "climate",
+                            "set_hvac_mode",
+                            {"entity_id": entity_id, "hvac_mode": HVACMode.OFF},
+                            context=self._internal_context,
+                        )
+                    except Exception as err:
+                        _LOGGER.debug("Failed to force TRV %s to OFF during cooling: %s", entity_id, err)
+                    return None, None
                 if (physical_sync_enabled or self._authoritative_sync) and master_hvac_mode != HVACMode.HEAT:
                     return HVACMode.HEAT, None
                 return None, None
@@ -502,6 +531,19 @@ class ZoneSyncManager:
                 if abs(new_temp - old_temp) > 0.01:
                     delta = new_temp - old_temp
                     self._last_known_trv_targets[entity_id] = new_temp
+                    if master_hvac_mode in (HVACMode.COOL, "cool"):
+                        # In cooling season, TRV knob delta must not change heating setpoint or turn on heat
+                        if eff_new_mode != HVACMode.OFF:
+                            try:
+                                await self.hass.services.async_call(
+                                    "climate",
+                                    "set_hvac_mode",
+                                    {"entity_id": entity_id, "hvac_mode": HVACMode.OFF},
+                                    context=self._internal_context,
+                                )
+                            except Exception as err:
+                                _LOGGER.debug("Failed to force TRV %s to OFF during cooling knob delta: %s", entity_id, err)
+                        return None, None
                     self._coordinator.record_diagnostic_event("TRV_KNOB_DELTA", {
                         "zone": self._zone_name,
                         "trv": entity_id,

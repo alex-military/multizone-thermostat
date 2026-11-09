@@ -36,6 +36,7 @@ from .const import (
     CONF_ZONE_CLIMATES,
     make_zone_entity_id,
     make_via_device_kwargs,
+    make_zone_device_info,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -83,6 +84,10 @@ async def async_setup_entry(
             entities.append(MultizonePhysicalSyncSwitch(coordinator, config_entry.entry_id, zone_name))
         # Per-Zone Passive Heat Switch (Dynamic Toggle for fancoils without valves / mezzanines)
         entities.append(MultizonePassiveHeatSwitch(coordinator, config_entry.entry_id, zone_name))
+
+    # Phase 11: Master Split Heating & Cooling switches
+    entities.append(MultizoneMasterAllowSplitHeatingSwitch(coordinator, config_entry.entry_id))
+    entities.append(MultizoneMasterAllowSplitCoolingSwitch(coordinator, config_entry.entry_id))
 
     async_add_entities(entities, True)
 
@@ -143,6 +148,8 @@ class MultizoneMasterSwitch(RestoreEntity, SwitchEntity):
             "boiler_switch": self._coordinator.boiler_switch,
             "boiler_status_reason": self._coordinator.boiler_status_reason,
             "boiler_mode": self._coordinator.boiler_mode,
+            "master_hvac_mode": getattr(self._coordinator, "master_hvac_mode", "heat"),
+            "season": "summer" if getattr(self._coordinator, "master_hvac_mode", "heat") == "cool" else "winter",
         }
         if hasattr(self._coordinator, "schedule_manager") and hasattr(self._coordinator.schedule_manager, "get_state_summary"):
             attrs["schedule_status"] = self._coordinator.schedule_manager.get_state_summary()
@@ -171,6 +178,12 @@ class MultizoneMasterSwitch(RestoreEntity, SwitchEntity):
             is_on = last_state.state == "on"
             self._coordinator.set_master_state(is_on)
             _LOGGER.debug("Master switch restored to: %s", is_on)
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Clean up when entity is removed from hass."""
+        if getattr(self._coordinator, "_master_switch", None) is self:
+            self._coordinator._master_switch = None
+        await super().async_will_remove_from_hass()
 
 
 
@@ -308,8 +321,9 @@ class MultizonePhysicalSyncSwitch(SwitchEntity):
         safe_name = "".join(c for c in safe_name if c.isalnum() or c == "_")
         self._safe_name = safe_name
         self._attr_unique_id = f"{DOMAIN}_{entry_id}_physical_sync_{safe_name}"
-        self._attr_name = f"Physical Controls Sync {zone_name}"
-        self._attr_device_info = _make_device_info(entry_id, getattr(coordinator, "master_device_id", None), "zone_modes")
+        self._attr_name = "Physical Controls Sync"
+        master_dev_id = getattr(coordinator, "master_device_id", None)
+        self._attr_device_info = make_zone_device_info(entry_id, zone_name, master_dev_id)
 
     @property
     def is_on(self) -> bool:
@@ -345,8 +359,9 @@ class MultizonePassiveHeatSwitch(SwitchEntity):
         self._safe_name = safe_name
         self._climate_id = make_zone_entity_id(zone_name)
         self._attr_unique_id = f"{DOMAIN}_{entry_id}_passive_heat_{safe_name}"
-        self._attr_name = f"Passive Heat {zone_name}"
-        self._attr_device_info = _make_device_info(entry_id, getattr(coordinator, "master_device_id", None), "zone_modes")
+        self._attr_name = "Passive Heat"
+        master_dev_id = getattr(coordinator, "master_device_id", None)
+        self._attr_device_info = make_zone_device_info(entry_id, zone_name, master_dev_id)
 
     @property
     def is_on(self) -> bool:
@@ -416,4 +431,79 @@ class MultizoneSchedulerSwitch(RestoreEntity, SwitchEntity):
         """Turn off weekly scheduler."""
         if hasattr(self._coordinator, "schedule_manager"):
             await self._coordinator.schedule_manager.async_set_scheduler_enabled(False)
+        self.async_write_ha_state()
+
+
+
+class MultizoneMasterAllowSplitHeatingSwitch(SwitchEntity):
+    """Switch to globally enable or disable Split AC heating."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "master_allow_split_heating"
+    _attr_icon = "mdi:heat-pump"
+
+    def __init__(self, coordinator: Any, entry_id: str) -> None:
+        """Initialize switch."""
+        self._coordinator = coordinator
+        self._entry_id = entry_id
+        self._attr_unique_id = f"{DOMAIN}_{entry_id}_allow_split_heating"
+        self._attr_device_info = _make_device_info(entry_id, getattr(coordinator, "master_device_id", None))
+
+    @property
+    def is_on(self) -> bool:
+        """Return True if split heating is allowed."""
+        energy_mgr = getattr(self._coordinator, "energy_manager", None)
+        if energy_mgr is not None:
+            return bool(energy_mgr.is_split_heating_allowed())
+        return True
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Turn on split heating permission."""
+        energy_mgr = getattr(self._coordinator, "energy_manager", None)
+        if energy_mgr is not None:
+            await energy_mgr.async_set_split_heating_allowed(True)
+        self.async_write_ha_state()
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Turn off split heating permission."""
+        energy_mgr = getattr(self._coordinator, "energy_manager", None)
+        if energy_mgr is not None:
+            await energy_mgr.async_set_split_heating_allowed(False)
+        self.async_write_ha_state()
+
+
+class MultizoneMasterAllowSplitCoolingSwitch(SwitchEntity):
+    """Switch to globally enable or disable Split AC cooling."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "master_allow_split_cooling"
+    _attr_icon = "mdi:air-conditioner"
+
+    def __init__(self, coordinator: Any, entry_id: str) -> None:
+        """Initialize switch."""
+        self._coordinator = coordinator
+        self._entry_id = entry_id
+        self._attr_unique_id = f"{DOMAIN}_{entry_id}_allow_split_cooling"
+        self._attr_device_info = _make_device_info(entry_id, getattr(coordinator, "master_device_id", None))
+
+    @property
+    def is_on(self) -> bool:
+        """Return True if split cooling is allowed."""
+        energy_mgr = getattr(self._coordinator, "energy_manager", None)
+        if energy_mgr is not None:
+            return bool(energy_mgr.is_split_cooling_allowed())
+        return True
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Turn on split cooling permission."""
+        energy_mgr = getattr(self._coordinator, "energy_manager", None)
+        if energy_mgr is not None:
+            await energy_mgr.async_set_split_cooling_allowed(True)
+        self.async_write_ha_state()
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Turn off split cooling permission."""
+        energy_mgr = getattr(self._coordinator, "energy_manager", None)
+        if energy_mgr is not None:
+            await energy_mgr.async_set_split_cooling_allowed(False)
         self.async_write_ha_state()

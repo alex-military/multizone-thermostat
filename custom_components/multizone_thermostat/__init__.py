@@ -20,6 +20,9 @@ from .const import (
     MODE_OPENTHERM,
     CONF_ZONES,
     DOMAIN,
+    CONF_ENABLE_GAS_HEATER,
+    CONF_ENABLE_HEAT_PUMP,
+    CONF_HEAT_PUMP_ENTITY,
 )
 from .coordinator import MultizoneCoordinator
 
@@ -33,13 +36,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
 
     config = {**entry.data, **entry.options}
+    enable_gas = config.get(CONF_ENABLE_GAS_HEATER, True)
+    enable_hp = config.get(CONF_ENABLE_HEAT_PUMP, False)
     boiler_mode = config.get(CONF_BOILER_MODE, MODE_RELAY)
     boiler_switch = config.get(CONF_BOILER_SWITCH)
     opentherm_entity = config.get(CONF_OPENTHERM_ENTITY)
+    hp_entity = config.get(CONF_HEAT_PUMP_ENTITY)
     zones = [dict(z) for z in list(config.get(CONF_ZONES, []))]
 
     # Validate primary entity exists
-    if boiler_mode == MODE_RELAY and boiler_switch:
+    if enable_gas and boiler_mode == MODE_RELAY and boiler_switch:
         boiler_state = hass.states.get(boiler_switch)
         if boiler_state is None:
             if getattr(hass, "is_running", True):
@@ -63,7 +69,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                                 boiler_switch,
                             )
                     hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, _check_boiler_started)
-    elif boiler_mode == MODE_OPENTHERM and opentherm_entity:
+    elif enable_gas and boiler_mode == MODE_OPENTHERM and opentherm_entity:
         ot_state = hass.states.get(opentherm_entity)
         if ot_state is None:
             if getattr(hass, "is_running", True):
@@ -87,6 +93,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                                 opentherm_entity,
                             )
                     hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, _check_ot_started)
+    if enable_hp and hp_entity:
+        hp_state = hass.states.get(hp_entity)
+        if hp_state is None:
+            _LOGGER.debug("Heat pump entity '%s' not yet available during startup.", hp_entity)
 
     # Migrate old config format to new Hybrid Zones format
     migrated = False
@@ -161,6 +171,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Set up platforms first so entities are registered before listeners/calendar fire
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    # Safely clean up legacy empty devices (_zones, _virtual_thermostats, _zone_modes)
+    try:
+        from homeassistant.helpers import entity_registry as er
+        entity_registry = er.async_get(hass)
+        legacy_suffixes = ["_zones", "_virtual_thermostats", "_zone_modes"]
+        for suffix in legacy_suffixes:
+            dev = device_registry.async_get_device(identifiers={(DOMAIN, f"{entry.entry_id}{suffix}")})
+            if dev is not None:
+                entries = er.async_entries_for_device(entity_registry, dev.id)
+                if not entries:
+                    _LOGGER.info("Cleaning up legacy empty device: %s (%s)", dev.name, dev.id)
+                    device_registry.async_remove_device(dev.id)
+    except Exception as cleanup_err:
+        _LOGGER.debug("Legacy device cleanup skipped: %s", cleanup_err)
 
     # Set up state listeners
     coordinator.async_setup_listeners()
@@ -251,11 +276,17 @@ async def _async_register_services(hass: HomeAssistant) -> None:
     from homeassistant.core import ServiceCall
 
     async def handle_save_schedule_profile(call: ServiceCall) -> None:
-        profile_id = call.data["profile_id"]
+        profile_dict = call.data.get("profile") or {}
+        if not isinstance(profile_dict, dict):
+            profile_dict = {}
+        profile_id = call.data.get("profile_id") or profile_dict.get("profile_id") or profile_dict.get("id")
+        if not profile_id:
+            _LOGGER.error("Cannot save schedule profile without profile_id")
+            return
         profile_data = {
-            "name": call.data.get("name", profile_id.capitalize()),
-            "baseline_preset": call.data.get("baseline_preset", "eco"),
-            "days": call.data.get("days", {}),
+            "name": call.data.get("name") or profile_dict.get("name") or profile_id.capitalize(),
+            "baseline_preset": call.data.get("baseline_preset") or profile_dict.get("baseline_preset") or "eco",
+            "days": call.data.get("days") if call.data.get("days") is not None else profile_dict.get("days", {}),
         }
         for coord in _get_active_coordinators(hass):
             if hasattr(coord, "schedule_manager"):
@@ -312,11 +343,21 @@ async def _async_register_services(hass: HomeAssistant) -> None:
         preset = call.data["preset"]
         entity_id = call.data["entity_id"]
         temperature = float(call.data["temperature"])
+        hvac_mode = call.data.get("hvac_mode")
         for coord in _get_active_coordinators(hass):
             if hasattr(coord, "zone_manager"):
-                coord.zone_manager.update_preset_temperature(preset, entity_id, temperature)
+                coord.zone_manager.update_preset_temperature(preset, entity_id, temperature, hvac_mode=hvac_mode)
             if hasattr(coord, "schedule_manager"):
                 await coord.schedule_manager.async_evaluate_schedule()
+
+    async def handle_set_master_operation_mode(call: ServiceCall) -> None:
+        mode = call.data.get("operation_mode") or call.data.get("hvac_mode")
+        if mode not in (HVAC_MODE_HEAT, HVAC_MODE_COOL):
+            _LOGGER.warning("Invalid master operation mode: %s", mode)
+            return
+        for coord in _get_active_coordinators(hass):
+            if hasattr(coord, "async_set_master_hvac_mode"):
+                await coord.async_set_master_hvac_mode(mode)
 
     services = {
         "save_schedule_profile": handle_save_schedule_profile,
@@ -326,6 +367,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
         "cancel_smart_return": handle_cancel_smart_return,
         "clear_zone_override": handle_clear_zone_override,
         "set_preset_temperature": handle_set_preset_temperature,
+        "set_master_operation_mode": handle_set_master_operation_mode,
     }
 
     if hasattr(hass, "services") and hasattr(hass.services, "async_register"):
@@ -352,6 +394,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 await coordinator.boiler_backend.async_emergency_off()
         except Exception as err:
             _LOGGER.warning("Could not turn off boiler on unload: %s", err)
+        try:
+            if hasattr(coordinator, "heat_pump_backend") and coordinator.heat_pump_backend:
+                await coordinator.heat_pump_backend.async_emergency_off()
+        except Exception as err:
+            _LOGGER.warning("Could not turn off heat pump on unload: %s", err)
         coordinator.async_teardown_listeners()
         hass.data[DOMAIN].pop(entry.entry_id)
         _LOGGER.info("Multizone Thermostat unloaded.")

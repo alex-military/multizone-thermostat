@@ -278,17 +278,30 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
       let title = this._config.title || climateState.attributes.friendly_name || climateId;
       title = title.replace(/^Virtual Thermostats VT /i, '').replace(/^Heating Zones(?: Zone)? /i, '');
       let slug = climateId.replace("climate.multizone_thermostat_", "").replace("climate.", "");
+      const cleanSlug = slug.replace(/^zona_/, "");
+      const isSlugMatch = (id) => {
+        if (typeof isZoneEntityMatch === 'function') return isZoneEntityMatch(id, cleanSlug);
+        const objId = (id.includes('.') ? id.split('.')[1] : id).toLowerCase();
+        const cSlug = cleanSlug.toLowerCase();
+        let stripped = objId.replace(/^(multizone_thermostat_|zona_|zone_)/, '');
+        if (stripped === cSlug) return true;
+        const sfxs = ['_energy_class', '_classe_energetica', '_thermal_retention', '_tempo_ritenzione_termica', '_tempo_di_ritenzione_termica', '_radiator_sizing', '_dimensionamento_radiatore', '_anomaly', '_anomalia', '_passive_heat', '_apporto_passivo', '_battery', '_batteria', '_heating_rate', '_cooling_rate', '_thermal_loss', '_duty_cycle', '_mode', '_modalita_zona'];
+        for (const sfx of sfxs) {
+          if (stripped.endsWith(sfx) && stripped.slice(0, -sfx.length) === cSlug) return true;
+        }
+        return objId.endsWith('_' + cSlug) || objId.endsWith('_zona_' + cSlug);
+      };
 
       const energyEntity = this._hass && this._hass.states && Object.keys(this._hass.states).find(k =>
-        k.startsWith('sensor.') && (k.includes('energy_class') || k.includes('classe_energetica')) && k.includes(slug)
+        k.startsWith('sensor.') && (k.includes('energy_class') || k.includes('classe_energetica')) && isSlugMatch(k)
       );
       const retentionEntity = this._hass && this._hass.states && Object.keys(this._hass.states).find(k =>
-        k.startsWith('sensor.') && (k.includes('thermal_retention') || k.includes('tempo_ritenzione_termica')) && k.includes(slug)
+        k.startsWith('sensor.') && (k.includes('thermal_retention') || k.includes('tempo_ritenzione_termica') || k.includes('tempo_di_ritenzione_termica')) && isSlugMatch(k)
       );
       const sizingEntity = this._hass && this._hass.states && Object.keys(this._hass.states).find(k =>
-        k.startsWith('sensor.') && (k.includes('radiator_sizing') || k.includes('dimensionamento_radiatore')) && k.includes(slug)
+        k.startsWith('sensor.') && (k.includes('radiator_sizing') || k.includes('dimensionamento_radiatore')) && isSlugMatch(k)
       );
-      const anomalyEntity = this._hass && this._hass.states && Object.keys(this._hass.states).find(k => k.startsWith('binary_sensor.') && k.includes('anomaly') && k.includes(slug));
+      const anomalyEntity = this._hass && this._hass.states && Object.keys(this._hass.states).find(k => k.startsWith('binary_sensor.') && (k.includes('anomaly') || k.includes('anomalia')) && isSlugMatch(k));
 
       const titleEl = this.shadowRoot.getElementById('zone-title');
       const tempSubEl = this.shadowRoot.getElementById('temp-sub');
@@ -317,9 +330,9 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
         zoneMode = climateState.attributes.zone_mode;
       } else {
         const selectObj = Object.values(this._hass.states).find(s => 
-          s.entity_id.startsWith('select.') && (
+          s.entity_id && (s.entity_id.startsWith('select.') || s.entity_id.startsWith('switch.')) && (
             (s.attributes && s.attributes.climate_entity === climateId) ||
-            (s.entity_id.includes(slug) && (s.entity_id.includes('mode') || s.entity_id.includes('zone')))
+            (isSlugMatch(s.entity_id) && (s.entity_id.includes('mode') || s.entity_id.includes('zone') || s.entity_id.includes('modalita')))
           )
         );
         if (selectObj && selectObj.state) {
@@ -385,7 +398,7 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
       }
 
       const eState = energyEntity ? this._hass.states[energyEntity] : null;
-      const energyClass = eState ? eState.state : "--";
+      const energyClass = (eState && !['unavailable', 'unknown'].includes(eState.state)) ? eState.state : "--";
       const colors = {
         'A4': '#00873d', 'A': '#139f37', 'B': '#55b726', 'C': '#96c818',
         'D': '#e0d100', 'E': '#f39200', 'F': '#e64213', 'G': '#cb0019'
@@ -414,32 +427,45 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
       });
 
       const rState = retentionEntity ? this._hass.states[retentionEntity] : null;
-      if (retentionVal && rState) {
-        const r = parseFloat(rState.state);
-        retentionVal.innerText = isNaN(r) ? "--" : r.toFixed(1);
-        if (retentionEval) {
-          if (isNaN(r)) retentionEval.innerText = t('learning');
-          else if (r >= 6.0) retentionEval.innerText = t('opt_insulation');
-          else if (r >= 3.5) retentionEval.innerText = t('med_insulation');
-          else retentionEval.innerText = t('fast_dispersion');
+      if (retentionVal) {
+        if (rState && !['unavailable', 'unknown'].includes(rState.state)) {
+          const r = parseFloat(rState.state);
+          retentionVal.innerText = isNaN(r) ? "--" : r.toFixed(1);
+          if (retentionEval) {
+            if (isNaN(r)) retentionEval.innerText = t('learning');
+            else if (r >= 6.0) retentionEval.innerText = t('opt_insulation');
+            else if (r >= 3.5) retentionEval.innerText = t('med_insulation');
+            else retentionEval.innerText = t('fast_dispersion');
+          }
+        } else {
+          retentionVal.innerText = "--";
+          if (retentionEval) retentionEval.innerText = "--";
         }
       }
 
       const sState = sizingEntity ? this._hass.states[sizingEntity] : null;
-      if (sizingVal && sState) {
-        sizingVal.innerText = sState.state;
-        if (sizingEval) {
-          if (sState.state === "Optimal" || sState.state === "Ottimale") {
-            sizingEval.innerText = t('sizing_opt');
-            sizingEval.style.color = "#34d399";
-          } else if (sState.state === "Undersized" || sState.state === "Sottodimensionato") {
-            sizingEval.innerText = t('sizing_under');
-            sizingEval.style.color = "#f87171";
-          } else if (sState.state === "Oversized" || sState.state === "Sovradimensionato") {
-            sizingEval.innerText = t('sizing_over');
-            sizingEval.style.color = "#fbbf24";
-          } else {
-            sizingEval.innerText = t('sizing_waiting');
+      if (sizingVal) {
+        if (sState && !['unavailable', 'unknown'].includes(sState.state)) {
+          sizingVal.innerText = sState.state;
+          if (sizingEval) {
+            if (sState.state === "Optimal" || sState.state === "Ottimale") {
+              sizingEval.innerText = t('sizing_opt');
+              sizingEval.style.color = "#34d399";
+            } else if (sState.state === "Undersized" || sState.state === "Sottodimensionato") {
+              sizingEval.innerText = t('sizing_under');
+              sizingEval.style.color = "#f87171";
+            } else if (sState.state === "Oversized" || sState.state === "Sovradimensionato") {
+              sizingEval.innerText = t('sizing_over');
+              sizingEval.style.color = "#fbbf24";
+            } else {
+              sizingEval.innerText = t('sizing_waiting');
+              sizingEval.style.color = "#94a3b8";
+            }
+          }
+        } else {
+          sizingVal.innerText = "--";
+          if (sizingEval) {
+            sizingEval.innerText = "--";
             sizingEval.style.color = "#94a3b8";
           }
         }
@@ -447,7 +473,7 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
 
       const aState = anomalyEntity ? this._hass.states[anomalyEntity] : null;
       const passiveHeatSwitch = this._hass && this._hass.states && Object.keys(this._hass.states).find(k => 
-        k.startsWith('switch.') && k.includes('passive_heat') && k.includes(slug)
+        k.startsWith('switch.') && (k.includes('passive_heat') || k.includes('apporto_passivo')) && isSlugMatch(k)
       );
       const swState = passiveHeatSwitch ? this._hass.states[passiveHeatSwitch] : null;
       const allowPassive = (swState && swState.state === 'on') || (climateState.attributes && climateState.attributes.allow_passive_heat);
@@ -460,7 +486,7 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
           valveStatusEl.addEventListener('click', (e) => {
             e.stopPropagation();
             const sw = this._hass && this._hass.states && Object.keys(this._hass.states).find(k => 
-              k.startsWith('switch.') && k.includes('passive_heat') && k.includes(slug)
+              k.startsWith('switch.') && (k.includes('passive_heat') || k.includes('apporto_passivo')) && isSlugMatch(k)
             );
             if (sw) {
               this._hass.callService('switch', 'toggle', { entity_id: sw });
@@ -535,7 +561,7 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
             const batEntity = Object.keys(this._hass.states).find(k => 
               k.startsWith('sensor.') && 
               (k.includes('battery') || k.includes('batteria')) && 
-              k.includes(slug) &&
+              isSlugMatch(k) &&
               !['unavailable', 'unknown'].includes(this._hass.states[k].state)
             );
             if (batEntity && this._hass.states[batEntity]) {

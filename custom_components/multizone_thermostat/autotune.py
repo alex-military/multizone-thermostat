@@ -9,6 +9,7 @@ class PassiveAutotuneObserver:
     """
     Observes natural ON/OFF cycles (Hysteresis) to calculate PID parameters
     using the Ziegler-Nichols Open-Loop / Reaction Curve method for integrating processes.
+    Supports both heating (rising temp) and cooling (falling temp) modes.
     """
 
     STATE_IDLE = "idle"
@@ -16,9 +17,10 @@ class PassiveAutotuneObserver:
     STATE_COOLING = "cooling"
     STATE_COMPLETED = "completed"
 
-    def __init__(self, zone_name: str, required_cycles: int = 3):
+    def __init__(self, zone_name: str, required_cycles: int = 3, mode: str = "heat"):
         self.zone_name = zone_name
         self.required_cycles = required_cycles
+        self.mode = mode.lower()  # "heat" or "cool"
         self.state = self.STATE_IDLE
         
         self.history = deque(maxlen=1000)  # Stores (timestamp, temperature)
@@ -36,6 +38,8 @@ class PassiveAutotuneObserver:
         if not data:
             return
         self.completed_cycles = data.get("completed_cycles", [])
+        if "mode" in data:
+            self.mode = str(data["mode"]).lower()
         if len(self.completed_cycles) >= self.required_cycles:
             self.state = self.STATE_COMPLETED
             self._compute_final_pid()
@@ -43,11 +47,13 @@ class PassiveAutotuneObserver:
     def dump_state(self) -> dict:
         """Dump state for storage."""
         return {
-            "completed_cycles": self.completed_cycles
+            "completed_cycles": self.completed_cycles,
+            "mode": self.mode,
         }
         
-    def update(self, current_temp: float, is_heating: bool, now: float = None):
+    def update(self, current_temp: float, is_heating: bool | None = None, now: float = None, is_active: bool | None = None):
         """Called periodically or on state change."""
+        active = is_active if is_active is not None else bool(is_heating)
         if now is None:
             now_mono = time.monotonic()
             wall_time = time.time()
@@ -59,33 +65,39 @@ class PassiveAutotuneObserver:
             return
             
         if self.state == self.STATE_IDLE:
-            if is_heating:
-                self._start_heating(now_mono, current_temp)
+            if active:
+                self._start_cycle(now_mono, current_temp)
                 
         elif self.state == self.STATE_HEATING:
             self.history.append((now_mono, current_temp))
-            if not is_heating:
-                self._stop_heating(now_mono, current_temp, wall_time=wall_time)
+            if not active:
+                self._stop_cycle(now_mono, current_temp, wall_time=wall_time)
                 
         elif self.state == self.STATE_COOLING:
-            if is_heating:
-                self._start_heating(now_mono, current_temp)
+            if active:
+                self._start_cycle(now_mono, current_temp)
 
-    def _start_heating(self, now: float, temp: float):
-        _LOGGER.info("Autotune [%s]: Heating started. Recording cycle.", self.zone_name)
+    def _start_cycle(self, now: float, temp: float):
+        action_name = "Heating" if self.mode == "heat" else "Cooling"
+        _LOGGER.info("Autotune [%s - %s]: %s started. Recording cycle.", self.zone_name, self.mode, action_name)
         self.state = self.STATE_HEATING
         self.cycle_start_time = now
         self.cycle_start_temp = temp
         self.history.clear()
         self.history.append((now, temp))
+
+    def _start_heating(self, now: float, temp: float):
+        """Backward-compatible alias."""
+        self._start_cycle(now, temp)
         
-    def _stop_heating(self, now: float, temp: float, wall_time: float | None = None):
-        _LOGGER.info("Autotune [%s]: Heating stopped. Analyzing cycle...", self.zone_name)
+    def _stop_cycle(self, now: float, temp: float, wall_time: float | None = None):
+        action_name = "Heating" if self.mode == "heat" else "Cooling"
+        _LOGGER.info("Autotune [%s - %s]: %s stopped. Analyzing cycle...", self.zone_name, self.mode, action_name)
         self.state = self.STATE_COOLING
         
         # Analyze the collected history
         if len(self.history) < 5:
-            _LOGGER.warning("Autotune [%s]: Not enough data points.", self.zone_name)
+            _LOGGER.warning("Autotune [%s - %s]: Not enough data points.", self.zone_name, self.mode)
             return
             
         # Calculate slopes over a sliding window (e.g. 5 minutes)
@@ -102,7 +114,7 @@ class PassiveAutotuneObserver:
                 t2, temp2 = history_list[j]
                 dt = t2 - t1
                 if dt >= 180:  # At least 3 minutes diff to avoid noise
-                    slope = (temp2 - temp1) / dt
+                    slope = ((temp1 - temp2) if self.mode == "cool" else (temp2 - temp1)) / dt
                     if slope > max_slope:
                         max_slope = slope
                         # We use the midpoint of the interval for the tangent line
@@ -116,27 +128,34 @@ class PassiveAutotuneObserver:
             t2, temp2 = history_list[-1]
             dt = t2 - t1
             if dt < 60.0:
-                _LOGGER.warning("Autotune [%s]: Fallback slope dt too short (%.1fs). Cycle discarded.", self.zone_name, dt)
+                _LOGGER.warning("Autotune [%s - %s]: Fallback slope dt too short (%.1fs). Cycle discarded.", self.zone_name, self.mode, dt)
                 return
             if dt > 0:
-                max_slope = (temp2 - temp1) / dt
+                max_slope = ((temp1 - temp2) if self.mode == "cool" else (temp2 - temp1)) / dt
                 max_slope_t = t1 + (dt / 2.0)
                 max_slope_temp = temp1 + (temp2 - temp1) / 2.0
                 
         if max_slope <= 0.0001:
-            _LOGGER.warning("Autotune [%s]: Invalid slope %.4f. Cycle discarded.", self.zone_name, max_slope)
+            _LOGGER.warning("Autotune [%s - %s]: Invalid slope %.4f. Cycle discarded.", self.zone_name, self.mode, max_slope)
             return
             
         # Find L (Dead Time)
-        t0 = (self.cycle_start_temp - max_slope_temp) / max_slope + max_slope_t
+        if self.mode == "cool":
+            # For cooling: tangent line is T(t) = max_slope_temp - max_slope * (t - max_slope_t)
+            # Intersection with cycle_start_temp yields:
+            t0 = (max_slope_temp - self.cycle_start_temp) / max_slope + max_slope_t
+        else:
+            # For heating: tangent line is T(t) = max_slope_temp + max_slope * (t - max_slope_t)
+            # Intersection with cycle_start_temp yields:
+            t0 = (self.cycle_start_temp - max_slope_temp) / max_slope + max_slope_t
         L = t0 - self.cycle_start_time
         
         if L < 60.0:
-            _LOGGER.info("Autotune [%s]: Dead time too short (%.1fs), clamping to 60s.", self.zone_name, L)
+            _LOGGER.info("Autotune [%s - %s]: Dead time too short (%.1fs), clamping to 60s.", self.zone_name, self.mode, L)
             L = 60.0
             
         if L > 7200.0:
-            _LOGGER.warning("Autotune [%s]: Dead time too long (%.1fs). Cycle discarded.", self.zone_name, L)
+            _LOGGER.warning("Autotune [%s - %s]: Dead time too long (%.1fs). Cycle discarded.", self.zone_name, self.mode, L)
             return
             
         kp_calc = 120.0 / (max_slope * L)
@@ -148,8 +167,8 @@ class PassiveAutotuneObserver:
         ki_calc = kp_calc / ti_calc if ti_calc > 0 else 0
         kd_calc = kp_calc * td_calc
         
-        _LOGGER.info("Autotune [%s]: Cycle valid! L=%.1f s, slope=%.6f °C/s. Kp=%.1f, Ki=%.4f, Kd=%.1f", 
-                     self.zone_name, L, max_slope, kp_calc, ki_calc, kd_calc)
+        _LOGGER.info("Autotune [%s - %s]: Cycle valid! L=%.1f s, slope=%.6f °C/s. Kp=%.1f, Ki=%.4f, Kd=%.1f", 
+                     self.zone_name, self.mode, L, max_slope, kp_calc, ki_calc, kd_calc)
                      
         self.completed_cycles.append({
             "L": L,
@@ -161,10 +180,14 @@ class PassiveAutotuneObserver:
         })
         
         if len(self.completed_cycles) >= self.required_cycles:
-            _LOGGER.info("Autotune [%s]: Required cycles reached. Learning completed!", self.zone_name)
+            _LOGGER.info("Autotune [%s - %s]: Required cycles reached. Learning completed!", self.zone_name, self.mode)
             self.state = self.STATE_COMPLETED
             self._compute_final_pid()
-            
+
+    def _stop_heating(self, now: float, temp: float, wall_time: float | None = None):
+        """Backward-compatible alias."""
+        self._stop_cycle(now, temp, wall_time=wall_time)
+
     def _compute_final_pid(self):
         """Average the valid cycles to find final PID parameters."""
         if not self.completed_cycles:
@@ -178,4 +201,4 @@ class PassiveAutotuneObserver:
         self.ki = avg_ki
         self.kd = avg_kd
         
-        _LOGGER.info("Autotune [%s]: FINAL PID: Kp=%.1f, Ki=%.4f, Kd=%.1f", self.zone_name, self.kp, self.ki, self.kd)
+        _LOGGER.info("Autotune [%s - %s]: FINAL PID: Kp=%.1f, Ki=%.4f, Kd=%.1f", self.zone_name, self.mode, self.kp, self.ki, self.kd)

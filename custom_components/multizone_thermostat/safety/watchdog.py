@@ -22,8 +22,10 @@ class SensorWatchdog:
         """Initialize sensor watchdog."""
         self.hass = hass
 
-    def is_sensor_stale(self, last_update: float | datetime, timeout_seconds: float) -> bool:
+    def is_sensor_stale(self, last_update: float | datetime | None, timeout_seconds: float) -> bool:
         """Return True if time elapsed since last update exceeds timeout."""
+        if last_update is None:
+            return True
         if timeout_seconds <= 0:
             return False
         if isinstance(last_update, datetime):

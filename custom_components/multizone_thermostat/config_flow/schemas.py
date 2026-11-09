@@ -44,7 +44,266 @@ from ..const import (
     DEFAULT_ZONE_WEIGHT,
     CONF_ZONE_AUTHORITATIVE_SYNC,
     DEFAULT_AUTHORITATIVE_SYNC,
+    # Phase 11 — Central Heating Plants
+    CONF_ENABLE_GAS_HEATER,
+    CONF_ENABLE_HEAT_PUMP,
+    CONF_HEAT_PUMP_TYPE,
+    HP_TYPE_CLIMATE,
+    HP_TYPE_SWITCH,
+    HP_TYPE_OPENTHERM,
+    CONF_HEAT_PUMP_ENTITY,
+    CONF_HEAT_PUMP_CH_SWITCH,
+    CONF_HEAT_PUMP_MIN_TEMP,
+    CONF_HEAT_PUMP_MAX_TEMP,
+    CONF_HEAT_PUMP_COOLING,
+    DEFAULT_HEAT_PUMP_COOLING,
+    CONF_HEAT_PUMP_COOL_MIN_TEMP,
+    CONF_HEAT_PUMP_COOL_MAX_TEMP,
+    DEFAULT_HP_COOL_MIN_TEMP,
+    DEFAULT_HP_COOL_MAX_TEMP,
+    # Phase 11 — Zone Split Climate Actuators
+    CONF_ZONE_SPLIT_CLIMATE,
+    CONF_ZONE_SPLIT_ROLE,
+    SPLIT_ROLE_HEAT_COOL,
+    SPLIT_ROLE_HEATING_ONLY,
+    SPLIT_ROLE_COOLING_ONLY,
+    DEFAULT_SPLIT_ROLE,
+    CONF_ZONE_SPLIT_SOLAR_PRIORITY,
+    DEFAULT_SPLIT_SOLAR_PRIORITY,
+    CONF_ZONE_SPLIT_QUICK_BOOST,
+    DEFAULT_SPLIT_QUICK_BOOST,
+    CONF_ZONE_SPLIT_BOOST_DELTA,
+    DEFAULT_SPLIT_BOOST_DELTA,
+    CONF_ZONE_SPLIT_SENSOR_INJECTION,
+    DEFAULT_SPLIT_SENSOR_INJECTION,
+    # Phase 11 — Energy Management & Solar
+    CONF_ENERGY_MANAGEMENT_ENABLED,
+    CONF_SOLAR_POWER_SENSOR,
+    CONF_GRID_EXPORT_SENSOR,
+    CONF_BATTERY_SOC_SENSOR,
+    CONF_EXTERNAL_SOLAR_OVERRIDE_ENTITY,
+    CONF_SOLAR_EXPORT_THRESHOLD,
+    DEFAULT_SOLAR_EXPORT_THRESHOLD,
+    CONF_BATTERY_MIN_RESERVE_SOC,
+    DEFAULT_BATTERY_MIN_RESERVE_SOC,
+    CONF_SOLAR_MIN_RUN_TIME,
+    DEFAULT_SOLAR_MIN_RUN_TIME,
+    CONF_SOLAR_OVERHEAT_OFFSET,
+    DEFAULT_SOLAR_OVERHEAT_OFFSET,
+    CONF_BATTERY_POWER_SENSOR,
+    CONF_SOLAR_FORECAST_SENSOR,
+    CONF_SOLAR_IRRADIANCE_SENSOR,
+    CONF_BATTERY_MAX_DISCHARGE_TIME,
+    DEFAULT_BATTERY_MAX_DISCHARGE_TIME,
+    CONF_BATTERY_POWER_INVERTED,
+    DEFAULT_BATTERY_POWER_INVERTED,
 )
+
+
+def get_plants_selection_schema(
+    enable_gas: bool = True,
+    enable_hp: bool = False,
+) -> vol.Schema:
+    return vol.Schema({
+        vol.Required(CONF_ENABLE_GAS_HEATER, default=enable_gas): bool,
+        vol.Required(CONF_ENABLE_HEAT_PUMP, default=enable_hp): bool,
+    })
+
+
+def get_heat_pump_schema(
+    hp_type: str = HP_TYPE_CLIMATE,
+    hp_entity: str | None = None,
+    hp_min_temp: float = 25.0,
+    hp_max_temp: float = 55.0,
+    hp_ch_switch: str | None = None,
+    hp_cooling: bool = DEFAULT_HEAT_PUMP_COOLING,
+    hp_cool_min_temp: float = DEFAULT_HP_COOL_MIN_TEMP,
+    hp_cool_max_temp: float = DEFAULT_HP_COOL_MAX_TEMP,
+) -> vol.Schema:
+    schema_dict: dict[Any, Any] = {
+        vol.Required(CONF_HEAT_PUMP_TYPE, default=hp_type): selector.SelectSelector(
+            selector.SelectSelectorConfig(
+                options=[
+                    selector.SelectOptionDict(value=HP_TYPE_CLIMATE, label="Climate Entity (HA Native Climate)"),
+                    selector.SelectOptionDict(value=HP_TYPE_SWITCH, label="Switch / Relay / SG-Ready (ON/OFF)"),
+                    selector.SelectOptionDict(value=HP_TYPE_OPENTHERM, label="OpenTherm (Modulating Gateway)"),
+                ],
+                mode=selector.SelectSelectorMode.DROPDOWN,
+            )
+        ),
+    }
+    entity_key = (
+        vol.Required(CONF_HEAT_PUMP_ENTITY, default=hp_entity)
+        if hp_entity
+        else vol.Required(CONF_HEAT_PUMP_ENTITY)
+    )
+    schema_dict[entity_key] = selector.EntitySelector(
+        selector.EntitySelectorConfig(domain=["climate", "switch", "number", "water_heater"])
+    )
+    schema_dict[vol.Required(CONF_HEAT_PUMP_COOLING, default=hp_cooling)] = bool
+    schema_dict[vol.Required(CONF_HEAT_PUMP_MIN_TEMP, default=hp_min_temp)] = selector.NumberSelector(
+        selector.NumberSelectorConfig(min=15, max=65, step=1, mode=selector.NumberSelectorMode.BOX)
+    )
+    schema_dict[vol.Required(CONF_HEAT_PUMP_MAX_TEMP, default=hp_max_temp)] = selector.NumberSelector(
+        selector.NumberSelectorConfig(min=20, max=75, step=1, mode=selector.NumberSelectorMode.BOX)
+    )
+    schema_dict[vol.Required(CONF_HEAT_PUMP_COOL_MIN_TEMP, default=hp_cool_min_temp)] = selector.NumberSelector(
+        selector.NumberSelectorConfig(min=5, max=25, step=1, mode=selector.NumberSelectorMode.BOX)
+    )
+    schema_dict[vol.Required(CONF_HEAT_PUMP_COOL_MAX_TEMP, default=hp_cool_max_temp)] = selector.NumberSelector(
+        selector.NumberSelectorConfig(min=10, max=30, step=1, mode=selector.NumberSelectorMode.BOX)
+    )
+    ch_key = (
+        vol.Optional(CONF_HEAT_PUMP_CH_SWITCH, description={"suggested_value": hp_ch_switch})
+        if hp_ch_switch
+        else vol.Optional(CONF_HEAT_PUMP_CH_SWITCH)
+    )
+    schema_dict[ch_key] = selector.EntitySelector(selector.EntitySelectorConfig(domain=SWITCH_DOMAIN))
+    return vol.Schema(schema_dict)
+
+
+def get_options_heat_pump_schema(current_data: dict[str, Any] | None = None) -> vol.Schema:
+    """Generate schema for editing Heat Pump settings in Options Flow."""
+    data = current_data or {}
+    enable_hp = data.get(CONF_ENABLE_HEAT_PUMP, False)
+    hp_type = data.get(CONF_HEAT_PUMP_TYPE, HP_TYPE_CLIMATE)
+    hp_entity = data.get(CONF_HEAT_PUMP_ENTITY)
+    hp_cooling = data.get(CONF_HEAT_PUMP_COOLING, DEFAULT_HEAT_PUMP_COOLING)
+    hp_min_temp = data.get(CONF_HEAT_PUMP_MIN_TEMP, 25.0)
+    hp_max_temp = data.get(CONF_HEAT_PUMP_MAX_TEMP, 55.0)
+    hp_cool_min_temp = data.get(CONF_HEAT_PUMP_COOL_MIN_TEMP, DEFAULT_HP_COOL_MIN_TEMP)
+    hp_cool_max_temp = data.get(CONF_HEAT_PUMP_COOL_MAX_TEMP, DEFAULT_HP_COOL_MAX_TEMP)
+    hp_ch_switch = data.get(CONF_HEAT_PUMP_CH_SWITCH)
+
+    schema_dict: dict[Any, Any] = {
+        vol.Required(CONF_ENABLE_HEAT_PUMP, default=enable_hp): bool,
+        vol.Required(CONF_HEAT_PUMP_TYPE, default=hp_type): selector.SelectSelector(
+            selector.SelectSelectorConfig(
+                options=[
+                    selector.SelectOptionDict(value=HP_TYPE_CLIMATE, label="Climate Entity (HA Native Climate)"),
+                    selector.SelectOptionDict(value=HP_TYPE_SWITCH, label="Switch / Relay / SG-Ready (ON/OFF)"),
+                    selector.SelectOptionDict(value=HP_TYPE_OPENTHERM, label="OpenTherm (Modulating Gateway)"),
+                ],
+                mode=selector.SelectSelectorMode.DROPDOWN,
+            )
+        ),
+    }
+    entity_key = (
+        vol.Optional(CONF_HEAT_PUMP_ENTITY, description={"suggested_value": hp_entity})
+        if hp_entity
+        else vol.Optional(CONF_HEAT_PUMP_ENTITY)
+    )
+    schema_dict[entity_key] = selector.EntitySelector(
+        selector.EntitySelectorConfig(domain=["climate", "switch", "number", "water_heater"])
+    )
+    schema_dict[vol.Required(CONF_HEAT_PUMP_COOLING, default=hp_cooling)] = bool
+    schema_dict[vol.Required(CONF_HEAT_PUMP_MIN_TEMP, default=hp_min_temp)] = selector.NumberSelector(
+        selector.NumberSelectorConfig(min=15, max=65, step=1, mode=selector.NumberSelectorMode.BOX)
+    )
+    schema_dict[vol.Required(CONF_HEAT_PUMP_MAX_TEMP, default=hp_max_temp)] = selector.NumberSelector(
+        selector.NumberSelectorConfig(min=20, max=75, step=1, mode=selector.NumberSelectorMode.BOX)
+    )
+    schema_dict[vol.Required(CONF_HEAT_PUMP_COOL_MIN_TEMP, default=hp_cool_min_temp)] = selector.NumberSelector(
+        selector.NumberSelectorConfig(min=5, max=25, step=1, mode=selector.NumberSelectorMode.BOX)
+    )
+    schema_dict[vol.Required(CONF_HEAT_PUMP_COOL_MAX_TEMP, default=hp_cool_max_temp)] = selector.NumberSelector(
+        selector.NumberSelectorConfig(min=10, max=30, step=1, mode=selector.NumberSelectorMode.BOX)
+    )
+    ch_key = (
+        vol.Optional(CONF_HEAT_PUMP_CH_SWITCH, description={"suggested_value": hp_ch_switch})
+        if hp_ch_switch
+        else vol.Optional(CONF_HEAT_PUMP_CH_SWITCH)
+    )
+    schema_dict[ch_key] = selector.EntitySelector(selector.EntitySelectorConfig(domain=SWITCH_DOMAIN))
+    return vol.Schema(schema_dict)
+
+
+def get_energy_management_schema(
+    enabled: bool = False,
+    solar_power_sensor: str | None = None,
+    grid_export_sensor: str | None = None,
+    battery_soc_sensor: str | None = None,
+    battery_power_sensor: str | None = None,
+    solar_forecast_sensor: str | None = None,
+    solar_irradiance_sensor: str | None = None,
+    external_override_entity: str | None = None,
+    export_threshold: float = DEFAULT_SOLAR_EXPORT_THRESHOLD,
+    min_reserve_soc: float = DEFAULT_BATTERY_MIN_RESERVE_SOC,
+    solar_min_run_time: float = DEFAULT_SOLAR_MIN_RUN_TIME,
+    solar_overheat_offset: float = DEFAULT_SOLAR_OVERHEAT_OFFSET,
+    battery_max_discharge_time: float = DEFAULT_BATTERY_MAX_DISCHARGE_TIME,
+    battery_power_inverted: bool = DEFAULT_BATTERY_POWER_INVERTED,
+) -> vol.Schema:
+    schema_dict: dict[Any, Any] = {
+        vol.Required(CONF_ENERGY_MANAGEMENT_ENABLED, default=enabled): bool,
+    }
+
+    sp_key = (
+        vol.Optional(CONF_SOLAR_POWER_SENSOR, description={"suggested_value": solar_power_sensor})
+        if solar_power_sensor
+        else vol.Optional(CONF_SOLAR_POWER_SENSOR)
+    )
+    schema_dict[sp_key] = selector.EntitySelector(selector.EntitySelectorConfig(domain=SENSOR_DOMAIN, device_class="power"))
+
+    exp_key = (
+        vol.Optional(CONF_GRID_EXPORT_SENSOR, description={"suggested_value": grid_export_sensor})
+        if grid_export_sensor
+        else vol.Optional(CONF_GRID_EXPORT_SENSOR)
+    )
+    schema_dict[exp_key] = selector.EntitySelector(selector.EntitySelectorConfig(domain=SENSOR_DOMAIN, device_class="power"))
+
+    soc_key = (
+        vol.Optional(CONF_BATTERY_SOC_SENSOR, description={"suggested_value": battery_soc_sensor})
+        if battery_soc_sensor
+        else vol.Optional(CONF_BATTERY_SOC_SENSOR)
+    )
+    schema_dict[soc_key] = selector.EntitySelector(selector.EntitySelectorConfig(domain=SENSOR_DOMAIN, device_class="battery"))
+
+    bp_key = (
+        vol.Optional(CONF_BATTERY_POWER_SENSOR, description={"suggested_value": battery_power_sensor})
+        if battery_power_sensor
+        else vol.Optional(CONF_BATTERY_POWER_SENSOR)
+    )
+    schema_dict[bp_key] = selector.EntitySelector(selector.EntitySelectorConfig(domain=SENSOR_DOMAIN, device_class="power"))
+
+    fc_key = (
+        vol.Optional(CONF_SOLAR_FORECAST_SENSOR, description={"suggested_value": solar_forecast_sensor})
+        if solar_forecast_sensor
+        else vol.Optional(CONF_SOLAR_FORECAST_SENSOR)
+    )
+    schema_dict[fc_key] = selector.EntitySelector(selector.EntitySelectorConfig(domain=SENSOR_DOMAIN))
+
+    irr_key = (
+        vol.Optional(CONF_SOLAR_IRRADIANCE_SENSOR, description={"suggested_value": solar_irradiance_sensor})
+        if solar_irradiance_sensor
+        else vol.Optional(CONF_SOLAR_IRRADIANCE_SENSOR)
+    )
+    schema_dict[irr_key] = selector.EntitySelector(selector.EntitySelectorConfig(domain=SENSOR_DOMAIN))
+
+    ext_key = (
+        vol.Optional(CONF_EXTERNAL_SOLAR_OVERRIDE_ENTITY, description={"suggested_value": external_override_entity})
+        if external_override_entity
+        else vol.Optional(CONF_EXTERNAL_SOLAR_OVERRIDE_ENTITY)
+    )
+    schema_dict[ext_key] = selector.EntitySelector(selector.EntitySelectorConfig(domain=["binary_sensor", "input_boolean", "switch", "sensor"]))
+
+    schema_dict[vol.Required(CONF_SOLAR_EXPORT_THRESHOLD, default=export_threshold)] = selector.NumberSelector(
+        selector.NumberSelectorConfig(min=0, max=10000, step=50, mode=selector.NumberSelectorMode.BOX)
+    )
+    schema_dict[vol.Required(CONF_BATTERY_MIN_RESERVE_SOC, default=min_reserve_soc)] = selector.NumberSelector(
+        selector.NumberSelectorConfig(min=5, max=100, step=1, mode=selector.NumberSelectorMode.BOX)
+    )
+    schema_dict[vol.Optional(CONF_SOLAR_MIN_RUN_TIME, default=solar_min_run_time)] = selector.NumberSelector(
+        selector.NumberSelectorConfig(min=0, max=60, step=1, mode=selector.NumberSelectorMode.BOX)
+    )
+    schema_dict[vol.Optional(CONF_SOLAR_OVERHEAT_OFFSET, default=solar_overheat_offset)] = selector.NumberSelector(
+        selector.NumberSelectorConfig(min=0.0, max=3.0, step=0.5, mode=selector.NumberSelectorMode.BOX)
+    )
+    schema_dict[vol.Optional(CONF_BATTERY_MAX_DISCHARGE_TIME, default=battery_max_discharge_time)] = selector.NumberSelector(
+        selector.NumberSelectorConfig(min=1, max=30, step=1, mode=selector.NumberSelectorMode.BOX)
+    )
+    schema_dict[vol.Optional(CONF_BATTERY_POWER_INVERTED, default=battery_power_inverted)] = bool
+    return vol.Schema(schema_dict)
 
 
 def get_boiler_mode_schema() -> vol.Schema:
@@ -133,6 +392,30 @@ def get_add_zone_schema() -> vol.Schema:
                 ),
                 vol.Optional(CONF_ZONE_ANTI_SEIZE, default=True): bool,
                 vol.Optional(CONF_ZONE_ALLOW_PASSIVE_HEAT, default=False): bool,
+            }),
+            {"collapsed": True},
+        ),
+
+        # Section 5: Climatizzatori Split d'Ambiente
+        vol.Optional("split_settings"): data_entry_flow.section(
+            vol.Schema({
+                vol.Optional(CONF_ZONE_SPLIT_CLIMATE): selector.EntitySelector(selector.EntitySelectorConfig(domain=CLIMATE_DOMAIN)),
+                vol.Optional(CONF_ZONE_SPLIT_ROLE, default=DEFAULT_SPLIT_ROLE): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[
+                            selector.SelectOptionDict(value=SPLIT_ROLE_HEAT_COOL, label="Heating & Cooling (Both)"),
+                            selector.SelectOptionDict(value=SPLIT_ROLE_HEATING_ONLY, label="Heating Only"),
+                            selector.SelectOptionDict(value=SPLIT_ROLE_COOLING_ONLY, label="Cooling Only"),
+                        ],
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+                vol.Optional(CONF_ZONE_SPLIT_SOLAR_PRIORITY, default=DEFAULT_SPLIT_SOLAR_PRIORITY): bool,
+                vol.Optional(CONF_ZONE_SPLIT_QUICK_BOOST, default=DEFAULT_SPLIT_QUICK_BOOST): bool,
+                vol.Optional(CONF_ZONE_SPLIT_BOOST_DELTA, default=DEFAULT_SPLIT_BOOST_DELTA): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=0.5, max=5.0, step=0.5, mode=selector.NumberSelectorMode.BOX)
+                ),
+                vol.Optional(CONF_ZONE_SPLIT_SENSOR_INJECTION, default=DEFAULT_SPLIT_SENSOR_INJECTION): bool,
             }),
             {"collapsed": True},
         ),
@@ -248,6 +531,13 @@ def get_zone_select_schema(zone_options: dict[str, str]) -> vol.Schema:
 
 
 def get_options_edit_zone_schema(zone_data: dict[str, Any], temp_desc: dict[str, Any], window_desc: dict[str, Any]) -> vol.Schema:
+    split_climate = zone_data.get(CONF_ZONE_SPLIT_CLIMATE)
+    split_role = zone_data.get(CONF_ZONE_SPLIT_ROLE, DEFAULT_SPLIT_ROLE)
+    split_solar = zone_data.get(CONF_ZONE_SPLIT_SOLAR_PRIORITY, DEFAULT_SPLIT_SOLAR_PRIORITY)
+    split_boost = zone_data.get(CONF_ZONE_SPLIT_QUICK_BOOST, DEFAULT_SPLIT_QUICK_BOOST)
+    split_delta = zone_data.get(CONF_ZONE_SPLIT_BOOST_DELTA, DEFAULT_SPLIT_BOOST_DELTA)
+    split_injection = zone_data.get(CONF_ZONE_SPLIT_SENSOR_INJECTION, DEFAULT_SPLIT_SENSOR_INJECTION)
+
     return vol.Schema({
         vol.Optional(CONF_ZONE_TEMP_SENSOR, **temp_desc): selector.EntitySelector(selector.EntitySelectorConfig(domain=SENSOR_DOMAIN, device_class="temperature")),
         vol.Optional(CONF_ZONE_TARGET_TEMP, default=zone_data.get(CONF_ZONE_TARGET_TEMP, 20.0)): selector.NumberSelector(selector.NumberSelectorConfig(min=5, max=35, step=0.5, mode=selector.NumberSelectorMode.BOX)),
@@ -299,6 +589,34 @@ def get_options_edit_zone_schema(zone_data: dict[str, Any], temp_desc: dict[str,
                 ),
                 vol.Optional(CONF_ZONE_ANTI_SEIZE, default=zone_data.get(CONF_ZONE_ANTI_SEIZE, True)): bool,
                 vol.Optional(CONF_ZONE_ALLOW_PASSIVE_HEAT, default=zone_data.get(CONF_ZONE_ALLOW_PASSIVE_HEAT, False)): bool,
+            }),
+            {"collapsed": True},
+        ),
+
+        # Section 5: Climatizzatori Split d'Ambiente
+        vol.Optional("split_settings"): data_entry_flow.section(
+            vol.Schema({
+                **(
+                    {vol.Optional(CONF_ZONE_SPLIT_CLIMATE, description={"suggested_value": split_climate}): selector.EntitySelector(selector.EntitySelectorConfig(domain=CLIMATE_DOMAIN))}
+                    if split_climate
+                    else {vol.Optional(CONF_ZONE_SPLIT_CLIMATE): selector.EntitySelector(selector.EntitySelectorConfig(domain=CLIMATE_DOMAIN))}
+                ),
+                vol.Optional(CONF_ZONE_SPLIT_ROLE, default=split_role): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[
+                            selector.SelectOptionDict(value=SPLIT_ROLE_HEAT_COOL, label="Heating & Cooling (Both)"),
+                            selector.SelectOptionDict(value=SPLIT_ROLE_HEATING_ONLY, label="Heating Only"),
+                            selector.SelectOptionDict(value=SPLIT_ROLE_COOLING_ONLY, label="Cooling Only"),
+                        ],
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+                vol.Optional(CONF_ZONE_SPLIT_SOLAR_PRIORITY, default=split_solar): bool,
+                vol.Optional(CONF_ZONE_SPLIT_QUICK_BOOST, default=split_boost): bool,
+                vol.Optional(CONF_ZONE_SPLIT_BOOST_DELTA, default=split_delta): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=0.5, max=5.0, step=0.5, mode=selector.NumberSelectorMode.BOX)
+                ),
+                vol.Optional(CONF_ZONE_SPLIT_SENSOR_INJECTION, default=split_injection): bool,
             }),
             {"collapsed": True},
         ),

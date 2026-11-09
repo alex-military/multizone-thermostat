@@ -14,6 +14,7 @@ from ..const import (
     CONF_ZONE_NAME,
     DEFAULT_BASELINE_PRESET,
     DEFAULT_PRESET_TEMPS,
+    DEFAULT_COOLING_PRESET_TEMPS,
     DEFAULT_SCHEDULE_PROFILE,
     DEFAULT_SMART_START_HEATING_RATE,
     KEY_ACTIVE_PROFILE,
@@ -244,6 +245,12 @@ class ScheduleProfileManager:
         """Get zone heating rate from thermal model or default fallback."""
         return self._smart_return_planner.get_zone_heating_rate(climate_id)
 
+    def _get_zone_cooling_rate(self, climate_id: str) -> float:
+        """Get zone cooling rate from thermal model or default fallback."""
+        if hasattr(self._smart_return_planner, "get_zone_cooling_rate"):
+            return self._smart_return_planner.get_zone_cooling_rate(climate_id)
+        return self._smart_return_planner.get_zone_heating_rate(climate_id)
+
     def _parse_arrival_time(self, arrival_time: str | datetime, now: datetime) -> datetime:
         """Parse arrival time string or datetime relative to now."""
         return self._smart_return_planner.parse_arrival_time(arrival_time, now)
@@ -254,9 +261,10 @@ class ScheduleProfileManager:
         preset: str = "comfort",
         zones: list[str] | None = None,
         now: datetime | None = None,
+        hvac_mode: str | None = None,
     ) -> dict[str, dict[str, Any]]:
-        """Calculate the Thermal Radar plan with staggered preheating start times."""
-        return self._smart_return_planner.calculate_plan(arrival_time, preset, zones, now)
+        """Calculate the Thermal Radar plan with staggered preheating or precooling start times."""
+        return self._smart_return_planner.calculate_plan(arrival_time, preset, zones, now, hvac_mode=hvac_mode)
 
     async def async_set_smart_return(
         self,
@@ -312,12 +320,22 @@ class ScheduleProfileManager:
 
     def _resolve_preset_temp(self, preset: str, climate_id: str) -> float:
         """Resolve preset temperature for a zone."""
+        master_mode = str(getattr(self.coordinator, "master_hvac_mode", "heat")).lower()
         if hasattr(self.coordinator, "zone_manager") and hasattr(
             self.coordinator.zone_manager, "get_preset_temperature"
         ):
-            t = self.coordinator.zone_manager.get_preset_temperature(preset, climate_id)
+            try:
+                t = self.coordinator.zone_manager.get_preset_temperature(
+                    preset, climate_id, hvac_mode=master_mode
+                )
+            except TypeError:
+                t = self.coordinator.zone_manager.get_preset_temperature(
+                    preset, climate_id
+                )
             if t is not None:
                 return float(t)
+        if master_mode == "cool":
+            return float(DEFAULT_COOLING_PRESET_TEMPS.get(preset, 24.5))
         return float(DEFAULT_PRESET_TEMPS.get(preset, 20.0))
 
     def evaluate_zone_slot(self, climate_id: str, now: datetime) -> dict[str, Any]:
@@ -336,6 +354,9 @@ class ScheduleProfileManager:
         self, climate_id: str, target_temp: float, now: datetime | None = None
     ) -> None:
         """Record manual override for zone lasting until current slot changes/expires."""
+        master_mode = str(getattr(self.coordinator, "master_hvac_mode", "heat")).lower()
+        if master_mode == "cool" and hasattr(self.coordinator, "can_zone_cool") and not self.coordinator.can_zone_cool(climate_id):
+            return
         now = self._as_local(now)
         slot = self.evaluate_zone_slot(climate_id, now)
         until_dt = slot["until"]
@@ -394,16 +415,30 @@ class ScheduleProfileManager:
                     _LOGGER.debug("Could not write state for master switch: %s", ex)
 
     async def _async_wake_zone(self, climate_id: str, climate_ent: Any | None = None) -> None:
-        """Wake up a zone to HVACMode.HEAT if currently off."""
-        _LOGGER.info("Smart Return: waking up zone %s to HVACMode.HEAT", climate_id)
+        """Wake up a zone to target HVACMode based on master_hvac_mode if currently off."""
+        master_mode = str(getattr(self.coordinator, "master_hvac_mode", "heat")).lower()
+        target_mode = HVACMode.COOL if master_mode == "cool" else HVACMode.HEAT
+
         if climate_ent is None:
             climate_ent = getattr(self.coordinator, "_climate_entities", {}).get(climate_id)
+
+        if climate_ent is not None:
+            supported = getattr(climate_ent, "hvac_modes", None) or getattr(climate_ent, "_attr_hvac_modes", None)
+            if supported and target_mode not in supported:
+                if HVACMode.HEAT in supported:
+                    target_mode = HVACMode.HEAT
+                else:
+                    non_off = [m for m in supported if m != HVACMode.OFF]
+                    if non_off:
+                        target_mode = non_off[0]
+
+        _LOGGER.info("Smart Return: waking up zone %s to %s", climate_id, target_mode)
         if climate_ent is not None:
             if hasattr(climate_ent, "_hvac_mode"):
-                climate_ent._hvac_mode = HVACMode.HEAT
+                climate_ent._hvac_mode = target_mode
             if hasattr(climate_ent, "async_set_hvac_mode"):
                 try:
-                    res = climate_ent.async_set_hvac_mode(HVACMode.HEAT)
+                    res = climate_ent.async_set_hvac_mode(target_mode)
                     if inspect.isawaitable(res):
                         await res
                 except Exception as ex:
@@ -415,7 +450,7 @@ class ScheduleProfileManager:
                     pass
         if hasattr(self.coordinator, "_async_set_hvac_mode"):
             try:
-                res = self.coordinator._async_set_hvac_mode(climate_id, HVACMode.HEAT)
+                res = self.coordinator._async_set_hvac_mode(climate_id, target_mode)
                 if inspect.isawaitable(res):
                     await res
             except Exception as ex:
@@ -502,6 +537,15 @@ class ScheduleProfileManager:
             climate_id = zone.get("climate_id") or make_zone_entity_id(
                 zone.get(CONF_ZONE_NAME, "")
             )
+
+            # In cooling mode, apply hourly/schedule override only to zones that support cooling
+            master_mode = str(getattr(self.coordinator, "master_hvac_mode", "heat")).lower()
+            if master_mode == "cool" and hasattr(self.coordinator, "can_zone_cool") and not self.coordinator.can_zone_cool(climate_id):
+                self.schedule_overrides.pop(climate_id, None)
+                self.manual_overrides.pop(climate_id, None)
+                self.smart_start_info.pop(climate_id, None)
+                self._active_smart_starts.pop(climate_id, None)
+                continue
 
             # Check if climate entity is in HVACMode.OFF
             is_off = False
@@ -636,14 +680,32 @@ class ScheduleProfileManager:
                             self.smart_start_info[climate_id] = active_ss
                             smart_start_found = True
                             break
-                        elif next_b["target_temp"] > slot["target_temp"]:
+                        else:
+                            master_mode = str(getattr(self.coordinator, "master_hvac_mode", "heat")).lower()
+                            is_cool = (master_mode == "cool")
+                            should_precondition = False
                             curr_temp = self._get_zone_current_temp(climate_id)
-                            if curr_temp is not None and curr_temp < next_b["target_temp"]:
-                                heating_rate = self._get_zone_heating_rate(climate_id)
-                                hours_needed = min(
-                                    MAX_SMART_START_HOURS,
-                                    (next_b["target_temp"] - curr_temp) / heating_rate,
-                                )
+
+                            if is_cool:
+                                if next_b["target_temp"] < slot["target_temp"] and curr_temp is not None and curr_temp > next_b["target_temp"]:
+                                    cooling_rate = self._get_zone_cooling_rate(climate_id)
+                                    hours_needed = min(
+                                        MAX_SMART_START_HOURS,
+                                        (curr_temp - next_b["target_temp"]) / cooling_rate,
+                                    )
+                                    rate = cooling_rate
+                                    should_precondition = True
+                            else:
+                                if next_b["target_temp"] > slot["target_temp"] and curr_temp is not None and curr_temp < next_b["target_temp"]:
+                                    heating_rate = self._get_zone_heating_rate(climate_id)
+                                    hours_needed = min(
+                                        MAX_SMART_START_HOURS,
+                                        (next_b["target_temp"] - curr_temp) / heating_rate,
+                                    )
+                                    rate = heating_rate
+                                    should_precondition = True
+
+                            if should_precondition:
                                 preheat_dt = next_b["start_dt"] - timedelta(hours=hours_needed)
                                 check_now = now
                                 if preheat_dt.tzinfo is not None and check_now.tzinfo is None:
@@ -657,7 +719,7 @@ class ScheduleProfileManager:
                                         "preset": next_b["preset"],
                                         "block_start": block_start_iso,
                                         "preheat_start": preheat_dt.isoformat(),
-                                        "heating_rate": round(heating_rate, 2),
+                                        "heating_rate": round(rate, 2),
                                         "source": "schedule",
                                     }
                                     self.schedule_overrides[climate_id] = float(next_b["target_temp"])

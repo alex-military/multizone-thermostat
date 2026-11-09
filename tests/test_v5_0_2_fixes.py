@@ -183,3 +183,76 @@ async def test_relay_backend_trv_closed_grace_period():
     hass.services.async_call.assert_called_once_with(
         "switch", "turn_on", {"entity_id": "switch.boiler"}, blocking=False
     )
+
+
+@pytest.mark.asyncio
+async def test_preset_saved_even_when_scheduler_enabled():
+    """Verify that changing temperature saves to active preset even when weekly scheduler is enabled."""
+    hass = MagicMock()
+    hass.services.async_call = AsyncMock()
+    hass.async_create_task = MagicMock(side_effect=lambda coro: coro.close() if hasattr(coro, "close") else None)
+
+    coordinator = MagicMock()
+    coordinator.zones = [{"name": "Salone", "target_temp": 20.0}]
+    coordinator.get_master_state.return_value = True
+    coordinator.async_set_persistent_data = AsyncMock()
+    coordinator.master_device_id = "master_dev_123"
+    coordinator.get_global_preset.return_value = "comfort"
+    coordinator.zone_manager = MagicMock()
+    coordinator.calendar_manager.temp_overrides = {}
+    coordinator.schedule_manager = MagicMock()
+    coordinator.schedule_manager.scheduler_enabled = True
+    coordinator.schedule_manager.get_effective_target.return_value = 21.5
+
+    hass.data = {DOMAIN: {"test_entry": {"coordinator": coordinator}}}
+
+    climate = MultizoneVirtualThermostat(
+        hass=hass,
+        entry_id="test_entry",
+        zone_data={CONF_ZONE_NAME: "Salone", CONF_ZONE_TARGET_TEMP: 20.0},
+    )
+    climate.async_write_ha_state = MagicMock()
+
+    await climate.async_set_temperature(temperature=21.5)
+    coordinator.schedule_manager.record_manual_override.assert_called_once_with(climate.entity_id, 21.5)
+    coordinator.zone_manager.update_preset_temperature.assert_called_once_with("comfort", climate.entity_id, 21.5)
+
+
+@pytest.mark.asyncio
+async def test_zone_select_options_are_zone_modes():
+    """Verify MultizoneZoneSelect.options returns primary, secondary, bypass."""
+    from custom_components.multizone_thermostat.select import MultizoneZoneSelect
+    from custom_components.multizone_thermostat.const import ZONE_MODES
+
+    coordinator = MagicMock()
+    coordinator.zones = [{"name": "Salone"}]
+    sel = MultizoneZoneSelect(coordinator, "entry_1", "Salone")
+    assert sel.options == list(ZONE_MODES)
+
+
+@pytest.mark.asyncio
+async def test_presets_not_wiped_after_async_load_storage():
+    """Verify _async_save_presets_storage does not wipe in-memory presets after async_load_storage."""
+    from custom_components.multizone_thermostat.coordinator import MultizoneCoordinator
+
+    hass = MagicMock()
+    hass.async_create_task = MagicMock(side_effect=lambda coro: coro.close() if hasattr(coro, "close") else None)
+    entry = MagicMock()
+    entry.entry_id = "test_entry"
+    entry.data = {"zones": [{"name": "Salone", "target_temp": 20.0}]}
+    entry.options = {}
+
+    coordinator = MultizoneCoordinator(hass, entry)
+    coordinator._store.async_load = AsyncMock(return_value={})
+    coordinator._settings_store.async_load = AsyncMock(return_value={})
+    coordinator._preset_store.async_load = AsyncMock(return_value={"presets_heat": {}, "presets_cool": {}})
+    coordinator._preset_store.async_save = AsyncMock()
+
+    await coordinator.async_load_storage()
+    coordinator.zone_manager.update_preset_temperature("comfort", "climate.multizone_thermostat_salone", 22.5, hvac_mode="heat")
+    coordinator.zone_manager.update_preset_temperature("comfort", "climate.multizone_thermostat_salone", 24.0, hvac_mode="cool")
+
+    await coordinator._async_save_presets_storage()
+
+    assert coordinator.zone_manager.get_preset_temperature("comfort", "climate.multizone_thermostat_salone", "heat") == 22.5
+    assert coordinator.zone_manager.get_preset_temperature("comfort", "climate.multizone_thermostat_salone", "cool") == 24.0

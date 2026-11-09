@@ -2,10 +2,11 @@
   "config": {
     "step": {
       "user": {
-        "title": "Multizone Thermostat — Boiler Mode",
-        "description": "Select how you want to control your central heating system (Relay ON/OFF or OpenTherm Modulating).",
+        "title": "Multizone Thermostat — Central Heating Plants",
+        "description": "Select the central heating generators available on your system.",
         "data": {
-          "boiler_mode": "Boiler Control Mode"
+          "enable_gas_heater": "Gas / Combustion Boiler",
+          "enable_heat_pump": "Electric Heat Pump (PDC)"
         }
       },
       "weather": {
@@ -65,6 +66,18 @@
               "allow_passive_heat": "Allow Passive Heat (Fancoil without valve / Mezzanine)",
               "weight": "Zone Thermal Weight (Area / Emitter Power)"
             }
+          },
+          "split_settings": {
+            "name": "Room Air Split Actuators",
+            "description": "Secondary direct-expansion split AC / Heat Pump unit for this room.",
+            "data": {
+              "split_climate_entity": "Split AC / Heat Pump Entity",
+              "split_role": "Operational Role",
+              "split_solar_priority": "Solar Priority (Prefer Split on PV Surplus)",
+              "split_quick_boost": "Thermal Shock / Quick Heat Boost",
+              "split_boost_delta": "Boost Delta-T Threshold (°C)",
+              "split_sensor_injection": "Inject Room Sensor (Bypass Ceiling Probe)"
+            }
           }
         },
         "data_description": {
@@ -117,6 +130,47 @@
           "opentherm_max_temp": "Maximum Water Temperature (°C)",
           "opentherm_ch_switch": "CH enable switch (optional)"
         }
+      },
+      "boiler_mode": {
+        "title": "Gas Boiler Mode",
+        "description": "Select how you want to control your gas boiler (Relay ON/OFF or OpenTherm Modulating).",
+        "data": {
+          "boiler_mode": "Boiler Control Mode"
+        }
+      },
+      "heat_pump": {
+        "title": "Central Heat Pump (PDC) Setup",
+        "description": "Configure your central hydronic heat pump entity and temperature limits.",
+        "data": {
+          "heat_pump_type": "Heat Pump Control Type",
+          "heat_pump_entity": "Heat Pump Entity",
+          "heat_pump_min_temp": "Minimum Flow Water Temperature (°C)",
+          "heat_pump_max_temp": "Maximum Flow Water Temperature (°C)",
+          "heat_pump_ch_switch": "Heating Enable Switch (Optional)",
+          "heat_pump_cooling": "Enable Cooling Mode",
+          "hp_cool_min_temp": "Minimum Cooling Water Temperature (°C)",
+          "hp_cool_max_temp": "Maximum Cooling Water Temperature (°C)"
+        }
+      },
+      "energy_management": {
+        "title": "Solar Self-Consumption & Energy Management",
+        "description": "Configure solar PV surplus detection, battery protection, or external signals from EMHASS/Predbat.",
+        "data": {
+          "energy_management_enabled": "Enable Solar Energy Management",
+          "solar_power_sensor": "Solar Production Power Sensor (W)",
+          "grid_export_sensor": "Grid Export Power Sensor (W)",
+          "battery_soc_sensor": "Battery State of Charge (SOC) Sensor (%)",
+          "external_solar_override_entity": "External Solar Signal / Switch (EMHASS/Predbat)",
+          "solar_export_threshold": "Surplus Export Threshold (W)",
+          "battery_min_reserve_soc": "Battery Safety Reserve Minimum SOC (%)",
+          "solar_min_run_time": "Minimum Solar Run Time Anti-Chatter (minutes)",
+          "solar_overheat_offset": "Solar / EMHASS Thermal Storage Overheat Offset (+°C)",
+          "battery_power_sensor": "Battery Power Sensor (W, optional)",
+          "solar_forecast_sensor": "Solar Forecast Sensor (W or kWh, optional)",
+          "solar_irradiance_sensor": "Solar Irradiance Sensor (W/m² or lux, optional)",
+          "battery_max_discharge_time": "Max Allowed Battery Discharge Time (minutes)",
+          "battery_power_inverted": "Invert Battery Power Sign (if positive = discharge)"
+        }
       }
     },
     "abort": {
@@ -130,7 +184,8 @@
       "presence_sensor_required": "A presence sensor is required when geofencing is enabled.",
       "invalid_temp_range": "Minimum temperature must be lower than maximum temperature.",
       "no_actuators_selected": "You must select at least one climate entity or switch for the zone.",
-      "zone_name_exists": "A zone with this name already exists."
+      "zone_name_exists": "A zone with this name already exists.",
+      "no_plants_selected": "You must select at least one central heating plant (Gas boiler or Heat pump)."
     }
   },
   "options": {
@@ -140,6 +195,17 @@
         "description": "Configured zones: **{zones_count}**\n\nWhat would you like to change?",
         "data": {
           "action": "Action"
+        },
+        "menu_options": {
+          "change_boiler": "Change boiler / plant mode",
+          "edit_heat_pump": "Edit Heat Pump (PDC)",
+          "edit_energy_management": "Edit Solar & Energy Management",
+          "add_zone": "Add a zone",
+          "edit_zone": "Edit a zone",
+          "remove_zone": "Remove a zone",
+          "edit_weather_comp": "Edit Weather Compensation",
+          "edit_geofencing": "Edit Geofencing Settings",
+          "edit_calendar": "Edit Global Calendar"
         }
       },
       "change_boiler": {
@@ -204,6 +270,18 @@
               "allow_passive_heat": "Allow Passive Heat (Fancoil without valve / Mezzanine)",
               "weight": "Zone Thermal Weight (Area / Emitter Power)"
             }
+          },
+          "split_settings": {
+            "name": "Room Air Split Actuators",
+            "description": "Secondary direct-expansion split AC / Heat Pump unit for this room.",
+            "data": {
+              "split_climate_entity": "Split AC / Heat Pump Entity",
+              "split_role": "Operational Role",
+              "split_solar_priority": "Solar Priority (Prefer Split on PV Surplus)",
+              "split_quick_boost": "Thermal Shock / Quick Heat Boost",
+              "split_boost_delta": "Boost Delta-T Threshold (°C)",
+              "split_sensor_injection": "Inject Room Sensor (Bypass Ceiling Probe)"
+            }
           }
         },
         "data_description": {
@@ -265,6 +343,18 @@
               "allow_passive_heat": "Allow Passive Heat (Fancoil without valve / Mezzanine)",
               "weight": "Zone Thermal Weight (Area / Emitter Power)"
             }
+          },
+          "split_settings": {
+            "name": "Room Air Split Actuators",
+            "description": "Secondary direct-expansion split AC / Heat Pump unit for this room.",
+            "data": {
+              "split_climate_entity": "Split AC / Heat Pump Entity",
+              "split_role": "Operational Role",
+              "split_solar_priority": "Solar Priority (Prefer Split on PV Surplus)",
+              "split_quick_boost": "Thermal Shock / Quick Heat Boost",
+              "split_boost_delta": "Boost Delta-T Threshold (°C)",
+              "split_sensor_injection": "Inject Room Sensor (Bypass Ceiling Probe)"
+            }
           }
         }
       },
@@ -312,6 +402,46 @@
           "opentherm_max_temp": "Maximum Water Temperature (°C)",
           "opentherm_ch_switch": "CH enable switch (optional)"
         }
+      },
+      "edit_energy_management": {
+        "title": "Solar Self-Consumption & Energy Management",
+        "description": "Configure solar PV surplus detection, battery protection, or external signals from EMHASS/Predbat.",
+        "data": {
+          "energy_management_enabled": "Enable Solar Energy Management",
+          "solar_power_sensor": "Solar Production Power Sensor (W)",
+          "grid_export_sensor": "Grid Export Power Sensor (W)",
+          "battery_soc_sensor": "Battery State of Charge (SOC) Sensor (%)",
+          "external_solar_override_entity": "External Solar Signal / Switch (EMHASS/Predbat)",
+          "solar_export_threshold": "Surplus Export Threshold (W)",
+          "battery_min_reserve_soc": "Battery Safety Reserve Minimum SOC (%)",
+          "solar_min_run_time": "Minimum Solar Run Time Anti-Chatter (minutes)",
+          "solar_overheat_offset": "Solar / EMHASS Thermal Storage Overheat Offset (+°C)",
+          "battery_power_sensor": "Battery Power Sensor (W, optional)",
+          "solar_forecast_sensor": "Solar Forecast Sensor (W or kWh, optional)",
+          "solar_irradiance_sensor": "Solar Irradiance Sensor (W/m² or lux, optional)",
+          "battery_max_discharge_time": "Max Allowed Battery Discharge Time (minutes)",
+          "battery_power_inverted": "Invert Battery Power Sign (if positive = discharge)"
+        }
+      },
+      "edit_heat_pump": {
+        "title": "Edit Central Heat Pump (PDC)",
+        "description": "Modify your central hydronic heat pump entity and temperature limits.",
+        "data": {
+          "enable_heat_pump": "Enable Central Heat Pump (PDC)",
+          "heat_pump_type": "Heat Pump Control Type",
+          "heat_pump_entity": "Heat Pump Entity",
+          "heat_pump_cooling": "Enable Cooling Mode",
+          "heat_pump_min_temp": "Minimum Flow Water Temperature (°C)",
+          "heat_pump_max_temp": "Maximum Flow Water Temperature (°C)",
+          "hp_cool_min_temp": "Minimum Cooling Water Temperature (°C)",
+          "hp_cool_max_temp": "Maximum Cooling Water Temperature (°C)",
+          "heat_pump_ch_switch": "Heating Enable Switch (Optional)"
+        }
+      },
+      "trv_calibration": {
+        "title": "TRV Configuration (Offset Sensor)",
+        "description": "Select the temperature offset (calibration) entities for each TRV in zone {zone_name}. These are usually `number` entities provided by your TRV integration (e.g. Better Thermostat, Z2M, ZHA). If left empty, we will use 'Target Temperature Compensation' (faking the target temp to match the external sensor).",
+        "data": {}
       }
     },
     "abort": {
@@ -326,13 +456,21 @@
       "presence_sensor_required": "A presence sensor is required when geofencing is enabled.",
       "invalid_temp_range": "Minimum temperature must be lower than maximum temperature.",
       "no_actuators_selected": "You must select at least one climate entity or switch for the zone.",
-      "zone_name_exists": "A zone with this name already exists."
+      "zone_name_exists": "A zone with this name already exists.",
+      "hp_temps_invalid": "Heat pump heating/cooling minimum temperature must be lower than maximum temperature.",
+      "no_plants_selected": "You must select at least one plant generator (Gas boiler, Heat pump, or Split zone)."
     }
   },
   "entity": {
     "switch": {
       "master": {
         "name": "Heating Master"
+      },
+      "master_allow_split_heating": {
+        "name": "Allow Split Heating"
+      },
+      "master_allow_split_cooling": {
+        "name": "Allow Split Cooling"
       }
     },
     "select": {
@@ -353,6 +491,46 @@
           "weighted_average": "Weighted Average",
           "sum_capped": "Cumulative Sum (Capped 100%)"
         }
+      },
+      "master_heat_source_priority": {
+        "name": "Heat Source Priority",
+        "state": {
+          "auto": "Automatic (PV Surplus, Quick Boost & AI)",
+          "hybrid": "Manual Hybrid (Split where present, Gas for others)",
+          "combined": "Manual Combined (Gas + Split simultaneously)",
+          "gas_only": "Manual Gas Only (Blocks Split)",
+          "electric_only": "Manual Electric Only (Blocks Boiler)"
+        }
+      },
+      "master_operation_mode": {
+        "name": "Master Operation Mode",
+        "state": {
+          "heat": "Heating",
+          "cool": "Cooling"
+        }
+      },
+      "schedule_profile": {
+        "name": "Schedule Profile"
+      }
+    },
+    "sensor": {
+      "energy_class": {
+        "name": "Energy Class"
+      }
+    }
+  },
+  "selector": {
+    "action": {
+      "options": {
+        "change_boiler": "Change boiler / plant mode",
+        "edit_heat_pump": "Edit Heat Pump (PDC)",
+        "edit_energy_management": "Edit Solar & Energy Management",
+        "add_zone": "Add a zone",
+        "edit_zone": "Edit a zone",
+        "remove_zone": "Remove a zone",
+        "edit_weather_comp": "Edit Weather Compensation",
+        "edit_geofencing": "Edit Geofencing Settings",
+        "edit_calendar": "Edit Global Calendar"
       }
     }
   }

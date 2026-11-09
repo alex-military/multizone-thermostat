@@ -27,8 +27,11 @@ class ThermalObserver:
         self.cooling_rate = 0.0  # °C / hour
         self.thermal_inertia = 0.0  # °C overshoot
 
-    def update(self, current_temp: float, is_heating: bool):
+    def update(self, current_temp: float, is_heating: bool, hvac_mode: str | None = None):
         """Update the observer with the latest temperature and state."""
+        if hvac_mode in ("cool", "COOL"):
+            return
+
         now = time.monotonic()
         
         if self._last_temp is None:

@@ -12,6 +12,8 @@ from ..const import (
     CONF_ANTI_SEIZE_BOILER,
     CONF_ZONE_ANTI_SEIZE,
     CONF_ZONE_NAME,
+    CONF_ZONE_SPLIT_ROLE,
+    SPLIT_ROLE_COOLING_ONLY,
     HVAC_MODE_HEAT,
     KEY_ANTI_SEIZE_DURATION,
     KEY_ANTI_SEIZE_ENABLED,
@@ -116,6 +118,17 @@ class AntiSeizeManager:
                 if not zone.get(CONF_ZONE_ANTI_SEIZE, True):
                     _LOGGER.debug("Skipping zone %s (anti-seize disabled)", climate_id)
                     continue
+
+                split_role = zone.get(CONF_ZONE_SPLIT_ROLE, zone.get("split_role"))
+                if split_role == SPLIT_ROLE_COOLING_ONLY:
+                    _LOGGER.debug("Skipping zone %s (cooling_only split)", climate_id)
+                    continue
+
+                if hasattr(self.coordinator, "split_manager") and self.coordinator.split_manager:
+                    split_info = self.coordinator.split_manager.get_split_info(climate_id)
+                    if split_info and split_info.get("split_role") == SPLIT_ROLE_COOLING_ONLY:
+                        _LOGGER.debug("Skipping zone %s (cooling_only split)", climate_id)
+                        continue
 
                 state = self.hass.states.get(climate_id)
                 if state:

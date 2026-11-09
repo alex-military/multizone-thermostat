@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import homeassistant.util.dt as dt_util
 
 from .calendar_parser import parse_calendar_event
-from .const import CONF_ZONE_NAME, make_zone_entity_id
+from .const import CONF_ZONE_NAME, make_zone_entity_id, HVAC_MODE_COOL
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -157,9 +157,14 @@ class CalendarManager:
                     if parsed["global_preset"]:
                         await self.coordinator.zone_manager.async_set_global_preset(parsed["global_preset"])
                         
+                    master_mode = str(getattr(self.coordinator, "master_hvac_mode", "heat")).lower()
+                    is_cool = (master_mode in ("cool", HVAC_MODE_COOL.lower()))
+
                     if parsed["global_temperature"] is not None:
                         for zone in self.coordinator.zones:
                             climate_id = make_zone_entity_id(zone[CONF_ZONE_NAME])
+                            if is_cool and hasattr(self.coordinator, "can_zone_cool") and not self.coordinator.can_zone_cool(climate_id):
+                                continue
                             self.current_event_overrides[climate_id] = parsed["global_temperature"]
                             
                     # Apply Zone Overrides
@@ -194,7 +199,9 @@ class CalendarManager:
                                 target_temp = self.coordinator.zone_manager._presets.get(override.preset, {}).get(climate_id, {}).get("target_temp")
 
                         if target_temp is not None:
-                            if override.is_permanent:
+                            if is_cool and hasattr(self.coordinator, "can_zone_cool") and not self.coordinator.can_zone_cool(climate_id):
+                                pass
+                            elif override.is_permanent:
                                 # Save permanently to current preset (Demeter violation fixed)
                                 if self.coordinator.zone_manager.current_global_preset:
                                     self.coordinator.zone_manager.update_preset_temperature(
@@ -233,6 +240,8 @@ class CalendarManager:
             future_events = []
 
         evaluated_zones: set[str] = set()
+        master_mode = str(getattr(self.coordinator, "master_hvac_mode", "heat")).lower()
+        is_cool = (master_mode in ("cool", HVAC_MODE_COOL.lower()))
         for fut_event in future_events:
             start_time = self._parse_event_datetime(fut_event.get("start"))
             if not start_time:
@@ -241,6 +250,8 @@ class CalendarManager:
             for zone in self.coordinator.zones:
                 climate_id = make_zone_entity_id(zone[CONF_ZONE_NAME])
                 if climate_id in evaluated_zones:
+                    continue
+                if is_cool and hasattr(self.coordinator, "can_zone_cool") and not self.coordinator.can_zone_cool(climate_id):
                     continue
                 target = None
                 
@@ -271,22 +282,45 @@ class CalendarManager:
                     state = self.hass.states.get(climate_id)
                     if state:
                         current_temp = state.attributes.get("current_temperature")
-                        
-                    if current_temp is not None and current_temp < target:
-                        # We need to heat. Calculate time.
-                        thermal_model = self.coordinator._thermal_models.get(climate_id)
-                        if thermal_model and thermal_model.heating_rate > 0.05: # At least 0.05 deg/hour
+
+                    master_mode = str(getattr(self.coordinator, "master_hvac_mode", "heat")).lower()
+                    is_cool = (master_mode == "cool")
+
+                    need_smart_start = False
+                    delta_t = 0.0
+                    rate = 1.0
+
+                    if is_cool:
+                        if current_temp is not None and current_temp > target:
+                            delta_t = current_temp - target
+                            thermal_model = getattr(self.coordinator, "_thermal_models", {}).get(climate_id)
+                            c_rate = getattr(thermal_model, "cooling_rate", 0.0) if thermal_model else 0.0
+                            if c_rate > 0.05:
+                                rate = c_rate
+                            else:
+                                h_rate = getattr(thermal_model, "heating_rate", 0.0) if thermal_model else 0.0
+                                rate = h_rate if h_rate > 0.05 else 1.0
+                            need_smart_start = True
+                    else:
+                        if current_temp is not None and current_temp < target:
                             delta_t = target - current_temp
-                            hours_needed = delta_t / thermal_model.heating_rate
-                            time_needed = timedelta(hours=hours_needed)
-                            
-                            if now + time_needed >= start_time:
-                                _LOGGER.info("Smart Start Active for %s! Target: %.1f, Need: %s", climate_id, target, time_needed)
-                                # Override current target temp temporarily
-                                self.smart_start_overrides[climate_id] = target
-                                # Wake up zone if temporarily bypassed/off by calendar
-                                if self.mode_overrides.get(climate_id) in ("off", "bypass"):
-                                    del self.mode_overrides[climate_id]
+                            thermal_model = getattr(self.coordinator, "_thermal_models", {}).get(climate_id)
+                            h_rate = getattr(thermal_model, "heating_rate", 0.0) if thermal_model else 0.0
+                            if h_rate > 0.05:
+                                rate = h_rate
+                                need_smart_start = True
+
+                    if need_smart_start and rate > 0:
+                        hours_needed = delta_t / rate
+                        time_needed = timedelta(hours=hours_needed)
+
+                        if now + time_needed >= start_time:
+                            _LOGGER.info("Smart Start Active for %s! Target: %.1f, Need: %s", climate_id, target, time_needed)
+                            # Override current target temp temporarily
+                            self.smart_start_overrides[climate_id] = target
+                            # Wake up zone if temporarily bypassed/off by calendar
+                            if self.mode_overrides.get(climate_id) in ("off", "bypass"):
+                                del self.mode_overrides[climate_id]
                                         
         # If smart start state changed for any zone, trigger refresh
         if old_smart_start != self.smart_start_overrides:

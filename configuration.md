@@ -1,8 +1,13 @@
 # Configuration & Documentation
 
-[⬅️ Back to Main Readme](README.md)
+[⬅️ Back to Main Readme](README.md) • [🌿 Hybrid Plant, Split AC & Energy Guide](hybrid_and_energy.md) • [🎨 Cards Guide](cards.md)
 
 Everything you need to know to set up, configure, and understand how the Multizone Thermostat integration works.
+
+> [!IMPORTANT]
+> **Phase 11 (v6.1.0-beta)** adds bivalent central plant configuration (Gas Boiler + Central Heat Pump), per-zone Room Split AC management with real sensor injection, off-grid solar surplus & battery protection, and seasonal dual-track regulation.
+
+---
 
 ## Prerequisite: Home Assistant Local Calendar
 
@@ -19,21 +24,39 @@ If you want to use the **Global Calendar & Smart Start** feature, you must first
 1. Go to **Settings → Devices & Services → Add Integration**
 2. Search for **"Multizone Thermostat"**
 3. Follow the setup wizard:
-   - **Step 1 (Boiler Mode)**: Choose between **Relay (ON/OFF)** and **OpenTherm (Modulating)**.
-   - **Step 1a (Relay Mode)**: Select your central boiler relay / circulator pump (`switch`).
-   - **Step 1b (OpenTherm Mode)**: Select your OpenTherm entity (`climate`, `water_heater`, or `number`), optionally specify a dedicated Central Heating toggle switch (`opentherm_ch_switch`), and set the Minimum ($T_{\text{min}}$, default 35°C) and Maximum ($T_{\text{max}}$, default 75°C) boiler water temperatures.
+   - **Step 1 (Central Generators Selection)**: Choose whether your home has a **Gas / Fuel Boiler**, a **Central Hydronic Heat Pump (PDC)**, or **Both** (Bivalent Hybrid Plant). You can also configure a pure Full-Electric installation (Heat Pump only).
+   - **Step 1a (Gas Boiler Configuration)**: Choose between **Relay (ON/OFF PWM)** or **OpenTherm (Modulating)**.
+     - *Relay*: select your central boiler relay / circulator switch.
+     - *OpenTherm*: select your OpenTherm gateway entity (`climate`, `water_heater`, or `number`), optional CH enable switch, and Min/Max water flow temperatures (e.g. 35°C – 75°C).
+   - **Step 1b (Central Heat Pump Configuration)**: Select control interface:
+     - `climate`: Modulates flow temperature and switches between `heat`/`cool`/`off`.
+     - `switch`: Contact dry relay / Smart Grid Ready (SG-Ready) activation.
+     - `opentherm`: Modulating OpenTherm bus drive.
+     - Configure heating temperature range (e.g. 25°C – 55°C), reversible cooling toggle (`heat_pump_cooling`), and chilled water temperature limits (e.g. 7°C – 18°C).
    - **Step 2 (Add Zone)**: Create your thermal zone through intuitive collapsible sections:
      - **Main Settings**: Name, primary Temperature Sensor, and Base Target Temperature.
      - **▶ TRVs (Standard)**: Assign smart thermostatic radiator valves (`climate`) and enable preset sync.
      - **▶ Proportional & 0-10V Valves**: Assign direct-opening actuators (`valve`, `number`) and choose scaling (**Percentage 0–100%** or **Voltage 0.0–10.0 V**).
      - **▶ Relay Actuators (PWM)**: Assign switches/relays for thermal ON/OFF actuators.
+     - **▶ Room Split AC (Condizionatori Split)**:
+       - Associate an air-to-air split unit (`climate.*`).
+       - Set operational role: `heat_cool` (all year), `heating_only` (winter boost), `cooling_only` (summer air conditioning).
+       - Enable **Bypass Sonda a Soffitto (Sensor Injection)** to overcome ceiling hot-air pooling by injecting an eye-level room sensor target.
+       - Enable **Quick Heat Boost (Thermal Shock)** and configure trigger threshold ($\Delta T \ge 1.5^\circ\text{C}$).
      - **▶ Protections & Advanced**: Assign Window Sensors, adjust Sensor Watchdog Timeout, toggle Summer Anti-seize, or enable Passive Heat intake.
-   - **Step 3 (TRV Calibration - Conditional)**: If in Step 2 you assigned *both* TRVs and a pure external Temperature Sensor, you will be asked if you want to assign a `Local Temperature Calibration` entity to each TRV (for the mathematical offset injection).
+   - **Step 3 (TRV Calibration - Conditional)**: If you assigned *both* TRVs and a pure external Temperature Sensor, you can assign a `Local Temperature Calibration` entity to each TRV for mathematical offset injection.
    - **Step 4 (More Zones)**: Choose whether to add another zone or proceed to global settings.
-   - **Step 5 (Global Calendar)**: Select the Local Calendar entity you created in the prerequisite step. Leave blank if you don't want to use calendar scheduling.
-   - **Step 6 (Weather Compensation)**: Select an optional outdoor sensor (physical or `weather` domain) to enable the Feed-Forward heating curve.
-   - **Step 7 (Geofencing)**: Select an optional presence sensor (`binary_sensor` or `device_tracker` or `zone`) and choose the target presets for when you leave or return home.
-   - **Step 8**: Confirm and finish.
+   - **Step 5 (Solar Self-Consumption & Energy Management - Optional)**:
+     - Enable solar energy management.
+     - Select **Solar Power Sensor** (PV generation in Watts) and optional **Grid Export Sensor**.
+     - Off-grid & zero-export settings: **Battery SoC Sensor** (e.g. $> 95\%$) and **Battery Power Sensor** (Watts).
+     - Safeguards: **Battery Minimum Reserve SoC** (e.g. 80-85%) and **Battery Max Discharge Time** (timeout before reverting to gas).
+     - External optimizer: **EMHASS / Predbat** deferred load sensor entity.
+     - Operational tuning: **Compressor Minimum Run Time** (anti-chatter, default 10 min) and **Solar Overheating Offset** (thermal mass banking, $0.0^\circ\text{C} \dots +3.0^\circ\text{C}$).
+   - **Step 6 (Global Calendar)**: Select your Local Calendar entity or leave blank.
+   - **Step 7 (Weather Compensation)**: Select an optional outdoor sensor to enable the Feed-Forward heating curve.
+   - **Step 8 (Geofencing)**: Select an optional presence sensor (`binary_sensor`, `device_tracker`, or `zone`) and configure Away/Sleep presets.
+   - **Step 9**: Confirm and finish.
 
 ---
 
@@ -41,29 +64,35 @@ If you want to use the **Global Calendar & Smart Start** feature, you must first
 
 In the modular architecture, a **Zone** is a powerful virtual aggregator:
 
-- **Pure TRV Room**: Assign one or multiple TRVs to the zone. The zone averages their temperatures and syncs their setpoints.
-- **Relay / Underfloor Room**: Assign a simple relay switch and a temperature sensor. The zone automatically acts as a virtual thermostat, computing PID and driving the relay via PWM!
-- **Proportional / 0-10V Analog Actuators**: Assign motorized valves or 0-10V DAC/dimmer modules (e.g. Shelly Dimmer 0-10V, ESPHome). The zone maps the calculated PID demand (0-100%) directly into opening percentage or analog voltage (0-10V), bypassing PWM clicking completely!
-- **Direct-Pin TRVs**: TRVs that expose an internal valve opening percentage or `valve` entity can be driven directly via the Proportional Valves section for continuous micro-regulation without local setpoint fighting.
-- **Hybrid TRV + External Sensor**: Assign your TRVs AND a pure external temperature sensor. The zone intercepts the TRVs and injects a fake target (or a dynamic calibration offset) to force the physical TRV to align with the pure external sensor, bypassing the TRV's inaccurate internal thermometer!
+- **Pure TRV Room**: Assign one or multiple TRVs. The zone averages their temperatures and syncs their setpoints.
+- **Relay / Underfloor Room**: Assign a simple relay switch and a temperature sensor. The zone computes PID and drives the relay via PWM.
+- **Proportional / 0-10V Analog Actuators**: Assign motorized valves or 0-10V DAC modules. The zone maps PID demand (0-100%) directly into opening percentage or analog voltage (0-10V).
+- **Direct-Pin TRVs**: TRVs exposing an internal valve opening percentage or `valve` entity can be driven directly via proportional regulation without local setpoint fighting.
+- **Room Split AC**: Individual air conditioners operate in harmony with radiators. They activate during solar surplus or quick warm-up bursts, while the system automatically suppresses hydronic gas demand to `0.0%` for that room to avoid burning fuel.
+- **Hybrid TRV + External Sensor**: Assign your TRVs AND a pure external temperature sensor. The zone intercepts the TRVs and injects a dynamic calibration offset to force the physical TRV to align with the pure external sensor.
 
 ---
 
 ## Entities Created
 
-> **Note:** Entity IDs are assigned by Home Assistant based on the entity's unique ID and device name. The actual IDs may differ slightly from the examples below. Always copy the exact entity ID from **Settings → Devices & Services → Multizone Thermostat** or from the entity's settings page.
+> **Note:** Entity IDs are assigned by Home Assistant based on the entity's unique ID and device name. Always copy the exact entity ID from **Settings → Devices & Services → Multizone Thermostat**.
 
 | Entity (example ID) | Platform | Description |
 |----------------------|----------|-------------|
-| `switch.master_control_heating_master` | Switch | Master on/off for the entire heating system |
-| `switch.master_control_anti_seize_summer_protection` | Switch | Global toggle for the Summer Anti-seize protection |
+| `switch.master_control_heating_master` | Switch | Master on/off for the entire system |
+| `switch.master_control_allow_split_heating` | Switch | Global toggle to permit or lock Split AC heating |
+| `switch.master_control_allow_split_cooling` | Switch | Global toggle to permit or lock Split AC cooling |
+| `switch.master_control_anti_seize_summer_protection` | Switch | Global toggle for Summer Anti-seize protection |
 | `switch.master_control_anti_frost_protection` | Switch | Emergency frost protection toggle |
 | `switch.time_geofencing_geofencing` | Switch | Geofencing automation toggle |
 | `switch.time_geofencing_auto_night_mode` | Switch | Automated night mode toggle |
 | `switch.zone_modes_sync_controlli_fisici_[zone]` | Switch | Bidirectional physical TRV button synchronization toggle |
 | `switch.zone_modes_apporto_passivo_[zone]` | Switch | Passive heat intake toggle (fancoils without valves / mezzanines) |
-| `select.zone_modes_[zone]_mode` | Select | Per-zone mode selector (`primary`, `secondary`, `bypass`) |
+| `select.master_control_heat_source_priority` | Select | Heat source priority (`auto`, `hybrid`, `combined`, `electric_only`, `gas_only`) |
+| `select.master_control_master_operation_mode` | Select | Seasonal operation mode (`heat`, `cool`) |
 | `select.master_control_global_preset` | Select | Global preset selector (`manual`, `eco`, `comfort`, `sleep`, `away`) |
+| `select.master_control_demand_strategy` | Select | Demand formula (`max`, `weighted_average`, `sum_capped`) |
+| `select.zone_modes_[zone]_mode` | Select | Per-zone mode selector (`primary`, `secondary`, `bypass`) |
 | `number.master_control_min_cycle_on` | Number | Minimum boiler ON time (minutes, default: 5) |
 | `number.master_control_min_cycle_off` | Number | Minimum boiler OFF time (minutes, default: 5) |
 | `number.master_control_valve_delay` | Number | Valve opening delay before boiler starts (seconds, default: 0) |
@@ -89,163 +118,36 @@ In the modular architecture, a **Zone** is a powerful virtual aggregator:
 
 ---
 
-## How It Works
+## 🎛️ Heat Source Priorities Explained
 
-```
-Master Switch ON
-    └── Zone Mode = Primary   → Boiler can be triggered if zone is heating
-    └── Zone Mode = Secondary → Receives heat if boiler is running, but cannot trigger boiler
-    └── Zone Mode = Bypass    → Zone is completely excluded
+The priority selector (`select.master_control_heat_source_priority`) controls how gas and electric generators cooperate:
 
-Master Switch OFF
-    └── ALL zones → Overridden to OFF
-    └── Boiler   → switch.turn_off() (ignores min_cycle_on for safety)
+1. **`auto`**: The gas boiler covers baseline heating. Whenever free solar surplus is detected, or EMHASS/Predbat calls for boost, or a cold room triggers Quick Boost ($\Delta T \ge 1.5^\circ\text{C}$), splits and heat pumps engage.
+2. **`hybrid`**: Rooms with splits use electric heating **only when solar surplus is available**. If solar power is insufficient, they seamlessly fall back to hydronic heating, preserving household batteries.
+3. **`combined`**: Gas boiler maintains hydronic baseline, while the Heat Pump and Splits kick in during Solar Surplus or Thermal Shock for accelerated warm-up.
+4. **`electric_only`**: Zero gas consumption. Caldaia locked at 0%. 100% of demand is directed to the Heat Pump and Room Splits.
+5. **`gas_only`**: Electric splits and heat pumps are turned off in heating mode; all heating is delivered via hydronics and gas.
 
-Any Primary zone hvac_action = heating
-    └── If valve_delay > 0, wait for delay
-    └── If boiler was recently off, wait for min_cycle_off
-    └── Boiler ON
+---
 
-All Primary zones hvac_action = idle/off
-    └── If boiler was recently on, wait for min_cycle_on
-    └── Boiler OFF
-    
-Window Opened
-    └── Zone Mode temporarily overridden to Bypassed (saves previous state)
-Window Closed
-    └── Zone Mode restores previous state
-```
+## 🔄 Dual-Track Seasonal Operation (Heat & Cool)
+
+Commutating between Winter and Summer is done via the **Caldo 🔥 / Freddo ❄️** master slider:
+- **Dual-Track Presets**: Presets (*Comfort, Eco, Sleep, Away, Manual*) maintain completely separate target temperature memories for heating (`presets_heat`) and cooling (`presets_cool`).
+- **Dual-Track PID Loops**: The system automatically switches between independent winter PID gains (`_pids_heat`) and summer cooling PID gains (`_pids_cool`), ensuring stable regulation despite asymmetric heat exchange properties.
+- **Passive Cooling Autotuner**: Tunes PID gains automatically using Ziegler-Nichols reaction curves observed during natural room cooling.
+- **Dashboard Summer Filter**: Rooms without cooling capability (no split and no reversible heat pump) automatically hide their cards in summer to keep the dashboard clean.
 
 ---
 
 ## Options (Post-Installation)
 
 Go to **Settings → Devices & Services → Multizone Thermostat → Configure** to:
-- Change boiler mode or entity (Relay vs OpenTherm settings)
+- Change plant generators (Gas Boiler, Heat Pump, Reversible Cooling)
+- Configure Solar Self-Consumption, Battery Safeguards, and EMHASS/Predbat bridge
 - Edit Global Calendar (change or remove the calendar entity)
 - Edit Weather Compensation (change or remove outdoor sensor)
-- Change the presence sensor for geofencing
+- Change presence sensor for geofencing
 - Add a new zone
 - Remove a zone
-- Edit a zone (TRV preset sync, Window Sensor, Anti-seize exclusion, etc)
-
----
-
-## TRV Preset Sync
-
-When enabled for a zone, the integration automatically syncs the TRV preset mode:
-- HVAC mode `heat` → preset `manual`
-- HVAC mode `off` → preset `off`
-
-Only enable this for zones with physical TRV valves that support preset modes.
-
----
-
-## Summer Anti-seize Protection
-
-During the summer months, thermostatic valves and boiler circulator pumps can remain inactive for long periods, which may cause them to mechanically seize or become stuck.
-The integration includes a built-in safety mechanism to periodically cycle them:
-
-1. Enable the `switch.master_control_anti_seize_summer_protection` entity.
-2. The system tracks the exact time since the heating was last turned on.
-3. If the system remains completely idle for the configured number of days (`number.master_control_anti_seize_idle_days`, default 15 days), the integration will:
-   - Save the current state of all zones.
-   - Force all zones that have the anti-seize feature enabled to turn ON (opening their valves).
-   - Wait for the configured valve opening delay.
-   - Wait for the configured duration (`number.master_control_anti_seize_duration`, default 2 minutes).
-   - Restore all zones to their previous state.
-
-**Note**: You can selectively disable the Anti-seize protection for specific zones (e.g., fancoil units that don't have moving mechanical valves) through the UI Options flow (**Edit a zone** -> Disable "Enable Anti-seize (Summer Protection) for this zone").
-
----
-
-## 📅 Global Calendar Integration & Smart Start
-
-You can control the entire Multizone Thermostat system natively using Home Assistant's `Local Calendar` integration. 
-Go to **Settings → Devices & Services → Multizone Thermostat → Configure** and select "Edit Global Calendar" to assign a calendar to the integration.
-
-### Syntax Rules
-
-When you create an event in the calendar, the integration reads the **Summary (Title)** of the event. The syntax is highly flexible.
-
-#### 1. Change the Global Preset
-Simply write the name of the preset:
-`Eco` or `Comfort` or `Sleep` or `Away` or `Manual`
-- *What it does*: The system switches to this preset for the duration of the event, and seamlessly restores the previous preset when the event ends.
-
-#### 2. Set a Global Temperature
-Simply write a number:
-`21.5`
-- *What it does*: Temporarily overrides all zones to 21.5°C for the duration of the event.
-
-#### 3. Advanced Per-Zone Overrides
-You can combine a global preset with specific overrides for individual zones. Separate commands with commas `,` and specify the zone name with a colon `:`.
-`Comfort, Bagno: 24, Camera: Bypass`
-- *What it does*: Sets the system to Comfort. However, it forces the "Bagno" zone to 24°C, and forces the "Camera" zone to Bypass mode. 
-- *When the event ends*: The system reverts to its previous state (restores previous preset, clears 24°C from Bagno, and restores Camera).
-
-#### 4. Multiple Commands per Zone
-You can send multiple commands to the same zone by separating them with spaces. Valid modes are `primary`, `secondary`, `bypass`, `standalone`, `off`.
-`Eco, Salone: 22.5 primary`
-- *What it does*: Sets global preset to Eco. Forces the "Salone" to 22.5°C AND forces its mode to Primary.
-
-#### 5. Permanent Overrides (The `SET` keyword)
-By default, all calendar overrides are temporary and vanish when the event ends. If you want a calendar event to permanently alter the underlying preset, add the word `SET` to the zone command:
-`Comfort, Bagno: 25 SET`
-- *What it does*: Changes the target temperature of the Bagno to 25°C and saves it permanently into the Comfort preset memory. When the event ends, the Bagno will still be 25°C next time Comfort is activated!
-
-### 🤖 Predictive Smart Start
-
-Because the Multizone Thermostat actively builds a **Thermal Model** of each room (learning its heating rate in °C/hour), it can predict exactly how long a room will take to heat up!
-
-If you schedule an event like `Comfort` at 08:00 AM, the system will look ahead in the calendar. If it predicts that your bedroom needs 45 minutes to reach the Comfort temperature, the boiler will automatically fire up at 07:15 AM (Smart Start), ensuring the room is exactly at the right temperature when your alarm rings at 08:00!
-
----
-
-## 🐕 Sensor Timeout Watchdog & TRV Fallback (P1)
-
-External wireless thermometers (Zigbee, BLE, Wi-Fi) can run out of battery, drop off the mesh network, or freeze up. When this happens, a traditional thermostat risks staying permanently stuck in heating (burning fuel) or permanently off (freezing the room).
-
-Multizone Thermostat includes an **active sensor watchdog**:
-- **Configurable Timeout**: Set `sensor_timeout_min` per zone (default: 60 minutes; set to `0` to disable).
-- **Graceful Fallback**: If the external temperature sensor doesn't report a new state for longer than the timeout period (or goes `unavailable` / `unknown`), the zone automatically falls back to reading the internal temperature sensor of the assigned TRV(s).
-- **Safety Mode**: TRV calibration offsets and fake target injections are suspended while fallback is active, ensuring the TRV modulates safely based on its local reading.
-- **Trace & Telemetry**: When fallback triggers, a `SENSOR_TIMEOUT_FALLBACK` event is recorded in the diagnostics history, and `safety_fallback_active: true` is set in the zone's thermostat attributes.
-- **Automatic Recovery**: The instant the external thermometer resumes broadcasting valid temperature readings, the zone automatically disengages fallback mode and returns to normal high-precision operation.
-
----
-
-## 🔥 OpenTherm Telemetry, Fault Codes & DHW Priority
-
-When OpenTherm mode is enabled, the integration does more than just modulate water temperature — it turns Home Assistant into a boiler supervision station:
-
-### Telemetry Auto-Discovery
-The integration automatically queries the OpenTherm gateway and exposes:
-- **Water Pressure (`water_pressure`)**: Measured in Bar. The diagnostic supervisor alerts if water pressure drops below 0.8 Bar (low circuit pressure warning).
-- **Return Temperature (`return_temperature`)**: Flow and return temperature monitoring allows calculating the exact $\Delta T$ of the hydraulic distribution system.
-- **Flame Active (`flame_active`)**: Real-time binary indicator showing whether the burner flame is physically ignited.
-- **Modulation Level (`modulation_level`)**: Current burner modulation percentage (0-100%).
-- **Boiler Fault Code (`fault_code`)**: Direct capture of boiler error codes transmitted over the OpenTherm bus, eliminating the need to physically check the boiler panel.
-
-### Domestic Hot Water (DHW) Priority Freeze
-When a tap or shower is running, modern combination boilers prioritize Domestic Hot Water production over central heating. 
-During this time:
-1. The coordinator detects DHW production (`is_dhw_active: true`).
-2. Zone PID demand calculations are **frozen** (holding the previous integral state) so the integration does not falsely assume radiators are failing to warm the rooms.
-3. False "stuck valve" or "heating anomaly" alarms are suppressed.
-4. The boiler status reason cleanly displays: `HOLD_DHW - Priorità Acqua Calda Sanitaria attiva`.
-5. Once DHW draw-off finishes, central heating resumes immediately without integral windup overshoot.
-
----
-
-## 🔋 Universal Battery Monitoring & Diagnostics
-
-Managing wireless thermostats and radiator valves across multiple rooms requires clear visibility over battery health:
-- **Automatic Discovery**: The integration resolves battery levels automatically across Zigbee2MQTT, ZHA, and Tuya/Avatto devices without requiring manual sensor mapping.
-- **Zone Thermostat Attributes**: Every zone thermostat entity exposes `battery_level` in its `extra_state_attributes` (reflecting the lowest battery among the zone's external thermometer and TRVs).
-- **Diagnostic Dashboard Card**: The `ZoneEnergyCard` displays real-time battery percentage and color-coded status icons:
-  - 🟢 **> 80%**: Optimal battery health (`mdi:battery`)
-  - 🟡 **40% - 80%**: Normal operation (`mdi:battery-50`)
-  - 🟠 **15% - 40%**: Low battery warning (`mdi:battery-20`)
-  - 🔴 **< 15%**: Critical alert (`mdi:battery-alert`)
-- **Proactive Anomaly Prevention**: Low-battery devices are flagged early in diagnostics before sensor dropouts cause room temperature disruptions.
+- Edit a zone (Room Split AC, TRV preset sync, Window Sensor, Anti-seize, Sensor Watchdog, Passive Heat)

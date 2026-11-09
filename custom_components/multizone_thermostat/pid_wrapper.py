@@ -11,7 +11,17 @@ _LOGGER = logging.getLogger(__name__)
 class MultizonePID:
     """A wrapper around the mathematical PID controller."""
     
-    def __init__(self, kp: float, ki: float, kd: float, out_min: float = 0.0, out_max: float = 100.0, sensor_timeout: float = 7200.0, zone_id: str = ''):
+    def __init__(
+        self,
+        kp: float,
+        ki: float,
+        kd: float,
+        out_min: float = 0.0,
+        out_max: float = 100.0,
+        sensor_timeout: float = 7200.0,
+        zone_id: str = '',
+        action: str = 'heat',
+    ):
         """Initialize the PID wrapper.
         
         Args:
@@ -21,10 +31,13 @@ class MultizonePID:
             out_min: Minimum output (default 0%)
             out_max: Maximum output (default 100%)
             sensor_timeout: Seconds before a sensor is considered dead (default 2 hours)
+            zone_id: Identifier of zone
+            action: 'heat' for heating (reverse action) or 'cool' for cooling (direct action)
         """
         self._pid = PID(kp, ki, kd, out_min=out_min, out_max=out_max, sampling_period=0)
         self.sensor_timeout = sensor_timeout
         self.zone_id = zone_id
+        self.action = action.lower()
         self.update_sensor_timestamp()
         self.last_sensor_update = time.monotonic()
         self._last_input_time: float | None = None
@@ -63,8 +76,17 @@ class MultizonePID:
             self._last_demand = 0.0
             return self._last_demand
             
+        # In cooling mode, mirror input and setpoint so positive error (room hotter than target)
+        # produces positive output, and temperature drop acts as negative rate for braking derivative.
+        if self.action == 'cool':
+            input_val = -current_temp
+            set_point = -target_temp
+        else:
+            input_val = current_temp
+            set_point = target_temp
+
         # Calculate PID with tracked last_input_time to ensure proper dt calculation without jumps
-        demand, _ = self._pid.calc(current_temp, target_temp, input_time=now, last_input_time=self._last_input_time)
+        demand, _ = self._pid.calc(input_val, set_point, input_time=now, last_input_time=self._last_input_time)
         self._last_input_time = now
         self._last_demand = demand
         return self._last_demand

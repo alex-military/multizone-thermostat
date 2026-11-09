@@ -388,9 +388,11 @@ class PIDAutotune:
                 return False
             self._sample_time_calc.append(now - self._last_sample_time)
             self._last_sample_time = now
-            if len(self._sample_time_calc) < self._inputs.maxlen:
+            if len(self._sample_time_calc) <= 5 or len(self._sample_time_calc) < self._inputs.maxlen:
                 return False
             self._sampletime = sum(self._sample_time_calc[5::]) / len(self._sample_time_calc[5::])
+            if self._sampletime <= 0:
+                return False
             self._setpoint = set_point
             self._inputs = deque(maxlen=round(self._lookback / self._sampletime))
             self._inputs_timestamps = deque(maxlen=round(self._lookback / self._sampletime))

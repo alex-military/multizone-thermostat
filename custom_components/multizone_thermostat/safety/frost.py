@@ -13,6 +13,7 @@ from ..const import (
     DEFAULT_FROST_PROTECTION_TEMP,
     HVAC_MODE_HEAT,
     HVAC_MODE_OFF,
+    HVAC_MODE_COOL,
     KEY_ANTI_FROST_ENABLED,
     KEY_FROST_PROTECTION_TEMP,
     make_zone_entity_id,
@@ -103,9 +104,9 @@ class FrostManager:
                 )
                 # Force zone demand to 100% so boiler PWM activates
                 self.coordinator.set_zone_demand(climate_id, 100.0)
-                # Force zone to HEAT mode if OFF
+                # Force zone to HEAT mode if OFF or COOL
                 st = self.hass.states.get(climate_id)
-                if st and st.state == HVAC_MODE_OFF:
+                if st and st.state in (HVAC_MODE_OFF, HVAC_MODE_COOL, "off", "cool"):
                     await self.coordinator._async_set_hvac_mode(climate_id, HVAC_MODE_HEAT)
 
                 # Set target temperature above frost threshold so TRV internal PID opens valve

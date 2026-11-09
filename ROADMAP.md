@@ -54,31 +54,29 @@ Multizone Thermostat transforms Home Assistant into an **autonomous, self-learni
 
 ## 🚀 Active Roadmap & Upcoming Features
 
-### Phase 11 — Hybrid Multi-Generator, Room Split Climate & Solar Self-Consumption (Next Target)
-*Complete architectural design and technical specifications available in [`PHASE_11_SPECIFICATION.md`](PHASE_11_SPECIFICATION.md).*
+### Phase 11 — Hybrid Multi-Generator, Room Split Climate & Solar Self-Consumption (v6.1.0-beta)
+*Complete documentation and guide available in [`hybrid_and_energy.md`](hybrid_and_energy.md).*
 
-- [ ] **Dual-Level Heating Architecture (Central Hydronic + Room Air Splits)**:
-  - **Central Hydronic Drive**: Coordinated bivalent staging between primary Heat Pump (PDC) and auxiliary/peak Gas Boiler on the shared water loop.
-  - **Room Direct Expansion Actuators**: Integration of room-level AC/heat pump split units (`climate.*` entities) as secondary/auxiliary climate actuators.
-- [ ] **Configurable Split Operational Roles & Runtime Master Controls**:
+- [x] **Dual-Level Heating Architecture (Central Hydronic + Room Air Splits)**:
+  - **Central Hydronic Drive**: Coordinated bivalent staging between primary Heat Pump (PDC) and auxiliary/peak Gas Boiler on the shared water loop with 5 priority modes (`auto`, `hybrid`, `combined`, `electric_only`, `gas_only`).
+  - **Room Direct Expansion Actuators**: Integration of room-level AC/heat pump split units (`climate.*` entities) as secondary/auxiliary climate actuators with automatic hydronic decoupling.
+- [x] **Configurable Split Operational Roles & Runtime Master Controls**:
   - Per-zone role configuration: *Heating Only*, *Cooling Only*, or *Both (Heat & Cool)*.
   - Global Dashboard Master Switches for immediate runtime control without re-configuration:
-    - `switch.multizone_master_allow_split_heating` (Toggle Split Heating ON/OFF globally).
-    - `switch.multizone_master_allow_split_cooling` (Toggle Split Cooling ON/OFF globally).
-  - Per-zone toggle options for 3 independent runtime behaviors: *Solar Priority*, *Thermal Shock / Quick Heat Boost*, and *Real Room Sensor Injection* (bypassing the ceiling probe).
-- [ ] **Optional Solar Self-Consumption & Inverter Clipping Engine**:
-  - Fully optional and bypassable for installations without solar; provides a runtime source selector (`select.multizone_heat_source_priority`: *Gas Priority*, *Electric Priority*, *Gas Only*, *Electric Only*).
-  - Multiple solar detection methods:
-    - **Inverter Clipping / Curtailment detection**: Native evaluation ($SOC \ge 98\%$, battery `idle`, $|P_{PV} - P_{Load}| < 80\text{ W}$, $P_{PV} > 300\text{ W}$) or custom template sensor state (`Limitazione`).
-    - **Grid Export**: Configurable export power threshold ($P_{export} > X\text{ W}$).
-    - **Predictive Optimizer**: Signal input from EMHASS or Predbat for pre-scheduled solar thermal charging.
-  - Two operational modes during solar surplus:
-    - *Global Hybrid Mode*: Gas boiler fires only for rooms without splits, while rooms with splits bypass radiators and heat for free via splits.
-    - *Solar Self-Consumption Only (Zero Gas)*: Gas boiler strictly locked OFF; only splits engage to dump surplus energy into thermal mass.
-  - Battery Protection Guard & Anti-Chatter: Minimum continuous run time (10–15 min) and automatic shutoff if battery discharges past threshold.
-- [ ] **Foundations for Summer Cooling Mode**:
+    - `switch.master_control_allow_split_heating` (Toggle Split Heating ON/OFF globally).
+    - `switch.master_control_allow_split_cooling` (Toggle Split Cooling ON/OFF globally).
+  - Per-zone runtime behaviors: *Solar Priority*, *Thermal Shock / Quick Heat Boost* ($\Delta T \ge 1.5^\circ	ext{C}$), and *Real Room Sensor Injection* (bypassing the ceiling probe).
+  - Single-room independent split run button with safety lockout when Master is active.
+- [x] **Solar Self-Consumption & Off-Grid Inverter Clipping Engine**:
+  - Runtime priority selector (`select.master_control_heat_source_priority`).
+  - Multiple solar surplus detection methods: Inverter Clipping / Curtailment detection without export, Grid Export threshold, and EMHASS / Predbat predictive optimizers.
+  - Active battery anti-discharge safeguard (timeout after 5 min of continuous discharge >150W reverts to gas) and minimum SoC night reserve.
+  - Free solar thermal over-heating offset ($0.0^\circ	ext{C} \dots +3.0^\circ	ext{C}$) and 10-minute anti-chatter compressor protection.
+- [x] **Summer Cooling & Dual-Track Climate Engine**:
   - Seasonal Master Mode Switch (`HVACMode.HEAT` / `HVACMode.COOL`).
-  - Active cooling management for AC splits and dew-point controlled hydronic cooling manifolds.
+  - Dual-track PID loops (`_pids_heat` vs `_pids_cool`) and passive Ziegler-Nichols cooling autotuner.
+  - Dual-track isolated preset memory (`presets_heat` and `presets_cool`).
+  - Visual Twin Lovelace cards with 14px dial stroke, direct arc touch, and active heat source badges.
 
 ---
 

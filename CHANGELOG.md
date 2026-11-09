@@ -1,5 +1,38 @@
 # Changelog
 
+## [6.1.0-beta.1] - 2026-11-09
+### Feature: Phase 11 — Hybrid Multi-Generator, Room Split Climate & Solar Self-Consumption
+- **Bivalent Central Plant Architecture (`PlantOrchestrator` & `HeatPumpBackend`)**:
+  - Independent or concurrent orchestration of Gas Boiler (Relay PWM or OpenTherm) and Central Hydronic Heat Pump (`climate`, `switch`, or `number`).
+  - Staged arbitration between 5 priority modes (`auto`, `hybrid`, `combined`, `electric_only`, `gas_only`).
+  - Reversible hydronic cooling (`heat_pump_cooling`) with strict gas boiler lockout in summer.
+  - Full-electric support for homes without a gas boiler.
+- **Per-Zone Room Split AC Integration (`split_controller.py`)**:
+  - Assign individual room air conditioners (`climate.*`) with configurable operational roles (`heat_cool`, `heating_only`, `cooling_only`).
+  - Ceiling sensor bypass (Dynamic Real Room Sensor Injection) to eliminate premature throttling from hot ceiling air.
+  - Quick Heat Boost (Thermal Shock): Dual-heat boost at $\Delta T \ge 1.5^\circ\text{C}$ with automatic disengagement at $\Delta T \le 0.3^\circ\text{C}$.
+  - Automatic hydronic decoupling: Suppresses hydronic gas demand to 0.0% for rooms heated by electric split.
+  - Independent Room Split Manual Run: Header button on Dial card allows single-room electric split run when Master is OFF, with automated safety lockout when Master is active.
+- **Off-Grid Solar Self-Consumption & Battery Protection (`energy_manager.py`)**:
+  - Inverter clipping & zero-export solar surplus detection without requiring grid export sensors.
+  - Battery anti-discharge safeguard: Reverts to gas baseline if battery discharges (>150W) continuously for >5 minutes.
+  - Night battery reserve protection (configurable SoC threshold e.g. 80-85%).
+  - Seamless bridge for external AI optimizers (EMHASS deferred load sensor `p_deferrable0 > 0 W` & Predbat).
+  - Free solar thermal over-heating offset ($0.0^\circ\text{C} \dots +3.0^\circ\text{C}$) to bank heat into walls and floors.
+  - Anti-chatter protection enforcing 10-minute minimum compressor run times.
+- **Dual-Track Seasonal Engine & Passive Cooling Autotuner**:
+  - Dual-track PID loops (`_pids_heat` vs `_pids_cool`) tailored to asymmetric heating vs cooling dynamics.
+  - Passive Ziegler-Nichols autotuner with dedicated cooling reaction curve observer (`mode="cool"`).
+  - Dual-track preset storage (`presets_heat` and `presets_cool`) maintaining independent setpoints across seasons.
+- **Lovelace Cards 1-to-1 Visual Twins & Parity**:
+  - 14px dial stroke width matching native HA climate card.
+  - Direct arc touch/click target temperature setting.
+  - Symmetrical floating 42px circular `[-]` and `[+]` step buttons.
+  - Comma decimal formatting (`21,5 °C`) and clean title case status labels.
+  - Active source badges: `🔥 GAS`, `⚡ ELETTRICO`, `🔥⚡ GAS + ELETTRICO`.
+  - Constant-height seasonal preset card with segmented priority pill selector and Caldo 🔥 / Freddo ❄️ master slider.
+  - Automatic summer card filtering (`hide_if_cannot_cool`).
+
 ## [6.0.6] - 2026-11-07
 ### Fix: Bulletproof Dashboard Navigation & Instant Fallback Modal
 - **Home Assistant Native Navigation Fix**:

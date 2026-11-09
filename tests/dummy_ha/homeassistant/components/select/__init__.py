@@ -4,5 +4,9 @@ from homeassistant.helpers.entity import Entity
 DOMAIN = "select"
 
 class SelectEntity(Entity):
-    pass
+    _attr_options: list[str] | None = None
+
+    @property
+    def options(self) -> list[str]:
+        return self._attr_options or []
 

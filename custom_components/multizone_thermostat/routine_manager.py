@@ -190,7 +190,7 @@ class RoutineManager:
                 if self._last_night_trigger_date != current_date:
                     self._last_night_trigger_date = current_date
                     current_preset = self._get_current_global_preset()
-                    if current_preset in (GLOBAL_PRESET_MANUAL, GLOBAL_PRESET_AWAY, "none"):
+                    if current_preset in (GLOBAL_PRESET_AWAY, "none"):
                         _LOGGER.info("Auto Night Mode skipped because system is in %s mode.", current_preset)
                     elif current_preset != GLOBAL_PRESET_SLEEP:
                         _LOGGER.info("Auto Night Mode triggered. Setting Sleep mode.")
@@ -212,7 +212,7 @@ class RoutineManager:
                 if self._last_morning_trigger_date != current_date:
                     self._last_morning_trigger_date = current_date
                     current_preset = self._get_current_global_preset()
-                    if current_preset in (GLOBAL_PRESET_MANUAL, GLOBAL_PRESET_AWAY, "none"):
+                    if current_preset in (GLOBAL_PRESET_AWAY, "none"):
                         _LOGGER.info("Auto Morning Mode skipped because system is in %s mode.", current_preset)
                     else:
                         pre_night = self._get_persistent_data(KEY_PRE_NIGHT_PRESET, GLOBAL_PRESET_COMFORT)
