@@ -294,17 +294,26 @@ class ZoneController:
 
         tuner = self._autotuners[entity_id]
         if tuner.state != tuner.STATE_COMPLETED:
+            prev_cycles = len(tuner.completed_cycles)
             tuner.update(current_temp, demand > 0)
-            # Check if this update just completed the learning phase
-            if tuner.state == tuner.STATE_COMPLETED:
-                self._pids[entity_id].set_pid_param(kp=tuner.kp, ki=tuner.ki, kd=tuner.kd)
-                _LOGGER.info(
-                    "Autotuning just completed for %s! Smart PID activated. Kp=%.1f, Ki=%.4f, Kd=%.1f",
-                    entity_id,
-                    tuner.kp,
-                    tuner.ki,
-                    tuner.kd,
-                )
+            # Check if this update recorded a cycle or completed the learning phase
+            if len(tuner.completed_cycles) > prev_cycles or tuner.state == tuner.STATE_COMPLETED:
+                if tuner.state == tuner.STATE_COMPLETED:
+                    self._pids[entity_id].set_pid_param(kp=tuner.kp, ki=tuner.ki, kd=tuner.kd)
+                    _LOGGER.info(
+                        "Autotuning just completed for %s! Smart PID activated. Kp=%.1f, Ki=%.4f, Kd=%.1f",
+                        entity_id,
+                        tuner.kp,
+                        tuner.ki,
+                        tuner.kd,
+                    )
+                else:
+                    _LOGGER.info(
+                        "Autotuning cycle %d/%d recorded for %s. Saving progress.",
+                        len(tuner.completed_cycles),
+                        tuner.required_cycles,
+                        entity_id,
+                    )
                 await self.async_save_autotuner_states()
 
         # Feed Thermal Observer

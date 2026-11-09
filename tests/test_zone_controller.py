@@ -265,6 +265,25 @@ async def test_zone_controller_smart_pid_and_weather_comp():
     print("test_zone_controller_smart_pid_and_weather_comp PASSED")
 
 
+
+async def test_zone_controller_saves_intermediate_autotune_cycles():
+    hass = MagicMock()
+    coordinator, demands = create_mock_coordinator()
+    zc = ZoneController(hass, coordinator)
+    cid = make_zone_entity_id("Living Room")
+    tuner = zc.get_autotuner(cid)
+
+    def mock_update(temp, heating):
+        tuner.completed_cycles.append({"L": 100.0, "slope": 0.01, "Kp": 50.0, "Ki": 0.01, "Kd": 10.0})
+    tuner.update = mock_update
+
+    state = DummyState("heat", current_temp=19.0, target_temp=20.0)
+    await zc.async_update_zone(cid, state)
+
+    assert len(tuner.completed_cycles) == 1
+    assert tuner.state != tuner.STATE_COMPLETED
+    coordinator.storage.async_save_autotuner_states.assert_called_once()
+
 async def main():
     test_zone_controller_init()
     test_zone_controller_load_state()
@@ -273,6 +292,7 @@ async def main():
     await test_zone_controller_update_fault_or_dhw()
     await test_zone_controller_hysteresis_learning()
     await test_zone_controller_smart_pid_and_weather_comp()
+    await test_zone_controller_saves_intermediate_autotune_cycles()
     print("\nAll ZoneController tests passed successfully!")
 
 if __name__ == "__main__":

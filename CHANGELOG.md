@@ -1,5 +1,14 @@
 # Changelog
 
+## [6.0.8] - 2026-11-09
+### Fix: Persistent Autotuner State on Intermediate Cycles
+- **Intermediate Learning Cycle Persistence**:
+  - Saved autotuner progress to persistent `.storage` upon the completion of every valid cycle (1/3, 2/3, 3/3) rather than exclusively waiting for full completion (`STATE_COMPLETED`).
+  - Guarantees learning progress is retained across Home Assistant restarts and integration reloads.
+
+## [6.0.7] - 2026-11-07
+- Bumped version for release.
+
 ## [6.0.6] - 2026-11-07
 ### Fix: Bulletproof Dashboard Navigation & Instant Fallback Modal
 - **Home Assistant Native Navigation Fix**:
