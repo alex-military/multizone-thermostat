@@ -115,10 +115,12 @@
         "title": "Configurazione Relè Caldaia",
         "description": "Seleziona l'entità switch che controlla il relè della caldaia (circolatore).",
         "data": {
-          "boiler_switch": "Interruttore Caldaia"
+          "boiler_switch": "Interruttore Caldaia",
+          "dhw_active_sensor": "Sensore attività ACS / DHW (opzionale)"
         },
         "data_description": {
-          "boiler_switch": "Lo switch/relè che controlla la pompa o la caldaia"
+          "boiler_switch": "Lo switch/relè che controlla la pompa o la caldaia",
+          "dhw_active_sensor": "Sensore che segnala la produzione attiva di Acqua Calda Sanitaria. Se omesso, viene usato l'auto-discovery."
         }
       },
       "boiler_opentherm": {
@@ -128,7 +130,11 @@
           "opentherm_entity": "Entità OpenTherm (Climate / Scaldabagno)",
           "opentherm_min_temp": "Temperatura Minima Acqua (°C)",
           "opentherm_max_temp": "Temperatura Massima Acqua (°C)",
-          "opentherm_ch_switch": "Switch abilitazione riscaldamento CH (opzionale)"
+          "opentherm_ch_switch": "Switch abilitazione riscaldamento CH (opzionale)",
+          "dhw_active_sensor": "Sensore attività ACS / DHW (opzionale)"
+        },
+        "data_description": {
+          "dhw_active_sensor": "Sensore che segnala la produzione attiva di Acqua Calda Sanitaria. Se omesso, viene usato l'auto-discovery (EMS-ESP/OpenTherm)."
         }
       },
       "boiler_mode": {
@@ -387,10 +393,12 @@
         "title": "Configurazione Relè Caldaia",
         "description": "Seleziona l'entità switch che controlla il relè della caldaia (circolatore).",
         "data": {
-          "boiler_switch": "Interruttore Caldaia"
+          "boiler_switch": "Interruttore Caldaia",
+          "dhw_active_sensor": "Sensore attività ACS / DHW (opzionale)"
         },
         "data_description": {
-          "boiler_switch": "Lo switch/relè che controlla la pompa o la caldaia"
+          "boiler_switch": "Lo switch/relè che controlla la pompa o la caldaia",
+          "dhw_active_sensor": "Sensore che segnala la produzione attiva di Acqua Calda Sanitaria. Se omesso, viene usato l'auto-discovery."
         }
       },
       "boiler_opentherm": {
@@ -400,7 +408,11 @@
           "opentherm_entity": "Entità OpenTherm (Climate / Scaldabagno)",
           "opentherm_min_temp": "Temperatura Minima Acqua (°C)",
           "opentherm_max_temp": "Temperatura Massima Acqua (°C)",
-          "opentherm_ch_switch": "Switch abilitazione riscaldamento CH (opzionale)"
+          "opentherm_ch_switch": "Switch abilitazione riscaldamento CH (opzionale)",
+          "dhw_active_sensor": "Sensore attività ACS / DHW (opzionale)"
+        },
+        "data_description": {
+          "dhw_active_sensor": "Sensore che segnala la produzione attiva di Acqua Calda Sanitaria. Se omesso, viene usato l'auto-discovery (EMS-ESP/OpenTherm)."
         }
       },
       "edit_energy_management": {

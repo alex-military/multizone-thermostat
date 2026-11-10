@@ -115,10 +115,12 @@
         "title": "Kesselrelais Einrichtung",
         "description": "Wählen Sie den Schalter (Switch), der Ihr Kesselrelais (Umwälzpumpe) steuert.",
         "data": {
-          "boiler_switch": "Kesselschalter"
+          "boiler_switch": "Kesselschalter",
+          "dhw_active_sensor": "Warmwasser-Aktivsensor (optional)"
         },
         "data_description": {
-          "boiler_switch": "Der Schalter/Relais, das die Kesselumwälzpumpe steuert"
+          "boiler_switch": "Der Schalter/Relais, das die Kesselumwälzpumpe steuert",
+          "dhw_active_sensor": "Sensor, der die aktive Warmwasserbereitung meldet. Wenn nicht angegeben, wird die automatische Erkennung verwendet."
         }
       },
       "boiler_opentherm": {
@@ -128,7 +130,11 @@
           "opentherm_entity": "OpenTherm-Entität (Climate/Water Heater)",
           "opentherm_min_temp": "Minimale Wassertemperatur (°C)",
           "opentherm_max_temp": "Maximale Wassertemperatur (°C)",
-          "opentherm_ch_switch": "Heizungsfreigabeschalter CH (optional)"
+          "opentherm_ch_switch": "Heizungsfreigabeschalter CH (optional)",
+          "dhw_active_sensor": "Warmwasser-Aktivsensor (optional)"
+        },
+        "data_description": {
+          "dhw_active_sensor": "Sensor, der die aktive Warmwasserbereitung meldet. Wenn nicht angegeben, wird die automatische Erkennung verwendet (EMS-ESP/OpenTherm)."
         }
       },
       "boiler_mode": {
@@ -387,10 +393,12 @@
         "title": "Kesselrelais Einrichtung",
         "description": "Wählen Sie den Schalter (Switch), der Ihr Kesselrelais (Umwälzpumpe) steuert.",
         "data": {
-          "boiler_switch": "Kesselschalter"
+          "boiler_switch": "Kesselschalter",
+          "dhw_active_sensor": "Warmwasser-Aktivsensor (optional)"
         },
         "data_description": {
-          "boiler_switch": "Der Schalter/Relais, das die Kesselumwälzpumpe steuert"
+          "boiler_switch": "Der Schalter/Relais, das die Kesselumwälzpumpe steuert",
+          "dhw_active_sensor": "Sensor, der die aktive Warmwasserbereitung meldet. Wenn nicht angegeben, wird die automatische Erkennung verwendet."
         }
       },
       "boiler_opentherm": {
@@ -400,7 +408,11 @@
           "opentherm_entity": "OpenTherm-Entität",
           "opentherm_min_temp": "Minimale Wassertemperatur (°C)",
           "opentherm_max_temp": "Maximale Wassertemperatur (°C)",
-          "opentherm_ch_switch": "Heizungsfreigabeschalter CH (optional)"
+          "opentherm_ch_switch": "Heizungsfreigabeschalter CH (optional)",
+          "dhw_active_sensor": "Warmwasser-Aktivsensor (optional)"
+        },
+        "data_description": {
+          "dhw_active_sensor": "Sensor, der die aktive Warmwasserbereitung meldet. Wenn nicht angegeben, wird die automatische Erkennung verwendet (EMS-ESP/OpenTherm)."
         }
       },
       "edit_energy_management": {

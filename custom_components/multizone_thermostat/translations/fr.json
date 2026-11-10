@@ -115,10 +115,12 @@
         "title": "Configuration Relais Chaudière",
         "description": "Sélectionnez l'interrupteur (switch) qui contrôle le relais de votre chaudière (circulateur).",
         "data": {
-          "boiler_switch": "Interrupteur Chaudière"
+          "boiler_switch": "Interrupteur Chaudière",
+          "dhw_active_sensor": "Capteur dactivité ECS / DHW (optionnel)"
         },
         "data_description": {
-          "boiler_switch": "L'interrupteur/relais qui contrôle la pompe de la chaudière"
+          "boiler_switch": "L'interrupteur/relais qui contrôle la pompe de la chaudière",
+          "dhw_active_sensor": "Capteur signalant la production active dEau Chaude Sanitaire. Si omis, la détection automatique est utilisée."
         }
       },
       "boiler_opentherm": {
@@ -128,7 +130,11 @@
           "opentherm_entity": "Entité OpenTherm (Climate/Water Heater)",
           "opentherm_min_temp": "Température Minimale de l'eau (°C)",
           "opentherm_max_temp": "Température Maximale de l'eau (°C)",
-          "opentherm_ch_switch": "Interrupteur d'activation du chauffage central (optionnel)"
+          "opentherm_ch_switch": "Interrupteur d'activation du chauffage central (optionnel)",
+          "dhw_active_sensor": "Capteur dactivité ECS / DHW (optionnel)"
+        },
+        "data_description": {
+          "dhw_active_sensor": "Capteur signalant la production active dEau Chaude Sanitaire. Si omis, la détection automatique est utilisée (EMS-ESP/OpenTherm)."
         }
       },
       "boiler_mode": {
@@ -387,10 +393,12 @@
         "title": "Configuration Relais Chaudière",
         "description": "Sélectionnez l'interrupteur (switch) qui contrôle le relais de votre chaudière (circulateur).",
         "data": {
-          "boiler_switch": "Interrupteur Chaudière"
+          "boiler_switch": "Interrupteur Chaudière",
+          "dhw_active_sensor": "Capteur dactivité ECS / DHW (optionnel)"
         },
         "data_description": {
-          "boiler_switch": "L'interrupteur/relais qui contrôle la pompe de la chaudière"
+          "boiler_switch": "L'interrupteur/relais qui contrôle la pompe de la chaudière",
+          "dhw_active_sensor": "Capteur signalant la production active dEau Chaude Sanitaire. Si omis, la détection automatique est utilisée."
         }
       },
       "boiler_opentherm": {
@@ -400,7 +408,11 @@
           "opentherm_entity": "Entité OpenTherm",
           "opentherm_min_temp": "Température Minimale de l'eau (°C)",
           "opentherm_max_temp": "Température Maximale de l'eau (°C)",
-          "opentherm_ch_switch": "Interrupteur d'activation du chauffage central (optionnel)"
+          "opentherm_ch_switch": "Interrupteur d'activation du chauffage central (optionnel)",
+          "dhw_active_sensor": "Capteur dactivité ECS / DHW (optionnel)"
+        },
+        "data_description": {
+          "dhw_active_sensor": "Capteur signalant la production active dEau Chaude Sanitaire. Si omis, la détection automatique est utilisée (EMS-ESP/OpenTherm)."
         }
       },
       "edit_energy_management": {

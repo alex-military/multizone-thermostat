@@ -43,6 +43,7 @@ from .const import (
     CONF_OPENTHERM_MIN_TEMP,
     CONF_OPENTHERM_MAX_TEMP,
     CONF_OPENTHERM_CH_SWITCH,
+    CONF_DHW_ACTIVE_SENSOR,
     CONF_ZONES,
     CONF_PRESENCE_SENSOR,
     CONF_ANTI_SEIZE_ENABLED,
@@ -169,6 +170,7 @@ class MultizoneCoordinator:
         self.opentherm_min_temp = config.get(CONF_OPENTHERM_MIN_TEMP, 35.0)
         self.opentherm_max_temp = config.get(CONF_OPENTHERM_MAX_TEMP, 75.0)
         self.opentherm_ch_switch = config.get(CONF_OPENTHERM_CH_SWITCH)
+        self.dhw_active_sensor = config.get(CONF_DHW_ACTIVE_SENSOR)
         self.zones = config.get(CONF_ZONES, [])
         self.presence_sensor = config.get(CONF_PRESENCE_SENSOR)
         self.weather_sensor_id = config.get(CONF_WEATHER_SENSOR)
@@ -374,9 +376,33 @@ class MultizoneCoordinator:
 
     @property
     def is_dhw_active(self) -> bool:
-        """Return True if OpenTherm reports active Domestic Hot Water production."""
+        """Return True if Domestic Hot Water (DHW) production is active."""
+        # 1. Explicit user-configured DHW active sensor
+        dhw_sensor = getattr(self, "dhw_active_sensor", None)
+        if dhw_sensor:
+            st = self.hass.states.get(dhw_sensor)
+            if st and st.state not in ("unavailable", "unknown"):
+                val = str(st.state).lower()
+                if val in ("on", "true", "1", "charging", "heat", "heating", "active"):
+                    return True
+                if st.attributes:
+                    for ak in ("charging", "is_charging", "dhw_active", "active"):
+                        av = st.attributes.get(ak)
+                        if av is True or (isinstance(av, str) and av.lower() in ("true", "on", "1")):
+                            return True
+                return False
+
+        # 2. Plant diagnostics / OpenTherm auto-discovery
         if hasattr(self, "plant_diagnostics"):
-            return self.plant_diagnostics.get_opentherm_diagnostics().get("dhw_active", False)
+            if self.plant_diagnostics.get_opentherm_diagnostics().get("dhw_active", False):
+                return True
+
+        # 3. Direct fallback for well-known standard EMS-ESP entities (e.g. in Relay mode)
+        for std_id in ("binary_sensor.boiler_dhw_charging", "binary_sensor.dhw_charging"):
+            st = self.hass.states.get(std_id)
+            if st and st.state.lower() in ("on", "true", "1", "charging", "heat", "heating"):
+                return True
+
         return False
 
                     

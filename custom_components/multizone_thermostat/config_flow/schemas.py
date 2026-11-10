@@ -17,6 +17,7 @@ from ..const import (
     CONF_OPENTHERM_MAX_TEMP,
     CONF_OPENTHERM_CH_SWITCH,
     CONF_OPENTHERM_MIN_TEMP,
+    CONF_DHW_ACTIVE_SENSOR,
     CONF_PRESENCE_SENSOR,
     CONF_ZONE_NAME,
     CONF_ZONE_CLIMATES,
@@ -320,14 +321,23 @@ def get_boiler_mode_schema() -> vol.Schema:
     })
 
 
-def get_boiler_relay_schema() -> vol.Schema:
-    return vol.Schema({
+def get_boiler_relay_schema(dhw_active_sensor: str | None = None) -> vol.Schema:
+    schema_dict: dict[Any, Any] = {
         vol.Required(CONF_BOILER_SWITCH): selector.EntitySelector(selector.EntitySelectorConfig(domain=SWITCH_DOMAIN)),
-    })
+    }
+    dhw_key = (
+        vol.Optional(CONF_DHW_ACTIVE_SENSOR, description={"suggested_value": dhw_active_sensor})
+        if dhw_active_sensor
+        else vol.Optional(CONF_DHW_ACTIVE_SENSOR)
+    )
+    schema_dict[dhw_key] = selector.EntitySelector(
+        selector.EntitySelectorConfig(domain=["binary_sensor", "sensor", "input_boolean"])
+    )
+    return vol.Schema(schema_dict)
 
 
-def get_boiler_opentherm_schema() -> vol.Schema:
-    return vol.Schema({
+def get_boiler_opentherm_schema(dhw_active_sensor: str | None = None) -> vol.Schema:
+    schema_dict: dict[Any, Any] = {
         vol.Required(CONF_OPENTHERM_ENTITY): selector.EntitySelector(selector.EntitySelectorConfig(domain=["climate", "water_heater", "number"])),
         vol.Required(CONF_OPENTHERM_MIN_TEMP, default=35.0): selector.NumberSelector(
             selector.NumberSelectorConfig(min=20, max=90, step=1, mode=selector.NumberSelectorMode.BOX)
@@ -336,7 +346,16 @@ def get_boiler_opentherm_schema() -> vol.Schema:
             selector.NumberSelectorConfig(min=20, max=90, step=1, mode=selector.NumberSelectorMode.BOX)
         ),
         vol.Optional(CONF_OPENTHERM_CH_SWITCH): selector.EntitySelector(selector.EntitySelectorConfig(domain=SWITCH_DOMAIN)),
-    })
+    }
+    dhw_key = (
+        vol.Optional(CONF_DHW_ACTIVE_SENSOR, description={"suggested_value": dhw_active_sensor})
+        if dhw_active_sensor
+        else vol.Optional(CONF_DHW_ACTIVE_SENSOR)
+    )
+    schema_dict[dhw_key] = selector.EntitySelector(
+        selector.EntitySelectorConfig(domain=["binary_sensor", "sensor", "input_boolean"])
+    )
+    return vol.Schema(schema_dict)
 
 
 def get_add_zone_schema() -> vol.Schema:
@@ -481,8 +500,8 @@ def get_options_change_boiler_schema(boiler_mode: str) -> vol.Schema:
     })
 
 
-def get_options_boiler_relay_schema(boiler_switch: str) -> vol.Schema:
-    schema_dict = {}
+def get_options_boiler_relay_schema(boiler_switch: str, dhw_active_sensor: str | None = None) -> vol.Schema:
+    schema_dict: dict[Any, Any] = {}
     if boiler_switch:
         schema_dict[vol.Required(CONF_BOILER_SWITCH, default=boiler_switch)] = selector.EntitySelector(
             selector.EntitySelectorConfig(domain=SWITCH_DOMAIN)
@@ -491,6 +510,14 @@ def get_options_boiler_relay_schema(boiler_switch: str) -> vol.Schema:
         schema_dict[vol.Required(CONF_BOILER_SWITCH)] = selector.EntitySelector(
             selector.EntitySelectorConfig(domain=SWITCH_DOMAIN)
         )
+    dhw_key = (
+        vol.Optional(CONF_DHW_ACTIVE_SENSOR, description={"suggested_value": dhw_active_sensor})
+        if dhw_active_sensor
+        else vol.Optional(CONF_DHW_ACTIVE_SENSOR)
+    )
+    schema_dict[dhw_key] = selector.EntitySelector(
+        selector.EntitySelectorConfig(domain=["binary_sensor", "sensor", "input_boolean"])
+    )
     return vol.Schema(schema_dict)
 
 
@@ -499,8 +526,9 @@ def get_options_boiler_opentherm_schema(
     opentherm_min_temp: float,
     opentherm_max_temp: float,
     opentherm_ch_switch: str | None = None,
+    dhw_active_sensor: str | None = None,
 ) -> vol.Schema:
-    schema_dict = {}
+    schema_dict: dict[Any, Any] = {}
     if opentherm_entity:
         schema_dict[vol.Required(CONF_OPENTHERM_ENTITY, default=opentherm_entity)] = selector.EntitySelector(
             selector.EntitySelectorConfig(domain=["climate", "water_heater", "number"])
@@ -521,6 +549,14 @@ def get_options_boiler_opentherm_schema(
         else vol.Optional(CONF_OPENTHERM_CH_SWITCH)
     )
     schema_dict[ch_key] = selector.EntitySelector(selector.EntitySelectorConfig(domain=SWITCH_DOMAIN))
+    dhw_key = (
+        vol.Optional(CONF_DHW_ACTIVE_SENSOR, description={"suggested_value": dhw_active_sensor})
+        if dhw_active_sensor
+        else vol.Optional(CONF_DHW_ACTIVE_SENSOR)
+    )
+    schema_dict[dhw_key] = selector.EntitySelector(
+        selector.EntitySelectorConfig(domain=["binary_sensor", "sensor", "input_boolean"])
+    )
     return vol.Schema(schema_dict)
 
 
