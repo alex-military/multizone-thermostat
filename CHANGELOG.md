@@ -1,5 +1,17 @@
 # Changelog
 
+## [6.0.9] - 2026-11-10
+### Fix: EMS-ESP Multi-Device DHW Activity Detection & Custom DHW Entity (#10)
+- **Multi-Device Integration Auto-Discovery**:
+  - Traverses all entity registry entries across the integration's config_entry_id (resolving architectures where thermostat, boiler, and solar devices are split across separate Home Assistant device IDs, such as EMS-ESP).
+  - Enhanced pattern matching for DHW active states (including dhw_charging, dhw_active, is_charging).
+  - Strict filtering out of configuration / setting entities (e.g. _activated, _presence, etc.) to prevent false-positive DHW active status.
+- **Configurable DHW Active Sensor in UI**:
+  - Added optional dhw_active_sensor selector to both Config Flow and Options Flow in Relay and OpenTherm boiler modes.
+  - Automatically suggests and pre-fills discovered DHW sensors while allowing full custom entity override (binary_sensor, sensor, input_boolean).
+- **Relay Mode & Standalone EMS-ESP Fallback**:
+  - Direct runtime fallback to check well-known EMS-ESP sensors (binary_sensor.boiler_dhw_charging, binary_sensor.dhw_charging) when operating in relay mode or without OpenTherm binding.
+
 ## [6.0.8] - 2026-11-09
 ### Fix: Persistent Autotuner State on Intermediate Cycles
 - **Intermediate Learning Cycle Persistence**:
