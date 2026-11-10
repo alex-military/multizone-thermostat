@@ -111,14 +111,63 @@ def get_zone_battery_level(coordinator: Any, hass: HomeAssistant, climate_id: st
         return min(batteries)
     return None
 
+def find_suggested_dhw_sensor(hass: HomeAssistant, ot_entity: str | None = None) -> str | None:
+    """Auto-detect candidate DHW active sensor entity in Home Assistant."""
+    if not hass:
+        return None
+
+    # 1. Check known standard EMS-ESP / OpenTherm entity IDs directly
+    for candidate_id in (
+        "binary_sensor.boiler_dhw_charging",
+        "binary_sensor.dhw_charging",
+        "binary_sensor.ems_esp_boiler_dhw_charging",
+        "binary_sensor.ems_esp_dhw_charging",
+        "binary_sensor.boiler_dhw_active",
+        "binary_sensor.dhw_active",
+    ):
+        st = hass.states.get(candidate_id)
+        if st is not None:
+            return candidate_id
+
+    # 2. If ot_entity is provided, search entity registry devices / config_entry
+    if ot_entity:
+        try:
+            ent_reg = er.async_get(hass)
+        except Exception:
+            ent_reg = hass.data.get("entity_registry")
+
+        if ent_reg:
+            entry = ent_reg.async_get(ot_entity)
+            if entry:
+                candidates: list[Any] = []
+                if entry.device_id:
+                    candidates.extend(er.async_entries_for_device(ent_reg, entry.device_id))
+                if getattr(entry, "config_entry_id", None):
+                    try:
+                        for c_ent in er.async_entries_for_config_entry(ent_reg, entry.config_entry_id):
+                            if c_ent not in candidates:
+                                candidates.append(c_ent)
+                    except Exception:
+                        pass
+
+                for ent in candidates:
+                    eid = ent.entity_id.lower()
+                    if any(ign in eid for ign in ("_temp", "_setpoint", "_activated", "_presence", "_comfort", "_eco", "_hysteresis")):
+                        continue
+                    if any(p in eid for p in ("dhw_charging", "dhw_active", "hot_water_charging")):
+                        return ent.entity_id
+
+    return None
+
 def get_opentherm_diagnostics(coordinator: Any, hass: HomeAssistant) -> dict[str, Any]:
     """Auto-discover and read OpenTherm telemetry, registers and error flags."""
     ot_entity = getattr(coordinator, "opentherm_entity", None)
-    if not ot_entity:
+    configured_dhw = getattr(coordinator, "dhw_active_sensor", None)
+    if not ot_entity and not configured_dhw:
         return {"enabled": False}
 
     result: dict[str, Any] = {
-        "enabled": True,
+        "enabled": bool(ot_entity),
         "entity_id": ot_entity,
         "water_pressure": None,
         "return_temperature": None,
@@ -131,8 +180,22 @@ def get_opentherm_diagnostics(coordinator: Any, hass: HomeAssistant) -> dict[str
         "condensing_optimal": None,
     }
 
+    # 0. Check explicit user-configured DHW active sensor
+    if configured_dhw:
+        dhw_st = hass.states.get(configured_dhw)
+        if dhw_st and dhw_st.state not in ("unavailable", "unknown"):
+            dhw_val = str(dhw_st.state).lower()
+            if dhw_val in ("on", "true", "1", "charging", "heat", "heating", "active"):
+                result["dhw_active"] = True
+            elif dhw_st.attributes:
+                for ak in ("charging", "is_charging", "dhw_active", "active"):
+                    av = dhw_st.attributes.get(ak)
+                    if av is True or (isinstance(av, str) and av.lower() in ("true", "on", "1")):
+                        result["dhw_active"] = True
+                        break
+
     # 1. Inspect direct attributes of opentherm_entity
-    st = hass.states.get(ot_entity)
+    st = hass.states.get(ot_entity) if ot_entity else None
     if st and st.attributes:
         attrs = st.attributes
         # Current / Flow temp
@@ -189,66 +252,93 @@ def get_opentherm_diagnostics(coordinator: Any, hass: HomeAssistant) -> dict[str
                 result["fault_active"] = True
                 break
 
-        # DHW Active
-        for k in ("dhw_active", "dhw_state", "dhw_mode", "hot_water_active"):
-            if k in attrs and attrs[k] is not None:
-                v = attrs[k]
-                result["dhw_active"] = bool(v) if not isinstance(v, str) else v.lower() in ("true", "on", "1")
-                break
+        # DHW Active (if not already set by explicit sensor)
+        if not result["dhw_active"] and not configured_dhw:
+            for k in ("dhw_active", "dhw_state", "dhw_mode", "hot_water_active"):
+                if k in attrs and attrs[k] is not None:
+                    v = attrs[k]
+                    result["dhw_active"] = bool(v) if not isinstance(v, str) else v.lower() in ("true", "on", "1")
+                    break
 
-    # 2. Check Device Registry for companion sensor entities (OpenTherm Gateway / ESPHome)
-    try:
-        ent_reg = er.async_get(hass)
-    except Exception:
-        ent_reg = hass.data.get("entity_registry")
+    # 2. Check Device Registry and Config Entry for companion sensor entities (OpenTherm Gateway / ESPHome / EMS-ESP)
+    if not result["dhw_active"] and not configured_dhw:
+        try:
+            ent_reg = er.async_get(hass)
+        except Exception:
+            ent_reg = hass.data.get("entity_registry")
 
-    if ent_reg:
-        entry = ent_reg.async_get(ot_entity)
-        if entry and entry.device_id:
-            for ent in er.async_entries_for_device(ent_reg, entry.device_id):
-                if ent.entity_id != ot_entity:
-                    s_st = hass.states.get(ent.entity_id)
-                    if not s_st or s_st.state in ("unavailable", "unknown"):
-                        continue
-                    
-                    eid = ent.entity_id.lower()
-                    dev_cls = getattr(ent, "original_device_class", None) or getattr(ent, "device_class", None)
-                    
-                    # Pressure sensor
-                    if (dev_cls == "pressure" or "pressure" in eid) and result["water_pressure"] is None:
-                        try:
-                            result["water_pressure"] = round(float(s_st.state), 2)
-                        except (ValueError, TypeError):
-                            pass
+        if ent_reg and ot_entity:
+            entry = ent_reg.async_get(ot_entity)
+            if entry:
+                candidates: list[Any] = []
+                if entry.device_id:
+                    candidates.extend(er.async_entries_for_device(ent_reg, entry.device_id))
+                # Multi-device integrations like EMS-ESP create multiple devices under the same config_entry
+                if getattr(entry, "config_entry_id", None):
+                    try:
+                        for c_ent in er.async_entries_for_config_entry(ent_reg, entry.config_entry_id):
+                            if c_ent not in candidates:
+                                candidates.append(c_ent)
+                    except Exception:
+                        pass
 
-                    # Return temp sensor
-                    if ("return" in eid and ("temp" in eid or dev_cls == "temperature")) and result["return_temperature"] is None:
-                        try:
-                            result["return_temperature"] = round(float(s_st.state), 1)
-                        except (ValueError, TypeError):
-                            pass
+                for ent in candidates:
+                    if ent.entity_id != ot_entity:
+                        s_st = hass.states.get(ent.entity_id)
+                        if not s_st or s_st.state in ("unavailable", "unknown"):
+                            continue
+                        
+                        eid = ent.entity_id.lower()
+                        dev_cls = getattr(ent, "original_device_class", None) or getattr(ent, "device_class", None)
+                        
+                        # Pressure sensor
+                        if (dev_cls == "pressure" or "pressure" in eid) and result["water_pressure"] is None:
+                            try:
+                                result["water_pressure"] = round(float(s_st.state), 2)
+                            except (ValueError, TypeError):
+                                pass
 
-                    # Modulation
-                    if ("modulation" in eid or "mod_level" in eid) and result["modulation_level"] is None:
-                        try:
-                            result["modulation_level"] = round(float(s_st.state), 1)
-                        except (ValueError, TypeError):
-                            pass
+                        # Return temp sensor
+                        if ("return" in eid and ("temp" in eid or dev_cls == "temperature")) and result["return_temperature"] is None:
+                            try:
+                                result["return_temperature"] = round(float(s_st.state), 1)
+                            except (ValueError, TypeError):
+                                pass
 
-                    # Flame
-                    if ("flame" in eid) and result["flame_active"] is None:
-                        result["flame_active"] = s_st.state.lower() in ("on", "true", "1")
+                        # Modulation
+                        if ("modulation" in eid or "mod_level" in eid) and result["modulation_level"] is None:
+                            try:
+                                result["modulation_level"] = round(float(s_st.state), 1)
+                            except (ValueError, TypeError):
+                                pass
 
-                    # Fault / Error
-                    if ("fault" in eid or "error" in eid):
-                        if s_st.state.lower() not in ("off", "none", "0", "ok", "false", "unavailable", "unknown"):
-                            result["fault_active"] = True
-                            result["fault_code"] = str(s_st.state)
+                        # Flame
+                        if ("flame" in eid) and result["flame_active"] is None:
+                            result["flame_active"] = s_st.state.lower() in ("on", "true", "1")
 
-                    # DHW Active
-                    if ("dhw" in eid or "hot_water" in eid):
-                        if s_st.state.lower() in ("on", "true", "1"):
-                            result["dhw_active"] = True
+                        # Fault / Error
+                        if ("fault" in eid or "error" in eid):
+                            if s_st.state.lower() not in ("off", "none", "0", "ok", "false", "unavailable", "unknown"):
+                                result["fault_active"] = True
+                                result["fault_code"] = str(s_st.state)
+
+                        # DHW Active: filter out settings / temperatures, prioritize charging/active
+                        if any(ign in eid for ign in ("_temp", "_setpoint", "_activated", "_presence", "_hysteresis", "_comfort", "_eco", "_selected", "_mode")):
+                            continue
+                        if any(act_pattern in eid for act_pattern in ("dhw_charging", "dhw_active", "hot_water_charging")):
+                            if s_st.state.lower() in ("on", "true", "1", "charging", "heat", "heating"):
+                                result["dhw_active"] = True
+                        elif ("dhw" in eid or "hot_water" in eid):
+                            if (getattr(ent, "domain", None) == "binary_sensor" or dev_cls in ("heat", "running")) and s_st.state.lower() in ("on", "true", "1"):
+                                result["dhw_active"] = True
+
+        # Fallback check for well-known EMS-ESP standard entities
+        if not result["dhw_active"]:
+            for std_id in ("binary_sensor.boiler_dhw_charging", "binary_sensor.dhw_charging"):
+                s_st = hass.states.get(std_id)
+                if s_st and s_st.state.lower() in ("on", "true", "1", "charging", "heat", "heating"):
+                    result["dhw_active"] = True
+                    break
 
     # Compute condensing optimization metric (condenses when return water < 54°C)
     if result["return_temperature"] is not None:

@@ -102,10 +102,12 @@
         "title": "Boiler Relay Setup",
         "description": "Select the switch entity that controls your boiler relay (circulator).",
         "data": {
-          "boiler_switch": "Boiler Switch"
+          "boiler_switch": "Boiler Switch",
+          "dhw_active_sensor": "DHW Active Sensor (optional)"
         },
         "data_description": {
-          "boiler_switch": "The switch/relay that controls the boiler circulator pump"
+          "boiler_switch": "The switch/relay that controls the boiler circulator pump",
+          "dhw_active_sensor": "Sensor reporting active Domestic Hot Water production. If omitted, auto-discovery is used."
         }
       },
       "boiler_opentherm": {
@@ -115,7 +117,11 @@
           "opentherm_entity": "OpenTherm Climate/Water Heater Entity",
           "opentherm_min_temp": "Minimum Water Temperature (°C)",
           "opentherm_max_temp": "Maximum Water Temperature (°C)",
-          "opentherm_ch_switch": "CH enable switch (optional)"
+          "opentherm_ch_switch": "CH enable switch (optional)",
+          "dhw_active_sensor": "DHW Active Sensor (optional)"
+        },
+        "data_description": {
+          "dhw_active_sensor": "Sensor reporting active Domestic Hot Water production. If omitted, auto-discovery is used (EMS-ESP/OpenTherm)."
         }
       }
     },
@@ -297,10 +303,12 @@
         "title": "Boiler Relay Setup",
         "description": "Select the switch entity that controls your boiler relay (circulator).",
         "data": {
-          "boiler_switch": "Boiler Switch"
+          "boiler_switch": "Boiler Switch",
+          "dhw_active_sensor": "DHW Active Sensor (optional)"
         },
         "data_description": {
-          "boiler_switch": "The switch/relay that controls the boiler circulator pump"
+          "boiler_switch": "The switch/relay that controls the boiler circulator pump",
+          "dhw_active_sensor": "Sensor reporting active Domestic Hot Water production. If omitted, auto-discovery is used."
         }
       },
       "boiler_opentherm": {
@@ -310,7 +318,11 @@
           "opentherm_entity": "OpenTherm Climate/Water Heater Entity",
           "opentherm_min_temp": "Minimum Water Temperature (°C)",
           "opentherm_max_temp": "Maximum Water Temperature (°C)",
-          "opentherm_ch_switch": "CH enable switch (optional)"
+          "opentherm_ch_switch": "CH enable switch (optional)",
+          "dhw_active_sensor": "DHW Active Sensor (optional)"
+        },
+        "data_description": {
+          "dhw_active_sensor": "Sensor reporting active Domestic Hot Water production. If omitted, auto-discovery is used (EMS-ESP/OpenTherm)."
         }
       }
     },

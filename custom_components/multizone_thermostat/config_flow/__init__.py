@@ -23,6 +23,7 @@ from ..const import (
     CONF_OPENTHERM_MAX_TEMP,
     CONF_OPENTHERM_CH_SWITCH,
     CONF_OPENTHERM_MIN_TEMP,
+    CONF_DHW_ACTIVE_SENSOR,
     CONF_PRESENCE_SENSOR,
     CONF_ZONE_NAME,
     CONF_ZONE_CLIMATES,
@@ -55,6 +56,7 @@ from ..const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+from ..plant_diagnostics.anomalies import find_suggested_dhw_sensor
 
 from .validators import validate_opentherm_temps, validate_zone_input, validate_geofencing
 from .schemas import *
@@ -76,6 +78,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._opentherm_min_temp: float = 35.0
         self._opentherm_max_temp: float = 75.0
         self._opentherm_ch_switch: str | None = None
+        self._dhw_active_sensor: str | None = None
         self._zones: list[dict] = []
         self._geofencing_enabled: bool = True
         self._presence_sensor: str | None = None
@@ -116,10 +119,11 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             self._boiler_switch = user_input[CONF_BOILER_SWITCH]
+            self._dhw_active_sensor = user_input.get(CONF_DHW_ACTIVE_SENSOR) or None
             return await self.async_step_add_zone()
 
-        schema = get_boiler_relay_schema()
-
+        suggested_dhw = self._dhw_active_sensor or find_suggested_dhw_sensor(self.hass)
+        schema = get_boiler_relay_schema(suggested_dhw)
         return self.async_show_form(
             step_id="boiler_relay",
             data_schema=schema,
@@ -138,12 +142,13 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._opentherm_min_temp = user_input[CONF_OPENTHERM_MIN_TEMP]
             self._opentherm_max_temp = user_input[CONF_OPENTHERM_MAX_TEMP]
             self._opentherm_ch_switch = user_input.get(CONF_OPENTHERM_CH_SWITCH) or None
+            self._dhw_active_sensor = user_input.get(CONF_DHW_ACTIVE_SENSOR) or None
             errors.update(validate_opentherm_temps(self._opentherm_min_temp, self._opentherm_max_temp))
             if not errors:
                 return await self.async_step_add_zone()
 
-        schema = get_boiler_opentherm_schema()
-
+        suggested_dhw = self._dhw_active_sensor or find_suggested_dhw_sensor(self.hass, self._opentherm_entity)
+        schema = get_boiler_opentherm_schema(suggested_dhw)
         return self.async_show_form(
             step_id="boiler_opentherm",
             data_schema=schema,
@@ -338,6 +343,8 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 }
                 if self._opentherm_ch_switch:
                     data[CONF_OPENTHERM_CH_SWITCH] = self._opentherm_ch_switch
+            if self._dhw_active_sensor:
+                data[CONF_DHW_ACTIVE_SENSOR] = self._dhw_active_sensor
             if self._geofencing_enabled and self._presence_sensor:
                 data[CONF_PRESENCE_SENSOR] = self._presence_sensor
             if self._weather_sensor:
