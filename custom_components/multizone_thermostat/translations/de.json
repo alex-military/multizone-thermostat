@@ -29,7 +29,8 @@
         "data": {
           "name": "Zonenname",
           "temp_sensor": "Zonentemperatursensor",
-          "target_temperature": "Basis-Solltemperatur"
+          "target_temperature": "Basis-Solltemperatur",
+          "emitter_type": "Emittententyp"
         },
         "sections": {
           "trv_settings": {
@@ -131,7 +132,8 @@
           "opentherm_min_temp": "Minimale Wassertemperatur (°C)",
           "opentherm_max_temp": "Maximale Wassertemperatur (°C)",
           "opentherm_ch_switch": "Heizungsfreigabeschalter CH (optional)",
-          "dhw_active_sensor": "Warmwasser-Aktivsensor (optional)"
+          "dhw_active_sensor": "Warmwasser-Aktivsensor (optional)",
+          "has_mixing_valve": "Mischventil vorhanden (für Fußbodenheizung)"
         },
         "data_description": {
           "dhw_active_sensor": "Sensor, der die aktive Warmwasserbereitung meldet. Wenn nicht angegeben, wird die automatische Erkennung verwendet (EMS-ESP/OpenTherm)."
@@ -155,7 +157,8 @@
           "heat_pump_ch_switch": "Heating Enable Switch (Optional)",
           "heat_pump_cooling": "Kühlmodus aktivieren",
           "hp_cool_min_temp": "Minimale Kühlwassertemperatur (°C)",
-          "hp_cool_max_temp": "Maximale Kühlwassertemperatur (°C)"
+          "hp_cool_max_temp": "Maximale Kühlwassertemperatur (°C)",
+          "has_mixing_valve": "Mischventil vorhanden (für Fußbodenheizung)"
         }
       },
       "energy_management": {
@@ -239,7 +242,8 @@
           "switch_entities": "Zonenschalter / Relais",
           "temp_sensor": "Zonen-Temperatursensor",
           "target_temperature": "Basis-Zieltemperatur",
-          "sensor_timeout_min": "Sensor-Watchdog-Timeout (Minuten)"
+          "sensor_timeout_min": "Sensor-Watchdog-Timeout (Minuten)",
+          "emitter_type": "Emittententyp"
         },
         "sections": {
           "trv_settings": {
@@ -312,7 +316,8 @@
         "data": {
           "zone_name": "Zone",
           "temp_sensor": "Zonen-Temperatursensor",
-          "target_temperature": "Basis-Zieltemperatur"
+          "target_temperature": "Basis-Zieltemperatur",
+          "emitter_type": "Emittententyp"
         },
         "sections": {
           "trv_settings": {
@@ -409,7 +414,8 @@
           "opentherm_min_temp": "Minimale Wassertemperatur (°C)",
           "opentherm_max_temp": "Maximale Wassertemperatur (°C)",
           "opentherm_ch_switch": "Heizungsfreigabeschalter CH (optional)",
-          "dhw_active_sensor": "Warmwasser-Aktivsensor (optional)"
+          "dhw_active_sensor": "Warmwasser-Aktivsensor (optional)",
+          "has_mixing_valve": "Mischventil vorhanden (für Fußbodenheizung)"
         },
         "data_description": {
           "dhw_active_sensor": "Sensor, der die aktive Warmwasserbereitung meldet. Wenn nicht angegeben, wird die automatische Erkennung verwendet (EMS-ESP/OpenTherm)."
@@ -447,7 +453,8 @@
           "heat_pump_max_temp": "Maximale Vorlauftemperatur (°C)",
           "hp_cool_min_temp": "Minimale Kühlwassertemperatur (°C)",
           "hp_cool_max_temp": "Maximale Kühlwassertemperatur (°C)",
-          "heat_pump_ch_switch": "Heizungs-Freigabeschalter (Optional)"
+          "heat_pump_ch_switch": "Heizungs-Freigabeschalter (Optional)",
+          "has_mixing_valve": "Mischventil vorhanden (für Fußbodenheizung)"
         }
       },
       "trv_calibration": {
@@ -543,6 +550,13 @@
         "edit_weather_comp": "Witterungsführung bearbeiten",
         "edit_geofencing": "Geofencing-Einstellungen bearbeiten",
         "edit_calendar": "Globalen Kalender bearbeiten"
+      }
+    },
+    "emitter_type": {
+      "options": {
+        "radiator": "Heizkörper",
+        "underfloor": "Fußbodenheizung",
+        "fancoil": "Gebläsekonvektoren"
       }
     }
   }

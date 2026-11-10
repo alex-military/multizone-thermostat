@@ -42,7 +42,10 @@ class PlantDiagnosticsEngine:
         self.coordinator = coordinator
         self.hass = coordinator.hass
 
-        # Boiler tracking
+        # Multi-generator tracking (L2 fix: isolated per generator)
+        self._generator_on_events: dict[str, deque[float]] = {}
+        self._generator_run_intervals: dict[str, deque[tuple[float, float]]] = {}
+        self._current_generator_start: dict[str, float | None] = {}
         self._boiler_on_events: deque[float] = deque(maxlen=200) # Timestamps when boiler turned ON
         self._boiler_run_intervals: deque[tuple[float, float]] = deque(maxlen=1000) # (start, end)
         self._current_boiler_start: float | None = None
@@ -66,41 +69,74 @@ class PlantDiagnosticsEngine:
     # Boiler Metrics
     # ------------------------------------------------------------------
 
-    def record_boiler_state(self, is_on: bool) -> None:
-        """Record a boiler switch ON or OFF transition."""
+    def record_generator_state(self, generator_id: str, is_on: bool) -> None:
+        """Record an individual generator switch ON or OFF transition (L2 fix)."""
         now = time.monotonic()
         try:
-            if is_on:
-                if self._current_boiler_start is None:
-                    self._boiler_on_events.append(now)
-                    self._current_boiler_start = now
-            else:
-                if self._current_boiler_start is not None:
-                    self._boiler_run_intervals.append((self._current_boiler_start, now))
-                    self._current_boiler_start = None
-        except Exception as err:
-            _LOGGER.debug("Error recording boiler state in plant diagnostics: %s", err)
+            if generator_id not in self._generator_on_events:
+                self._generator_on_events[generator_id] = deque(maxlen=200)
+                self._generator_run_intervals[generator_id] = deque(maxlen=1000)
+                self._current_generator_start[generator_id] = None
 
-    def get_boiler_cycles_per_hour(self) -> int:
-        """Calculate boiler ignition cycles in the past 60 minutes."""
+            cur_start = self._current_generator_start[generator_id]
+            if is_on:
+                if cur_start is None:
+                    self._generator_on_events[generator_id].append(now)
+                    self._current_generator_start[generator_id] = now
+                    if generator_id in ("gas", "boiler"):
+                        self._boiler_on_events.append(now)
+                        self._current_boiler_start = now
+            else:
+                if cur_start is not None:
+                    self._generator_run_intervals[generator_id].append((cur_start, now))
+                    self._current_generator_start[generator_id] = None
+                    if generator_id in ("gas", "boiler"):
+                        self._boiler_run_intervals.append((cur_start, now))
+                        self._current_boiler_start = None
+        except Exception as err:
+            _LOGGER.debug("Error recording generator state (%s): %s", generator_id, err)
+
+    def record_boiler_state(self, is_on: bool) -> None:
+        """Record a boiler switch ON or OFF transition (backward compatible)."""
+        self.record_generator_state("gas", is_on)
+
+    def is_any_generator_running(self) -> bool:
+        """Return True if at least one generator is actively running."""
+        return any(v is not None for v in self._current_generator_start.values()) or (self._current_boiler_start is not None)
+
+    def get_boiler_cycles_per_hour(self, generator_id: str | None = None) -> int:
+        """Calculate generator ignition cycles in the past 60 minutes."""
         now = time.monotonic()
         one_hour_ago = now - 3600.0
+        if generator_id and generator_id in self._generator_on_events:
+            return sum(1 for t in self._generator_on_events[generator_id] if t >= one_hour_ago)
+        if "gas" in self._generator_on_events:
+            return sum(1 for t in self._generator_on_events["gas"] if t >= one_hour_ago)
         return sum(1 for t in self._boiler_on_events if t >= one_hour_ago)
 
-    def get_boiler_daily_runtime_hours(self) -> float:
-        """Calculate total boiler running hours in the past 24 hours."""
+    def get_boiler_daily_runtime_hours(self, generator_id: str | None = None) -> float:
+        """Calculate total running hours in the past 24 hours."""
         now = time.monotonic()
         twenty_four_hours_ago = now - 86400.0
         total_seconds = 0.0
 
-        for start, end in self._boiler_run_intervals:
+        if generator_id and generator_id in self._generator_run_intervals:
+            target_intervals = list(self._generator_run_intervals[generator_id])
+            cur_start = self._current_generator_start.get(generator_id)
+        elif "gas" in self._generator_run_intervals:
+            target_intervals = list(self._generator_run_intervals["gas"])
+            cur_start = self._current_generator_start.get("gas")
+        else:
+            target_intervals = list(self._boiler_run_intervals)
+            cur_start = self._current_boiler_start
+
+        for start, end in target_intervals:
             if end >= twenty_four_hours_ago:
                 actual_start = max(start, twenty_four_hours_ago)
                 total_seconds += max(0.0, end - actual_start)
 
-        # Include currently active run if any
-        if self._current_boiler_start is not None:
-            actual_start = max(self._current_boiler_start, twenty_four_hours_ago)
+        if cur_start is not None:
+            actual_start = max(cur_start, twenty_four_hours_ago)
             total_seconds += max(0.0, now - actual_start)
 
         return round(total_seconds / 3600.0, 1)
@@ -129,7 +165,7 @@ class PlantDiagnosticsEngine:
             "last_temp_time": None,
             "last_heating_time": None,
         })
-        boiler_on = self.coordinator.get_master_state() and self._current_boiler_start is not None
+        boiler_on = self.coordinator.get_master_state() and self.is_any_generator_running()
         return evaluate_zone_anomalies(self.coordinator, self.hass, climate_id, state, boiler_on)
 
     def get_zone_energy_class(self, climate_id: str) -> str:

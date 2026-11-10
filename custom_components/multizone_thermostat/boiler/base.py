@@ -4,6 +4,8 @@ from abc import ABC, abstractmethod
 class BoilerBackend(ABC):
     """Abstract base class for boiler generators."""
 
+    is_modulating: bool = False
+
     @abstractmethod
     async def async_update(self, demand: float, peak_zone: str | None, frost_emergency: bool) -> None:
         """Update the boiler state based on heat demand (0.0 to 100.0)."""

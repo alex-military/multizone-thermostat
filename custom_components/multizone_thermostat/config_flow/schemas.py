@@ -11,6 +11,13 @@ from homeassistant import data_entry_flow
 
 from ..const import (
     CONF_BOILER_MODE,
+    CONF_ZONE_EMITTER_TYPE,
+    EMITTER_TYPE_RADIATOR,
+    EMITTER_TYPE_UNDERFLOOR,
+    EMITTER_TYPE_FANCOIL,
+    DEFAULT_ZONE_EMITTER_TYPE,
+    CONF_HAS_MIXING_VALVE,
+    DEFAULT_HAS_MIXING_VALVE,
     CONF_BOILER_SWITCH,
     CONF_GEOFENCING_ENABLED,
     CONF_OPENTHERM_ENTITY,
@@ -120,6 +127,7 @@ def get_heat_pump_schema(
     hp_cooling: bool = DEFAULT_HEAT_PUMP_COOLING,
     hp_cool_min_temp: float = DEFAULT_HP_COOL_MIN_TEMP,
     hp_cool_max_temp: float = DEFAULT_HP_COOL_MAX_TEMP,
+    has_mixing_valve: bool = DEFAULT_HAS_MIXING_VALVE,
 ) -> vol.Schema:
     schema_dict: dict[Any, Any] = {
         vol.Required(CONF_HEAT_PUMP_TYPE, default=hp_type): selector.SelectSelector(
@@ -160,6 +168,7 @@ def get_heat_pump_schema(
         else vol.Optional(CONF_HEAT_PUMP_CH_SWITCH)
     )
     schema_dict[ch_key] = selector.EntitySelector(selector.EntitySelectorConfig(domain=SWITCH_DOMAIN))
+    schema_dict[vol.Optional(CONF_HAS_MIXING_VALVE, default=has_mixing_valve)] = bool
     return vol.Schema(schema_dict)
 
 
@@ -175,6 +184,7 @@ def get_options_heat_pump_schema(current_data: dict[str, Any] | None = None) -> 
     hp_cool_min_temp = data.get(CONF_HEAT_PUMP_COOL_MIN_TEMP, DEFAULT_HP_COOL_MIN_TEMP)
     hp_cool_max_temp = data.get(CONF_HEAT_PUMP_COOL_MAX_TEMP, DEFAULT_HP_COOL_MAX_TEMP)
     hp_ch_switch = data.get(CONF_HEAT_PUMP_CH_SWITCH)
+    has_mixing_valve = data.get(CONF_HAS_MIXING_VALVE, DEFAULT_HAS_MIXING_VALVE)
 
     schema_dict: dict[Any, Any] = {
         vol.Required(CONF_ENABLE_HEAT_PUMP, default=enable_hp): bool,
@@ -216,6 +226,7 @@ def get_options_heat_pump_schema(current_data: dict[str, Any] | None = None) -> 
         else vol.Optional(CONF_HEAT_PUMP_CH_SWITCH)
     )
     schema_dict[ch_key] = selector.EntitySelector(selector.EntitySelectorConfig(domain=SWITCH_DOMAIN))
+    schema_dict[vol.Optional(CONF_HAS_MIXING_VALVE, default=has_mixing_valve)] = bool
     return vol.Schema(schema_dict)
 
 
@@ -333,10 +344,11 @@ def get_boiler_relay_schema(dhw_active_sensor: str | None = None) -> vol.Schema:
     schema_dict[dhw_key] = selector.EntitySelector(
         selector.EntitySelectorConfig(domain=["binary_sensor", "sensor", "input_boolean"])
     )
+    schema_dict[vol.Optional(CONF_HAS_MIXING_VALVE, default=has_mixing_valve)] = bool
     return vol.Schema(schema_dict)
 
 
-def get_boiler_opentherm_schema(dhw_active_sensor: str | None = None) -> vol.Schema:
+def get_boiler_opentherm_schema(dhw_active_sensor: str | None = None, has_mixing_valve: bool = DEFAULT_HAS_MIXING_VALVE) -> vol.Schema:
     schema_dict: dict[Any, Any] = {
         vol.Required(CONF_OPENTHERM_ENTITY): selector.EntitySelector(selector.EntitySelectorConfig(domain=["climate", "water_heater", "number"])),
         vol.Required(CONF_OPENTHERM_MIN_TEMP, default=35.0): selector.NumberSelector(
@@ -355,6 +367,7 @@ def get_boiler_opentherm_schema(dhw_active_sensor: str | None = None) -> vol.Sch
     schema_dict[dhw_key] = selector.EntitySelector(
         selector.EntitySelectorConfig(domain=["binary_sensor", "sensor", "input_boolean"])
     )
+    schema_dict[vol.Optional(CONF_HAS_MIXING_VALVE, default=has_mixing_valve)] = bool
     return vol.Schema(schema_dict)
 
 
@@ -363,6 +376,17 @@ def get_add_zone_schema() -> vol.Schema:
         vol.Required(CONF_ZONE_NAME): str,
         vol.Optional(CONF_ZONE_TEMP_SENSOR): selector.EntitySelector(selector.EntitySelectorConfig(domain=SENSOR_DOMAIN, device_class="temperature")),
         vol.Optional(CONF_ZONE_TARGET_TEMP, default=20.0): selector.NumberSelector(selector.NumberSelectorConfig(min=5, max=35, step=0.5, mode=selector.NumberSelectorMode.BOX)),
+        vol.Optional(CONF_ZONE_EMITTER_TYPE, default=DEFAULT_ZONE_EMITTER_TYPE): selector.SelectSelector(
+            selector.SelectSelectorConfig(
+                options=[
+                    selector.SelectOptionDict(value=EMITTER_TYPE_RADIATOR, label="Radiators"),
+                    selector.SelectOptionDict(value=EMITTER_TYPE_UNDERFLOOR, label="Underfloor Heating"),
+                    selector.SelectOptionDict(value=EMITTER_TYPE_FANCOIL, label="Fan Coils"),
+                ],
+                mode=selector.SelectSelectorMode.DROPDOWN,
+                translation_key="emitter_type",
+            )
+        ),
         
         # Section 1: TRV Standard
         vol.Optional("trv_settings"): data_entry_flow.section(
@@ -518,6 +542,7 @@ def get_options_boiler_relay_schema(boiler_switch: str, dhw_active_sensor: str |
     schema_dict[dhw_key] = selector.EntitySelector(
         selector.EntitySelectorConfig(domain=["binary_sensor", "sensor", "input_boolean"])
     )
+    schema_dict[vol.Optional(CONF_HAS_MIXING_VALVE, default=has_mixing_valve)] = bool
     return vol.Schema(schema_dict)
 
 
@@ -527,6 +552,7 @@ def get_options_boiler_opentherm_schema(
     opentherm_max_temp: float,
     opentherm_ch_switch: str | None = None,
     dhw_active_sensor: str | None = None,
+    has_mixing_valve: bool = DEFAULT_HAS_MIXING_VALVE,
 ) -> vol.Schema:
     schema_dict: dict[Any, Any] = {}
     if opentherm_entity:
@@ -557,6 +583,7 @@ def get_options_boiler_opentherm_schema(
     schema_dict[dhw_key] = selector.EntitySelector(
         selector.EntitySelectorConfig(domain=["binary_sensor", "sensor", "input_boolean"])
     )
+    schema_dict[vol.Optional(CONF_HAS_MIXING_VALVE, default=has_mixing_valve)] = bool
     return vol.Schema(schema_dict)
 
 
@@ -577,6 +604,17 @@ def get_options_edit_zone_schema(zone_data: dict[str, Any], temp_desc: dict[str,
     return vol.Schema({
         vol.Optional(CONF_ZONE_TEMP_SENSOR, **temp_desc): selector.EntitySelector(selector.EntitySelectorConfig(domain=SENSOR_DOMAIN, device_class="temperature")),
         vol.Optional(CONF_ZONE_TARGET_TEMP, default=zone_data.get(CONF_ZONE_TARGET_TEMP, 20.0)): selector.NumberSelector(selector.NumberSelectorConfig(min=5, max=35, step=0.5, mode=selector.NumberSelectorMode.BOX)),
+        vol.Optional(CONF_ZONE_EMITTER_TYPE, default=zone_data.get(CONF_ZONE_EMITTER_TYPE, DEFAULT_ZONE_EMITTER_TYPE)): selector.SelectSelector(
+            selector.SelectSelectorConfig(
+                options=[
+                    selector.SelectOptionDict(value=EMITTER_TYPE_RADIATOR, label="Radiators"),
+                    selector.SelectOptionDict(value=EMITTER_TYPE_UNDERFLOOR, label="Underfloor Heating"),
+                    selector.SelectOptionDict(value=EMITTER_TYPE_FANCOIL, label="Fan Coils"),
+                ],
+                mode=selector.SelectSelectorMode.DROPDOWN,
+                translation_key="emitter_type",
+            )
+        ),
 
         # Section 1: TRV Standard
         vol.Optional("trv_settings"): data_entry_flow.section(

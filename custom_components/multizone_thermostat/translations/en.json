@@ -29,7 +29,8 @@
         "data": {
           "name": "Zone Name",
           "temp_sensor": "Zone Temperature Sensor",
-          "target_temperature": "Base Target Temperature"
+          "target_temperature": "Base Target Temperature",
+          "emitter_type": "Emitter Type"
         },
         "sections": {
           "trv_settings": {
@@ -131,7 +132,8 @@
           "opentherm_min_temp": "Minimum Water Temperature (°C)",
           "opentherm_max_temp": "Maximum Water Temperature (°C)",
           "opentherm_ch_switch": "CH enable switch (optional)",
-          "dhw_active_sensor": "DHW Active Sensor (optional)"
+          "dhw_active_sensor": "DHW Active Sensor (optional)",
+          "has_mixing_valve": "Mixing valve present (for underfloor heating circuit)"
         },
         "data_description": {
           "dhw_active_sensor": "Sensor reporting active Domestic Hot Water production. If omitted, auto-discovery is used (EMS-ESP/OpenTherm)."
@@ -155,7 +157,8 @@
           "heat_pump_ch_switch": "Heating Enable Switch (Optional)",
           "heat_pump_cooling": "Enable Cooling Mode",
           "hp_cool_min_temp": "Minimum Cooling Water Temperature (°C)",
-          "hp_cool_max_temp": "Maximum Cooling Water Temperature (°C)"
+          "hp_cool_max_temp": "Maximum Cooling Water Temperature (°C)",
+          "has_mixing_valve": "Mixing valve present (for underfloor heating circuit)"
         }
       },
       "energy_management": {
@@ -239,7 +242,8 @@
           "switch_entities": "Zone Switches / Relays",
           "temp_sensor": "Zone Temperature Sensor",
           "target_temperature": "Base Target Temperature",
-          "sensor_timeout_min": "Sensor Watchdog Timeout (minutes)"
+          "sensor_timeout_min": "Sensor Watchdog Timeout (minutes)",
+          "emitter_type": "Emitter Type"
         },
         "sections": {
           "trv_settings": {
@@ -312,7 +316,8 @@
         "data": {
           "zone_name": "Zone",
           "temp_sensor": "Zone Temperature Sensor",
-          "target_temperature": "Base Target Temperature"
+          "target_temperature": "Base Target Temperature",
+          "emitter_type": "Emitter Type"
         },
         "sections": {
           "trv_settings": {
@@ -409,7 +414,8 @@
           "opentherm_min_temp": "Minimum Water Temperature (°C)",
           "opentherm_max_temp": "Maximum Water Temperature (°C)",
           "opentherm_ch_switch": "CH enable switch (optional)",
-          "dhw_active_sensor": "DHW Active Sensor (optional)"
+          "dhw_active_sensor": "DHW Active Sensor (optional)",
+          "has_mixing_valve": "Mixing valve present (for underfloor heating circuit)"
         },
         "data_description": {
           "dhw_active_sensor": "Sensor reporting active Domestic Hot Water production. If omitted, auto-discovery is used (EMS-ESP/OpenTherm)."
@@ -447,7 +453,8 @@
           "heat_pump_max_temp": "Maximum Flow Water Temperature (°C)",
           "hp_cool_min_temp": "Minimum Cooling Water Temperature (°C)",
           "hp_cool_max_temp": "Maximum Cooling Water Temperature (°C)",
-          "heat_pump_ch_switch": "Heating Enable Switch (Optional)"
+          "heat_pump_ch_switch": "Heating Enable Switch (Optional)",
+          "has_mixing_valve": "Mixing valve present (for underfloor heating circuit)"
         }
       },
       "trv_calibration": {
@@ -543,6 +550,13 @@
         "edit_weather_comp": "Edit Weather Compensation",
         "edit_geofencing": "Edit Geofencing Settings",
         "edit_calendar": "Edit Global Calendar"
+      }
+    },
+    "emitter_type": {
+      "options": {
+        "radiator": "Radiators",
+        "underfloor": "Underfloor Heating",
+        "fancoil": "Fan Coils"
       }
     }
   }

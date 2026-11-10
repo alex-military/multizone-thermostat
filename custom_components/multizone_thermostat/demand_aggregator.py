@@ -32,6 +32,7 @@ VALID_DEMAND_STRATEGIES = (
 )
 
 DEFAULT_ZONE_WEIGHT = 1.0
+DEFAULT_WEIGHTED_AVERAGE_PEAK_FLOOR = 0.70  # Safety floor: 70% of peak room demand to avoid starving
 
 
 @dataclass
@@ -368,7 +369,7 @@ class DemandAggregator:
             final_demand = peak_demand
 
         elif self._strategy == DEMAND_STRATEGY_WEIGHTED_AVERAGE:
-            # Weighted average over active primary zones (demand > 0)
+            # Weighted average over active primary zones with Peak Safety Floor (ORACLE-2 / L1 fix)
             active_items = []
             for cid, name in zone_entries:
                 demand = primary_demands.get(name, 0.0)
@@ -388,13 +389,19 @@ class DemandAggregator:
                     for cid, _, _ in active_items
                 )
                 if weight_sum > 0:
-                    final_demand = min(100.0, max(0.0, round(weighted_sum / weight_sum, 2)))
+                    raw_avg = weighted_sum / weight_sum
                 else:
-                    final_demand = max(d for _, _, d in active_items)
+                    raw_avg = max(d for _, _, d in active_items)
 
                 # Peak zone is the one with highest demand among primary
                 peak_item = max(active_items, key=lambda item: item[2])
                 peak_zone = peak_item[1]
+                peak_demand = peak_item[2]
+
+                # Option 2 (Concordata): Pavimento di sicurezza sulla zona di picco
+                # Evita che una stanza fredda venga affamata all'accensione di altre zone
+                safety_floor = peak_demand * DEFAULT_WEIGHTED_AVERAGE_PEAK_FLOOR
+                final_demand = min(100.0, max(0.0, round(max(raw_avg, safety_floor), 2)))
 
         elif self._strategy == DEMAND_STRATEGY_SUM_CAPPED:
             total_sum = sum(primary_demands.values())

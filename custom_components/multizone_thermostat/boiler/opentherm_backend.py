@@ -1,3 +1,10 @@
+
+from .flow_curve import (
+    create_flow_curve_for_emitter,
+    EMITTER_RADIATOR,
+    EMITTER_UNDERFLOOR,
+    EMITTER_FANCOIL,
+)
 """OpenTherm boiler backend."""
 import logging
 import time
@@ -11,6 +18,8 @@ COMMAND_CONFIRM_TIMEOUT = 60.0  # seconds to wait for entity confirmation
 
 class OpenThermBoilerBackend(BoilerBackend):
     """Handles OpenTherm modulating boilers."""
+
+    is_modulating: bool = True
 
     def __init__(
         self,
@@ -36,6 +45,57 @@ class OpenThermBoilerBackend(BoilerBackend):
         """Return the current status reason."""
         return self._status_reason
 
+    def _get_outdoor_temperature(self) -> float | None:
+        """Extract outdoor temperature from configured weather sensor."""
+        weather_sensor_id = getattr(self.coordinator, "weather_sensor_id", None)
+        if not weather_sensor_id or not hasattr(self.hass, "states") or not self.hass.states:
+            return None
+        w_state = self.hass.states.get(weather_sensor_id)
+        if not w_state or getattr(w_state, "state", None) in (None, "unavailable", "unknown"):
+            return None
+        if getattr(w_state, "domain", None) == "weather" or str(weather_sensor_id).startswith("weather."):
+            raw_t = w_state.attributes.get("temperature") if getattr(w_state, "attributes", None) else None
+        else:
+            raw_t = w_state.state
+        if isinstance(raw_t, (int, float, str)):
+            try:
+                return float(raw_t)
+            except (ValueError, TypeError):
+                return None
+        return None
+
+    def _get_plant_emitter_type(self, peak_zone: str | None = None) -> str:
+        """Determine dominant emitter type for water flow calculation."""
+        zones = getattr(self.coordinator, "zones", None)
+        if not isinstance(zones, list):
+            zones = []
+        if peak_zone:
+            for z in zones:
+                if z.get("name") == peak_zone or z.get("zone_name") == peak_zone:
+                    if z.get("emitter_type"):
+                        return str(z.get("emitter_type"))
+                    if z.get("is_fancoil"):
+                        return EMITTER_FANCOIL
+        for z in zones:
+            if z.get("emitter_type") == EMITTER_UNDERFLOOR:
+                return EMITTER_UNDERFLOOR
+        for z in zones:
+            if z.get("emitter_type") == EMITTER_FANCOIL or z.get("is_fancoil"):
+                return EMITTER_FANCOIL
+        return EMITTER_RADIATOR
+
+    def _has_mixed_underfloor(self) -> bool:
+        """Check if plant has mixed underfloor and high-temperature emitters."""
+        zones = getattr(self.coordinator, "zones", None)
+        if not isinstance(zones, list):
+            zones = []
+        has_underfloor = any(z.get("emitter_type") == EMITTER_UNDERFLOOR for z in zones)
+        has_high_temp = any(
+            z.get("emitter_type") in (EMITTER_RADIATOR, EMITTER_FANCOIL) or z.get("is_fancoil")
+            for z in zones
+        )
+        return has_underfloor and has_high_temp
+
     async def async_update(self, demand: float, peak_zone: str | None, frost_emergency: bool) -> None:
         """Map demand to OpenTherm target temperature."""
         if not self.opentherm_entity:
@@ -50,48 +110,43 @@ class OpenThermBoilerBackend(BoilerBackend):
         norm_demand = max(0.0, min(1.0, demand / 100.0))
         wanted_on = norm_demand > 0.0
 
+        raw_curve = (
+            self.coordinator.get_persistent_data("weather_curve", 1.0)
+            if hasattr(self.coordinator, "get_persistent_data")
+            else 1.0
+        )
+        try:
+            curve_val = float(raw_curve) if raw_curve not in (None, "") else 1.0
+        except (ValueError, TypeError):
+            curve_val = 1.0
+
+        outdoor_temp = self._get_outdoor_temperature()
+        emitter = self._get_plant_emitter_type(peak_zone)
+        has_mixing = getattr(self.coordinator, "has_mixing_valve", False) is True
+
         target_temp = self.opentherm_min_temp + (norm_demand * (self.opentherm_max_temp - self.opentherm_min_temp))
 
-        if norm_demand > 0.0 and not frost_emergency:
-            weather_sensor_id = getattr(self.coordinator, "weather_sensor_id", None)
-            if isinstance(weather_sensor_id, str) and weather_sensor_id and hasattr(self.coordinator, "get_persistent_data"):
-                raw_curve = self.coordinator.get_persistent_data("weather_curve", 0.0)
-                try:
-                    curve_val = float(raw_curve) if isinstance(raw_curve, (int, float, str)) and raw_curve != "" else 0.0
-                except (ValueError, TypeError):
-                    curve_val = 0.0
-                if curve_val > 0.0:
-                    w_state = self.hass.states.get(weather_sensor_id)
-                    outdoor_temp = None
-                    if w_state and getattr(w_state, "state", None) not in (None, "unavailable", "unknown"):
-                        if getattr(w_state, "domain", None) == "weather" or str(weather_sensor_id).startswith("weather."):
-                            raw_t = w_state.attributes.get("temperature") if getattr(w_state, "attributes", None) else None
-                        else:
-                            raw_t = w_state.state
-                        if isinstance(raw_t, (int, float, str)):
-                            try:
-                                outdoor_temp = float(raw_t)
-                            except (ValueError, TypeError):
-                                outdoor_temp = None
-                    if outdoor_temp is not None and outdoor_temp < 15.0:
-                        delta_ext = 15.0 - outdoor_temp
-                        thermal_models = getattr(self.coordinator, "_thermal_models", {})
-                        valid_rates = []
-                        if isinstance(thermal_models, dict):
-                            for m in thermal_models.values():
-                                cr = getattr(m, "cooling_rate", None)
-                                if isinstance(cr, (int, float)) and float(cr) > 0.05:
-                                    valid_rates.append(float(cr))
-                        if valid_rates:
-                            avg_cooling_rate = sum(valid_rates) / len(valid_rates)
-                            retention_factor = min(1.5, max(0.8, 1.0 + (avg_cooling_rate - 0.2)))
-                        else:
-                            retention_factor = 1.0
-                        weather_flow_offset = min(15.0, max(0.0, delta_ext * curve_val * 0.5 * retention_factor))
-                        target_temp = max(
-                            self.opentherm_min_temp,
-                            min(self.opentherm_max_temp, target_temp + weather_flow_offset),
-                        )
+        if frost_emergency:
+            frost_flow = float(getattr(self.coordinator, "frost_flow_temp", 45.0))
+            target_temp = max(self.opentherm_min_temp, min(self.opentherm_max_temp, frost_flow))
+        elif norm_demand > 0.0 and outdoor_temp is not None and curve_val > 0.0:
+            if has_mixing or emitter != EMITTER_RADIATOR:
+                curve = create_flow_curve_for_emitter(
+                    emitter_type=emitter,
+                    t_min=self.opentherm_min_temp,
+                    t_max=self.opentherm_max_temp,
+                    curve_multiplier=curve_val,
+                    has_mixing_valve=has_mixing,
+                    is_mixed_underfloor=self._has_mixed_underfloor(),
+                )
+                target_temp = curve.flow_for_demand(demand, outdoor_temp)
+            elif outdoor_temp < 15.0:
+                delta_ext = 15.0 - outdoor_temp
+                weather_flow_offset = min(15.0, max(0.0, delta_ext * curve_val * 0.5))
+                target_temp = max(
+                    self.opentherm_min_temp,
+                    min(self.opentherm_max_temp, target_temp + weather_flow_offset),
+                )
 
         target_temp = round(target_temp, 1)
 
@@ -126,7 +181,7 @@ class OpenThermBoilerBackend(BoilerBackend):
         if (confirmed_on or wanted_on) and hasattr(self.coordinator, "reset_last_active_time"):
             self.coordinator.reset_last_active_time()
 
-        if diag:
+        if diag and hasattr(diag, "record_boiler_state"):
             if confirmed_on and diag._current_boiler_start is None:
                 diag.record_boiler_state(True)
             elif not confirmed_on and diag._current_boiler_start is not None:

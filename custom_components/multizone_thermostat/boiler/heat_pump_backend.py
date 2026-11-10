@@ -1,10 +1,18 @@
+from __future__ import annotations
+import math
+
+from .flow_curve import (
+    create_flow_curve_for_emitter,
+    EMITTER_RADIATOR,
+    EMITTER_UNDERFLOOR,
+    EMITTER_FANCOIL,
+)
 """Central Heat Pump (PDC) Backend for Multizone Thermostat (Phase 11).
 
 Single Responsibility: Drives the centralized hydronic Heat Pump (via HA Climate entity,
 Switch / SG-Ready relay, or OpenTherm/Number flow temperature modulation) in both
 Heating and Reversible Cooling modes.
 """
-from __future__ import annotations
 
 import logging
 import time
@@ -28,6 +36,8 @@ _LOGGER = logging.getLogger(__name__)
 
 class CentralHeatPumpBackend(BoilerBackend):
     """Handles centralized hydronic Heat Pump (PDC) actuation."""
+
+    is_modulating: bool = True
 
     def __init__(
         self,
@@ -58,6 +68,13 @@ class CentralHeatPumpBackend(BoilerBackend):
         self._status_reason = "INIT"
         self._last_state_on: bool | None = None
         self._valve_delay_start: float | None = None
+        # Anti-short-cycle guards (L3 / ORACLE-3)
+        coord_min_on = getattr(coordinator, "_min_cycle_on", 0.0)
+        self.min_cycle_on: float = float(coord_min_on if isinstance(coord_min_on, (int, float)) else 0.0)
+        coord_min_off = getattr(coordinator, "_min_cycle_off", 0.0)
+        self.min_cycle_off: float = float(coord_min_off if isinstance(coord_min_off, (int, float)) else 0.0)
+        self._last_switch_time: float = 0.0
+        self._current_running_state: bool = False
 
     def _is_currently_on(self, entity_id: str | None = None) -> bool:
         """Check if target entity is currently considered ON."""
@@ -216,6 +233,81 @@ class CentralHeatPumpBackend(BoilerBackend):
                 blocking=False,
             )
 
+    def _get_outdoor_temperature(self) -> float | None:
+        """Extract outdoor temperature from configured weather sensor."""
+        weather_sensor_id = getattr(self.coordinator, "weather_sensor_id", None)
+        if not weather_sensor_id or not isinstance(weather_sensor_id, str) or not hasattr(self.hass, "states") or not self.hass.states:
+            return None
+        w_state = self.hass.states.get(weather_sensor_id)
+        if not w_state or getattr(w_state, "state", None) in (None, "unavailable", "unknown"):
+            return None
+        if getattr(w_state, "domain", None) == "weather" or str(weather_sensor_id).startswith("weather."):
+            raw_t = w_state.attributes.get("temperature") if getattr(w_state, "attributes", None) else None
+        else:
+            raw_t = w_state.state
+        if isinstance(raw_t, (int, float, str)):
+            try:
+                return float(raw_t)
+            except (ValueError, TypeError):
+                return None
+        return None
+
+    def _get_plant_emitter_type(self, peak_zone: str | None = None) -> str:
+        """Determine dominant emitter type."""
+        zones = getattr(self.coordinator, "zones", [])
+        if peak_zone:
+            for z in zones:
+                if z.get("name") == peak_zone or z.get("zone_name") == peak_zone:
+                    if z.get("emitter_type"):
+                        return str(z.get("emitter_type"))
+                    if z.get("is_fancoil"):
+                        return EMITTER_FANCOIL
+        for z in zones:
+            if z.get("emitter_type") == EMITTER_UNDERFLOOR:
+                return EMITTER_UNDERFLOOR
+        for z in zones:
+            if z.get("emitter_type") == EMITTER_FANCOIL or z.get("is_fancoil"):
+                return EMITTER_FANCOIL
+        return EMITTER_RADIATOR
+
+    def _has_mixed_underfloor(self) -> bool:
+        """Check if plant has mixed underfloor and high-temp emitters."""
+        zones = getattr(self.coordinator, "zones", [])
+        has_underfloor = any(z.get("emitter_type") == EMITTER_UNDERFLOOR for z in zones)
+        has_high_temp = any(
+            z.get("emitter_type") in (EMITTER_RADIATOR, EMITTER_FANCOIL) or z.get("is_fancoil")
+            for z in zones
+        )
+        return has_underfloor and has_high_temp
+
+    def _calculate_safe_cooling_min_temp(self) -> float:
+        """Calculate safe minimum cooling water temperature to prevent condensation (L4)."""
+        safe_floor = self.cool_min_temp
+
+        # If plant includes underfloor cooling, never drop below 17°C by default
+        if self._has_mixed_underfloor() or self._get_plant_emitter_type() == EMITTER_UNDERFLOOR:
+            safe_floor = max(safe_floor, 17.0)
+
+        # Check weather or zone humidity sensor for real dew-point calculation (Magnus formula)
+        weather_sensor_id = getattr(self.coordinator, "weather_sensor_id", None)
+        if weather_sensor_id and hasattr(self.hass, "states") and self.hass.states:
+            w_st = self.hass.states.get(weather_sensor_id)
+            if w_st and getattr(w_st, "attributes", None):
+                rh = w_st.attributes.get("humidity")
+                temp = w_st.attributes.get("temperature")
+                if isinstance(rh, (int, float)) and isinstance(temp, (int, float)) and float(rh) > 10.0:
+                    t = float(temp)
+                    h = float(rh)
+                    try:
+                        a, b = 17.27, 237.7
+                        alpha = ((a * t) / (b + t)) + math.log(max(1.0, min(100.0, h)) / 100.0)
+                        dew_point = (b * alpha) / (a - alpha)
+                        # Water temperature must remain at least 2.0°C above dew point
+                        safe_floor = max(safe_floor, round(dew_point + 2.0, 1))
+                    except Exception:
+                        pass
+        return safe_floor
+
     async def async_update(
         self,
         demand: float,
@@ -236,12 +328,65 @@ class CentralHeatPumpBackend(BoilerBackend):
         domain = self.hp_entity.split(".")[0] if "." in self.hp_entity else self.hp_type
         st = self.hass.states.get(self.hp_entity) if hasattr(self.hass, "states") and self.hass.states else None
 
+        # Anti-short-cycling guard for heat pump compressor (L3 / ORACLE-3)
+        now = time.monotonic()
+        elapsed = now - self._last_switch_time if self._last_switch_time > 0 else 99999.0
+
+        if wanted_on and not self._current_running_state:
+            if elapsed < self.min_cycle_off and not frost_emergency:
+                rem = self.min_cycle_off - elapsed
+                self._status_reason = f"HOLD_OFF - PDC anti-short-cycle: {rem:.0f}s"
+                wanted_on = False
+            else:
+                self._last_switch_time = now
+                self._current_running_state = True
+        elif not wanted_on and self._current_running_state:
+            if elapsed < self.min_cycle_on and not frost_emergency:
+                rem = self.min_cycle_on - elapsed
+                self._status_reason = f"HOLD_ON - PDC min run time: {rem:.0f}s"
+                wanted_on = True
+            else:
+                self._last_switch_time = now
+                self._current_running_state = False
+
         if hvac_mode in (HVAC_MODE_COOL, "cool"):
-            # In cooling mode, higher demand lowers water temp toward cool_min_temp
-            target_temp = round(self.cool_max_temp - norm_demand * (self.cool_max_temp - self.cool_min_temp), 1)
+            # In cooling mode: apply dew point condensation protection (L4)
+            safe_cool_min = self._calculate_safe_cooling_min_temp()
+            target_temp = round(self.cool_max_temp - norm_demand * (self.cool_max_temp - safe_cool_min), 1)
+            target_temp = max(target_temp, safe_cool_min)
         else:
-            # In heating mode, higher demand raises water temp toward max_temp
-            target_temp = round(self.min_temp + norm_demand * (self.max_temp - self.min_temp), 1)
+            # In heating mode, use FlowCurve with emitter calibration
+            raw_curve = (
+                self.coordinator.get_persistent_data("weather_curve", 1.0)
+                if hasattr(self.coordinator, "get_persistent_data")
+                else 1.0
+            )
+            try:
+                curve_val = float(raw_curve) if raw_curve not in (None, "") else 1.0
+            except (ValueError, TypeError):
+                curve_val = 1.0
+
+            outdoor_temp = self._get_outdoor_temperature()
+            emitter = self._get_plant_emitter_type(peak_zone)
+            has_mixing = bool(getattr(self.coordinator, "has_mixing_valve", False))
+
+            curve = create_flow_curve_for_emitter(
+                emitter_type=emitter,
+                t_min=self.min_temp,
+                t_max=self.max_temp,
+                curve_multiplier=curve_val,
+                has_mixing_valve=has_mixing,
+                is_mixed_underfloor=self._has_mixed_underfloor(),
+            )
+
+            if frost_emergency:
+                frost_flow = float(getattr(self.coordinator, "frost_flow_temp", 40.0))
+                target_temp = max(self.min_temp, min(curve.t_max, frost_flow))
+            elif outdoor_temp is not None:
+                target_temp = curve.flow_for_demand(demand, outdoor_temp)
+            else:
+                target_temp = self.min_temp + norm_demand * (self.max_temp - self.min_temp)
+            target_temp = round(target_temp, 1)
 
         if wanted_on:
             if self.valve_delay > 0 and not self._is_currently_on(self.hp_entity):
@@ -261,20 +406,23 @@ class CentralHeatPumpBackend(BoilerBackend):
                     )
                     return
             self._valve_delay_start = None
-            self._status_reason = (
-                f"HP_{hvac_mode.upper()} - Target: {target_temp}°C "
-                f"(Demand: {round(demand, 1)}% from {peak_zone or 'None'})"
-            )
+            if not self._status_reason.startswith("HOLD_"):
+                self._status_reason = (
+                    f"HP_{hvac_mode.upper()} - Target: {target_temp}°C "
+                    f"(Demand: {round(demand, 1)}% from {peak_zone or 'None'})"
+                )
         else:
             self._valve_delay_start = None
-            self._status_reason = "OFF - No Demand"
+            if not self._status_reason.startswith("HOLD_"):
+                self._status_reason = "OFF - No Demand"
 
         diag = getattr(self.coordinator, "plant_diagnostics", None)
-        if diag and hasattr(diag, "record_boiler_state"):
-            if wanted_on and getattr(diag, "_current_boiler_start", None) is None:
-                diag.record_boiler_state(True)
-            elif not wanted_on and getattr(diag, "_current_boiler_start", None) is not None:
-                diag.record_boiler_state(False)
+        confirmed_hp_on = bool(self._current_running_state)
+        if diag:
+            if hasattr(diag, "record_generator_state"):
+                diag.record_generator_state("heat_pump", confirmed_hp_on)
+            elif hasattr(diag, "record_boiler_state") and not getattr(self.coordinator, "enable_gas_heater", False):
+                diag.record_boiler_state(confirmed_hp_on)
 
         try:
             if domain == "switch" or self.hp_type == HP_TYPE_SWITCH:
@@ -306,6 +454,8 @@ class CentralHeatPumpBackend(BoilerBackend):
 
     async def async_emergency_off(self) -> None:
         """Force Central Heat Pump off immediately."""
+        self._current_running_state = False
+        self._last_switch_time = 0.0
         self._valve_delay_start = None
         self._status_reason = "OFF - Emergency/Master OFF"
         await self.async_update(0.0, None, False, HVAC_MODE_OFF)

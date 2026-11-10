@@ -16,6 +16,10 @@ from homeassistant.helpers import selector
 
 from ..const import (
     CONF_BOILER_MODE,
+    CONF_ZONE_EMITTER_TYPE,
+    DEFAULT_ZONE_EMITTER_TYPE,
+    CONF_HAS_MIXING_VALVE,
+    DEFAULT_HAS_MIXING_VALVE,
     CONF_BOILER_SWITCH,
     CONF_GEOFENCING_ENABLED,
     CONF_OPENTHERM_ENTITY,
@@ -137,6 +141,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._opentherm_entity: str | None = None
         self._opentherm_min_temp: float = 35.0
         self._opentherm_max_temp: float = 75.0
+        self._has_mixing_valve: bool = DEFAULT_HAS_MIXING_VALVE
         self._opentherm_ch_switch: str | None = None
         self._dhw_active_sensor: str | None = None
         # Heat pump
@@ -261,6 +266,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._opentherm_max_temp = user_input[CONF_OPENTHERM_MAX_TEMP]
             self._opentherm_ch_switch = user_input.get(CONF_OPENTHERM_CH_SWITCH) or None
             self._dhw_active_sensor = user_input.get(CONF_DHW_ACTIVE_SENSOR) or None
+            self._has_mixing_valve = user_input.get(CONF_HAS_MIXING_VALVE, DEFAULT_HAS_MIXING_VALVE)
             errors.update(validate_opentherm_temps(self._opentherm_min_temp, self._opentherm_max_temp))
             if not errors:
                 if self._enable_hp:
@@ -289,6 +295,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._hp_cooling = user_input.get(CONF_HEAT_PUMP_COOLING, DEFAULT_HEAT_PUMP_COOLING)
             self._hp_cool_min_temp = user_input.get(CONF_HEAT_PUMP_COOL_MIN_TEMP, DEFAULT_HP_COOL_MIN_TEMP)
             self._hp_cool_max_temp = user_input.get(CONF_HEAT_PUMP_COOL_MAX_TEMP, DEFAULT_HP_COOL_MAX_TEMP)
+            self._has_mixing_valve = user_input.get(CONF_HAS_MIXING_VALVE, self._has_mixing_valve)
             errors.update(validate_heat_pump_temps(self._hp_min_temp, self._hp_max_temp))
             if not errors:
                 return await self.async_step_add_zone()
@@ -342,6 +349,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_ZONE_SENSOR_TIMEOUT: user_input.get(CONF_ZONE_SENSOR_TIMEOUT, DEFAULT_SENSOR_TIMEOUT_MIN),
                     CONF_ZONE_TARGET_TEMP: user_input.get(CONF_ZONE_TARGET_TEMP, 20.0),
                     CONF_ZONE_CALIBRATIONS: {},
+                    CONF_ZONE_EMITTER_TYPE: user_input.get(CONF_ZONE_EMITTER_TYPE, DEFAULT_ZONE_EMITTER_TYPE),
                     # Phase 11 Split Settings
                     CONF_ZONE_SPLIT_CLIMATE: split_climate,
                     CONF_ZONE_SPLIT_ROLE: user_input.get(CONF_ZONE_SPLIT_ROLE, DEFAULT_SPLIT_ROLE),
@@ -527,6 +535,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             data: dict[str, Any] = {
+                CONF_HAS_MIXING_VALVE: self._has_mixing_valve,
                 CONF_ENABLE_GAS_HEATER: self._enable_gas,
                 CONF_ENABLE_HEAT_PUMP: self._enable_hp,
                 CONF_ZONES: self._zones,

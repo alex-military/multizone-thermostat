@@ -25,6 +25,8 @@ COMMAND_CONFIRM_TIMEOUT = 60.0  # seconds to wait for the switch entity to confi
 class RelayBoilerBackend(BoilerBackend):
     """Handles Relay/On-Off boilers via PWM."""
 
+    is_modulating: bool = False
+
     def __init__(
         self,
         hass: HomeAssistant,
@@ -247,11 +249,12 @@ class RelayBoilerBackend(BoilerBackend):
         self._last_known_boiler_on = current_boiler_on
 
         # Diagnostics follow the CONFIRMED entity state, not the command sent
-        diag = self.coordinator.plant_diagnostics
-        if current_boiler_on and diag._current_boiler_start is None:
-            diag.record_boiler_state(True)
-        elif boiler_state is not None and boiler_state.state == STATE_OFF and diag._current_boiler_start is not None:
-            diag.record_boiler_state(False)
+        diag = getattr(self.coordinator, "plant_diagnostics", None)
+        if diag and hasattr(diag, "record_boiler_state"):
+            if current_boiler_on and diag._current_boiler_start is None:
+                diag.record_boiler_state(True)
+            elif boiler_state is not None and boiler_state.state == STATE_OFF and diag._current_boiler_start is not None:
+                diag.record_boiler_state(False)
         if self._pending_command is not None:
             cmd, ts = self._pending_command
             if (cmd == "on" and current_boiler_on) or (cmd == "off" and boiler_state is not None and not current_boiler_on):

@@ -29,7 +29,8 @@
         "data": {
           "name": "Nom de la Zone",
           "temp_sensor": "Capteur de Température de Zone",
-          "target_temperature": "Température Cible de Base"
+          "target_temperature": "Température Cible de Base",
+          "emitter_type": "Type d'émetteur"
         },
         "sections": {
           "trv_settings": {
@@ -131,7 +132,8 @@
           "opentherm_min_temp": "Température Minimale de l'eau (°C)",
           "opentherm_max_temp": "Température Maximale de l'eau (°C)",
           "opentherm_ch_switch": "Interrupteur d'activation du chauffage central (optionnel)",
-          "dhw_active_sensor": "Capteur dactivité ECS / DHW (optionnel)"
+          "dhw_active_sensor": "Capteur dactivité ECS / DHW (optionnel)",
+          "has_mixing_valve": "Vanne mélangeuse présente (pour plancher chauffant)"
         },
         "data_description": {
           "dhw_active_sensor": "Capteur signalant la production active dEau Chaude Sanitaire. Si omis, la détection automatique est utilisée (EMS-ESP/OpenTherm)."
@@ -155,7 +157,8 @@
           "heat_pump_ch_switch": "Heating Enable Switch (Optional)",
           "heat_pump_cooling": "Activer le mode refroidissement",
           "hp_cool_min_temp": "Température minimale eau froide (°C)",
-          "hp_cool_max_temp": "Température maximale eau froide (°C)"
+          "hp_cool_max_temp": "Température maximale eau froide (°C)",
+          "has_mixing_valve": "Vanne mélangeuse présente (pour plancher chauffant)"
         }
       },
       "energy_management": {
@@ -239,7 +242,8 @@
           "switch_entities": "Interrupteurs de Zone / Relais",
           "temp_sensor": "Capteur de Température de Zone",
           "target_temperature": "Température Cible de Base",
-          "sensor_timeout_min": "Délai Watchdog Capteur (minutes)"
+          "sensor_timeout_min": "Délai Watchdog Capteur (minutes)",
+          "emitter_type": "Type d'émetteur"
         },
         "sections": {
           "trv_settings": {
@@ -312,7 +316,8 @@
         "data": {
           "zone_name": "Zone",
           "temp_sensor": "Capteur de Température de Zone",
-          "target_temperature": "Température Cible de Base"
+          "target_temperature": "Température Cible de Base",
+          "emitter_type": "Type d'émetteur"
         },
         "sections": {
           "trv_settings": {
@@ -409,7 +414,8 @@
           "opentherm_min_temp": "Température Minimale de l'eau (°C)",
           "opentherm_max_temp": "Température Maximale de l'eau (°C)",
           "opentherm_ch_switch": "Interrupteur d'activation du chauffage central (optionnel)",
-          "dhw_active_sensor": "Capteur dactivité ECS / DHW (optionnel)"
+          "dhw_active_sensor": "Capteur dactivité ECS / DHW (optionnel)",
+          "has_mixing_valve": "Vanne mélangeuse présente (pour plancher chauffant)"
         },
         "data_description": {
           "dhw_active_sensor": "Capteur signalant la production active dEau Chaude Sanitaire. Si omis, la détection automatique est utilisée (EMS-ESP/OpenTherm)."
@@ -447,7 +453,8 @@
           "heat_pump_max_temp": "Température maximale de départ (°C)",
           "hp_cool_min_temp": "Température minimale eau froide (°C)",
           "hp_cool_max_temp": "Température maximale eau froide (°C)",
-          "heat_pump_ch_switch": "Interrupteur d'activation chauffage (Optionnel)"
+          "heat_pump_ch_switch": "Interrupteur d'activation chauffage (Optionnel)",
+          "has_mixing_valve": "Vanne mélangeuse présente (pour plancher chauffant)"
         }
       },
       "trv_calibration": {
@@ -543,6 +550,13 @@
         "edit_weather_comp": "Modifier Compensation Météo",
         "edit_geofencing": "Modifier Paramètres de Géorepérage",
         "edit_calendar": "Modifier Calendrier Global"
+      }
+    },
+    "emitter_type": {
+      "options": {
+        "radiator": "Radiateurs",
+        "underfloor": "Plancher chauffant",
+        "fancoil": "Ventilo-convecteurs"
       }
     }
   }

@@ -91,6 +91,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
         self._opentherm_max_temp: float = 75.0
         self._opentherm_ch_switch: str | None = None
         self._dhw_active_sensor: str | None = None
+        self._has_mixing_valve: bool = DEFAULT_HAS_MIXING_VALVE
         # Heat pump
         self._hp_type: str = HP_TYPE_CLIMATE
         self._hp_entity: str | None = None
@@ -139,6 +140,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             self._opentherm_max_temp = cfg.get(CONF_OPENTHERM_MAX_TEMP, 75.0)
             self._opentherm_ch_switch = cfg.get(CONF_OPENTHERM_CH_SWITCH)
             self._dhw_active_sensor = cfg.get(CONF_DHW_ACTIVE_SENSOR)
+            self._has_mixing_valve = cfg.get(CONF_HAS_MIXING_VALVE, DEFAULT_HAS_MIXING_VALVE)
             # HP
             self._hp_type = cfg.get(CONF_HEAT_PUMP_TYPE, HP_TYPE_CLIMATE)
             self._hp_entity = cfg.get(CONF_HEAT_PUMP_ENTITY)
@@ -279,13 +281,14 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             self._opentherm_max_temp = user_input[CONF_OPENTHERM_MAX_TEMP]
             self._opentherm_ch_switch = user_input.get(CONF_OPENTHERM_CH_SWITCH) or None
             self._dhw_active_sensor = user_input.get(CONF_DHW_ACTIVE_SENSOR) or None
+            self._has_mixing_valve = user_input.get(CONF_HAS_MIXING_VALVE, self._has_mixing_valve)
             errors.update(validate_opentherm_temps(self._opentherm_min_temp, self._opentherm_max_temp))
             if not errors:
                 return self._save_options()
 
         suggested_dhw = self._dhw_active_sensor or find_suggested_dhw_sensor(self.hass, self._opentherm_entity)
         schema = get_options_boiler_opentherm_schema(
-            self._opentherm_entity, self._opentherm_min_temp, self._opentherm_max_temp, self._opentherm_ch_switch, suggested_dhw
+            self._opentherm_entity, self._opentherm_min_temp, self._opentherm_max_temp, self._opentherm_ch_switch, suggested_dhw, self._has_mixing_valve
         )
         return self.async_show_form(step_id="boiler_opentherm", data_schema=schema, errors=errors)
 
@@ -304,6 +307,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             self._hp_cool_min_temp = float(user_input.get(CONF_HEAT_PUMP_COOL_MIN_TEMP, DEFAULT_HP_COOL_MIN_TEMP))
             self._hp_cool_max_temp = float(user_input.get(CONF_HEAT_PUMP_COOL_MAX_TEMP, DEFAULT_HP_COOL_MAX_TEMP))
             self._hp_ch_switch = user_input.get(CONF_HEAT_PUMP_CH_SWITCH) or None
+            self._has_mixing_valve = user_input.get(CONF_HAS_MIXING_VALVE, self._has_mixing_valve)
 
             errors.update(validate_heat_pump_temps(self._hp_min_temp, self._hp_max_temp))
             errors.update(validate_heat_pump_cool_temps(self._hp_cool_min_temp, self._hp_cool_max_temp))
@@ -326,6 +330,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             CONF_HEAT_PUMP_COOL_MIN_TEMP: self._hp_cool_min_temp,
             CONF_HEAT_PUMP_COOL_MAX_TEMP: self._hp_cool_max_temp,
             CONF_HEAT_PUMP_CH_SWITCH: self._hp_ch_switch,
+            CONF_HAS_MIXING_VALVE: self._has_mixing_valve,
         }
         schema = get_options_heat_pump_schema(current_data)
         return self.async_show_form(
@@ -410,6 +415,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                     CONF_ZONE_SENSOR_TIMEOUT: user_input.get(CONF_ZONE_SENSOR_TIMEOUT, DEFAULT_SENSOR_TIMEOUT_MIN),
                     CONF_ZONE_TARGET_TEMP: user_input.get(CONF_ZONE_TARGET_TEMP, 20.0),
                     CONF_ZONE_CALIBRATIONS: {},
+                    CONF_ZONE_EMITTER_TYPE: user_input.get(CONF_ZONE_EMITTER_TYPE, DEFAULT_ZONE_EMITTER_TYPE),
                     # Phase 11 Split Settings
                     CONF_ZONE_SPLIT_CLIMATE: split_climate,
                     CONF_ZONE_SPLIT_ROLE: user_input.get(CONF_ZONE_SPLIT_ROLE, DEFAULT_SPLIT_ROLE),
@@ -559,6 +565,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                             self._zones[i][CONF_ZONE_ALLOW_PASSIVE_HEAT] = user_input.get(CONF_ZONE_ALLOW_PASSIVE_HEAT, False)
                             self._zones[i][CONF_ZONE_SENSOR_TIMEOUT] = user_input.get(CONF_ZONE_SENSOR_TIMEOUT, DEFAULT_SENSOR_TIMEOUT_MIN)
                             self._zones[i][CONF_ZONE_TARGET_TEMP] = user_input.get(CONF_ZONE_TARGET_TEMP, 20.0)
+                            self._zones[i][CONF_ZONE_EMITTER_TYPE] = user_input.get(CONF_ZONE_EMITTER_TYPE, DEFAULT_ZONE_EMITTER_TYPE)
                             
                             # Phase 11 Split Settings
                             self._zones[i][CONF_ZONE_SPLIT_CLIMATE] = split_climate
@@ -666,6 +673,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
     def _save_options(self) -> config_entries.FlowResult:
         """Save updated options into entry.data and reload entry."""
         data: dict[str, Any] = {
+            CONF_HAS_MIXING_VALVE: self._has_mixing_valve,
             CONF_ENABLE_GAS_HEATER: self._enable_gas,
             CONF_ENABLE_HEAT_PUMP: self._enable_hp,
             CONF_ZONES: self._zones,

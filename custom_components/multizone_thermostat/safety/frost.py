@@ -34,6 +34,8 @@ class FrostManager:
         """Initialize frost manager."""
         self.hass = hass
         self.coordinator = coordinator
+        self._pre_frost_targets: dict[str, float] = {}
+        self._active_frost_emergencies: set[str] = set()
 
     def is_zone_in_frost_emergency(self, climate_id: str) -> bool:
         """Return True if anti-frost is enabled and zone temperature is below the safety threshold."""
@@ -81,7 +83,18 @@ class FrostManager:
             self.coordinator.get_persistent_data(KEY_FROST_PROTECTION_TEMP, DEFAULT_FROST_PROTECTION_TEMP)
         )
         try:
-            return float(current_temp) < frost_temp
+            t = float(current_temp)
+            # Hysteresis: enter emergency below frost_temp, exit above frost_temp + 1.5°C
+            if climate_id in self._active_frost_emergencies:
+                is_danger = t < (frost_temp + 1.5)
+            else:
+                is_danger = t < frost_temp
+
+            if is_danger:
+                self._active_frost_emergencies.add(climate_id)
+            else:
+                self._active_frost_emergencies.discard(climate_id)
+            return is_danger
         except (ValueError, TypeError):
             return False
 
@@ -119,11 +132,32 @@ class FrostManager:
                     + 3.0
                 )
                 st = self.hass.states.get(climate_id)
-                if not st or st.attributes.get(ATTR_TEMPERATURE) != frost_target:
+                if st:
+                    # Save user target prior to frost override
+                    curr_user_target = st.attributes.get(ATTR_TEMPERATURE)
+                    if curr_user_target and curr_user_target > frost_target and climate_id not in self._pre_frost_targets:
+                        self._pre_frost_targets[climate_id] = float(curr_user_target)
+
+                    if st.attributes.get(ATTR_TEMPERATURE) != frost_target:
+                        await self.hass.services.async_call(
+                            CLIMATE_DOMAIN,
+                            SERVICE_SET_TEMPERATURE,
+                            {ATTR_ENTITY_ID: climate_id, ATTR_TEMPERATURE: frost_target},
+                            blocking=False,
+                        )
+            else:
+                # Zone is NOT in frost emergency: restore previous user target if it was overridden
+                if climate_id in self._pre_frost_targets:
+                    restored_target = self._pre_frost_targets.pop(climate_id)
+                    _LOGGER.info(
+                        "Anti-Frost emergency ended for %s: restoring user target to %.1f°C",
+                        climate_id,
+                        restored_target,
+                    )
                     await self.hass.services.async_call(
                         CLIMATE_DOMAIN,
                         SERVICE_SET_TEMPERATURE,
-                        {ATTR_ENTITY_ID: climate_id, ATTR_TEMPERATURE: frost_target},
+                        {ATTR_ENTITY_ID: climate_id, ATTR_TEMPERATURE: restored_target},
                         blocking=False,
                     )
 

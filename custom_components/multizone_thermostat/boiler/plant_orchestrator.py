@@ -1,3 +1,8 @@
+from .plant_decision import (
+    PlantInputs,
+    decide_heating,
+    AUTO,
+)
 from datetime import datetime
 import asyncio
 import inspect
@@ -27,9 +32,15 @@ class PlantOrchestrator:
         self.boiler_backend = boiler_backend
         self.coordinator = coordinator
         self.heat_pump_backend = heat_pump_backend
+        self._last_plant_command = None
 
     def _get_hp_backend(self):
         return self.heat_pump_backend or getattr(self.coordinator, "heat_pump_backend", None)
+
+    @property
+    def last_plant_command(self):
+        """Return the last PlantCommand from decide_heating."""
+        return self._last_plant_command
 
     def _calculate_cooling_demand(self) -> tuple[float, str | None]:
         """Calculate central cooling demand across active cooling zones."""
@@ -185,14 +196,9 @@ class PlantOrchestrator:
         hp_enabled = bool(getattr(self.coordinator, "enable_heat_pump", False) is True and hp_backend is not None)
         gas_enabled = bool(getattr(self.coordinator, "enable_gas_heater", True) is not False)
 
-        if not hp_enabled:
-            gas_demand = agg.demand if gas_enabled else 0.0
-            await self.boiler_backend.async_update(gas_demand, agg.peak_zone, frost_emergency)
-            return
-
-        # Bivalent Gas + Central Heat Pump arbitration
+        # Collect priority and solar surplus from energy manager if present
         energy_mgr = getattr(self.coordinator, "energy_manager", None)
-        priority = "auto"
+        priority = AUTO
         solar_surplus = False
         if energy_mgr is not None:
             prio_fn = getattr(energy_mgr, "get_heat_source_priority", None)
@@ -206,42 +212,50 @@ class PlantOrchestrator:
             elif surp_fn is True:
                 solar_surplus = True
 
-        if not gas_enabled and hp_enabled:
-            hp_demand = agg.demand
-            gas_demand = 0.0
-        elif priority == SOURCE_PRIORITY_GAS_ONLY:
-            hp_demand = 0.0
-            gas_demand = agg.demand if gas_enabled else 0.0
-        elif priority in (SOURCE_PRIORITY_ELECTRIC_ONLY, SOURCE_PRIORITY_ELECTRIC):
-            hp_demand = agg.demand
-            gas_demand = 0.0
-        elif priority == SOURCE_PRIORITY_COMBINED:
-            # Combined Mode: Gas carries baseline, Central HP assists if Solar Surplus OR High Delta-T Boost (> 1.5°C)
-            gas_demand = agg.demand if gas_enabled else 0.0
-            is_boost_call = False
-            if isinstance(climate_entities, dict):
-                for ent in climate_entities.values():
-                    c_t = getattr(ent, "current_temperature", None)
-                    t_t = getattr(ent, "target_temperature", None)
-                    if isinstance(c_t, (int, float)) and isinstance(t_t, (int, float)):
-                        if (float(t_t) - float(c_t)) >= 1.5:
-                            is_boost_call = True
-                            break
-            if solar_surplus or is_boost_call or not gas_enabled:
-                hp_demand = agg.demand
-            else:
-                hp_demand = 0.0
-        else:
-            # AUTO or HYBRID: use Central Heat Pump during solar surplus / EMHASS boost, else Gas
-            if not gas_enabled and hp_enabled:
-                hp_demand = agg.demand
-                gas_demand = 0.0
-            elif solar_surplus:
-                hp_demand = agg.demand
-                gas_demand = 0.0
-            else:
-                hp_demand = 0.0
-                gas_demand = agg.demand if gas_enabled else 0.0
+        # Check heat pump availability (entity online and not unavailable/unknown)
+        hp_available = True
+        if hp_backend is not None and getattr(hp_backend, "hp_entity", None) and isinstance(hp_backend.hp_entity, str):
+            st = self.hass.states.get(hp_backend.hp_entity) if hasattr(self.hass, "states") and self.hass.states else None
+            if st and st.state in ("unavailable", "unknown"):
+                hp_available = False
 
-        await self.boiler_backend.async_update(gas_demand, agg.peak_zone, frost_emergency)
-        await hp_backend.async_update(hp_demand, agg.peak_zone, frost_emergency, hvac_mode=HVAC_MODE_HEAT)
+        # Calculate max zone delta (for COMBINED boost mode)
+        max_delta = 0.0
+        if isinstance(climate_entities, dict):
+            for ent in climate_entities.values():
+                c_t = getattr(ent, "current_temperature", None)
+                t_t = getattr(ent, "target_temperature", None)
+                if isinstance(c_t, (int, float)) and isinstance(t_t, (int, float)):
+                    diff = float(t_t) - float(c_t)
+                    if diff > max_delta:
+                        max_delta = diff
+
+        # Build immutable inputs and invoke pure decide_heating logic
+        inputs = PlantInputs(
+            demand=agg.demand,
+            priority=priority,
+            gas_enabled=gas_enabled,
+            hp_enabled=hp_enabled,
+            hp_available=hp_available,
+            solar_surplus=solar_surplus,
+            max_zone_delta=max_delta,
+            frost_emergency=frost_emergency,
+        )
+
+        cmd = decide_heating(inputs)
+        self._last_plant_command = cmd
+        _LOGGER.debug(
+            "Plant Heating Arbitration: gas=%.1f%%, hp=%.1f%%, reason=%s",
+            cmd.gas_demand,
+            cmd.hp_demand,
+            cmd.reason,
+        )
+
+        res_gas = self.boiler_backend.async_update(cmd.gas_demand, agg.peak_zone, frost_emergency)
+        if inspect.isawaitable(res_gas):
+            await res_gas
+
+        if hp_backend is not None and hp_enabled:
+            res_hp = hp_backend.async_update(cmd.hp_demand, agg.peak_zone, frost_emergency, hvac_mode=HVAC_MODE_HEAT)
+            if inspect.isawaitable(res_hp):
+                await res_hp

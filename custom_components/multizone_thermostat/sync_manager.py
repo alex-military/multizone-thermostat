@@ -12,9 +12,27 @@ from homeassistant.const import ATTR_ENTITY_ID, ATTR_TEMPERATURE, SERVICE_TURN_O
 from homeassistant.core import HomeAssistant, Context, State, Event
 
 from .pwm_engine import PWMEngine
-from .const import KEY_PHYSICAL_SYNC_PREFIX, VALVE_SCALE_VOLT, DEFAULT_VALVE_SCALE, DEFAULT_MIN_CYCLE_ON, DEFAULT_MIN_CYCLE_OFF
+from .const import (
+    KEY_PHYSICAL_SYNC_PREFIX,
+    VALVE_SCALE_VOLT,
+    DEFAULT_VALVE_SCALE,
+    DEFAULT_MIN_CYCLE_ON,
+    DEFAULT_MIN_CYCLE_OFF,
+    CONF_ZONE_EMITTER_TYPE,
+    EMITTER_TYPE_RADIATOR,
+    EMITTER_TYPE_UNDERFLOOR,
+    EMITTER_TYPE_FANCOIL,
+    DEFAULT_ZONE_EMITTER_TYPE,
+)
 
 _LOGGER = logging.getLogger(__name__)
+
+EMITTER_PWM_INTERVALS: dict[str, float] = {
+    EMITTER_TYPE_RADIATOR: 900.0,    # 15 min default for radiators
+    EMITTER_TYPE_UNDERFLOOR: 1800.0, # 30 min default for underfloor
+    EMITTER_TYPE_FANCOIL: 600.0,     # 10 min default for fan coils
+}
+
 
 class ZoneSyncManager:
     """Manages the synchronization of state from virtual zone to physical TRVs, Switches, and Proportional Valves."""
@@ -31,6 +49,7 @@ class ZoneSyncManager:
         valves: list[str] | None = None,
         valve_scale: str = DEFAULT_VALVE_SCALE,
         authoritative_sync: bool = False,
+        emitter_type: str = DEFAULT_ZONE_EMITTER_TYPE,
     ) -> None:
         """Initialize the sync manager."""
         self.hass = hass
@@ -52,9 +71,11 @@ class ZoneSyncManager:
         self._pending_calib: dict[str, tuple[float, float, float]] = {}
         self._internal_context = Context()
 
+        self._emitter_type = emitter_type
         min_on_s = float(getattr(coordinator, "_min_cycle_on", DEFAULT_MIN_CYCLE_ON)) * 60.0
         min_off_s = float(getattr(coordinator, "_min_cycle_off", DEFAULT_MIN_CYCLE_OFF)) * 60.0
-        self._local_pwm = PWMEngine(pwm_interval=900.0, min_on=min_on_s, min_off=min_off_s)
+        base_pwm_interval = EMITTER_PWM_INTERVALS.get(emitter_type, 900.0)
+        self._local_pwm = PWMEngine(pwm_interval=base_pwm_interval, min_on=min_on_s, min_off=min_off_s)
         self._local_pwm_state = False
         self._last_pwm_change: float = time.monotonic()
 

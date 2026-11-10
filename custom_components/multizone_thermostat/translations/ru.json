@@ -29,7 +29,8 @@
         "data": {
           "name": "Имя зоны",
           "temp_sensor": "Датчик температуры зоны",
-          "target_temperature": "Базовая целевая температура"
+          "target_temperature": "Базовая целевая температура",
+          "emitter_type": "Тип отопительного прибора"
         },
         "sections": {
           "trv_settings": {
@@ -131,7 +132,8 @@
           "opentherm_min_temp": "Минимальная температура воды (°C)",
           "opentherm_max_temp": "Максимальная температура воды (°C)",
           "opentherm_ch_switch": "Переключатель активации отопления CH (опционально)",
-          "dhw_active_sensor": "Датчик активности ГВС (опционально)"
+          "dhw_active_sensor": "Датчик активности ГВС (опционально)",
+          "has_mixing_valve": "Смесительный клапан установлен (для теплого пола)"
         },
         "data_description": {
           "dhw_active_sensor": "Датчик, сообщающий об активном нагреве горячей воды (ГВС). Если не указан, используется автоопределение (EMS-ESP/OpenTherm)."
@@ -155,7 +157,8 @@
           "heat_pump_ch_switch": "Heating Enable Switch (Optional)",
           "heat_pump_cooling": "Включить режим охлаждения",
           "hp_cool_min_temp": "Минимальная температура воды на охлаждение (°C)",
-          "hp_cool_max_temp": "Максимальная температура воды на охлаждение (°C)"
+          "hp_cool_max_temp": "Максимальная температура воды на охлаждение (°C)",
+          "has_mixing_valve": "Смесительный клапан установлен (для теплого пола)"
         }
       },
       "energy_management": {
@@ -239,7 +242,8 @@
           "switch_entities": "Zone Switches / Relays",
           "temp_sensor": "Zone Temperature Sensor",
           "target_temperature": "Base Target Temperature",
-          "sensor_timeout_min": "Тайм-аут сторожевого таймера датчика (минуты)"
+          "sensor_timeout_min": "Тайм-аут сторожевого таймера датчика (минуты)",
+          "emitter_type": "Тип отопительного прибора"
         },
         "sections": {
           "trv_settings": {
@@ -312,7 +316,8 @@
         "data": {
           "zone_name": "Зона",
           "temp_sensor": "Zone Temperature Sensor",
-          "target_temperature": "Base Target Temperature"
+          "target_temperature": "Base Target Temperature",
+          "emitter_type": "Тип отопительного прибора"
         },
         "sections": {
           "trv_settings": {
@@ -409,7 +414,8 @@
           "opentherm_min_temp": "Минимальная температура воды (°C)",
           "opentherm_max_temp": "Максимальная температура воды (°C)",
           "opentherm_ch_switch": "Переключатель активации отопления CH (опционально)",
-          "dhw_active_sensor": "Датчик активности ГВС (опционально)"
+          "dhw_active_sensor": "Датчик активности ГВС (опционально)",
+          "has_mixing_valve": "Смесительный клапан установлен (для теплого пола)"
         },
         "data_description": {
           "dhw_active_sensor": "Датчик, сообщающий об активном нагреве горячей воды (ГВС). Если не указан, используется автоопределение (EMS-ESP/OpenTherm)."
@@ -447,7 +453,8 @@
           "heat_pump_max_temp": "Максимальная температура подачи (°C)",
           "hp_cool_min_temp": "Минимальная температура воды на охлаждение (°C)",
           "hp_cool_max_temp": "Максимальная температура воды на охлаждение (°C)",
-          "heat_pump_ch_switch": "Переключатель нагрева (Опционально)"
+          "heat_pump_ch_switch": "Переключатель нагрева (Опционально)",
+          "has_mixing_valve": "Смесительный клапан установлен (для теплого пола)"
         }
       },
       "trv_calibration": {
@@ -543,6 +550,13 @@
         "edit_weather_comp": "Настроить погодную компенсацию",
         "edit_geofencing": "Настроить геозоны",
         "edit_calendar": "Редактировать общий календарь"
+      }
+    },
+    "emitter_type": {
+      "options": {
+        "radiator": "Радиаторы",
+        "underfloor": "Теплый пол",
+        "fancoil": "Фанкойлы"
       }
     }
   }

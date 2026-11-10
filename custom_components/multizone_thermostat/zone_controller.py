@@ -318,44 +318,46 @@ class ZoneController:
                 # Smart PID Mode
                 demand = self._pids_heat[entity_id].calc(current_temp, effective_target)
 
-                # Apply Weather Compensation (Feed Forward)
-                try:
-                    curve_val = float(self.coordinator.get_persistent_data(KEY_WEATHER_CURVE, 0.0) or 0.0)
-                except (ValueError, TypeError):
-                    curve_val = 0.0
-                if self.coordinator.weather_sensor_id:
-                    weather_state = self.hass.states.get(self.coordinator.weather_sensor_id)
-                    if weather_state and weather_state.state not in ("unavailable", "unknown"):
-                        try:
-                            outdoor_temp = None
-                            is_weather_domain = (
-                                str(self.coordinator.weather_sensor_id).startswith("weather.")
-                                or getattr(weather_state, "entity_id", "").startswith("weather.")
-                            )
-                            if is_weather_domain:
-                                temp_attr = weather_state.attributes.get("temperature") if getattr(weather_state, "attributes", None) else None
-                                if temp_attr is not None:
-                                    outdoor_temp = float(temp_attr)
-                            else:
-                                outdoor_temp = float(weather_state.state)
+                # Apply Weather Compensation (Feed Forward) ONLY for non-modulating plants (Relays)
+                # For modulating plants (OpenTherm / Heat Pump), FlowCurve has exclusive ownership.
+                if not (getattr(self.coordinator, "is_modulating_plant", False) is True):
+                    try:
+                        curve_val = float(self.coordinator.get_persistent_data(KEY_WEATHER_CURVE, 0.0) or 0.0)
+                    except (ValueError, TypeError):
+                        curve_val = 0.0
+                    if self.coordinator.weather_sensor_id:
+                        weather_state = self.hass.states.get(self.coordinator.weather_sensor_id)
+                        if weather_state and weather_state.state not in ("unavailable", "unknown"):
+                            try:
+                                outdoor_temp = None
+                                is_weather_domain = (
+                                    str(self.coordinator.weather_sensor_id).startswith("weather.")
+                                    or getattr(weather_state, "entity_id", "").startswith("weather.")
+                                )
+                                if is_weather_domain:
+                                    temp_attr = weather_state.attributes.get("temperature") if getattr(weather_state, "attributes", None) else None
+                                    if temp_attr is not None:
+                                        outdoor_temp = float(temp_attr)
+                                else:
+                                    outdoor_temp = float(weather_state.state)
 
-                            if outdoor_temp is not None:
-                                curve_val = thermal_model.get_weather_multiplier(manual_base_curve=curve_val)
-                                delta_t = effective_target - outdoor_temp
-                                if delta_t > 0.0 and curve_val > 0.0:
-                                    ff_demand = delta_t * curve_val
-                                    ff_demand = min(40.0, ff_demand)
-                                    
-                                    overheat = current_temp - effective_target
-                                    if overheat >= 0:
-                                        ff_demand = 0.0
-                                    elif overheat > -0.5:
-                                        ff_factor = max(0.0, -overheat / 0.5)
-                                        ff_demand *= ff_factor
+                                if outdoor_temp is not None:
+                                    curve_val = thermal_model.get_weather_multiplier(manual_base_curve=curve_val)
+                                    delta_t = effective_target - outdoor_temp
+                                    if delta_t > 0.0 and curve_val > 0.0:
+                                        ff_demand = delta_t * curve_val
+                                        ff_demand = min(40.0, ff_demand)
                                         
-                                    demand = min(100.0, max(0.0, demand + ff_demand))
-                        except (ValueError, TypeError):
-                            pass
+                                        overheat = current_temp - effective_target
+                                        if overheat >= 0:
+                                            ff_demand = 0.0
+                                        elif overheat > -0.5:
+                                            ff_factor = max(0.0, -overheat / 0.5)
+                                            ff_demand *= ff_factor
+                                            
+                                        demand = min(100.0, max(0.0, demand + ff_demand))
+                            except (ValueError, TypeError):
+                                pass
 
         elif hvac_mode == HVAC_MODE_COOL:
             is_faulty = (

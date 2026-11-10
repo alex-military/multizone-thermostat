@@ -29,7 +29,8 @@
         "data": {
           "name": "Nome Zona",
           "temp_sensor": "Sensore Temperatura Zona",
-          "target_temperature": "Temperatura Target Base"
+          "target_temperature": "Temperatura Target Base",
+          "emitter_type": "Tipo di emettitore"
         },
         "sections": {
           "trv_settings": {
@@ -131,7 +132,8 @@
           "opentherm_min_temp": "Temperatura Minima Acqua (°C)",
           "opentherm_max_temp": "Temperatura Massima Acqua (°C)",
           "opentherm_ch_switch": "Switch abilitazione riscaldamento CH (opzionale)",
-          "dhw_active_sensor": "Sensore attività ACS / DHW (opzionale)"
+          "dhw_active_sensor": "Sensore attività ACS / DHW (opzionale)",
+          "has_mixing_valve": "Valvola miscelatrice presente (per circuito pavimento)"
         },
         "data_description": {
           "dhw_active_sensor": "Sensore che segnala la produzione attiva di Acqua Calda Sanitaria. Se omesso, viene usato l'auto-discovery (EMS-ESP/OpenTherm)."
@@ -155,7 +157,8 @@
           "heat_pump_ch_switch": "Interruttore Abilitazione Riscaldamento (Opzionale)",
           "heat_pump_cooling": "Abilita Modalità Raffrescamento",
           "hp_cool_min_temp": "Temperatura Minima Acqua Freddo (°C)",
-          "hp_cool_max_temp": "Temperatura Massima Acqua Freddo (°C)"
+          "hp_cool_max_temp": "Temperatura Massima Acqua Freddo (°C)",
+          "has_mixing_valve": "Valvola miscelatrice presente (per circuito pavimento)"
         }
       },
       "energy_management": {
@@ -239,7 +242,8 @@
           "switch_entities": "Zone Switches / Relays",
           "temp_sensor": "Zone Temperature Sensor",
           "target_temperature": "Base Target Temperature",
-          "sensor_timeout_min": "Timeout Watchdog Sensore (minuti)"
+          "sensor_timeout_min": "Timeout Watchdog Sensore (minuti)",
+          "emitter_type": "Tipo di emettitore"
         },
         "sections": {
           "trv_settings": {
@@ -312,7 +316,8 @@
         "data": {
           "zone_name": "Zona",
           "temp_sensor": "Sensore Temperatura Zona",
-          "target_temperature": "Temperatura Target Base"
+          "target_temperature": "Temperatura Target Base",
+          "emitter_type": "Tipo di emettitore"
         },
         "sections": {
           "trv_settings": {
@@ -409,7 +414,8 @@
           "opentherm_min_temp": "Temperatura Minima Acqua (°C)",
           "opentherm_max_temp": "Temperatura Massima Acqua (°C)",
           "opentherm_ch_switch": "Switch abilitazione riscaldamento CH (opzionale)",
-          "dhw_active_sensor": "Sensore attività ACS / DHW (opzionale)"
+          "dhw_active_sensor": "Sensore attività ACS / DHW (opzionale)",
+          "has_mixing_valve": "Valvola miscelatrice presente (per circuito pavimento)"
         },
         "data_description": {
           "dhw_active_sensor": "Sensore che segnala la produzione attiva di Acqua Calda Sanitaria. Se omesso, viene usato l'auto-discovery (EMS-ESP/OpenTherm)."
@@ -447,7 +453,8 @@
           "heat_pump_max_temp": "Temperatura Massima Acqua Caldo (°C)",
           "hp_cool_min_temp": "Temperatura Minima Acqua Freddo (°C)",
           "hp_cool_max_temp": "Temperatura Massima Acqua Freddo (°C)",
-          "heat_pump_ch_switch": "Interruttore Abilitazione Riscaldamento (Opzionale)"
+          "heat_pump_ch_switch": "Interruttore Abilitazione Riscaldamento (Opzionale)",
+          "has_mixing_valve": "Valvola miscelatrice presente (per circuito pavimento)"
         }
       },
       "trv_calibration": {
@@ -543,6 +550,13 @@
         "edit_weather_comp": "Modifica Compensazione Climatica",
         "edit_geofencing": "Modifica Impostazioni Geofencing",
         "edit_calendar": "Modifica Calendario Globale"
+      }
+    },
+    "emitter_type": {
+      "options": {
+        "radiator": "Radiatori",
+        "underfloor": "Pavimento radiante",
+        "fancoil": "Ventilconvettori"
       }
     }
   }

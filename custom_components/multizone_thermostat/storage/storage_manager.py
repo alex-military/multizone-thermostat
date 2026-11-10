@@ -1,12 +1,22 @@
 import logging
+import inspect
+import time
 from typing import Any
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
+import homeassistant.util.dt as dt_util
 
 _LOGGER = logging.getLogger(__name__)
 
-from ..const import DOMAIN
+from ..const import (
+    DOMAIN,
+    CONF_MASTER_HVAC_MODE,
+    HVAC_MODE_HEAT,
+    HVAC_MODE_COOL,
+    KEY_DEMAND_STRATEGY,
+)
+from ..demand_aggregator import VALID_DEMAND_STRATEGIES
 try:
     from ..custom_types import PreWindowState
 except ImportError:
@@ -205,3 +215,98 @@ class StorageManager:
         """Cancel any pending tasks on unload."""
         # Note: Store handles its own shutdown flushing via HA core events.
         pass
+
+    async def async_load_coordinator_storage(self, coordinator: Any) -> None:
+        """Load stored window states, presets and settings and initialize coordinator state."""
+        window_store = getattr(coordinator, "_store", self._window_store)
+        legacy_window_store = getattr(coordinator, "_legacy_window_store", self._legacy_window_store)
+        preset_store = getattr(coordinator, "_preset_store", self._preset_store)
+        settings_store = getattr(coordinator, "_settings_store", self._settings_store)
+
+        res_win = window_store.async_load()
+        stored = await res_win if inspect.isawaitable(res_win) else res_win
+        if stored is None and legacy_window_store:
+            res_leg = legacy_window_store.async_load()
+            stored = await res_leg if inspect.isawaitable(res_leg) else res_leg
+            if stored and isinstance(stored, dict):
+                _LOGGER.info("Migrating legacy window states to entry storage")
+                res_save = window_store.async_save(stored)
+                if inspect.isawaitable(res_save):
+                    await res_save
+        if stored and isinstance(stored, dict):
+            parsed_stored = {
+                k: PreWindowState(v) if isinstance(v, dict) else v
+                for k, v in stored.items()
+            }
+            coordinator.zone_manager._pre_window_state.clear()
+            coordinator.zone_manager._pre_window_state.update(parsed_stored)
+            self._pre_window_state.clear()
+            self._pre_window_state.update(parsed_stored)
+            _LOGGER.debug("Loaded pre_window_state from storage: %s", coordinator.zone_manager._pre_window_state)
+
+        res_set = settings_store.async_load()
+        settings_stored = await res_set if inspect.isawaitable(res_set) else res_set
+        if settings_stored and isinstance(settings_stored, dict):
+            self._settings.clear()
+            self._settings.update(settings_stored)
+            _LOGGER.debug("Loaded settings from storage: %s", self._settings)
+
+        saved_hvac_mode = self._settings.get(CONF_MASTER_HVAC_MODE)
+        if saved_hvac_mode in (HVAC_MODE_HEAT, HVAC_MODE_COOL):
+            coordinator.master_hvac_mode = saved_hvac_mode
+
+        res_pre = preset_store.async_load()
+        preset_stored = await res_pre if inspect.isawaitable(res_pre) else res_pre
+        if preset_stored and isinstance(preset_stored, dict):
+            if "presets_heat" in preset_stored or "presets_cool" in preset_stored:
+                self._presets_heat.clear()
+                self._presets_heat.update(preset_stored.get("presets_heat", {}))
+                self._presets_cool.clear()
+                self._presets_cool.update(preset_stored.get("presets_cool", {}))
+            else:
+                self._presets_heat.clear()
+                self._presets_heat.update(preset_stored)
+                self._presets_cool.clear()
+            _LOGGER.debug("Loaded presets from storage: heat=%s, cool=%s", self.presets_heat, self.presets_cool)
+
+        if self._settings.get(KEY_DEMAND_STRATEGY) in VALID_DEMAND_STRATEGIES:
+            coordinator.demand_aggregator.strategy = self._settings[KEY_DEMAND_STRATEGY]
+
+        saved_zone_modes = self._settings.get("zone_modes", {})
+        coordinator.zone_manager.load_state(
+            coordinator.zone_manager._pre_window_state,
+            self.presets_heat,
+            saved_zone_modes,
+            self.presets_cool,
+        )
+        for cid, mode in saved_zone_modes.items():
+            if cid in coordinator._climate_callbacks:
+                coordinator._climate_callbacks[cid]()
+
+        autotune_data = self._settings.get("autotuners", {})
+        thermal_data = self._settings.get("thermal_models", {})
+        if hasattr(coordinator, "zone_controller"):
+            coordinator.zone_controller.load_state(autotune_data, thermal_data)
+        else:
+            for climate_id, tuner in getattr(coordinator, "_autotuners", {}).items():
+                if climate_id in autotune_data:
+                    tuner.load_state(autotune_data[climate_id])
+                    if tuner.state == tuner.STATE_COMPLETED:
+                        coordinator._pids[climate_id].set_pid_param(kp=tuner.kp, ki=tuner.ki, kd=tuner.kd)
+            for climate_id, model in getattr(coordinator, "_thermal_models", {}).items():
+                if climate_id in thermal_data:
+                    model.load_state(thermal_data[climate_id])
+
+        saved_wall_time = self._settings.get("last_active_wall_time")
+        if saved_wall_time is not None:
+            try:
+                coordinator._last_active_time = time.monotonic() - max(0.0, time.time() - float(saved_wall_time))
+            except (ValueError, TypeError):
+                pass
+
+        if hasattr(coordinator, "schedule_manager"):
+            coordinator.schedule_manager.load_from_storage()
+            if coordinator.schedule_manager.scheduler_enabled or coordinator.schedule_manager.profile_expires_at:
+                res_sched = coordinator.schedule_manager.async_evaluate_schedule(dt_util.now())
+                if inspect.isawaitable(res_sched):
+                    await res_sched

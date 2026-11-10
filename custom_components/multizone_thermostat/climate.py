@@ -53,6 +53,8 @@ from .const import (
     CONF_ZONE_WEIGHT,
     DEFAULT_ZONE_WEIGHT,
     CONF_ZONE_AUTHORITATIVE_SYNC,
+    CONF_ZONE_EMITTER_TYPE,
+    DEFAULT_ZONE_EMITTER_TYPE,
     DEFAULT_AUTHORITATIVE_SYNC,
     DOMAIN,
     make_zone_entity_id,
@@ -152,6 +154,7 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         self._authoritative_sync: bool = bool(
             zone_data.get(CONF_ZONE_AUTHORITATIVE_SYNC, DEFAULT_AUTHORITATIVE_SYNC)
         )
+        self._emitter_type: str = zone_data.get(CONF_ZONE_EMITTER_TYPE, DEFAULT_ZONE_EMITTER_TYPE)
         self._safety_fallback_active = False
         
         self._hvac_mode = HVACMode.OFF
@@ -183,6 +186,7 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             valves=self._valves,
             valve_scale=self._valve_scale,
             authoritative_sync=self._authoritative_sync,
+            emitter_type=self._emitter_type,
         )
 
     @property
@@ -267,6 +271,7 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             "safety_fallback_active": self._safety_fallback_active,
             "sensor_timeout_min": self._sensor_timeout_min,
             "can_cool": self.can_cool,
+            "emitter_type": self._emitter_type,
             "master_hvac_mode": getattr(self._coordinator, "master_hvac_mode", "heat"),
         }
         if hasattr(self._coordinator, "plant_diagnostics"):
