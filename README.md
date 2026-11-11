@@ -5,6 +5,7 @@
 [![HACS](https://img.shields.io/badge/HACS-Custom_Integration-orange.svg?style=flat-square)](https://hacs.xyz/)
 [![Live Simulator](https://img.shields.io/badge/Live%20Simulator-GitHub%20Pages-0ea5e9?style=flat-square&logo=googlechrome&logoColor=white)](https://alex-military.github.io/multizone-thermostat/)
 [![Support on Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20Me-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white)](https://ko-fi.com/Z8L52A8URQ)
+[![GitHub Sponsors](https://img.shields.io/badge/Sponsor-GitHub-EA4AAA?style=flat-square&logo=GitHub-Sponsors&logoColor=white)](https://github.com/sponsors/alex-military)
 
 A comprehensive custom integration for Home Assistant that provides **multi-zone heating management**, **centralized boiler supervision**, **dual-drive OpenTherm/Relay modulation**, and **building energy diagnostics**. No YAML automations or scripts required — everything is configured seamlessly through the Home Assistant UI.
 
@@ -252,12 +253,14 @@ A special thanks to the creators of [SmartThermostat](https://github.com/ScratMa
 If you find this integration helpful and would like to support its ongoing development, maintenance, and new features, consider buying a coffee!
 
 <p align="left">
+  <a href="https://github.com/sponsors/alex-military" target="_blank">
+    <img src="https://img.shields.io/badge/Sponsor-GitHub-30363D?style=for-the-badge&logo=GitHub-Sponsors&logoColor=EA4AAA" alt="Sponsor on GitHub" height="38">
+  </a>
+  &nbsp;&nbsp;
   <a href="https://ko-fi.com/Z8L52A8URQ" target="_blank">
     <img src="https://storage.ko-fi.com/cdn/kofi2.png?v=3" alt="Support on Ko-fi" height="38">
   </a>
 </p>
-
-*GitHub Sponsors will also be available once account verification completes.*
 
 ---
 
