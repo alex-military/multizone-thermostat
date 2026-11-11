@@ -50,6 +50,8 @@ from ..const import (
     DOMAIN,
     MODE_OPENTHERM,
     MODE_RELAY,
+    MODE_CENTRAL,
+    MODE_NONE,
     make_zone_entity_id,
     CONF_ZONE_WEIGHT,
     DEFAULT_ZONE_WEIGHT,
@@ -192,8 +194,12 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 self._boiler_mode = user_input[CONF_BOILER_MODE]
                 if self._boiler_mode == MODE_RELAY:
                     return await self.async_step_boiler_relay()
-                else:
+                elif self._boiler_mode == MODE_OPENTHERM:
                     return await self.async_step_boiler_opentherm()
+                else:
+                    self._boiler_switch = None
+                    self._opentherm_entity = None
+                    return await self.async_step_add_zone()
 
             self._enable_gas = user_input.get(CONF_ENABLE_GAS_HEATER, True)
             self._enable_hp = user_input.get(CONF_ENABLE_HEAT_PUMP, False)
@@ -201,8 +207,12 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if not errors:
                 if self._enable_gas:
                     return await self.async_step_boiler_mode()
-                else:
+                elif self._enable_hp:
                     return await self.async_step_heat_pump()
+                else:
+                    self._boiler_mode = MODE_CENTRAL
+                    self._boiler_switch = None
+                    return await self.async_step_add_zone()
 
         schema = get_plants_selection_schema(self._enable_gas, self._enable_hp)
         return self.async_show_form(
@@ -219,8 +229,14 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._boiler_mode = user_input[CONF_BOILER_MODE]
             if self._boiler_mode == MODE_RELAY:
                 return await self.async_step_boiler_relay()
-            else:
+            elif self._boiler_mode == MODE_OPENTHERM:
                 return await self.async_step_boiler_opentherm()
+            else:
+                self._boiler_switch = None
+                self._opentherm_entity = None
+                if self._enable_hp:
+                    return await self.async_step_heat_pump()
+                return await self.async_step_add_zone()
 
         schema = get_boiler_mode_schema()
         return self.async_show_form(
@@ -545,7 +561,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 data[CONF_BOILER_MODE] = self._boiler_mode
                 if self._boiler_mode == MODE_RELAY:
                     data[CONF_BOILER_SWITCH] = self._boiler_switch
-                else:
+                elif self._boiler_mode == MODE_OPENTHERM:
                     data[CONF_OPENTHERM_ENTITY] = self._opentherm_entity
                     data[CONF_OPENTHERM_MIN_TEMP] = self._opentherm_min_temp
                     data[CONF_OPENTHERM_MAX_TEMP] = self._opentherm_max_temp
@@ -553,6 +569,8 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         data[CONF_OPENTHERM_CH_SWITCH] = self._opentherm_ch_switch
                 if self._dhw_active_sensor:
                     data[CONF_DHW_ACTIVE_SENSOR] = self._dhw_active_sensor
+            elif not self._enable_hp:
+                data[CONF_BOILER_MODE] = MODE_CENTRAL
             if self._enable_hp:
                 data[CONF_HEAT_PUMP_TYPE] = self._hp_type
                 data[CONF_HEAT_PUMP_ENTITY] = self._hp_entity
@@ -600,9 +618,11 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         schema = get_confirm_schema()
         plant_desc = []
         if self._enable_gas:
-            plant_desc.append(f"Gas: {self._boiler_switch or self._opentherm_entity or 'N/A'}")
+            plant_desc.append(f"Gas: {self._boiler_switch or self._opentherm_entity or ('Centralized' if self._boiler_mode in (MODE_CENTRAL, MODE_NONE) else 'N/A')}")
         if self._enable_hp:
             plant_desc.append(f"Heat Pump: {self._hp_entity or 'N/A'} ({self._hp_type})")
+        if not self._enable_gas and not self._enable_hp:
+            plant_desc.append("Centralized Heating (Condominio)")
 
         return self.async_show_form(
             step_id="confirm",

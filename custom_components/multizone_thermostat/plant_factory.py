@@ -17,7 +17,9 @@ from .safety.anti_seize import AntiSeizeManager
 from .plant_diagnostics.engine import PlantDiagnosticsEngine
 from .boiler.opentherm_backend import OpenThermBoilerBackend
 from .boiler.relay_backend import RelayBoilerBackend
+from .boiler.centralized_backend import CentralizedBoilerBackend
 from .boiler.heat_pump_backend import CentralHeatPumpBackend
+from .const import MODE_CENTRAL, MODE_NONE
 from .boiler.plant_orchestrator import PlantOrchestrator
 from .cooling_policy import CoolingPolicy
 from .master_controller import MasterController
@@ -63,7 +65,9 @@ def build_plant_subsystems(coordinator: Any, hass: Any, config: PlantConfig) -> 
     coordinator.anti_seize_manager = AntiSeizeManager(hass, coordinator)
     coordinator.plant_diagnostics = PlantDiagnosticsEngine(coordinator)
 
-    if coordinator.boiler_mode == "opentherm":
+    if coordinator.boiler_mode in (MODE_CENTRAL, MODE_NONE) or (not getattr(coordinator, "enable_gas_heater", True) and not getattr(coordinator, "enable_heat_pump", False)):
+        coordinator.boiler_backend = CentralizedBoilerBackend(hass, coordinator)
+    elif coordinator.boiler_mode == "opentherm":
         coordinator.boiler_backend = OpenThermBoilerBackend(
             hass,
             coordinator,

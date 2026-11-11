@@ -238,8 +238,12 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                 self._boiler_mode = user_input[CONF_BOILER_MODE]
                 if self._boiler_mode == MODE_RELAY:
                     return await self.async_step_boiler_relay()
-                else:
+                elif self._boiler_mode == MODE_OPENTHERM:
                     return await self.async_step_boiler_opentherm()
+                else:
+                    self._boiler_switch = ""
+                    self._opentherm_entity = None
+                    return self._save_options()
 
         import voluptuous as vol
         from homeassistant.helpers import selector
@@ -250,6 +254,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                     options=[
                         selector.SelectOptionDict(value=MODE_RELAY, label="Relay (ON/OFF)"),
                         selector.SelectOptionDict(value=MODE_OPENTHERM, label="OpenTherm (Modulating)"),
+                        selector.SelectOptionDict(value=MODE_CENTRAL, label="Centralized / No Boiler (Condominiale)"),
                     ],
                     mode=selector.SelectSelectorMode.DROPDOWN,
                 )
@@ -683,7 +688,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             data[CONF_BOILER_MODE] = self._boiler_mode
             if self._boiler_mode == MODE_RELAY:
                 data[CONF_BOILER_SWITCH] = self._boiler_switch
-            else:
+            elif self._boiler_mode == MODE_OPENTHERM:
                 data[CONF_OPENTHERM_ENTITY] = self._opentherm_entity
                 data[CONF_OPENTHERM_MIN_TEMP] = self._opentherm_min_temp
                 data[CONF_OPENTHERM_MAX_TEMP] = self._opentherm_max_temp
@@ -691,6 +696,8 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                     data[CONF_OPENTHERM_CH_SWITCH] = self._opentherm_ch_switch
             if self._dhw_active_sensor:
                 data[CONF_DHW_ACTIVE_SENSOR] = self._dhw_active_sensor
+        elif not self._enable_hp:
+            data[CONF_BOILER_MODE] = MODE_CENTRAL
         if self._enable_hp:
             data[CONF_HEAT_PUMP_TYPE] = self._hp_type
             data[CONF_HEAT_PUMP_ENTITY] = self._hp_entity
