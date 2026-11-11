@@ -5,6 +5,10 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .const import (
+    CONF_ZONE_NAME,
+    CONF_ZONE_CLIMATES,
+    CONF_ZONE_SWITCHES,
+    CONF_ZONE_VALVES,
     CONF_BOILER_MODE,
     CONF_BOILER_SWITCH,
     CONF_OPENTHERM_ENTITY,
@@ -137,3 +141,34 @@ class PlantConfig:
             min_cycle_off=float(raw.get(CONF_MIN_CYCLE_OFF, DEFAULT_MIN_CYCLE_OFF)),
             valve_delay=float(raw.get(CONF_VALVE_DELAY, DEFAULT_VALVE_DELAY)),
         )
+
+
+def get_zone_name(zone: dict[str, Any] | None) -> str:
+    """Extract zone name, supporting both 'name' and 'zone_name'."""
+    if not isinstance(zone, dict):
+        return ""
+    return str(zone.get(CONF_ZONE_NAME) or zone.get("zone_name") or "")
+
+
+def get_zone_climates(zone: dict[str, Any] | None) -> list[str]:
+    """Extract list of climate entities (TRVs), supporting aliases."""
+    if not isinstance(zone, dict):
+        return []
+    res = zone.get(CONF_ZONE_CLIMATES) or zone.get("zone_climates") or zone.get("climates") or []
+    return list(res) if isinstance(res, (list, tuple, set)) else []
+
+
+def get_zone_switches(zone: dict[str, Any] | None) -> list[str]:
+    """Extract list of switch entities (relays), supporting aliases."""
+    if not isinstance(zone, dict):
+        return []
+    res = zone.get(CONF_ZONE_SWITCHES) or zone.get("zone_switches") or zone.get("switches") or []
+    return list(res) if isinstance(res, (list, tuple, set)) else []
+
+
+def get_zone_valves(zone: dict[str, Any] | None) -> list[str]:
+    """Extract list of proportional/analog valve entities, supporting aliases."""
+    if not isinstance(zone, dict):
+        return []
+    res = zone.get(CONF_ZONE_VALVES) or zone.get("zone_valves") or zone.get("valves") or []
+    return list(res) if isinstance(res, (list, tuple, set)) else []

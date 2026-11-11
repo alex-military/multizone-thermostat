@@ -196,7 +196,11 @@ class CalendarManager:
                             if hasattr(self.coordinator.zone_manager, "get_preset_temperature"):
                                 target_temp = self.coordinator.zone_manager.get_preset_temperature(override.preset, climate_id)
                             else:
-                                target_temp = self.coordinator.zone_manager._presets.get(override.preset, {}).get(climate_id, {}).get("target_temp")
+                                zm = self.coordinator.zone_manager
+                                presets = getattr(zm, "presets", None)
+                                if not isinstance(presets, dict):
+                                    presets = getattr(zm, "_presets", {})
+                                target_temp = presets.get(override.preset, {}).get(climate_id, {}).get("target_temp")
 
                         if target_temp is not None:
                             if is_cool and hasattr(self.coordinator, "can_zone_cool") and not self.coordinator.can_zone_cool(climate_id):
@@ -264,7 +268,11 @@ class CalendarManager:
                         if hasattr(self.coordinator.zone_manager, "get_preset_temperature"):
                             target = self.coordinator.zone_manager.get_preset_temperature(fut_override.preset, climate_id)
                         else:
-                            target = self.coordinator.zone_manager._presets.get(fut_override.preset, {}).get(climate_id, {}).get("target_temp")
+                            zm = self.coordinator.zone_manager
+                            presets = getattr(zm, "presets", None)
+                            if not isinstance(presets, dict):
+                                presets = getattr(zm, "_presets", {})
+                            target = presets.get(fut_override.preset, {}).get(climate_id, {}).get("target_temp")
                     
                 if target is None and parsed_next["global_temperature"] is not None:
                     target = parsed_next["global_temperature"]
@@ -274,7 +282,11 @@ class CalendarManager:
                     if hasattr(self.coordinator.zone_manager, "get_preset_temperature"):
                         target = self.coordinator.zone_manager.get_preset_temperature(parsed_next["global_preset"], climate_id)
                     else:
-                        target = self.coordinator.zone_manager._presets.get(parsed_next["global_preset"], {}).get(climate_id, {}).get("target_temp")
+                        zm = self.coordinator.zone_manager
+                        presets = getattr(zm, "presets", None)
+                        if not isinstance(presets, dict):
+                            presets = getattr(zm, "_presets", {})
+                        target = presets.get(parsed_next["global_preset"], {}).get(climate_id, {}).get("target_temp")
                     
                 if target is not None:
                     evaluated_zones.add(climate_id)

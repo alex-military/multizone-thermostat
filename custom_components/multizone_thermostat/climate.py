@@ -519,16 +519,12 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
                     pass
 
         if not ext_temp_valid:
-            temps = []
-            for trv in self._climates:
-                st = self.hass.states.get(trv)
-                if st and st.attributes.get("current_temperature") is not None:
-                    try:
-                        temps.append(float(st.attributes["current_temperature"]))
-                    except (ValueError, TypeError):
-                        pass
-            if temps:
-                self._current_temperature = sum(temps) / len(temps)
+            from .safety.watchdog import SensorWatchdog
+            avg_temp = SensorWatchdog(self.hass).get_zone_trv_fallback_temp(
+                {CONF_ZONE_CLIMATES: self._climates}, self.hass
+            )
+            if avg_temp is not None:
+                self._current_temperature = avg_temp
                 if self._temp_sensor and not self._safety_fallback_active:
                     self._safety_fallback_active = True
                     _LOGGER.warning("Zone %s: Safety fallback active, using onboard TRV average: %.1f°C", self._name, self._current_temperature)

@@ -41,6 +41,7 @@ CONF_ZONE_NAME = "name"
 CONF_ZONE_CLIMATES = "climate_entities"
 CONF_ZONE_SWITCHES = "switch_entities"
 CONF_ZONE_TEMP_SENSOR = "temp_sensor"
+CONF_ZONE_HUMIDITY_SENSOR = "humidity_sensor"
 CONF_ZONE_TARGET_TEMP = "target_temperature"
 CONF_ZONE_TRV_SYNC = "trv_preset_sync"
 CONF_ZONE_WINDOW_SENSOR = "window_sensor"
@@ -155,6 +156,8 @@ HEAT_SOURCE_PRIORITIES = (
     SOURCE_PRIORITY_COMBINED,
     SOURCE_PRIORITY_GAS_ONLY,
     SOURCE_PRIORITY_ELECTRIC_ONLY,
+    SOURCE_PRIORITY_GAS,
+    SOURCE_PRIORITY_ELECTRIC,
 )
 DEFAULT_HEAT_SOURCE_PRIORITY = SOURCE_PRIORITY_AUTO
 
@@ -220,6 +223,12 @@ DEFAULT_MIN_CYCLE_ON = 5
 DEFAULT_MIN_CYCLE_OFF = 5
 DEFAULT_VALVE_DELAY = 0
 
+# Heat Pump dedicated cycle timings
+KEY_HP_MIN_CYCLE_ON = "hp_min_cycle_on"
+KEY_HP_MIN_CYCLE_OFF = "hp_min_cycle_off"
+DEFAULT_HP_MIN_CYCLE_ON = 5
+DEFAULT_HP_MIN_CYCLE_OFF = 5
+
 # Virtual Thermostat keys
 CONF_VIRTUAL_THERMOSTATS = "virtual_thermostats"
 CONF_VT_TEMP_SENSOR = "temperature_sensor"
@@ -234,6 +243,8 @@ DEFAULT_VT_TOLERANCE = 0.5
 KEY_ANTI_FROST_ENABLED = "anti_frost_enabled"
 KEY_FROST_PROTECTION_TEMP = "frost_protection_temp"
 DEFAULT_FROST_PROTECTION_TEMP = 12.0
+KEY_FROST_FLOW_TEMP = "frost_flow_temp"
+DEFAULT_FROST_FLOW_TEMP = 40.0
 DEFAULT_ANTI_FROST_ENABLED = True
 
 # Persistent State Keys (Physical Sync Switch per Zone)

@@ -72,8 +72,12 @@ class AntiSeizeManager:
         return self._task
 
     async def _turn_boiler_on(self) -> None:
-        """Turn on boiler for anti-seize."""
-        if hasattr(self.coordinator, "boiler_backend") and self.coordinator.boiler_backend:
+        """Turn on central plant generator(s) for anti-seize."""
+        from ..boiler.plant_orchestrator import PlantOrchestrator
+        orch = getattr(self.coordinator, "plant_orchestrator", None)
+        if isinstance(orch, PlantOrchestrator):
+            await orch.async_update(100.0, "Anti-Seize", False)
+        elif hasattr(self.coordinator, "boiler_backend") and self.coordinator.boiler_backend:
             await self.coordinator.boiler_backend.async_update(100.0, "Anti-Seize", False)
         elif getattr(self.coordinator, "boiler_switch", None):
             await self.hass.services.async_call(
@@ -84,8 +88,12 @@ class AntiSeizeManager:
             )
 
     async def _turn_boiler_off(self) -> None:
-        """Turn off boiler after anti-seize."""
-        if hasattr(self.coordinator, "boiler_backend") and self.coordinator.boiler_backend:
+        """Turn off central plant generator(s) after anti-seize."""
+        from ..boiler.plant_orchestrator import PlantOrchestrator
+        orch = getattr(self.coordinator, "plant_orchestrator", None)
+        if isinstance(orch, PlantOrchestrator):
+            await orch.async_emergency_off()
+        elif hasattr(self.coordinator, "boiler_backend") and self.coordinator.boiler_backend:
             await self.coordinator.boiler_backend.async_update(0.0, None, False)
             status_reason = getattr(self.coordinator.boiler_backend, "_status_reason", None) or getattr(
                 self.coordinator.boiler_backend, "status_reason", ""

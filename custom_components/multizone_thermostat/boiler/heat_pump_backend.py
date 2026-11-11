@@ -27,6 +27,11 @@ from ..const import (
     HVAC_MODE_HEAT,
     HVAC_MODE_COOL,
     HVAC_MODE_OFF,
+    KEY_FROST_FLOW_TEMP,
+    KEY_HP_MIN_CYCLE_ON,
+    KEY_HP_MIN_CYCLE_OFF,
+    DEFAULT_HP_MIN_CYCLE_ON,
+    DEFAULT_HP_MIN_CYCLE_OFF,
 )
 
 HP_TYPE_WATER_HEATER = "water_heater"
@@ -69,10 +74,27 @@ class CentralHeatPumpBackend(BoilerBackend):
         self._last_state_on: bool | None = None
         self._valve_delay_start: float | None = None
         # Anti-short-cycle guards (L3 / ORACLE-3)
-        coord_min_on = getattr(coordinator, "_min_cycle_on", 0.0)
-        self.min_cycle_on: float = float(coord_min_on if isinstance(coord_min_on, (int, float)) else 0.0)
-        coord_min_off = getattr(coordinator, "_min_cycle_off", 0.0)
-        self.min_cycle_off: float = float(coord_min_off if isinstance(coord_min_off, (int, float)) else 0.0)
+        raw_on = (
+            self.coordinator.get_persistent_data(KEY_HP_MIN_CYCLE_ON, None)
+            if hasattr(self.coordinator, "get_persistent_data")
+            else None
+        )
+        if raw_on is None:
+            raw_on = getattr(self.coordinator, "hp_min_cycle_on", None)
+        if raw_on is None:
+            raw_on = getattr(self.coordinator, "_min_cycle_on", 0.0)
+        self.min_cycle_on: float = float(raw_on if isinstance(raw_on, (int, float)) else 0.0)
+
+        raw_off = (
+            self.coordinator.get_persistent_data(KEY_HP_MIN_CYCLE_OFF, None)
+            if hasattr(self.coordinator, "get_persistent_data")
+            else None
+        )
+        if raw_off is None:
+            raw_off = getattr(self.coordinator, "hp_min_cycle_off", None)
+        if raw_off is None:
+            raw_off = getattr(self.coordinator, "_min_cycle_off", 0.0)
+        self.min_cycle_off: float = float(raw_off if isinstance(raw_off, (int, float)) else 0.0)
         self._last_switch_time: float = 0.0
         self._current_running_state: bool = False
 
@@ -104,6 +126,14 @@ class CentralHeatPumpBackend(BoilerBackend):
     def set_valve_delay(self, value: int | float) -> None:
         """Set valve delay in seconds."""
         self.valve_delay = int(value)
+
+    def set_min_cycle_on(self, minutes: float) -> None:
+        """Set min cycle ON time for heat pump compressor."""
+        self.min_cycle_on = float(minutes) * 60.0 if float(minutes) <= 60.0 else float(minutes)
+
+    def set_min_cycle_off(self, minutes: float) -> None:
+        """Set min cycle OFF time for heat pump compressor."""
+        self.min_cycle_off = float(minutes) * 60.0 if float(minutes) <= 60.0 else float(minutes)
 
     @property
     def status_reason(self) -> str:
@@ -281,31 +311,92 @@ class CentralHeatPumpBackend(BoilerBackend):
         return has_underfloor and has_high_temp
 
     def _calculate_safe_cooling_min_temp(self) -> float:
-        """Calculate safe minimum cooling water temperature to prevent condensation (L4)."""
+        """Calculate safe minimum cooling water temperature to prevent internal condensation (L4).
+        
+        Calculates dew point from internal zone sensors (temperature + humidity) across active
+        cooling/underfloor zones. Safe floor is kept at least +2.0°C above highest room dew point.
+        """
         safe_floor = self.cool_min_temp
 
         # If plant includes underfloor cooling, never drop below 17°C by default
         if self._has_mixed_underfloor() or self._get_plant_emitter_type() == EMITTER_UNDERFLOOR:
             safe_floor = max(safe_floor, 17.0)
 
-        # Check weather or zone humidity sensor for real dew-point calculation (Magnus formula)
-        weather_sensor_id = getattr(self.coordinator, "weather_sensor_id", None)
-        if weather_sensor_id and hasattr(self.hass, "states") and self.hass.states:
-            w_st = self.hass.states.get(weather_sensor_id)
-            if w_st and getattr(w_st, "attributes", None):
-                rh = w_st.attributes.get("humidity")
-                temp = w_st.attributes.get("temperature")
-                if isinstance(rh, (int, float)) and isinstance(temp, (int, float)) and float(rh) > 10.0:
-                    t = float(temp)
-                    h = float(rh)
+        highest_dew_point = -999.0
+        zones = getattr(self.coordinator, "zones", []) or []
+
+        for z in zones:
+            t_val: float | None = None
+            h_val: float | None = None
+
+            # 1. Check configured internal humidity sensor for the zone
+            h_sensor = z.get("humidity_sensor")
+            if h_sensor and hasattr(self.hass, "states") and self.hass.states:
+                st = self.hass.states.get(h_sensor)
+                if st and st.state not in ("unavailable", "unknown", None):
                     try:
-                        a, b = 17.27, 237.7
-                        alpha = ((a * t) / (b + t)) + math.log(max(1.0, min(100.0, h)) / 100.0)
-                        dew_point = (b * alpha) / (a - alpha)
-                        # Water temperature must remain at least 2.0°C above dew point
-                        safe_floor = max(safe_floor, round(dew_point + 2.0, 1))
-                    except Exception:
+                        h_val = float(st.state)
+                    except (ValueError, TypeError):
                         pass
+
+            # 2. Check temperature sensor for the zone
+            t_sensor = z.get("temp_sensor")
+            if t_sensor and hasattr(self.hass, "states") and self.hass.states:
+                st = self.hass.states.get(t_sensor)
+                if st and st.state not in ("unavailable", "unknown", None):
+                    try:
+                        t_val = float(st.state)
+                    except (ValueError, TypeError):
+                        pass
+                # Also check state attributes if humidity was reported directly on the temp sensor entity
+                if h_val is None and st and getattr(st, "attributes", None):
+                    attr_rh = st.attributes.get("humidity") or st.attributes.get("current_humidity")
+                    if isinstance(attr_rh, (int, float)):
+                        h_val = float(attr_rh)
+
+            # 3. If temperature not resolved from sensor, check associated climate entity
+            if t_val is None:
+                climates = getattr(self.coordinator, "_climate_entities", {}) or {}
+                for cid, c_obj in climates.items():
+                    if z.get("name") and z.get("name") in cid:
+                        cur_t = getattr(c_obj, "current_temperature", None)
+                        if isinstance(cur_t, (int, float)):
+                            t_val = float(cur_t)
+                        cur_h = getattr(c_obj, "current_humidity", None)
+                        if h_val is None and isinstance(cur_h, (int, float)):
+                            h_val = float(cur_h)
+                        break
+
+            if t_val is not None and h_val is not None and 5.0 <= h_val <= 100.0:
+                try:
+                    a, b = 17.27, 237.7
+                    alpha = ((a * t_val) / (b + t_val)) + math.log(max(1.0, min(100.0, h_val)) / 100.0)
+                    dp = (b * alpha) / (a - alpha)
+                    if dp > highest_dew_point:
+                        highest_dew_point = dp
+                except Exception:
+                    pass
+
+        if highest_dew_point > -900.0:
+            # Water temperature must remain at least 2.0°C above worst-case indoor dew point
+            safe_floor = max(safe_floor, round(highest_dew_point + 2.0, 1))
+        else:
+            # Fallback to weather sensor if no internal zone humidity sensor is configured
+            weather_sensor_id = getattr(self.coordinator, "weather_sensor_id", None)
+            if weather_sensor_id and hasattr(self.hass, "states") and self.hass.states:
+                w_st = self.hass.states.get(weather_sensor_id)
+                if w_st and getattr(w_st, "attributes", None):
+                    rh = w_st.attributes.get("humidity")
+                    temp = w_st.attributes.get("temperature")
+                    if isinstance(rh, (int, float)) and isinstance(temp, (int, float)) and float(rh) > 10.0:
+                        try:
+                            a, b = 17.27, 237.7
+                            alpha = ((a * float(temp)) / (b + float(temp))) + math.log(max(1.0, min(100.0, float(rh))) / 100.0)
+                            dew_point = (b * alpha) / (a - alpha)
+                            safe_floor = max(safe_floor, round(dew_point + 2.0, 1))
+                        except Exception:
+                            pass
+
         return safe_floor
 
     async def async_update(
@@ -323,7 +414,7 @@ class CentralHeatPumpBackend(BoilerBackend):
             demand = 0.0
 
         norm_demand = max(0.0, min(1.0, float(demand) / 100.0))
-        wanted_on = norm_demand > 0.0
+        wanted_on = norm_demand > 0.0 or frost_emergency
 
         domain = self.hp_entity.split(".")[0] if "." in self.hp_entity else self.hp_type
         st = self.hass.states.get(self.hp_entity) if hasattr(self.hass, "states") and self.hass.states else None
@@ -337,9 +428,6 @@ class CentralHeatPumpBackend(BoilerBackend):
                 rem = self.min_cycle_off - elapsed
                 self._status_reason = f"HOLD_OFF - PDC anti-short-cycle: {rem:.0f}s"
                 wanted_on = False
-            else:
-                self._last_switch_time = now
-                self._current_running_state = True
         elif not wanted_on and self._current_running_state:
             if elapsed < self.min_cycle_on and not frost_emergency:
                 rem = self.min_cycle_on - elapsed
@@ -380,7 +468,11 @@ class CentralHeatPumpBackend(BoilerBackend):
             )
 
             if frost_emergency:
-                frost_flow = float(getattr(self.coordinator, "frost_flow_temp", 40.0))
+                p_val = self.coordinator.get_persistent_data(KEY_FROST_FLOW_TEMP, None) if hasattr(self.coordinator, "get_persistent_data") else None
+                if isinstance(p_val, (int, float)):
+                    frost_flow = float(p_val)
+                else:
+                    frost_flow = float(getattr(self.coordinator, "frost_flow_temp", 40.0))
                 target_temp = max(self.min_temp, min(curve.t_max, frost_flow))
             elif outdoor_temp is not None:
                 target_temp = curve.flow_for_demand(demand, outdoor_temp)
@@ -406,6 +498,10 @@ class CentralHeatPumpBackend(BoilerBackend):
                     )
                     return
             self._valve_delay_start = None
+            if not self._current_running_state:
+                self._last_switch_time = time.monotonic()
+                self._current_running_state = True
+
             if not self._status_reason.startswith("HOLD_"):
                 self._status_reason = (
                     f"HP_{hvac_mode.upper()} - Target: {target_temp}°C "

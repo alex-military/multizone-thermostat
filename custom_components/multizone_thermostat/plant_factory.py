@@ -34,8 +34,11 @@ def build_plant_subsystems(coordinator: Any, hass: Any, config: PlantConfig) -> 
     coordinator.demand_aggregator = DemandAggregator(
         zones=coordinator.zones,
         mode_getter=lambda cid: coordinator.get_zone_mode(cid),
+        fault_checker=lambda cid: bool(
+            getattr(coordinator, "plant_diagnostics", None)
+            and coordinator.plant_diagnostics.has_critical_sensor_fault(cid)
+        ),
     )
-    coordinator.demand_aggregator.coordinator = coordinator
 
     coordinator.zone_controller = ZoneController(hass, coordinator)
     coordinator.split_manager = SplitZoneManager(hass, coordinator)
@@ -48,6 +51,8 @@ def build_plant_subsystems(coordinator: Any, hass: Any, config: PlantConfig) -> 
     coordinator._legacy_window_store = coordinator.storage._legacy_window_store
     coordinator._preset_store = coordinator.storage._preset_store
     coordinator._settings_store = coordinator.storage._settings_store
+    coordinator._presets = coordinator.storage._presets
+    coordinator._settings = coordinator.storage._settings
 
     coordinator.calendar_manager = CalendarManager(coordinator)
     coordinator.schedule_manager = ScheduleProfileManager(coordinator)
@@ -90,9 +95,6 @@ def build_plant_subsystems(coordinator: Any, hass: Any, config: PlantConfig) -> 
     coordinator._pids = coordinator.zone_controller.pids
     coordinator._autotuners = coordinator.zone_controller.autotuners
     coordinator._thermal_models = coordinator.zone_controller.thermal_models
-
-    coordinator._presets = coordinator.storage._presets
-    coordinator._settings = coordinator.storage._settings
 
     coordinator.heat_pump_backend = (
         CentralHeatPumpBackend(

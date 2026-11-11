@@ -11,6 +11,7 @@ import time
 
 from homeassistant.core import HomeAssistant
 from .base import BoilerBackend
+from ..const import KEY_FROST_FLOW_TEMP
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -108,7 +109,7 @@ class OpenThermBoilerBackend(BoilerBackend):
 
         # Normalize demand from 0-100 to 0.0-1.0 and clamp
         norm_demand = max(0.0, min(1.0, demand / 100.0))
-        wanted_on = norm_demand > 0.0
+        wanted_on = norm_demand > 0.0 or frost_emergency
 
         raw_curve = (
             self.coordinator.get_persistent_data("weather_curve", 1.0)
@@ -127,7 +128,11 @@ class OpenThermBoilerBackend(BoilerBackend):
         target_temp = self.opentherm_min_temp + (norm_demand * (self.opentherm_max_temp - self.opentherm_min_temp))
 
         if frost_emergency:
-            frost_flow = float(getattr(self.coordinator, "frost_flow_temp", 45.0))
+            p_val = self.coordinator.get_persistent_data(KEY_FROST_FLOW_TEMP, None) if hasattr(self.coordinator, "get_persistent_data") else None
+            if isinstance(p_val, (int, float)):
+                frost_flow = float(p_val)
+            else:
+                frost_flow = float(getattr(self.coordinator, "frost_flow_temp", 45.0))
             target_temp = max(self.opentherm_min_temp, min(self.opentherm_max_temp, frost_flow))
         elif norm_demand > 0.0 and outdoor_temp is not None and curve_val > 0.0:
             if has_mixing or emitter != EMITTER_RADIATOR:
@@ -205,7 +210,7 @@ class OpenThermBoilerBackend(BoilerBackend):
                     )
                 self._pending_command = None
 
-        if norm_demand > 0.0:
+        if wanted_on:
             self._status_reason = f"MODULATING - Target water: {target_temp}°C (Demand: {round(demand, 1)}% from {peak_zone or 'None'})"
         elif self._status_reason != "OFF - Emergency/Master OFF":
             self._status_reason = "OFF - No Demand"
@@ -224,7 +229,7 @@ class OpenThermBoilerBackend(BoilerBackend):
 
                 # Turn OFF if demand is 0, otherwise HEAT / ON
                 if domain == "climate":
-                    hvac_mode = "off" if norm_demand <= 0.0 else "heat"
+                    hvac_mode = "heat" if wanted_on else "off"
                     current_mode = st.state if st else None
                     if current_mode != hvac_mode:
                         self._pending_command = ("off" if hvac_mode == "off" else "on", time.monotonic())
@@ -236,7 +241,7 @@ class OpenThermBoilerBackend(BoilerBackend):
                         )
                 elif domain == "water_heater":
                     current_state = st.state if st else None
-                    if norm_demand <= 0.0 and current_state not in ("off", None):
+                    if not wanted_on and current_state not in ("off", None):
                         self._pending_command = ("off", time.monotonic())
                         await self.hass.services.async_call(
                             "water_heater",
@@ -244,7 +249,7 @@ class OpenThermBoilerBackend(BoilerBackend):
                             {"entity_id": self.opentherm_entity},
                             blocking=False,
                         )
-                    elif norm_demand > 0.0 and current_state == "off":
+                    elif wanted_on and current_state == "off":
                         self._pending_command = ("on", time.monotonic())
                         await self.hass.services.async_call(
                             "water_heater",
@@ -253,7 +258,7 @@ class OpenThermBoilerBackend(BoilerBackend):
                             blocking=False,
                         )
             elif domain == "number":
-                heat_enabled = norm_demand > 0.0
+                heat_enabled = wanted_on
                 value = target_temp
                 if not heat_enabled and not self.ch_switch:
                     # A bare number entity has no OFF command: write the lowest value the
@@ -279,7 +284,7 @@ class OpenThermBoilerBackend(BoilerBackend):
                         blocking=False,
                     )
 
-            await self._async_set_ch_enabled(norm_demand > 0.0)
+            await self._async_set_ch_enabled(wanted_on)
         except Exception as err:
             _LOGGER.error("Failed to update OpenTherm entity %s: %s", self.opentherm_entity, err)
 

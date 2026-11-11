@@ -238,11 +238,22 @@ class StorageManager:
                 k: PreWindowState(v) if isinstance(v, dict) else v
                 for k, v in stored.items()
             }
-            coordinator.zone_manager._pre_window_state.clear()
-            coordinator.zone_manager._pre_window_state.update(parsed_stored)
+            zm = getattr(coordinator, "zone_manager", None)
+            from ..zone_manager import ZoneManager
+            if isinstance(zm, ZoneManager):
+                zm.set_pre_window_state(parsed_stored)
+            elif zm is not None:
+                if isinstance(getattr(zm, "_pre_window_state", None), dict):
+                    zm._pre_window_state.clear()
+                    zm._pre_window_state.update(parsed_stored)
+                elif hasattr(zm, "set_pre_window_state"):
+                    zm.set_pre_window_state(parsed_stored)
             self._pre_window_state.clear()
             self._pre_window_state.update(parsed_stored)
-            _LOGGER.debug("Loaded pre_window_state from storage: %s", coordinator.zone_manager._pre_window_state)
+            _LOGGER.debug(
+                "Loaded pre_window_state from storage: %s",
+                getattr(zm, "pre_window_state", getattr(zm, "_pre_window_state", None)),
+            )
 
         res_set = settings_store.async_load()
         settings_stored = await res_set if inspect.isawaitable(res_set) else res_set
@@ -273,12 +284,20 @@ class StorageManager:
             coordinator.demand_aggregator.strategy = self._settings[KEY_DEMAND_STRATEGY]
 
         saved_zone_modes = self._settings.get("zone_modes", {})
-        coordinator.zone_manager.load_state(
-            coordinator.zone_manager._pre_window_state,
-            self.presets_heat,
-            saved_zone_modes,
-            self.presets_cool,
+        zm = getattr(coordinator, "zone_manager", None)
+        from ..zone_manager import ZoneManager
+        pre_win = (
+            zm.pre_window_state
+            if isinstance(zm, ZoneManager)
+            else getattr(zm, "_pre_window_state", getattr(zm, "pre_window_state", {}))
         )
+        if zm and hasattr(zm, "load_state"):
+            zm.load_state(
+                pre_win,
+                self.presets_heat,
+                saved_zone_modes,
+                self.presets_cool,
+            )
         for cid, mode in saved_zone_modes.items():
             if cid in coordinator._climate_callbacks:
                 coordinator._climate_callbacks[cid]()

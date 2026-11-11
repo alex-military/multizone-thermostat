@@ -74,6 +74,12 @@ class RelayBoilerBackend(BoilerBackend):
         """Set the valve delay time (seconds)."""
         self._valve_delay = value
 
+    def cancel_pending_tasks(self) -> None:
+        """Cancel any pending delayed boiler activation task."""
+        if self._pending_boiler_task and not self._pending_boiler_task.done():
+            self._pending_boiler_task.cancel()
+        self._pending_boiler_task = None
+
     def _schedule_boiler_check(self, delay_seconds: float, turn_on: bool) -> None:
         """Schedule a delayed boiler update (used for valve delay)."""
         if self._pending_boiler_task:
@@ -127,10 +133,6 @@ class RelayBoilerBackend(BoilerBackend):
             return
 
         kwargs = {"blocking": False}
-        from unittest.mock import MagicMock
-        if not isinstance(self.hass, MagicMock):
-            from homeassistant.core import Context
-            kwargs["context"] = Context()
 
         await self.hass.services.async_call(
             "switch",
@@ -141,21 +143,6 @@ class RelayBoilerBackend(BoilerBackend):
         if was_off or has_pending_off:
             self._last_boiler_change = time.monotonic()
             self._pending_command = ("on", time.monotonic())
-
-            if not isinstance(self.hass, MagicMock) and self.hass.services.has_service("logbook", "log"):
-                self.hass.async_create_task(
-                    self.hass.services.async_call(
-                        "logbook",
-                        "log",
-                        {
-                            "name": "Multizone Thermostat",
-                            "message": f"Turned ON boiler ({self._status_reason})",
-                            "entity_id": self.boiler_switch,
-                            "domain": "multizone_thermostat",
-                        },
-                        blocking=False,
-                    )
-                )
 
             if hasattr(self.coordinator, "reset_last_active_time"):
                 self.coordinator.reset_last_active_time()
@@ -180,10 +167,6 @@ class RelayBoilerBackend(BoilerBackend):
             return
 
         kwargs = {"blocking": False}
-        from unittest.mock import MagicMock
-        if not isinstance(self.hass, MagicMock):
-            from homeassistant.core import Context
-            kwargs["context"] = Context()
 
         await self.hass.services.async_call(
             "switch",
@@ -194,21 +177,6 @@ class RelayBoilerBackend(BoilerBackend):
         if was_on or has_pending_on:
             self._last_boiler_change = time.monotonic()
             self._pending_command = ("off", time.monotonic())
-
-            if not isinstance(self.hass, MagicMock) and self.hass.services.has_service("logbook", "log"):
-                self.hass.async_create_task(
-                    self.hass.services.async_call(
-                        "logbook",
-                        "log",
-                        {
-                            "name": "Multizone Thermostat",
-                            "message": f"Turned OFF boiler ({self._status_reason})",
-                            "entity_id": self.boiler_switch,
-                            "domain": "multizone_thermostat",
-                        },
-                        blocking=False,
-                    )
-                )
 
             self.coordinator.record_diagnostic_event("BOILER_SWITCH_OFF", {"switch": self.boiler_switch, "reason": self._status_reason})
             _LOGGER.debug("Boiler forced OFF")

@@ -68,6 +68,11 @@ class ScheduleProfileManager:
         return self.coordinator.hass
 
     @property
+    def storage(self) -> ScheduleProfileStorage:
+        """Return the schedule storage engine."""
+        return self._storage
+
+    @property
     def scheduler_enabled(self) -> bool:
         """Return whether scheduler is enabled."""
         return self._storage.scheduler_enabled
@@ -616,36 +621,13 @@ class ScheduleProfileManager:
 
             # 3. Manual override check (only when scheduler is enabled)
             slot = self.evaluate_zone_slot(climate_id, now)
-            has_valid_manual_override = False
-            if self.scheduler_enabled and climate_id in self.manual_overrides:
-                ov = self.manual_overrides[climate_id]
-                ov_until_str = ov.get("until")
-                ov_slot_id = ov.get("slot_id")
-
-                is_expired = False
-                if ov_until_str:
-                    until_dt = dt_util.parse_datetime(ov_until_str)
-                    if until_dt is None:
-                        try:
-                            until_dt = datetime.fromisoformat(ov_until_str)
-                        except Exception:
-                            is_expired = True
-                    if until_dt is not None:
-                        check_now = now
-                        if until_dt.tzinfo is not None and check_now.tzinfo is None:
-                            check_now = check_now.replace(tzinfo=until_dt.tzinfo)
-                        elif until_dt.tzinfo is None and check_now.tzinfo is not None:
-                            until_dt = until_dt.replace(tzinfo=check_now.tzinfo)
-                        if check_now >= until_dt:
-                            is_expired = True
-
-                if is_expired or (ov_slot_id and ov_slot_id != slot["slot_id"]):
-                    self.manual_overrides.pop(climate_id, None)
-                else:
-                    self.schedule_overrides[climate_id] = float(ov["target_temp"])
-                    has_valid_manual_override = True
-
-            if has_valid_manual_override:
+            valid_override = (
+                self.storage.get_valid_manual_override(climate_id, slot["slot_id"], now)
+                if self.scheduler_enabled
+                else None
+            )
+            if valid_override is not None:
+                self.schedule_overrides[climate_id] = valid_override
                 self._active_smart_starts.pop(climate_id, None)
                 continue
 
@@ -664,71 +646,25 @@ class ScheduleProfileManager:
                 upcoming = self.get_upcoming_blocks(climate_id, now, horizon_hours=12)
                 future_blocks = [b for b in upcoming if b["start_dt"] > now]
                 if future_blocks:
-                    smart_start_found = False
-                    for next_b in future_blocks:
-                        block_start_iso = next_b["start_dt"].isoformat()
-
-                        active_ss = self._active_smart_starts.get(climate_id)
-                        is_already_preheating = (
-                            active_ss is not None
-                            and active_ss.get("block_start") == block_start_iso
-                            and now < next_b["start_dt"]
-                        )
-
-                        if is_already_preheating:
-                            self.schedule_overrides[climate_id] = float(next_b["target_temp"])
-                            self.smart_start_info[climate_id] = active_ss
-                            smart_start_found = True
-                            break
-                        else:
-                            master_mode = str(getattr(self.coordinator, "master_hvac_mode", "heat")).lower()
-                            is_cool = (master_mode == "cool")
-                            should_precondition = False
-                            curr_temp = self._get_zone_current_temp(climate_id)
-
-                            if is_cool:
-                                if next_b["target_temp"] < slot["target_temp"] and curr_temp is not None and curr_temp > next_b["target_temp"]:
-                                    cooling_rate = self._get_zone_cooling_rate(climate_id)
-                                    hours_needed = min(
-                                        MAX_SMART_START_HOURS,
-                                        (curr_temp - next_b["target_temp"]) / cooling_rate,
-                                    )
-                                    rate = cooling_rate
-                                    should_precondition = True
-                            else:
-                                if next_b["target_temp"] > slot["target_temp"] and curr_temp is not None and curr_temp < next_b["target_temp"]:
-                                    heating_rate = self._get_zone_heating_rate(climate_id)
-                                    hours_needed = min(
-                                        MAX_SMART_START_HOURS,
-                                        (next_b["target_temp"] - curr_temp) / heating_rate,
-                                    )
-                                    rate = heating_rate
-                                    should_precondition = True
-
-                            if should_precondition:
-                                preheat_dt = next_b["start_dt"] - timedelta(hours=hours_needed)
-                                check_now = now
-                                if preheat_dt.tzinfo is not None and check_now.tzinfo is None:
-                                    check_now = check_now.replace(tzinfo=preheat_dt.tzinfo)
-                                elif preheat_dt.tzinfo is None and check_now.tzinfo is not None:
-                                    preheat_dt = preheat_dt.replace(tzinfo=check_now.tzinfo)
-
-                                if check_now >= preheat_dt:
-                                    ss_info = {
-                                        "target_temp": float(next_b["target_temp"]),
-                                        "preset": next_b["preset"],
-                                        "block_start": block_start_iso,
-                                        "preheat_start": preheat_dt.isoformat(),
-                                        "heating_rate": round(rate, 2),
-                                        "source": "schedule",
-                                    }
-                                    self.schedule_overrides[climate_id] = float(next_b["target_temp"])
-                                    self.smart_start_info[climate_id] = ss_info
-                                    self._active_smart_starts[climate_id] = ss_info
-                                    smart_start_found = True
-                                    break
-
-                    if not smart_start_found:
+                    master_mode = str(getattr(self.coordinator, "master_hvac_mode", "heat")).lower()
+                    is_cool = (master_mode == "cool")
+                    active_ss = self._active_smart_starts.get(climate_id)
+                    ss_info = self._smart_return_planner.evaluate_predictive_smart_start(
+                        climate_id,
+                        slot,
+                        future_blocks,
+                        active_ss,
+                        now,
+                        is_cool=is_cool,
+                        get_current_temp_fn=self._get_zone_current_temp,
+                        get_heating_rate_fn=self._get_zone_heating_rate,
+                        get_cooling_rate_fn=self._get_zone_cooling_rate,
+                    )
+                    if ss_info:
+                        self.schedule_overrides[climate_id] = float(ss_info["target_temp"])
+                        self.smart_start_info[climate_id] = ss_info
+                        self._active_smart_starts[climate_id] = ss_info
+                    else:
                         self._active_smart_starts.pop(climate_id, None)
                 else:
                     self._active_smart_starts.pop(climate_id, None)

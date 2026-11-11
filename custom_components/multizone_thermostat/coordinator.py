@@ -13,8 +13,6 @@ import homeassistant.util.dt as dt_util
 from .plant_config import PlantConfig
 from .plant_factory import build_plant_subsystems
 from .const import (
-    DOMAIN,
-    GLOBAL_PRESET_MANUAL,
     KEY_ALLOW_SPLIT_HEATING,
     KEY_ALLOW_SPLIT_COOLING,
     KEY_HEAT_SOURCE_PRIORITY,
@@ -22,17 +20,6 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
-
-ATTR_HVAC_ACTION = "hvac_action"
-ATTR_HVAC_MODE = "hvac_mode"
-ATTR_PRESET_MODE = "preset_mode"
-
-WINDOW_STORAGE_VERSION = 1
-WINDOW_STORAGE_KEY = f"{DOMAIN}.window_states"
-PRESET_STORAGE_KEY = f"{DOMAIN}.presets"
-PRESET_STORAGE_VERSION = 1
-SETTINGS_STORAGE_KEY = f"{DOMAIN}.settings"
-SETTINGS_STORAGE_VERSION = 1
 
 
 class MultizoneCoordinator:
@@ -59,8 +46,8 @@ class MultizoneCoordinator:
         self._select_entities: dict[str, Any] = {}
         self._diagnostics_history: deque[dict[str, Any]] = deque(maxlen=100)
         self._climate_entities: dict[str, Any] = {}
-        self._boiler_status_reason: str = "OFF - Initializing"
-        self._current_global_preset: str = GLOBAL_PRESET_MANUAL
+        self._settings: dict[str, Any] = {}
+        self._presets: dict[str, Any] = {}
 
         # Build and wire all subsystems
         build_plant_subsystems(self, hass, self.config)
@@ -131,13 +118,24 @@ class MultizoneCoordinator:
         return self.demand_aggregator._zone_demands
 
     @property
+    def pre_window_state(self) -> dict[str, str]:
+        """Alias to pre-window states owned by ZoneManager."""
+        zm = getattr(self, "zone_manager", None)
+        return getattr(zm, "pre_window_state", getattr(zm, "_pre_window_state", {}))
+
+    @property
     def _pre_window_state(self) -> dict[str, str]:
         """Alias to pre-window states owned by ZoneManager."""
-        return self.zone_manager._pre_window_state
+        return self.pre_window_state
 
     @_pre_window_state.setter
     def _pre_window_state(self, val: dict[str, str]) -> None:
-        self.zone_manager._pre_window_state = val
+        zm = getattr(self, "zone_manager", None)
+        if zm is not None:
+            if hasattr(zm, "set_pre_window_state"):
+                zm.set_pre_window_state(val)
+            else:
+                zm._pre_window_state = val
 
     @property
     def last_active_time(self) -> float:
@@ -155,52 +153,29 @@ class MultizoneCoordinator:
     @property
     def is_modulating_plant(self) -> bool:
         """Return True if the plant has a modulating generator (OpenTherm or Heat Pump)."""
-        backend = getattr(self, "boiler_backend", None)
-        if backend and getattr(backend, "is_modulating", False):
-            return True
-        hp_backend = getattr(self, "heat_pump_backend", None)
-        if hp_backend and getattr(hp_backend, "is_modulating", False):
-            return True
-        if getattr(self, "opentherm_entity", None):
-            return True
-        if getattr(self, "enable_heat_pump", False) and getattr(self, "heat_pump_entity", None):
-            return True
-        return False
+        orchestrator = getattr(self, "plant_orchestrator", None)
+        from .boiler.plant_orchestrator import PlantOrchestrator, check_is_modulating_plant
+        if isinstance(orchestrator, PlantOrchestrator):
+            return orchestrator.is_modulating_plant
+        return check_is_modulating_plant(self)
 
     @property
     def is_dhw_active(self) -> bool:
         """Return True if Domestic Hot Water (DHW) production is active."""
-        dhw_sensor = getattr(self, "dhw_active_sensor", None)
-        if dhw_sensor:
-            st = self.hass.states.get(dhw_sensor)
-            if st and st.state not in ("unavailable", "unknown"):
-                val = str(st.state).lower()
-                if val in ("on", "true", "1", "charging", "heat", "heating", "active"):
-                    return True
-                if st.attributes:
-                    for ak in ("charging", "is_charging", "dhw_active", "active"):
-                        av = st.attributes.get(ak)
-                        if av is True or (isinstance(av, str) and av.lower() in ("true", "on", "1")):
-                            return True
-                return False
-
-        if hasattr(self, "plant_diagnostics"):
-            if self.plant_diagnostics.get_opentherm_diagnostics().get("dhw_active", False):
-                return True
-
-        for std_id in ("binary_sensor.boiler_dhw_charging", "binary_sensor.dhw_charging"):
-            st = self.hass.states.get(std_id)
-            if st and st.state.lower() in ("on", "true", "1", "charging", "heat", "heating"):
-                return True
-
-        return False
+        orchestrator = getattr(self, "plant_orchestrator", None)
+        from .boiler.plant_orchestrator import PlantOrchestrator, check_is_dhw_active
+        if isinstance(orchestrator, PlantOrchestrator):
+            return orchestrator.is_dhw_active
+        return check_is_dhw_active(self)
 
     @property
     def boiler_status_reason(self) -> str:
         """Return human-readable explanation of why the boiler is currently in its state."""
-        if not getattr(self, "enable_gas_heater", True) and getattr(self, "enable_heat_pump", False) and getattr(self, "heat_pump_backend", None):
-            return getattr(self.heat_pump_backend, "status_reason", "unknown")
-        return getattr(self.boiler_backend, "status_reason", "unknown")
+        orchestrator = getattr(self, "plant_orchestrator", None)
+        from .boiler.plant_orchestrator import PlantOrchestrator, check_boiler_status_reason
+        if isinstance(orchestrator, PlantOrchestrator):
+            return orchestrator.boiler_status_reason
+        return check_boiler_status_reason(self)
 
     @property
     def diagnostics_history(self) -> list[dict[str, Any]]:
@@ -232,12 +207,25 @@ class MultizoneCoordinator:
 
     def get_persistent_data(self, key: str, default: Any = None) -> Any:
         """Get a persistent setting."""
-        return self._settings.get(key, default)
+        st = getattr(self, "storage", None)
+        if st is not None and hasattr(st, "get_data"):
+            return st.get_data(key, default)
+        settings = getattr(self, "_settings", None)
+        if isinstance(settings, dict):
+            return settings.get(key, default)
+        return default
 
     async def async_set_persistent_data(self, key: str, value: Any) -> None:
         """Set a persistent setting."""
-        self._settings[key] = value
-        await self._settings_store.async_save(self._settings)
+        st = getattr(self, "storage", None)
+        if st is not None and hasattr(st, "async_set_data"):
+            await st.async_set_data(key, value)
+            return
+        if hasattr(self, "_settings") and isinstance(self._settings, dict):
+            self._settings[key] = value
+        settings_store = getattr(self, "_settings_store", None)
+        if settings_store is not None:
+            await settings_store.async_save(self._settings)
 
     def debounced_save_thermal_states(self, thermal_models) -> None:
         if hasattr(self, "storage") and self.storage:
@@ -245,11 +233,11 @@ class MultizoneCoordinator:
 
     async def async_load_storage(self) -> None:
         """Load stored window states and presets."""
+        from .storage.storage_manager import StorageManager
         st = getattr(self, "storage", None)
-        if st is not None and hasattr(st, "async_load_coordinator_storage") and not st.__class__.__name__ == "MagicMock":
+        if isinstance(st, StorageManager):
             await st.async_load_coordinator_storage(self)
         else:
-            from .storage.storage_manager import StorageManager
             hass = getattr(self, "hass", None)
             entry_id = getattr(self, "entry_id", "default")
             sm = StorageManager(hass, entry_id)
@@ -257,7 +245,9 @@ class MultizoneCoordinator:
 
     async def async_save_storage(self) -> None:
         """Save window states, presets and settings to storage."""
-        await self._store.async_save(self.zone_manager._pre_window_state)
+        zm = getattr(self, "zone_manager", None)
+        pre_win = getattr(zm, "pre_window_state", getattr(zm, "_pre_window_state", {}))
+        await self._store.async_save(pre_win)
         await self._preset_store.async_save(self.storage._get_preset_data())
         await self._settings_store.async_save(self._settings)
 
@@ -280,15 +270,34 @@ class MultizoneCoordinator:
         """Register a select entity."""
         self._select_entities[key] = select_entity
 
+    @property
+    def min_cycle_on(self) -> float:
+        """Return minimum cycle on time in minutes."""
+        return self._min_cycle_on
+
     def set_min_cycle_on(self, value: float) -> None:
         self._min_cycle_on = value
         if hasattr(self, "boiler_backend") and hasattr(self.boiler_backend, "set_min_cycle_on"):
             self.boiler_backend.set_min_cycle_on(int(value))
+        if hasattr(self, "heat_pump_backend") and hasattr(self.heat_pump_backend, "set_min_cycle_on"):
+            self.heat_pump_backend.set_min_cycle_on(value)
+
+    @property
+    def min_cycle_off(self) -> float:
+        """Return minimum cycle off time in minutes."""
+        return self._min_cycle_off
 
     def set_min_cycle_off(self, value: float) -> None:
         self._min_cycle_off = value
         if hasattr(self, "boiler_backend") and hasattr(self.boiler_backend, "set_min_cycle_off"):
             self.boiler_backend.set_min_cycle_off(int(value))
+        if hasattr(self, "heat_pump_backend") and hasattr(self.heat_pump_backend, "set_min_cycle_off"):
+            self.heat_pump_backend.set_min_cycle_off(value)
+
+    @property
+    def valve_delay(self) -> float:
+        """Return valve delay in seconds."""
+        return self._valve_delay
 
     def set_valve_delay(self, value: float) -> None:
         self._valve_delay = value
@@ -376,26 +385,26 @@ class MultizoneCoordinator:
 
     def can_central_cool(self) -> bool:
         """Return True if central plant supports cooling."""
-        policy = getattr(self, "cooling_policy", None)
-        if policy is not None and hasattr(policy, "can_central_cool") and not isinstance(policy, type(self).__bases__[0] if hasattr(self, "__bases__") else object) and not policy.__class__.__name__ == "MagicMock":
-            return policy.can_central_cool()
         from .cooling_policy import CoolingPolicy
+        policy = getattr(self, "cooling_policy", None)
+        if isinstance(policy, CoolingPolicy):
+            return policy.can_central_cool()
         return CoolingPolicy(self).can_central_cool()
 
     def can_zone_cool(self, climate_id: str) -> bool:
         """Return True if zone has cooling capabilities."""
-        policy = getattr(self, "cooling_policy", None)
-        if policy is not None and hasattr(policy, "can_zone_cool") and not policy.__class__.__name__ == "MagicMock":
-            return policy.can_zone_cool(climate_id)
         from .cooling_policy import CoolingPolicy
+        policy = getattr(self, "cooling_policy", None)
+        if isinstance(policy, CoolingPolicy):
+            return policy.can_zone_cool(climate_id)
         return CoolingPolicy(self).can_zone_cool(climate_id)
 
     def get_zone_cooling_rate(self, climate_id: str) -> float:
         """Return cooling rate for a zone from schedule_manager or thermal observer."""
-        policy = getattr(self, "cooling_policy", None)
-        if policy is not None and hasattr(policy, "get_zone_cooling_rate") and not policy.__class__.__name__ == "MagicMock":
-            return policy.get_zone_cooling_rate(climate_id)
         from .cooling_policy import CoolingPolicy
+        policy = getattr(self, "cooling_policy", None)
+        if isinstance(policy, CoolingPolicy):
+            return policy.get_zone_cooling_rate(climate_id)
         return CoolingPolicy(self).get_zone_cooling_rate(climate_id)
 
     # ------------------------------------------------------------------
@@ -404,38 +413,38 @@ class MultizoneCoordinator:
 
     async def async_set_master_hvac_mode(self, mode: str) -> None:
         """Set master operation mode ('heat' or 'cool') and coordinate whole-house operation."""
+        from .master_controller import MasterController
         ctrl = getattr(self, "master_controller", None)
-        if ctrl is not None and hasattr(ctrl, "async_set_master_hvac_mode") and not ctrl.__class__.__name__ == "MagicMock":
+        if isinstance(ctrl, MasterController):
             await ctrl.async_set_master_hvac_mode(mode)
         else:
-            from .master_controller import MasterController
             await MasterController(self).async_set_master_hvac_mode(mode)
 
     async def async_apply_master_on(self) -> None:
         """Master turned ON: apply mode to all eligible zones."""
+        from .master_controller import MasterController
         ctrl = getattr(self, "master_controller", None)
-        if ctrl is not None and hasattr(ctrl, "async_apply_master_on") and not ctrl.__class__.__name__ == "MagicMock":
+        if isinstance(ctrl, MasterController):
             await ctrl.async_apply_master_on()
         else:
-            from .master_controller import MasterController
             await MasterController(self).async_apply_master_on()
 
     async def async_apply_master_off(self) -> None:
         """Master turned OFF: turn off all zones and boiler."""
+        from .master_controller import MasterController
         ctrl = getattr(self, "master_controller", None)
-        if ctrl is not None and hasattr(ctrl, "async_apply_master_off") and not ctrl.__class__.__name__ == "MagicMock":
+        if isinstance(ctrl, MasterController):
             await ctrl.async_apply_master_off()
         else:
-            from .master_controller import MasterController
             await MasterController(self).async_apply_master_off()
 
     async def _async_set_hvac_mode(self, climate_entity: str, mode: str) -> None:
         """Set HVAC mode on a climate entity."""
+        from .master_controller import MasterController
         ctrl = getattr(self, "master_controller", None)
-        if ctrl is not None and hasattr(ctrl, "async_set_hvac_mode") and not ctrl.__class__.__name__ == "MagicMock":
+        if isinstance(ctrl, MasterController):
             await ctrl.async_set_hvac_mode(climate_entity, mode)
         else:
-            from .master_controller import MasterController
             await MasterController(self).async_set_hvac_mode(climate_entity, mode)
 
     async def async_update_all_climates(self) -> None:

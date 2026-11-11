@@ -518,7 +518,9 @@
           "hybrid": "Manuale Ibrido (Split se presente, Gas per le altre)",
           "combined": "Manuale Combinato (Gas + Split in contemporanea)",
           "gas_only": "Manuale Solo Gas (Blocca Split)",
-          "electric_only": "Manuale Solo Elettrico (Blocca Caldaia)"
+          "electric_only": "Manuale Solo Elettrico (Blocca Caldaia)",
+          "gas_priority": "Priorità Gas (Caldaia primaria, PDC/Split secondaria)",
+          "electric_priority": "Priorità Elettrico (PDC/Split primaria, Caldaia secondaria)"
         }
       },
       "master_operation_mode": {

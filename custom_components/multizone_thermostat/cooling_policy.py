@@ -15,6 +15,7 @@ from .const import (
     SPLIT_ROLE_COOLING_ONLY,
     make_zone_entity_id,
 )
+from .plant_config import get_zone_name
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -44,37 +45,44 @@ class CoolingPolicy:
         if not self.can_central_cool():
             return False
 
-        # Central cooling is active: verify that the zone has hydronic actuators suitable for cooling
         zone_conf = None
         for z in getattr(self.coordinator, "zones", []):
-            if make_zone_entity_id(z.get(CONF_ZONE_NAME, "")) == climate_id:
+            if make_zone_entity_id(get_zone_name(z)) == climate_id or z.get("climate_id") == climate_id:
                 zone_conf = z
                 break
 
-        if zone_conf:
-            if zone_conf.get("allow_cooling") is True:
-                return True
-            if zone_conf.get("allow_cooling") is False or zone_conf.get("emitter_type") == "radiator":
-                return False
+        if not zone_conf:
+            # If zone configuration is not found in central coordinator, it cannot be safely cooled
+            return False
 
-            is_fancoil = bool(
-                zone_conf.get("fancoil")
-                or zone_conf.get("is_fancoil")
-                or zone_conf.get("emitter_type") == "fancoil"
-            )
-            if is_fancoil:
-                return True
+        if zone_conf.get("allow_cooling") is True:
+            return True
+        if zone_conf.get("allow_cooling") is False:
+            return False
 
-            climates = zone_conf.get(CONF_ZONE_CLIMATES, []) or zone_conf.get("climate_entities", []) or zone_conf.get("climates", [])
-            switches = zone_conf.get(CONF_ZONE_SWITCHES, []) or zone_conf.get("switch_entities", []) or zone_conf.get("switches", [])
-            valves = zone_conf.get(CONF_ZONE_VALVES, []) or zone_conf.get("valve_entities", []) or zone_conf.get("valves", [])
-            has_trv_sync = bool(zone_conf.get(CONF_ZONE_TRV_SYNC, zone_conf.get("trv_preset_sync", False)))
+        emitter = zone_conf.get("emitter_type")
+        if emitter == "radiator":
+            return False
+        if emitter in ("underfloor", "fancoil"):
+            return True
 
-            if switches or valves:
-                return True
+        is_fancoil = bool(
+            zone_conf.get("fancoil")
+            or zone_conf.get("is_fancoil")
+        )
+        if is_fancoil:
+            return True
 
-            if climates and has_trv_sync:
-                return False
+        climates = zone_conf.get(CONF_ZONE_CLIMATES, []) or zone_conf.get("climate_entities", []) or zone_conf.get("climates", [])
+        switches = zone_conf.get(CONF_ZONE_SWITCHES, []) or zone_conf.get("switch_entities", []) or zone_conf.get("switches", [])
+        valves = zone_conf.get(CONF_ZONE_VALVES, []) or zone_conf.get("valve_entities", []) or zone_conf.get("valves", [])
+        has_trv_sync = bool(zone_conf.get(CONF_ZONE_TRV_SYNC, zone_conf.get("trv_preset_sync", False)))
+
+        if switches or valves:
+            return True
+
+        if climates and has_trv_sync:
+            return False
 
         return True
 

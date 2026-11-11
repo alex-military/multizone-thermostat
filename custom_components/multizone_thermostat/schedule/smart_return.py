@@ -243,3 +243,90 @@ class SmartReturnPlanner:
         return plan
 
     evaluate = calculate_plan
+
+    def evaluate_predictive_smart_start(
+        self,
+        climate_id: str,
+        slot: dict,
+        future_blocks: list[dict],
+        active_ss: dict | None,
+        now: datetime,
+        is_cool: bool = False,
+        get_current_temp_fn: Any = None,
+        get_heating_rate_fn: Any = None,
+        get_cooling_rate_fn: Any = None,
+    ) -> dict | None:
+        """Evaluate if upcoming blocks require predictive pre-heating or pre-cooling."""
+        for next_b in future_blocks:
+            block_start_iso = next_b["start_dt"].isoformat()
+
+            is_already_preheating = (
+                active_ss is not None
+                and active_ss.get("block_start") == block_start_iso
+                and now < next_b["start_dt"]
+            )
+
+            if is_already_preheating:
+                return active_ss
+
+            should_precondition = False
+            curr_temp = (
+                get_current_temp_fn(climate_id)
+                if get_current_temp_fn is not None
+                else self.get_zone_current_temp(climate_id)
+            )
+
+            if is_cool:
+                if (
+                    next_b["target_temp"] < slot["target_temp"]
+                    and curr_temp is not None
+                    and curr_temp > next_b["target_temp"]
+                ):
+                    cooling_rate = (
+                        get_cooling_rate_fn(climate_id)
+                        if get_cooling_rate_fn is not None
+                        else self.get_zone_cooling_rate(climate_id)
+                    )
+                    hours_needed = min(
+                        MAX_SMART_START_HOURS,
+                        (curr_temp - next_b["target_temp"]) / cooling_rate,
+                    )
+                    rate = cooling_rate
+                    should_precondition = True
+            else:
+                if (
+                    next_b["target_temp"] > slot["target_temp"]
+                    and curr_temp is not None
+                    and curr_temp < next_b["target_temp"]
+                ):
+                    heating_rate = (
+                        get_heating_rate_fn(climate_id)
+                        if get_heating_rate_fn is not None
+                        else self.get_zone_heating_rate(climate_id)
+                    )
+                    hours_needed = min(
+                        MAX_SMART_START_HOURS,
+                        (next_b["target_temp"] - curr_temp) / heating_rate,
+                    )
+                    rate = heating_rate
+                    should_precondition = True
+
+            if should_precondition:
+                preheat_dt = next_b["start_dt"] - timedelta(hours=hours_needed)
+                check_now = now
+                if preheat_dt.tzinfo is not None and check_now.tzinfo is None:
+                    check_now = check_now.replace(tzinfo=preheat_dt.tzinfo)
+                elif preheat_dt.tzinfo is None and check_now.tzinfo is not None:
+                    preheat_dt = preheat_dt.replace(tzinfo=check_now.tzinfo)
+
+                if check_now >= preheat_dt:
+                    return {
+                        "target_temp": float(next_b["target_temp"]),
+                        "preset": next_b["preset"],
+                        "block_start": block_start_iso,
+                        "preheat_start": preheat_dt.isoformat(),
+                        "heating_rate": round(rate, 2),
+                        "source": "schedule",
+                    }
+
+        return None

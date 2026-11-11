@@ -23,6 +23,7 @@ from .const import (
     HVAC_MODE_HEAT,
     HVAC_MODE_COOL,
 )
+from .plant_config import get_zone_name, get_zone_climates
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -133,6 +134,16 @@ class ZoneManager:
     def presets_cool(self) -> dict[str, dict[str, dict[str, Any]]]:
         """Return cooling presets."""
         return self._presets_cool
+
+    @property
+    def pre_window_state(self) -> dict[str, Any]:
+        """Return pre-window states."""
+        return self._pre_window_state
+
+    def set_pre_window_state(self, state: dict[str, Any]) -> None:
+        """Update pre-window states."""
+        self._pre_window_state.clear()
+        self._pre_window_state.update(state)
 
     def load_state(
         self,
@@ -341,7 +352,7 @@ class ZoneManager:
         if not zone:
             return
             
-        climates = zone.get(CONF_ZONE_CLIMATES, [])
+        climates = get_zone_climates(zone)
         for trv in climates:
             trv_state = self.hass.states.get(trv)
             if not trv_state or trv_state.state in ("unavailable", "unknown"):

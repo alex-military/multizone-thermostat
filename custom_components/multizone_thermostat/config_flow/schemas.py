@@ -35,6 +35,7 @@ from ..const import (
     VALVE_SCALE_VOLT,
     DEFAULT_VALVE_SCALE,
     CONF_ZONE_TEMP_SENSOR,
+    CONF_ZONE_HUMIDITY_SENSOR,
     CONF_ZONE_TARGET_TEMP,
     CONF_ZONE_TRV_SYNC,
     CONF_ZONE_WINDOW_SENSOR,
@@ -378,6 +379,7 @@ def get_add_zone_schema() -> vol.Schema:
     return vol.Schema({
         vol.Required(CONF_ZONE_NAME): str,
         vol.Optional(CONF_ZONE_TEMP_SENSOR): selector.EntitySelector(selector.EntitySelectorConfig(domain=SENSOR_DOMAIN, device_class="temperature")),
+        vol.Optional(CONF_ZONE_HUMIDITY_SENSOR): selector.EntitySelector(selector.EntitySelectorConfig(domain=SENSOR_DOMAIN, device_class="humidity")),
         vol.Optional(CONF_ZONE_TARGET_TEMP, default=20.0): selector.NumberSelector(selector.NumberSelectorConfig(min=5, max=35, step=0.5, mode=selector.NumberSelectorMode.BOX)),
         vol.Optional(CONF_ZONE_EMITTER_TYPE, default=DEFAULT_ZONE_EMITTER_TYPE): selector.SelectSelector(
             selector.SelectSelectorConfig(
@@ -605,8 +607,11 @@ def get_options_edit_zone_schema(zone_data: dict[str, Any], temp_desc: dict[str,
     split_delta = zone_data.get(CONF_ZONE_SPLIT_BOOST_DELTA, DEFAULT_SPLIT_BOOST_DELTA)
     split_injection = zone_data.get(CONF_ZONE_SPLIT_SENSOR_INJECTION, DEFAULT_SPLIT_SENSOR_INJECTION)
 
+    humidity_desc = {"suggested_value": zone_data.get(CONF_ZONE_HUMIDITY_SENSOR)} if zone_data.get(CONF_ZONE_HUMIDITY_SENSOR) else {}
+
     return vol.Schema({
         vol.Optional(CONF_ZONE_TEMP_SENSOR, **temp_desc): selector.EntitySelector(selector.EntitySelectorConfig(domain=SENSOR_DOMAIN, device_class="temperature")),
+        vol.Optional(CONF_ZONE_HUMIDITY_SENSOR, **humidity_desc): selector.EntitySelector(selector.EntitySelectorConfig(domain=SENSOR_DOMAIN, device_class="humidity")),
         vol.Optional(CONF_ZONE_TARGET_TEMP, default=zone_data.get(CONF_ZONE_TARGET_TEMP, 20.0)): selector.NumberSelector(selector.NumberSelectorConfig(min=5, max=35, step=0.5, mode=selector.NumberSelectorMode.BOX)),
         vol.Optional(CONF_ZONE_EMITTER_TYPE, default=zone_data.get(CONF_ZONE_EMITTER_TYPE, DEFAULT_ZONE_EMITTER_TYPE)): selector.SelectSelector(
             selector.SelectSelectorConfig(

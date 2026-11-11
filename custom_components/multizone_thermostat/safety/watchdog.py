@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 from homeassistant.util import dt as dt_util
 from ..const import CONF_ZONE_CLIMATES
+from ..plant_config import get_zone_climates
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -42,15 +43,15 @@ class SensorWatchdog:
         if not ha:
             return None
 
-        trv_entities = zone.get(CONF_ZONE_CLIMATES, [])
+        trv_entities = get_zone_climates(zone)
         if not trv_entities:
             return None
 
         temps: list[float] = []
         for trv in trv_entities:
             st = ha.states.get(trv)
-            if st and st.state not in ("unavailable", "unknown"):
-                t = st.attributes.get("current_temperature")
+            if st and getattr(st, "state", None) not in ("unavailable", "unknown"):
+                t = getattr(st, "attributes", {}).get("current_temperature")
                 if t is not None:
                     try:
                         temps.append(float(t))

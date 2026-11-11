@@ -518,7 +518,9 @@
           "hybrid": "Manuell Hybrid (Split wo vorhanden, Gas sonst)",
           "combined": "Manuell Kombiniert (Gas + Split gleichzeitig)",
           "gas_only": "Manuell Nur Gas (Split gesperrt)",
-          "electric_only": "Manuell Nur Elektrisch (Kessel gesperrt)"
+          "electric_only": "Manuell Nur Elektrisch (Kessel gesperrt)",
+          "gas_priority": "Gas-Priorität (Heizkessel primär, Wärmepumpe/Split sekundär)",
+          "electric_priority": "Elektro-Priorität (Wärmepumpe/Split primär, Heizkessel sekundär)"
         }
       },
       "master_operation_mode": {

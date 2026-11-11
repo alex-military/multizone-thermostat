@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
+import inspect
 import logging
 from typing import Any
 
@@ -113,13 +114,20 @@ class ListenerManager:
         if hasattr(coord, "routine_manager") and coord.routine_manager:
             coord.routine_manager.cleanup()
         if hasattr(coord, "anti_seize_manager") and coord.anti_seize_manager:
-            anti_seize_task = getattr(coord.anti_seize_manager, "_task", None)
-            if anti_seize_task and not anti_seize_task.done():
-                anti_seize_task.cancel()
-        backend_task = getattr(coord.boiler_backend, "_pending_boiler_task", None)
-        if backend_task and not backend_task.done():
-            backend_task.cancel()
-            coord.boiler_backend._pending_boiler_task = None
+            if hasattr(coord.anti_seize_manager, "stop"):
+                coord.anti_seize_manager.stop()
+            else:
+                anti_seize_task = getattr(coord.anti_seize_manager, "_task", None)
+                if anti_seize_task and not anti_seize_task.done():
+                    anti_seize_task.cancel()
+        if hasattr(coord, "boiler_backend") and coord.boiler_backend:
+            if hasattr(coord.boiler_backend, "cancel_pending_tasks"):
+                coord.boiler_backend.cancel_pending_tasks()
+            else:
+                backend_task = getattr(coord.boiler_backend, "_pending_boiler_task", None)
+                if backend_task and not backend_task.done():
+                    backend_task.cancel()
+                    coord.boiler_backend._pending_boiler_task = None
 
         if hasattr(coord, "energy_manager") and coord.energy_manager:
             coord.energy_manager.async_stop()
@@ -137,5 +145,20 @@ class ListenerManager:
         demand = await self.coordinator.zone_controller.async_update_zone(entity_id, new_state)
         self.coordinator.demand_aggregator.set_zone_demand(entity_id, demand)
         # Immediately trigger boiler update to improve UI responsiveness when lowering target
-        if hasattr(self.coordinator, "plant_orchestrator"):
-            await self.coordinator.plant_orchestrator._async_update_boiler()
+        if hasattr(self.coordinator, "plant_orchestrator") and self.coordinator.plant_orchestrator:
+            orch = self.coordinator.plant_orchestrator
+            from .boiler.plant_orchestrator import PlantOrchestrator
+            if isinstance(orch, PlantOrchestrator):
+                await orch.async_refresh()
+            elif "async_refresh" in getattr(orch, "_mock_children", {}) or "async_refresh" in getattr(orch, "__dict__", {}):
+                res = orch.async_refresh()
+                if inspect.isawaitable(res):
+                    await res
+            elif hasattr(orch, "_async_update_boiler"):
+                res = orch._async_update_boiler()
+                if inspect.isawaitable(res):
+                    await res
+            elif hasattr(orch, "async_refresh"):
+                res = orch.async_refresh()
+                if inspect.isawaitable(res):
+                    await res

@@ -518,7 +518,9 @@
           "hybrid": "Manual Hybrid (Split where present, Gas for others)",
           "combined": "Manual Combined (Gas + Split simultaneously)",
           "gas_only": "Manual Gas Only (Blocks Split)",
-          "electric_only": "Manual Electric Only (Blocks Boiler)"
+          "electric_only": "Manual Electric Only (Blocks Boiler)",
+          "gas_priority": "Gas Priority (Boiler primary, Heat Pump/Split secondary)",
+          "electric_priority": "Electric Priority (Heat Pump/Split primary, Boiler secondary)"
         }
       },
       "master_operation_mode": {

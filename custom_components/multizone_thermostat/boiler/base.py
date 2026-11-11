@@ -21,3 +21,7 @@ class BoilerBackend(ABC):
     def status_reason(self) -> str:
         """Return the current status reason."""
         pass
+
+    def cancel_pending_tasks(self) -> None:
+        """Cancel any pending asynchronous tasks."""
+        pass

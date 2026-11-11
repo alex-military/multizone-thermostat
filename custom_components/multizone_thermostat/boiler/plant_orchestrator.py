@@ -7,6 +7,7 @@ from datetime import datetime
 import asyncio
 import inspect
 import logging
+from typing import Any
 
 from ..const import (
     CONF_ZONE_NAME,
@@ -23,6 +24,69 @@ from ..const import (
 _LOGGER = logging.getLogger(__name__)
 
 
+def check_is_modulating_plant(coordinator: Any, boiler_backend: Any = None, heat_pump_backend: Any = None) -> bool:
+    """Return True if the plant has a modulating generator (OpenTherm or Heat Pump)."""
+    backend = boiler_backend if boiler_backend is not None else getattr(coordinator, "boiler_backend", None)
+    if backend and getattr(backend, "is_modulating", False):
+        return True
+    hp_backend = heat_pump_backend if heat_pump_backend is not None else getattr(coordinator, "heat_pump_backend", None)
+    if hp_backend and getattr(hp_backend, "is_modulating", False):
+        return True
+    if getattr(coordinator, "opentherm_entity", None):
+        return True
+    if getattr(coordinator, "enable_heat_pump", False) and getattr(coordinator, "heat_pump_entity", None):
+        return True
+    return False
+
+
+def check_is_dhw_active(coordinator: Any, hass: Any = None) -> bool:
+    """Return True if Domestic Hot Water (DHW) production is active."""
+    hass = hass or getattr(coordinator, "hass", None)
+    dhw_sensor = getattr(coordinator, "dhw_active_sensor", None)
+    if dhw_sensor and isinstance(dhw_sensor, str) and hass and hasattr(hass, "states") and hass.states:
+        st = hass.states.get(dhw_sensor)
+        if st and getattr(st, "state", None) not in ("unavailable", "unknown", None):
+            val = str(st.state).lower()
+            if val in ("on", "true", "1", "charging", "heat", "heating", "active"):
+                return True
+            if getattr(st, "attributes", None):
+                for ak in ("charging", "is_charging", "dhw_active", "active"):
+                    av = st.attributes.get(ak)
+                    if av is True or (isinstance(av, str) and av.lower() in ("true", "on", "1")):
+                        return True
+            return False
+
+    if hasattr(coordinator, "plant_diagnostics") and getattr(coordinator, "plant_diagnostics", None) is not None:
+        diag_fn = getattr(coordinator.plant_diagnostics, "get_opentherm_diagnostics", None)
+        if callable(diag_fn):
+            try:
+                diag = diag_fn()
+                if isinstance(diag, dict) and diag.get("dhw_active", False):
+                    return True
+            except Exception:
+                pass
+
+    if hass and hasattr(hass, "states") and hass.states:
+        for std_id in ("binary_sensor.boiler_dhw_charging", "binary_sensor.dhw_charging"):
+            try:
+                st = hass.states.get(std_id)
+                if st and hasattr(st, "state") and str(st.state).lower() in ("on", "true", "1", "charging", "heat", "heating"):
+                    return True
+            except Exception:
+                pass
+
+    return False
+
+
+def check_boiler_status_reason(coordinator: Any, boiler_backend: Any = None, heat_pump_backend: Any = None) -> str:
+    """Return human-readable explanation of why the boiler is currently in its state."""
+    hp_backend = heat_pump_backend if heat_pump_backend is not None else getattr(coordinator, "heat_pump_backend", None)
+    b_backend = boiler_backend if boiler_backend is not None else getattr(coordinator, "boiler_backend", None)
+    if not getattr(coordinator, "enable_gas_heater", True) and getattr(coordinator, "enable_heat_pump", False) and hp_backend:
+        return getattr(hp_backend, "status_reason", "unknown")
+    return getattr(b_backend, "status_reason", "unknown")
+
+
 class PlantOrchestrator:
     """Orchestrates the boiler and central heat pump PWM ticks and demand logic."""
 
@@ -36,6 +100,25 @@ class PlantOrchestrator:
 
     def _get_hp_backend(self):
         return self.heat_pump_backend or getattr(self.coordinator, "heat_pump_backend", None)
+
+    @property
+    def is_modulating_plant(self) -> bool:
+        """Return True if the plant has a modulating generator (OpenTherm or Heat Pump)."""
+        return check_is_modulating_plant(self.coordinator, self.boiler_backend, self._get_hp_backend())
+
+    @property
+    def is_dhw_active(self) -> bool:
+        """Return True if Domestic Hot Water (DHW) production is active."""
+        return check_is_dhw_active(self.coordinator, self.hass)
+
+    @property
+    def boiler_status_reason(self) -> str:
+        """Return human-readable explanation of why the boiler is currently in its state."""
+        return check_boiler_status_reason(self.coordinator, self.boiler_backend, self._get_hp_backend())
+
+    async def async_refresh(self) -> None:
+        """Refresh plant state by updating boiler and central heat pump."""
+        await self._async_update_boiler()
 
     @property
     def last_plant_command(self):
@@ -187,7 +270,16 @@ class PlantOrchestrator:
                 ):
                     self.demand_aggregator.set_zone_demand(climate_id, 0.0)
 
-        dhw_active = getattr(self.coordinator, "is_dhw_active", False)
+        coord_dhw = getattr(self.coordinator, "is_dhw_active", None)
+        if isinstance(coord_dhw, bool) and not isinstance(getattr(type(self.coordinator), "is_dhw_active", None), property):
+            dhw_active = coord_dhw
+        else:
+            try:
+                dhw_active = bool(self.is_dhw_active)
+            except Exception:
+                dhw_active = bool(coord_dhw) if isinstance(coord_dhw, bool) else False
+            if not dhw_active and isinstance(coord_dhw, bool):
+                dhw_active = coord_dhw
         agg = self.demand_aggregator.calculate(
             is_dhw_active=dhw_active,
             frost_emergency=frost_emergency,

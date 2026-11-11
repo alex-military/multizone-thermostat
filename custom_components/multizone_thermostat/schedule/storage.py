@@ -252,3 +252,37 @@ class ScheduleProfileStorage:
             self.profile_expires_at = None
             return True, old_profile, self.active_profile
         return False, None, None
+
+    def get_valid_manual_override(
+        self, climate_id: str, current_slot_id: str, now: datetime
+    ) -> float | None:
+        """Validate and return manual override target temperature, or None if expired/slot changed."""
+        if climate_id not in self.manual_overrides:
+            return None
+
+        ov = self.manual_overrides[climate_id]
+        ov_until_str = ov.get("until")
+        ov_slot_id = ov.get("slot_id")
+
+        is_expired = False
+        if ov_until_str:
+            until_dt = dt_util.parse_datetime(ov_until_str)
+            if until_dt is None:
+                try:
+                    until_dt = datetime.fromisoformat(ov_until_str)
+                except Exception:
+                    is_expired = True
+            if until_dt is not None:
+                check_now = now
+                if until_dt.tzinfo is not None and check_now.tzinfo is None:
+                    check_now = check_now.replace(tzinfo=until_dt.tzinfo)
+                elif until_dt.tzinfo is None and check_now.tzinfo is not None:
+                    until_dt = until_dt.replace(tzinfo=check_now.tzinfo)
+                if check_now >= until_dt:
+                    is_expired = True
+
+        if is_expired or (ov_slot_id and ov_slot_id != current_slot_id):
+            self.manual_overrides.pop(climate_id, None)
+            return None
+
+        return float(ov["target_temp"])

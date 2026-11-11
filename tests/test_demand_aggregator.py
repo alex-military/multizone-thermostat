@@ -248,10 +248,11 @@ def test_strategy_weighted_average():
     assert result.peak_zone == "Large Hall"
     assert result.strategy == DEMAND_STRATEGY_WEIGHTED_AVERAGE
 
-    # If only Small Room is active
+    # If only Small Room is active (monotonically weighted over all primary capacity):
+    # (50 * 20) / (20 + 80) = 10.0%
     aggregator.set_zone_demand(z_b, 0.0)
     result = aggregator.calculate()
-    assert result.demand == 50.0
+    assert result.demand == 10.0
     assert result.peak_zone == "Small Room"
 
     # All primary at 0%

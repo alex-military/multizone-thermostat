@@ -518,7 +518,9 @@
           "hybrid": "Manuel Hybride (Split si présent, Gaz pour le reste)",
           "combined": "Manuel Combiné (Gaz + Split en simultané)",
           "gas_only": "Manuel Gaz Seul (Bloque le Split)",
-          "electric_only": "Manuel Électrique Seul (Bloque la Chaudière)"
+          "electric_only": "Manuel Électrique Seul (Bloque la Chaudière)",
+          "gas_priority": "Priorité Gaz (Chaudière primaire, PAC/Split secondaire)",
+          "electric_priority": "Priorité Électrique (PAC/Split primaire, Chaudière secondaire)"
         }
       },
       "master_operation_mode": {

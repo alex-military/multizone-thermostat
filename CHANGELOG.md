@@ -1,5 +1,21 @@
 # Changelog
 
+## [6.1.0-beta.2] - 2026-11-11
+### Feature & Refactor: Centralized Condo Heating (#11), Complete SRP Decomposition & Physics/Safety Hardening
+- **Centralized / Condo Heating Support (`CentralizedBoilerBackend`, #11)**:
+  - Native support for centralized condominium / district heating plants not directly controlled by Home Assistant (`boiler_mode: central` or `enable_gas_heater: False` without central heat pump).
+  - Full Config Flow & Options Flow integration (`Centralized / No Boiler (Condominiale)`) driving TRVs and zone actuators without requiring a local boiler switch.
+- **Complete SRP Modular Architecture & Zero Mock/Assert Leaks**:
+  - Decomposed `MultizoneCoordinator` (~459 lines) into dedicated single-responsibility subsystems (`PlantConfig`, `build_plant_subsystems`, `MasterController`, `ListenerManager`, `CoolingPolicy`).
+  - Removed all `MagicMock` / `unittest.mock` references and `assert` statements from production code.
+  - Deduplicated `PIDAutotuner` into `autotune.py`, wired `SensorWatchdog` across `frost.py` and `climate.py`, and extracted predictive Smart Start / manual override expiry into `schedule/smart_return.py` and `schedule/storage.py`.
+- **Physics & Plant Safety Hardening**:
+  - **Monotonic Weighted Demand (`L1`)**: `weighted_average` strategy divides by total configured primary zone weights, guaranteeing strictly monotonic non-decreasing plant demand ($\frac{\partial D}{\partial D_i} \ge 0$).
+  - **Underfloor Hard Thermal Ceiling**: Enforces a strict $40.0^\circ\text{C}$ safety ceiling on unmixed underfloor radiant systems regardless of generic backend defaults.
+  - **Indoor Dew-Point Anti-Condensation**: Calculates worst-case indoor dew point from room temperature and humidity sensors (`humidity_sensor` per zone) to maintain chilled water at least $+2.0^\circ\text{C}$ above condensation point.
+  - **Heat Pump Valve Delay & Independent Compressor Cycles**: Prevents spurious `HOLD_ON` locks when demand drops during `valve_delay` and introduces independent compressor minimum cycle parameters (`hp_min_cycle_on`, `hp_min_cycle_off`).
+  - **Persistent Frost Recovery & Configurable Frost Flow Temp**: Persists pre-frost user setpoints (`pre_frost_targets`) across Home Assistant restarts, adds configurable `frost_flow_temp` number entity, and engages conservative frost protection when both room sensor and TRVs are unavailable below $2.0^\circ\text{C}$ outdoor temperature.
+
 ## [6.1.0-beta.1] - 2026-11-09
 ### Feature: Phase 11 — Hybrid Multi-Generator, Room Split Climate & Solar Self-Consumption
 - **Bivalent Central Plant Architecture (`PlantOrchestrator` & `HeatPumpBackend`)**:

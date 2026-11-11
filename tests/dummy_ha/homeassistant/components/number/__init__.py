@@ -11,3 +11,6 @@ class NumberMode:
 class NumberEntity(Entity):
     pass
 
+class RestoreNumber(NumberEntity):
+    pass
+

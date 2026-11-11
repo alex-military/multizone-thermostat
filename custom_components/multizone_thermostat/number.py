@@ -3,9 +3,16 @@ from __future__ import annotations
 
 import logging
 
-from homeassistant.components.number import NumberEntity, RestoreNumber
+try:
+    from homeassistant.components.number import NumberEntity, RestoreNumber
+except ImportError:
+    from homeassistant.components.number import NumberEntity
+
+    class RestoreNumber(NumberEntity):  # type: ignore[no-redef]
+        """Fallback RestoreNumber for environments without restore_state."""
+        pass
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import EntityCategory
+from homeassistant.const import EntityCategory, UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -23,6 +30,12 @@ from .const import (
     KEY_WEATHER_CURVE,
     KEY_FROST_PROTECTION_TEMP,
     DEFAULT_FROST_PROTECTION_TEMP,
+    KEY_FROST_FLOW_TEMP,
+    DEFAULT_FROST_FLOW_TEMP,
+    KEY_HP_MIN_CYCLE_ON,
+    KEY_HP_MIN_CYCLE_OFF,
+    DEFAULT_HP_MIN_CYCLE_ON,
+    DEFAULT_HP_MIN_CYCLE_OFF,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -122,7 +135,7 @@ async def async_setup_entry(
             step=0.1,
             unit_of_measurement=None,
             icon="mdi:chart-bell-curve-cumulative",
-            default_val=0.0,
+            default_val=1.0,
             device_info=device_info,
         ),
         MultizonePersistentNumber(
@@ -139,6 +152,54 @@ async def async_setup_entry(
             device_info=device_info,
         ),
     ]
+
+    if getattr(coordinator, "is_modulating_plant", False) or getattr(coordinator, "enable_heat_pump", False):
+        temp_unit = getattr(UnitOfTemperature, "CELSIUS", "°C")
+        entities.append(
+            MultizonePersistentNumber(
+                coordinator=coordinator,
+                entry_id=config_entry.entry_id,
+                key=KEY_FROST_FLOW_TEMP,
+                name="Frost Protection Flow Temp",
+                min_value=25.0,
+                max_value=55.0,
+                step=1.0,
+                unit_of_measurement=temp_unit,
+                icon="mdi:snowflake-thermometer",
+                default_val=DEFAULT_FROST_FLOW_TEMP,
+                device_info=device_info,
+            )
+        )
+
+    if getattr(coordinator, "enable_heat_pump", False):
+        entities.extend([
+            MultizonePersistentNumber(
+                coordinator=coordinator,
+                entry_id=config_entry.entry_id,
+                key=KEY_HP_MIN_CYCLE_ON,
+                name="Heat Pump Min Cycle ON",
+                min_value=0,
+                max_value=30,
+                step=1,
+                unit_of_measurement="min",
+                icon="mdi:timer-sand",
+                default_val=DEFAULT_HP_MIN_CYCLE_ON,
+                device_info=device_info,
+            ),
+            MultizonePersistentNumber(
+                coordinator=coordinator,
+                entry_id=config_entry.entry_id,
+                key=KEY_HP_MIN_CYCLE_OFF,
+                name="Heat Pump Min Cycle OFF",
+                min_value=0,
+                max_value=30,
+                step=1,
+                unit_of_measurement="min",
+                icon="mdi:timer-sand-empty",
+                default_val=DEFAULT_HP_MIN_CYCLE_OFF,
+                device_info=device_info,
+            ),
+        ])
 
     async_add_entities(entities)
 
@@ -256,3 +317,6 @@ class MultizonePersistentNumber(NumberEntity):
         """Update the value."""
         await self._coordinator.async_set_persistent_data(self._key, value)
         self.async_write_ha_state()
+
+
+MultizoneParameterNumber = MultizonePersistentNumber

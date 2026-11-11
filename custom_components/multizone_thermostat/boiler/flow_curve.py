@@ -98,6 +98,13 @@ def create_flow_curve_for_emitter(
     eff_max = t_max if t_max is not None else preset["t_max"]
     eff_exp = preset["exponent"]
 
+    # Se l'emettitore è a bassa temperatura (es. pavimento radiante),
+    # clampiamo t_max al tetto fisico dell'emettitore (40°C), a meno che
+    # non ci sia una valvola miscelatrice dedicata a valle dell'impianto centrale.
+    if emitter_type == EMITTER_UNDERFLOOR and not has_mixing_valve:
+        eff_max = min(eff_max, preset["t_max"])
+        eff_min = min(eff_min, eff_max - 5.0)
+
     # Se l'impianto è misto con pavimento e senza valvola miscelatrice,
     # la mandata centrale non può mai superare i 40°C del pavimento!
     if is_mixed_underfloor and not has_mixing_valve:

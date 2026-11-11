@@ -63,12 +63,14 @@ class DemandAggregator:
         zones: list[dict[str, Any]] | None = None,
         strategy: str = DEMAND_STRATEGY_MAX,
         mode_getter: Callable[[str], str] | None = None,
+        fault_checker: Callable[[str], bool] | None = None,
     ) -> None:
         """Initialize the demand aggregator.
 
         :param zones: Optional initial list of zone configuration dictionaries.
         :param strategy: Calculation strategy (max, weighted_average, sum_capped).
         :param mode_getter: Optional external callable to resolve zone mode (e.g. calendar overrides).
+        :param fault_checker: Optional callable to check if a zone has a critical sensor fault.
         """
         if strategy not in VALID_DEMAND_STRATEGIES:
             raise ValueError(
@@ -77,6 +79,7 @@ class DemandAggregator:
 
         self._strategy: str = strategy
         self._mode_getter: Callable[[str], str] | None = mode_getter
+        self._fault_checker: Callable[[str], bool] | None = fault_checker
 
         # Internal state
         self._zone_demands: dict[str, float] = {}
@@ -299,9 +302,13 @@ class DemandAggregator:
             mode = self.get_zone_mode(cid)
             demand = self.get_zone_demand(cid)
 
-            coord = getattr(self, "coordinator", None)
-            if coord and hasattr(coord, "plant_diagnostics") and coord.plant_diagnostics.has_critical_sensor_fault(cid):
-                demand = 0.0
+            if self._fault_checker is not None:
+                if self._fault_checker(cid):
+                    demand = 0.0
+            else:
+                coord = getattr(self, "coordinator", None)
+                if coord and hasattr(coord, "plant_diagnostics") and coord.plant_diagnostics.has_critical_sensor_fault(cid):
+                    demand = 0.0
 
             if mode == ZONE_MODE_BYPASS:
                 continue
@@ -369,7 +376,15 @@ class DemandAggregator:
             final_demand = peak_demand
 
         elif self._strategy == DEMAND_STRATEGY_WEIGHTED_AVERAGE:
-            # Weighted average over active primary zones with Peak Safety Floor (ORACLE-2 / L1 fix)
+            # Weighted average over all configured primary zones to ensure monotonicity.
+            # Using total primary weight in the denominator guarantees:
+            #   ∂Demand / ∂Demand_i >= 0  (activating or increasing demand in any zone never drops output)
+            total_primary_weight = sum(
+                self.get_zone_weight(cid)
+                for cid, name in zone_entries
+                if self.get_zone_mode(cid) == ZONE_MODE_PRIMARY
+            )
+
             active_items = []
             for cid, name in zone_entries:
                 demand = primary_demands.get(name, 0.0)
@@ -379,29 +394,23 @@ class DemandAggregator:
             if not active_items:
                 final_demand = 0.0
                 peak_zone = None
+            elif total_primary_weight <= 0:
+                # Fallback if all configured weights are 0
+                peak_item = max(active_items, key=lambda item: item[2])
+                peak_zone = peak_item[1]
+                final_demand = peak_item[2]
             else:
                 weighted_sum = sum(
                     demand * self.get_zone_weight(cid)
                     for cid, _, demand in active_items
                 )
-                weight_sum = sum(
-                    self.get_zone_weight(cid)
-                    for cid, _, _ in active_items
-                )
-                if weight_sum > 0:
-                    raw_avg = weighted_sum / weight_sum
-                else:
-                    raw_avg = max(d for _, _, d in active_items)
+                raw_avg = weighted_sum / total_primary_weight
 
                 # Peak zone is the one with highest demand among primary
                 peak_item = max(active_items, key=lambda item: item[2])
                 peak_zone = peak_item[1]
-                peak_demand = peak_item[2]
 
-                # Option 2 (Concordata): Pavimento di sicurezza sulla zona di picco
-                # Evita che una stanza fredda venga affamata all'accensione di altre zone
-                safety_floor = peak_demand * DEFAULT_WEIGHTED_AVERAGE_PEAK_FLOOR
-                final_demand = min(100.0, max(0.0, round(max(raw_avg, safety_floor), 2)))
+                final_demand = min(100.0, max(0.0, round(raw_avg, 2)))
 
         elif self._strategy == DEMAND_STRATEGY_SUM_CAPPED:
             total_sum = sum(primary_demands.values())
