@@ -37,6 +37,8 @@ from .const import (
     CONF_BOILER_MODE,
     MODE_RELAY,
     MODE_OPENTHERM,
+    MODE_CENTRAL,
+    MODE_NONE,
     CONF_OPENTHERM_ENTITY,
     CONF_OPENTHERM_MIN_TEMP,
     CONF_OPENTHERM_MAX_TEMP,
@@ -196,7 +198,10 @@ class MultizoneCoordinator:
 
         from .boiler.opentherm_backend import OpenThermBoilerBackend
         from .boiler.relay_backend import RelayBoilerBackend
-        if self.boiler_mode == "opentherm":
+        from .boiler.centralized_backend import CentralizedBoilerBackend
+        if self.boiler_mode in (MODE_CENTRAL, MODE_NONE):
+            self.boiler_backend = CentralizedBoilerBackend(hass, self)
+        elif self.boiler_mode == "opentherm":
             self.boiler_backend = OpenThermBoilerBackend(
                 hass, 
                 self, 

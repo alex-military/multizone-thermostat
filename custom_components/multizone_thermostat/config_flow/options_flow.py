@@ -109,8 +109,12 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             self._boiler_mode = user_input[CONF_BOILER_MODE]
             if self._boiler_mode == MODE_RELAY:
                 return await self.async_step_boiler_relay()
-            else:
+            elif self._boiler_mode == MODE_OPENTHERM:
                 return await self.async_step_boiler_opentherm()
+            else:
+                self._boiler_switch = ""
+                self._opentherm_entity = None
+                return self._save_options()
 
         schema = get_options_change_boiler_schema(self._boiler_mode)
 
@@ -439,7 +443,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                 CONF_ZONES: self._zones,
                 CONF_GEOFENCING_ENABLED: self._geofencing_enabled,
             }
-        else:
+        elif self._boiler_mode == MODE_OPENTHERM:
             data = {
                 CONF_BOILER_MODE: self._boiler_mode,
                 CONF_OPENTHERM_ENTITY: self._opentherm_entity,
@@ -450,6 +454,12 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             }
             if self._opentherm_ch_switch:
                 data[CONF_OPENTHERM_CH_SWITCH] = self._opentherm_ch_switch
+        else:
+            data = {
+                CONF_BOILER_MODE: self._boiler_mode,
+                CONF_ZONES: self._zones,
+                CONF_GEOFENCING_ENABLED: self._geofencing_enabled,
+            }
         if self._dhw_active_sensor:
             data[CONF_DHW_ACTIVE_SENSOR] = self._dhw_active_sensor
         if self._geofencing_enabled and self._presence_sensor:

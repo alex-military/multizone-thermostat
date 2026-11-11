@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Multizone Thermostat — Boiler Mode",
-        "description": "Select how you want to control your central heating system (Relay ON/OFF or OpenTherm Modulating).",
+        "description": "Select how you want to control your central heating system (Relay ON/OFF, OpenTherm Modulating or Centralized / No Boiler).",
         "data": {
           "boiler_mode": "Boiler Control Mode"
         }

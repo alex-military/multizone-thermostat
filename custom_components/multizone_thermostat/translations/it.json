@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Termostato Multizona — Modalità Caldaia",
-        "description": "Seleziona come vuoi controllare il tuo sistema di riscaldamento centrale (Relè ON/OFF o OpenTherm Modulante).",
+        "description": "Seleziona come vuoi controllare il tuo sistema di riscaldamento (Relè ON/OFF, OpenTherm Modulante o Centralizzato / Nessuna Caldaia).",
         "data": {
           "boiler_mode": "Modalità Controllo Caldaia"
         }

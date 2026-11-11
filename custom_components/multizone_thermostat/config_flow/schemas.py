@@ -40,6 +40,7 @@ from ..const import (
     DEFAULT_TRV_SYNC,
     MODE_OPENTHERM,
     MODE_RELAY,
+    MODE_CENTRAL,
     CONF_ZONE_CALIBRATIONS,
     CONF_ZONE_WEIGHT,
     DEFAULT_ZONE_WEIGHT,
@@ -55,6 +56,7 @@ def get_boiler_mode_schema() -> vol.Schema:
                 options=[
                     selector.SelectOptionDict(value=MODE_RELAY, label="Relay (ON/OFF)"),
                     selector.SelectOptionDict(value=MODE_OPENTHERM, label="OpenTherm (Modulating)"),
+                    selector.SelectOptionDict(value=MODE_CENTRAL, label="Centralized / No Boiler (Condominiale)"),
                 ],
                 mode=selector.SelectSelectorMode.DROPDOWN,
             )
@@ -210,6 +212,7 @@ def get_options_change_boiler_schema(boiler_mode: str) -> vol.Schema:
                 options=[
                     selector.SelectOptionDict(value=MODE_RELAY, label="Relay (ON/OFF)"),
                     selector.SelectOptionDict(value=MODE_OPENTHERM, label="OpenTherm (Modulating)"),
+                    selector.SelectOptionDict(value=MODE_CENTRAL, label="Centralized / No Boiler (Condominiale)"),
                 ],
                 mode=selector.SelectSelectorMode.DROPDOWN,
             )

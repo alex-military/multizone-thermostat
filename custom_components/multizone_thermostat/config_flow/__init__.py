@@ -47,6 +47,8 @@ from ..const import (
     DOMAIN,
     MODE_OPENTHERM,
     MODE_RELAY,
+    MODE_CENTRAL,
+    MODE_NONE,
     make_zone_entity_id,
     CONF_ZONE_WEIGHT,
     DEFAULT_ZONE_WEIGHT,
@@ -97,8 +99,12 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._boiler_mode = user_input[CONF_BOILER_MODE]
             if self._boiler_mode == MODE_RELAY:
                 return await self.async_step_boiler_relay()
-            else:
+            elif self._boiler_mode == MODE_OPENTHERM:
                 return await self.async_step_boiler_opentherm()
+            else:
+                self._boiler_switch = None
+                self._opentherm_entity = None
+                return await self.async_step_add_zone()
 
         schema = get_boiler_mode_schema()
 
@@ -332,7 +338,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_ZONES: self._zones,
                     CONF_GEOFENCING_ENABLED: self._geofencing_enabled,
                 }
-            else:
+            elif self._boiler_mode == MODE_OPENTHERM:
                 data = {
                     CONF_BOILER_MODE: self._boiler_mode,
                     CONF_OPENTHERM_ENTITY: self._opentherm_entity,
@@ -343,6 +349,12 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 }
                 if self._opentherm_ch_switch:
                     data[CONF_OPENTHERM_CH_SWITCH] = self._opentherm_ch_switch
+            else:
+                data = {
+                    CONF_BOILER_MODE: self._boiler_mode,
+                    CONF_ZONES: self._zones,
+                    CONF_GEOFENCING_ENABLED: self._geofencing_enabled,
+                }
             if self._dhw_active_sensor:
                 data[CONF_DHW_ACTIVE_SENSOR] = self._dhw_active_sensor
             if self._geofencing_enabled and self._presence_sensor:
@@ -362,7 +374,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="confirm",
             data_schema=schema,
             description_placeholders={
-                "boiler_switch": self._boiler_switch or self._opentherm_entity or "N/A",
+                "boiler_switch": self._boiler_switch or self._opentherm_entity or ("Centralized Heating" if self._boiler_mode in (MODE_CENTRAL, MODE_NONE) else "N/A"),
                 "zones_count": str(len(self._zones)),
                 "zones_list": "\n".join(
                     f"- {z.get(CONF_ZONE_NAME, 'Unnamed Zone')}"

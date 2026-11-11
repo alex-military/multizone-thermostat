@@ -1,5 +1,16 @@
 # Changelog
 
+## [6.0.10] - 2026-11-11
+### Feat: Centralized / Condo Heating Support without Local Boiler Hardware (#11)
+- **Centralized Heating Mode (`MODE_CENTRAL`)**:
+  - Added native support for apartment installations connected to centralized / condominium heating plants where no local boiler switch or OpenTherm entity exists.
+  - Introduced `CentralizedBoilerBackend` providing transparent demand tracking and human-readable reason strings (`CENTRALIZED - Active (Demand: X%)` / `CENTRALIZED - Idle`) without triggering phantom switch calls.
+- **Config Flow & Options Flow Streamlining**:
+  - Selecting *Centralized / No Boiler (Condominiale)* in Step 1 skips the boiler relay / OpenTherm configuration steps and navigates directly to zone setup.
+  - In Options Flow, users can seamlessly transition between Relay, OpenTherm, and Centralized modes without requiring dummy switch entities.
+- **Fail-Safe Operation**:
+  - Master OFF and emergency routines gracefully coordinate zone valves while safely idling the centralized backend.
+
 ## [6.0.9] - 2026-11-10
 ### Fix: EMS-ESP Multi-Device DHW Activity Detection & Custom DHW Entity (#10)
 - **Multi-Device Integration Auto-Discovery**:
