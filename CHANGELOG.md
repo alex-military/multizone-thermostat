@@ -1,5 +1,12 @@
 # Changelog
 
+## [6.0.11] - 2026-11-12
+### Diagnostics: boiler relay logging
+- Boiler `status_reason` changes are now logged at INFO with switch state, demand, Master and DHW state.
+- `Boiler forced ON/OFF` promoted from DEBUG to INFO (with reason).
+- WARNING (once) when heat demand exists but the boiler switch is `unavailable`/`unknown`/missing.
+- INFO (once) when the Master switch is OFF and forces the boiler OFF.
+
 ## [6.0.10] - 2026-11-11
 ### Feat: Centralized / Condo Heating Support without Local Boiler Hardware (#11)
 - **Centralized Heating Mode (`MODE_CENTRAL`)**:

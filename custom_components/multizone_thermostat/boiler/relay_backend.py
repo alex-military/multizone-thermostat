@@ -45,7 +45,8 @@ class RelayBoilerBackend(BoilerBackend):
         self._boiler_pwm = PWMEngine(pwm_interval=900.0, min_on=self._min_cycle_on * 60, min_off=self._min_cycle_off * 60)
         self._last_boiler_change = 0.0
         self._pending_boiler_task: asyncio.Task | None = None
-        self._status_reason = "INIT"
+        self._status_reason_value = "INIT"
+        self._unavailable_warned = False
         self._last_demand = 0.0
         self._last_frost_emergency = False
         # Command confirmation tracking: None | ("on"/"off", monotonic_ts)
@@ -57,6 +58,28 @@ class RelayBoilerBackend(BoilerBackend):
     def status_reason(self) -> str:
         """Return the current status reason."""
         return self._status_reason
+
+    @property
+    def _status_reason(self) -> str:
+        return self._status_reason_value
+
+    @_status_reason.setter
+    def _status_reason(self, value: str) -> None:
+        """Set the status reason and log it (INFO) whenever it changes."""
+        if value == self._status_reason_value:
+            return
+        self._status_reason_value = value
+        try:
+            sw = self.hass.states.get(self.boiler_switch) if self.boiler_switch else None
+            _LOGGER.info(
+                "Boiler status: %s | switch=%s(%s) demand=%.1f%% master=%s dhw=%s pending_cmd=%s",
+                value, self.boiler_switch, sw.state if sw else "missing",
+                self._last_demand, self.coordinator.get_master_state(),
+                getattr(self.coordinator, "is_dhw_active", None),
+                self._pending_command[0] if self._pending_command else None,
+            )
+        except Exception:  # never let logging break control
+            _LOGGER.info("Boiler status: %s", value)
 
     def set_min_cycle_on(self, value: int) -> None:
         """Set the min cycle on time (minutes)."""
@@ -158,7 +181,7 @@ class RelayBoilerBackend(BoilerBackend):
             if hasattr(self.coordinator, "reset_last_active_time"):
                 self.coordinator.reset_last_active_time()
             self.coordinator.record_diagnostic_event("BOILER_SWITCH_ON", {"switch": self.boiler_switch, "reason": self._status_reason})
-            _LOGGER.debug("Boiler forced ON")
+            _LOGGER.info("Boiler forced ON (%s)", self._status_reason)
 
     async def _force_boiler_off(self) -> None:
         """Actually turn the boiler off and set locks."""
@@ -209,7 +232,7 @@ class RelayBoilerBackend(BoilerBackend):
                 )
 
             self.coordinator.record_diagnostic_event("BOILER_SWITCH_OFF", {"switch": self.boiler_switch, "reason": self._status_reason})
-            _LOGGER.debug("Boiler forced OFF")
+            _LOGGER.info("Boiler forced OFF (%s)", self._status_reason)
 
     async def async_emergency_off(self) -> None:
         """Fallback for emergency off and anti-seize."""
@@ -234,6 +257,16 @@ class RelayBoilerBackend(BoilerBackend):
 
         boiler_state = self.hass.states.get(self.boiler_switch) if self.boiler_switch else None
         current_boiler_on = boiler_state is not None and boiler_state.state == STATE_ON
+
+        if self.boiler_switch and (boiler_state is None or boiler_state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN)):
+            if demand > 0 and not self._unavailable_warned:
+                _LOGGER.warning(
+                    "Boiler switch %s is %s: heat demand %.1f%% cannot be executed until it is available",
+                    self.boiler_switch, boiler_state.state if boiler_state else "missing", demand,
+                )
+                self._unavailable_warned = True
+        else:
+            self._unavailable_warned = False
 
         if current_boiler_on and hasattr(self.coordinator, "reset_last_active_time"):
             self.coordinator.reset_last_active_time()
