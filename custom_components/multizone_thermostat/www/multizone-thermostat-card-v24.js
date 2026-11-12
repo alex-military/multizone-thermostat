@@ -801,6 +801,33 @@ function findMasterEntity(hass) {
   }) || null;
 }
 
+// Helper function to auto-discover the boiler switch/sensor entity
+function findBoilerEntity(hass) {
+  if (!hass || !hass.states) return null;
+
+  // 1. boiler_switch attribute exposed by the master switch
+  const masterId = findMasterEntity(hass);
+  if (masterId && hass.states[masterId] && hass.states[masterId].attributes) {
+    const bSwitch = hass.states[masterId].attributes.boiler_switch;
+    if (bSwitch && hass.states[bSwitch]) return bSwitch;
+  }
+
+  // 2. boiler_entity_id attribute exposed by the zone climate entities
+  for (const key of Object.keys(hass.states)) {
+    if (key.startsWith('climate.')) {
+      const attrs = hass.states[key].attributes || {};
+      if (attrs.boiler_entity_id && hass.states[attrs.boiler_entity_id]) {
+        return attrs.boiler_entity_id;
+      }
+    }
+  }
+
+  // 3. Fallback: name search
+  return Object.keys(hass.states).find(key =>
+    key.startsWith('switch.') && (key.includes('boiler') || key.includes('caldaia'))
+  ) || null;
+}
+
 // Helper function to auto-discover the preset select entity
 function findPresetEntity(hass) {
   if (!hass) return null;
@@ -2884,7 +2911,16 @@ class MultizoneThermostatStatusCard extends HTMLElement {
     const telemetry = this.shadowRoot.getElementById('master-telemetry');
 
     if (telemetry) {
-      telemetry.textContent = `Caldaia: ${boilerText}`;
+      let zonesHeating = 0;
+      for (const k of Object.keys(this._hass.states)) {
+        if (k.startsWith('climate.')) {
+          const a = this._hass.states[k].attributes || {};
+          if ((a.hybrid_zone || k.includes('multizone_thermostat_')) && a.hvac_action === 'heating') zonesHeating++;
+        }
+      }
+      telemetry.textContent = (isMasterOn && !isBoilerActive && zonesHeating > 0 && boilerEntity)
+        ? `Caldaia: ${boilerText} (richiesta calore)`
+        : `Caldaia: ${boilerText}`;
     }
 
     const isClassic = (this.getEffectiveStyle() === 'classic');

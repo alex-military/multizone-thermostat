@@ -363,7 +363,16 @@ class MultizoneThermostatStatusCard extends HTMLElement {
     const telemetry = this.shadowRoot.getElementById('master-telemetry');
 
     if (telemetry) {
-      telemetry.textContent = `Caldaia: ${boilerText}`;
+      let zonesHeating = 0;
+      for (const k of Object.keys(this._hass.states)) {
+        if (k.startsWith('climate.')) {
+          const a = this._hass.states[k].attributes || {};
+          if ((a.hybrid_zone || k.includes('multizone_thermostat_')) && a.hvac_action === 'heating') zonesHeating++;
+        }
+      }
+      telemetry.textContent = (isMasterOn && !isBoilerActive && zonesHeating > 0 && boilerEntity)
+        ? `Caldaia: ${boilerText} (richiesta calore)`
+        : `Caldaia: ${boilerText}`;
     }
 
     const isClassic = (this.getEffectiveStyle() === 'classic');

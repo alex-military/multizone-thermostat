@@ -1,5 +1,10 @@
 # Changelog
 
+## [6.0.12] - 2026-11-12
+### Fix: Master card stuck on 'Caricamento...' / 'Caldaia: OFF'
+- Regression since 6.0.7: the frontend refactor called `findBoilerEntity()` but never defined it, so the Master card threw a ReferenceError and never updated. Helper restored (boiler_switch attribute on master, boiler_entity_id on zones, name fallback).
+- Master card telemetry shows `Caldaia: OFF (richiesta calore)` when zones are heating but the boiler switch is off.
+
 ## [6.0.11] - 2026-11-12
 ### Diagnostics: boiler relay logging
 - Boiler `status_reason` changes are now logged at INFO with switch state, demand, Master and DHW state.
