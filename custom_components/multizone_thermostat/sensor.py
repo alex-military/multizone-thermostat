@@ -37,6 +37,7 @@ async def async_setup_entry(
         entities.append(MultizonePlantHealthSensor(hass, config_entry.entry_id, coordinator))
         entities.append(MultizoneBoilerCyclesSensor(hass, config_entry.entry_id, coordinator))
         entities.append(MultizoneBoilerDailyRuntimeSensor(hass, config_entry.entry_id, coordinator))
+        entities.append(MultizoneMasterDemandSensor(hass, config_entry.entry_id, coordinator))
 
     for zone in zones:
         climate_entity_id = make_zone_entity_id(zone[CONF_ZONE_NAME])
@@ -324,6 +325,67 @@ class MultizonePlantHealthSensor(SensorEntity):
             async_track_time_interval(
                 self.hass, self._update_state, timedelta(seconds=60)
             )
+        )
+
+
+class MultizoneMasterDemandSensor(SensorEntity):
+    """Aggregated demand actually sent to the boiler (what the plant 'sees')."""
+
+    _attr_has_entity_name = True
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_icon = "mdi:gauge"
+
+    def __init__(self, hass: HomeAssistant, entry_id: str, coordinator) -> None:
+        self.hass = hass
+        self._coordinator = coordinator
+        self._attr_unique_id = f"{DOMAIN}_{entry_id}_master_demand"
+        self._attr_name = "Master Demand"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, entry_id)},
+            name="Master Control",
+            manufacturer="Custom Integration",
+            model="Master Control",
+        )
+
+    def _aggregate(self):
+        orch = getattr(self._coordinator, "plant_orchestrator", None)
+        return getattr(orch, "last_aggregate", None)
+
+    @property
+    def native_value(self) -> float:
+        agg = self._aggregate()
+        return round(agg.demand, 1) if agg is not None else 0.0
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        agg = self._aggregate()
+        backend = getattr(self._coordinator, "boiler_backend", None)
+        attrs: dict[str, Any] = {
+            "master_on": self._coordinator.get_master_state(),
+            "boiler_status": getattr(backend, "status_reason", None),
+        }
+        if agg is not None:
+            attrs.update({
+                "peak_zone": agg.peak_zone,
+                "strategy": agg.strategy,
+                "dhw_active": agg.dhw_active,
+                "frost_emergency": agg.frost_emergency,
+                "primary_demands": {k: round(v, 1) for k, v in agg.primary_demands.items()},
+                "secondary_demands": {k: round(v, 1) for k, v in agg.secondary_demands.items()},
+            })
+        else:
+            attrs["reason"] = "Master OFF" if not attrs["master_on"] else "no data yet"
+        return attrs
+
+    @callback
+    def _update_state(self, _) -> None:
+        self.async_write_ha_state()
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            async_track_time_interval(self.hass, self._update_state, timedelta(seconds=15))
         )
 
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## [6.0.13] - 2026-11-12
+### Feat: Master Demand sensor
+- New `Master Demand` sensor (Master Control device, Sensors tab): aggregated demand (%) actually sent to the boiler. Attributes: `master_on`, `boiler_status` (reason), `peak_zone`, `strategy`, `dhw_active`, `frost_emergency`, per-zone primary/secondary demands. Shows 0 with reason `Master OFF` when the Master is off.
+
 ## [6.0.12] - 2026-11-12
 ### Fix: Master card stuck on 'Caricamento...' / 'Caldaia: OFF'
 - Regression since 6.0.7: the frontend refactor called `findBoilerEntity()` but never defined it, so the Master card threw a ReferenceError and never updated. Helper restored (boiler_switch attribute on master, boiler_entity_id on zones, name fallback).

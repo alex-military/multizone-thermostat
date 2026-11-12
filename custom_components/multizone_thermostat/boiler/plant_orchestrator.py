@@ -16,6 +16,7 @@ class PlantOrchestrator:
         self.boiler_backend = boiler_backend
         self.coordinator = coordinator
         self._master_off_logged = False
+        self.last_aggregate = None  # last AggregatedDemand sent to the boiler (None when Master OFF)
         
     async def async_tick(self, now: datetime) -> None:
         """Periodic PWM tick for boiler."""
@@ -52,6 +53,7 @@ class PlantOrchestrator:
             if not self._master_off_logged:
                 _LOGGER.info("Master switch is OFF: boiler forced OFF and heat demand ignored (frost emergency: %s)", frost_emergency)
                 self._master_off_logged = True
+            self.last_aggregate = None
             await self.boiler_backend.async_emergency_off()
             return
         self._master_off_logged = False
@@ -86,4 +88,5 @@ class PlantOrchestrator:
             frost_emergency=frost_emergency,
         )
                 
+        self.last_aggregate = agg
         await self.boiler_backend.async_update(agg.demand, agg.peak_zone, frost_emergency)
