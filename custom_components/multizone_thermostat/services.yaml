@@ -228,7 +228,8 @@ set_pid_parameters:
         number:
           min: 0.0
           max: 1.0
-          step: 0.0001
+          step: any
+          mode: box
     kd:
       name: Derivative Gain (Kd)
       description: Manual Kd gain value.
@@ -255,6 +256,16 @@ set_pid_parameters:
       required: false
       selector:
         boolean:
+    mode:
+      name: Seasonal PID Track
+      description: Optional seasonal PID track (heat or cool). Defaults to active/heat track.
+      required: false
+      example: heat
+      selector:
+        select:
+          options:
+            - heat
+            - cool
 
 reset_autotune:
   name: Reset Autotuner
@@ -275,3 +286,13 @@ reset_autotune:
       default: false
       selector:
         boolean:
+    mode:
+      name: Seasonal Autotuner Track
+      description: Optional seasonal autotuner track (heat or cool). Defaults to active/heat track.
+      required: false
+      example: heat
+      selector:
+        select:
+          options:
+            - heat
+            - cool
