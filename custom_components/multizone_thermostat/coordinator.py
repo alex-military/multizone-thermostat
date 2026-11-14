@@ -46,6 +46,8 @@ class MultizoneCoordinator:
         self._select_entities: dict[str, Any] = {}
         self._diagnostics_history: deque[dict[str, Any]] = deque(maxlen=100)
         self._climate_entities: dict[str, Any] = {}
+        self._entity_id_aliases: dict[str, str] = {}
+        self._pid_listeners: list[Any] = []
         self._settings: dict[str, Any] = {}
         self._presets: dict[str, Any] = {}
 
@@ -93,19 +95,78 @@ class MultizoneCoordinator:
         """Register the master switch entity."""
         self._master_switch = switch_entity
 
-    def register_climate(self, entity_id: str, callback, entity_instance: Any = None) -> None:
+    def resolve_zone_id(self, climate_id: str) -> str:
+        """Resolve an HA-localized or aliased entity_id back to its canonical zone id."""
+        return self._entity_id_aliases.get(climate_id, climate_id)
+
+    def register_pid_listener(self, callback_fn) -> None:
+        """Register a PID/autotuner UI entity listener."""
+        if callback_fn not in self._pid_listeners:
+            self._pid_listeners.append(callback_fn)
+
+    def unregister_pid_listener(self, callback_fn) -> None:
+        """Unregister a PID/autotuner UI entity listener."""
+        if callback_fn in self._pid_listeners:
+            self._pid_listeners.remove(callback_fn)
+
+    def async_notify_pid_entities(self) -> None:
+        """Notify registered PID/autotuner UI entities of updated values."""
+        for cb in list(self._pid_listeners):
+            try:
+                cb()
+            except Exception:
+                pass
+
+    def _pid_unlock_storage_key(self, zone_name: str) -> str:
+        resolved = self.resolve_zone_id(zone_name)
+        target = zone_name
+        if resolved.startswith("climate."):
+            for z in getattr(self, "zones", []) or []:
+                zname = z.get(CONF_ZONE_NAME)
+                if zname and make_zone_entity_id(zname) == resolved:
+                    target = zname
+                    break
+        safe = (target or "").lower().replace(" ", "_").replace("-", "_")
+        safe = "".join(c for c in safe if c.isalnum() or c == "_")
+        return f"pid_manual_unlock_{safe}"
+
+    def get_pid_manual_unlock(self, zone_name: str) -> bool:
+        """Return True if manual PID override sliders are unlocked for a zone."""
+        return bool(self.get_persistent_data(self._pid_unlock_storage_key(zone_name), False))
+
+    async def async_set_pid_manual_unlock(self, zone_name: str, unlocked: bool) -> None:
+        """Persist manual PID unlock state for a zone and notify dependent entities."""
+        await self.async_set_persistent_data(self._pid_unlock_storage_key(zone_name), bool(unlocked))
+        self.async_notify_pid_entities()
+
+    def register_climate(
+        self,
+        entity_id: str,
+        callback,
+        entity_instance: Any = None,
+        canonical_id: str | None = None,
+    ) -> None:
         """Register a climate entity for state updates and diagnostics."""
-        self._climate_callbacks[entity_id] = callback
-        self.demand_aggregator.register_climate_callback(entity_id, callback)
+        if canonical_id and entity_id and entity_id != canonical_id:
+            self._entity_id_aliases[entity_id] = canonical_id
+        canon = canonical_id or self.resolve_zone_id(entity_id)
+        self._climate_callbacks[canon] = callback
+        self.demand_aggregator.register_climate_callback(canon, callback)
         if entity_instance is not None:
-            self._climate_entities[entity_id] = entity_instance
+            self._climate_entities[canon] = entity_instance
 
     def unregister_climate(self, entity_id: str) -> None:
         """Unregister a climate entity on removal."""
+        canon = self.resolve_zone_id(entity_id)
+        self._climate_callbacks.pop(canon, None)
         self._climate_callbacks.pop(entity_id, None)
+        self._climate_entities.pop(canon, None)
         self._climate_entities.pop(entity_id, None)
+        self._entity_id_aliases.pop(entity_id, None)
         if hasattr(self, "demand_aggregator"):
-            self.demand_aggregator.unregister_climate_callback(entity_id)
+            self.demand_aggregator.unregister_climate_callback(canon)
+            if canon != entity_id:
+                self.demand_aggregator.unregister_climate_callback(entity_id)
 
     @property
     def _zone_modes(self) -> dict[str, str]:
@@ -347,19 +408,22 @@ class MultizoneCoordinator:
         await self.listener_manager.async_on_climate_state_changed(event)
 
     def get_zone_mode(self, climate_id: str) -> str:
-        return self.zone_manager.get_zone_mode(climate_id)
+        return self.zone_manager.get_zone_mode(self.resolve_zone_id(climate_id))
 
     def set_zone_mode(self, climate_id: str, mode: str, save_to_preset: bool = True) -> None:
-        self.zone_manager.set_zone_mode(climate_id, mode, save_to_preset=save_to_preset)
+        self.zone_manager.set_zone_mode(self.resolve_zone_id(climate_id), mode, save_to_preset=save_to_preset)
 
     def get_zone_demand(self, climate_id: str) -> float:
-        return self.demand_aggregator.get_zone_demand(climate_id)
+        return self.demand_aggregator.get_zone_demand(self.resolve_zone_id(climate_id))
 
     def set_zone_demand(self, climate_id: str, demand: float) -> None:
-        self.demand_aggregator.set_zone_demand(climate_id, demand)
+        self.demand_aggregator.set_zone_demand(self.resolve_zone_id(climate_id), demand)
 
-    def get_autotuner(self, climate_id: str):
-        return self.zone_controller.get_autotuner(climate_id)
+    def get_autotuner(self, climate_id: str, mode: str | None = None):
+        cid = self.resolve_zone_id(climate_id)
+        if mode is None:
+            return self.zone_controller.get_autotuner(cid)
+        return self.zone_controller.get_autotuner(cid, mode=mode)
 
     def is_zone_in_frost_emergency(self, climate_id: str) -> bool:
         """Return True if anti-frost is enabled and zone temperature is below the safety threshold."""

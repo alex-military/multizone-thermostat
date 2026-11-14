@@ -172,6 +172,7 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         master_dev_id = getattr(self._coordinator, "master_device_id", None)
         self._attr_device_info = make_zone_device_info(entry_id, self._name, master_dev_id)
 
+        self._canonical_id = vt_entity_id
         self.entity_id = vt_entity_id
         self._unsub_listeners: list = []
 
@@ -299,6 +300,44 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             if isinstance(cr, (int, float)):
                 attrs["cooling_rate"] = cr
 
+        active_mode = "cool" if self._hvac_mode == HVACMode.COOL else "heat"
+        tuner_getter = getattr(self._coordinator, "get_autotuner", None)
+        cid_lookup = getattr(self, "_canonical_id", None) or self.entity_id
+        tuner = None
+        if callable(tuner_getter):
+            try:
+                tuner = tuner_getter(cid_lookup, mode=active_mode)
+            except TypeError:
+                tuner = tuner_getter(cid_lookup)
+        if tuner and isinstance(getattr(tuner, "kp", None), (int, float)):
+            attrs["pid_kp"] = round(float(tuner.kp), 2)
+            attrs["pid_ki"] = round(float(tuner.ki), 4)
+            attrs["pid_kd"] = round(float(tuner.kd), 2)
+            learned_kp = getattr(tuner, "_learned_kp", tuner.kp)
+            learned_ki = getattr(tuner, "_learned_ki", tuner.ki)
+            learned_kd = getattr(tuner, "_learned_kd", tuner.kd)
+            if isinstance(learned_kp, (int, float)):
+                attrs["learned_kp"] = round(float(learned_kp), 2)
+                attrs["learned_ki"] = round(float(learned_ki), 4)
+                attrs["learned_kd"] = round(float(learned_kd), 2)
+            if isinstance(getattr(tuner, "state", None), str):
+                attrs["autotune_state"] = tuner.state
+            if isinstance(getattr(tuner, "completed_cycles", None), list):
+                attrs["autotune_cycles"] = len(tuner.completed_cycles)
+            if isinstance(getattr(tuner, "required_cycles", None), int):
+                attrs["autotune_required_cycles"] = tuner.required_cycles
+            overrides = getattr(tuner, "manual_overrides", None)
+            if isinstance(overrides, dict):
+                attrs["pid_manual_overrides"] = sorted(overrides.keys())
+            weekly = getattr(tuner, "weekly_candidates", None)
+            if isinstance(weekly, list):
+                attrs["weekly_candidates_count"] = len(weekly)
+        unlock_getter = getattr(self._coordinator, "get_pid_manual_unlock", None)
+        if callable(unlock_getter):
+            unlock_val = unlock_getter(self._name)
+            if isinstance(unlock_val, bool):
+                attrs["pid_manual_unlock"] = unlock_val
+
         split_is_heating = False
         hydronic_suppressed = False
         if hasattr(self._coordinator, "split_manager") and self._coordinator.split_manager.has_split(self.entity_id):
@@ -385,16 +424,22 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             if hasattr(self.hass, "async_create_task"):
                 self.hass.async_create_task(sched_manager.async_save_to_storage())
 
+        has_temp_slot_override = (
+            sched_enabled
+            and isinstance(getattr(sched_manager, "manual_overrides", None), dict)
+            and self.entity_id in sched_manager.manual_overrides
+        )
         current_preset = self._coordinator.get_global_preset()
         if current_preset and current_preset != "none":
+            target_preset = "manual" if has_temp_slot_override else current_preset
             mode_val = str(self._hvac_mode.value if hasattr(self._hvac_mode, "value") else self._hvac_mode)
             if mode_val == "cool":
                 self._coordinator.zone_manager.update_preset_temperature(
-                    current_preset, self.entity_id, temperature, hvac_mode="cool"
+                    target_preset, self.entity_id, temperature, hvac_mode="cool"
                 )
             else:
                 self._coordinator.zone_manager.update_preset_temperature(
-                    current_preset, self.entity_id, temperature
+                    target_preset, self.entity_id, temperature
                 )
 
         self.async_write_ha_state()
@@ -410,7 +455,12 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         """Run when entity about to be added."""
         await super().async_added_to_hass()
         
-        self._coordinator.register_climate(self.entity_id, self.async_write_ha_state, self)
+        self._coordinator.register_climate(
+            self.entity_id,
+            self.async_write_ha_state,
+            self,
+            canonical_id=getattr(self, "_canonical_id", None) or self.entity_id,
+        )
 
         self._hvac_mode, self._target_temperature = await ZoneStateRestorer.async_restore_state(
             self, self._hvac_mode, self._target_temperature

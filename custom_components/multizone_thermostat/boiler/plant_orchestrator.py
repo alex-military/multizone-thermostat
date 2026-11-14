@@ -3,7 +3,9 @@ from .plant_decision import (
     decide_heating,
     AUTO,
 )
+from collections.abc import Mapping
 from datetime import datetime
+from types import SimpleNamespace
 import asyncio
 import inspect
 import logging
@@ -97,6 +99,71 @@ class PlantOrchestrator:
         self.coordinator = coordinator
         self.heat_pump_backend = heat_pump_backend
         self._last_plant_command = None
+        self._master_off_logged = False
+        self.last_aggregate = None
+
+    async def _async_refresh_zones_proactively(self) -> None:
+        """Proactively re-evaluate zone PID demands before plant aggregation."""
+        zone_ctrl = getattr(self.coordinator, "zone_controller", None)
+        if zone_ctrl is None or not callable(getattr(zone_ctrl, "async_update_zone", None)):
+            return
+
+        states = getattr(self.hass, "states", None) if self.hass else None
+        climates = getattr(self.coordinator, "_climate_entities", None)
+        climates_map = climates if isinstance(climates, dict) else {}
+        zones = getattr(self.coordinator, "zones", None)
+        resolve_fn = getattr(self.coordinator, "resolve_zone_id", None)
+        set_dem_fn = getattr(self.demand_aggregator, "set_zone_demand", None)
+
+        ordered_cids: list[str] = []
+        if isinstance(zones, list):
+            for z in zones:
+                if isinstance(z, dict) and z.get(CONF_ZONE_NAME):
+                    ordered_cids.append(make_zone_entity_id(z[CONF_ZONE_NAME]))
+        for raw_id in climates_map.keys():
+            canon = resolve_fn(raw_id) if callable(resolve_fn) else raw_id
+            ordered_cids.append(canon)
+        unique_cids = list(dict.fromkeys(ordered_cids))
+
+        for cid in unique_cids:
+            ent = climates_map.get(cid)
+            real_eid = getattr(ent, "entity_id", None) if ent is not None else None
+            st = None
+            if states:
+                for lookup_id in dict.fromkeys(x for x in (real_eid, cid) if x):
+                    cand = states.get(lookup_id)
+                    if cand is not None:
+                        st = cand
+                        break
+
+            state_obj = None
+            if (
+                st is not None
+                and isinstance(getattr(st, "attributes", None), Mapping)
+                and isinstance(getattr(st, "state", None), str)
+            ):
+                state_obj = st
+            elif ent is not None:
+                raw_mode = getattr(ent, "hvac_mode", None)
+                mode_str = str(getattr(raw_mode, "value", raw_mode) or "off")
+                attrs: dict[str, Any] = {}
+                if st is not None and isinstance(getattr(st, "attributes", None), Mapping):
+                    attrs.update(dict(st.attributes))
+                if getattr(ent, "current_temperature", None) is not None:
+                    attrs.setdefault("current_temperature", ent.current_temperature)
+                if getattr(ent, "target_temperature", None) is not None:
+                    attrs.setdefault("temperature", ent.target_temperature)
+                if getattr(ent, "preset_mode", None) is not None:
+                    attrs.setdefault("preset_mode", ent.preset_mode)
+                state_obj = SimpleNamespace(state=mode_str, attributes=attrs)
+
+            if state_obj is None:
+                continue
+
+            res = zone_ctrl.async_update_zone(cid, state_obj)
+            dem = await res if inspect.iscoroutine(res) else res
+            if isinstance(dem, (int, float)) and not isinstance(dem, bool) and callable(set_dem_fn):
+                set_dem_fn(cid, float(dem))
 
     def _get_hp_backend(self):
         return self.heat_pump_backend or getattr(self.coordinator, "heat_pump_backend", None)
@@ -204,10 +271,17 @@ class PlantOrchestrator:
 
         # Hard stop if master switch is OFF
         if not self.coordinator.get_master_state() and not frost_emergency:
+            if not self._master_off_logged:
+                _LOGGER.info("Master switch is OFF (no frost emergency): stopping plant")
+                self._master_off_logged = True
+            self.last_aggregate = None
             await self.boiler_backend.async_emergency_off()
             if hp_backend is not None and hasattr(hp_backend, "async_emergency_off"):
                 await hp_backend.async_emergency_off()
             return
+        self._master_off_logged = False
+
+        await self._async_refresh_zones_proactively()
 
         master_mode = getattr(self.coordinator, "master_hvac_mode", HVAC_MODE_HEAT)
         if master_mode == HVAC_MODE_COOL and not frost_emergency:
@@ -284,6 +358,7 @@ class PlantOrchestrator:
             is_dhw_active=dhw_active,
             frost_emergency=frost_emergency,
         )
+        self.last_aggregate = agg
 
         hp_enabled = bool(getattr(self.coordinator, "enable_heat_pump", False) is True and hp_backend is not None)
         gas_enabled = bool(getattr(self.coordinator, "enable_gas_heater", True) is not False)

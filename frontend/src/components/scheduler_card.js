@@ -582,17 +582,37 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
         }
         .time-ruler {
           display: flex;
-          margin-left: 180px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-          padding-bottom: 4px;
+          align-items: center;
+          gap: 10px;
           margin-bottom: 8px;
+        }
+        .ruler-spacer {
+          width: 170px;
+          flex-shrink: 0;
+        }
+        .ruler-track {
+          flex: 1;
           position: relative;
+          height: 20px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+          border-left: 1px solid transparent;
+          border-right: 1px solid transparent;
+          box-sizing: border-box;
         }
         .ruler-hour {
-          flex: 1;
-          text-align: left;
+          position: absolute;
+          top: 0;
+          transform: translateX(-50%);
           font-size: 0.75rem;
           color: rgba(255, 255, 255, 0.6);
+          white-space: nowrap;
+          user-select: none;
+        }
+        .ruler-hour.ruler-start {
+          transform: translateX(0);
+        }
+        .ruler-hour.ruler-end {
+          transform: translateX(-100%);
         }
         .matrix-row {
           display: flex;
@@ -675,6 +695,34 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
           transform: scaleY(1.08);
           filter: brightness(1.15);
           z-index: 5;
+        }
+        .time-block.baseline-block {
+          opacity: 0.36;
+          border: 1px dashed rgba(255, 255, 255, 0.35);
+          box-shadow: none;
+          font-weight: 500;
+          font-size: 0.68rem;
+          z-index: 1;
+          pointer-events: none;
+        }
+        .time-block.manual-override-block {
+          background: linear-gradient(135deg, rgba(245, 158, 11, 0.92), rgba(217, 119, 6, 0.92));
+          border: 1px solid #fde68a;
+          z-index: 6;
+          box-shadow: 0 0 8px rgba(245, 158, 11, 0.45);
+        }
+        .matrix-row.general-master-row {
+          padding-bottom: 8px;
+          margin-bottom: 10px;
+          border-bottom: 1px dashed rgba(56, 189, 248, 0.35);
+        }
+        .matrix-row.general-master-row .room-title {
+          color: #38bdf8;
+          font-weight: 700;
+        }
+        .matrix-row.general-master-row .timeline-track {
+          border-color: rgba(56, 189, 248, 0.35);
+          background: rgba(56, 189, 248, 0.06);
         }
         .block-comfort { background: linear-gradient(135deg, #f97316, #ea580c); }
         .block-eco { background: linear-gradient(135deg, #22c55e, #16a34a); }
@@ -1448,10 +1496,15 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
 
         <div class="matrix-container" id="matrix-scroll-area">
           <div class="time-ruler">
-            ${Array.from({ length: 13 }).map((_, i) => {
-              const h = String(i * 2).padStart(2, '0');
-              return `<div class="ruler-hour">${h}:00</div>`;
-            }).join('')}
+            <div class="ruler-spacer"></div>
+            <div class="ruler-track">
+              ${Array.from({ length: 13 }).map((_, i) => {
+                const h = String(i * 2).padStart(2, '0');
+                const leftPct = (i * 100) / 12;
+                const edgeCls = i === 0 ? 'ruler-start' : (i === 12 ? 'ruler-end' : '');
+                return `<div class="ruler-hour ${edgeCls}" style="left: ${leftPct}%;">${h}:00</div>`;
+              }).join('')}
+            </div>
           </div>
           <div id="matrix-rows-container"></div>
         </div>
@@ -1509,6 +1562,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
     sched.profiles[this._editorProfileId].baseline_preset = newPreset;
     this._localScheduleCache = sched;
     this._saveProfileToServer(this._editorProfileId, sched.profiles[this._editorProfileId]);
+    this.renderMatrixRows();
   }
 
   _copyDayToRange(targetDays) {
@@ -1527,6 +1581,108 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
     this.renderMatrixRows();
   }
 
+  _computeBaselineGaps(blocks, baselinePreset) {
+    const base = baselinePreset || 'eco';
+    const sorted = (blocks || [])
+      .map(b => {
+        const s = this._toMinutes(b.start);
+        const e = (b.end === '23:59' || b.end === '24:00') ? 1440 : this._toMinutes(b.end);
+        return { s, e };
+      })
+      .filter(b => b.e > b.s)
+      .sort((a, b) => a.s - b.s);
+
+    const gaps = [];
+    let cursor = 0;
+    for (const seg of sorted) {
+      if (seg.s > cursor) {
+        gaps.push({
+          startMin: cursor,
+          endMin: seg.s,
+          start: this._toTimeStr(cursor),
+          end: seg.s >= 1440 ? '24:00' : this._toTimeStr(seg.s),
+          preset: base,
+        });
+      }
+      cursor = Math.max(cursor, seg.e);
+    }
+    if (cursor < 1440) {
+      gaps.push({
+        startMin: cursor,
+        endMin: 1440,
+        start: this._toTimeStr(cursor),
+        end: '24:00',
+        preset: base,
+      });
+    }
+    return gaps;
+  }
+
+  _computeGeneralDayBlocks(zones, daySchedule) {
+    if (!zones || zones.length === 0) return [];
+    const points = new Set([0, 1440]);
+    const zoneIntervals = zones.map(z => {
+      const zBlocks = daySchedule[z.climate] || daySchedule[z.id] || [];
+      return zBlocks.map(b => {
+        const s = this._toMinutes(b.start);
+        const e = (b.end === '23:59' || b.end === '24:00') ? 1440 : this._toMinutes(b.end);
+        if (e > s) {
+          points.add(s);
+          points.add(e);
+        }
+        return { s, e, preset: b.preset || 'comfort' };
+      }).filter(b => b.e > b.s);
+    });
+
+    const sortedPoints = Array.from(points).sort((a, b) => a - b);
+    const priority = { comfort: 0, eco: 1, sleep: 2, away: 3 };
+    const slices = [];
+
+    for (let i = 0; i < sortedPoints.length - 1; i++) {
+      const t1 = sortedPoints[i];
+      const t2 = sortedPoints[i + 1];
+      if (t2 <= t1) continue;
+      const mid = (t1 + t2) / 2;
+      const counts = {};
+      let covered = 0;
+
+      for (const intervals of zoneIntervals) {
+        const hit = intervals.find(iv => iv.s <= mid && iv.e > mid);
+        if (hit) {
+          covered += 1;
+          counts[hit.preset] = (counts[hit.preset] || 0) + 1;
+        }
+      }
+      if (covered === 0) continue;
+
+      const topPreset = Object.keys(counts).sort((a, b) => {
+        if (counts[b] !== counts[a]) return counts[b] - counts[a];
+        return (priority[a] ?? 99) - (priority[b] ?? 99);
+      })[0];
+      const mixed = counts[topPreset] < zones.length;
+      slices.push({ startMin: t1, endMin: t2, preset: topPreset, mixed });
+    }
+
+    const merged = [];
+    for (const sl of slices) {
+      const prev = merged[merged.length - 1];
+      if (prev && prev.endMin === sl.startMin && prev.preset === sl.preset && prev.mixed === sl.mixed) {
+        prev.endMin = sl.endMin;
+      } else {
+        merged.push({ ...sl });
+      }
+    }
+
+    return merged.map(m => ({
+      start: this._toTimeStr(m.startMin),
+      end: m.endMin >= 1440 ? '24:00' : this._toTimeStr(m.endMin),
+      startMin: m.startMin,
+      endMin: m.endMin,
+      preset: m.preset,
+      mixed: m.mixed,
+    }));
+  }
+
   renderMatrixRows() {
     const rowsContainer = this.shadowRoot.querySelector('#matrix-rows-container');
     if (!rowsContainer) return;
@@ -1535,6 +1691,8 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
     const sched = this._getScheduleStatus();
     const prof = sched.profiles?.[this._editorProfileId] || {};
     const daySchedule = prof.days?.[this._selectedDay] || {};
+    const currentBaseline = prof.baseline_preset || 'eco';
+    const manualOverrides = sched.manual_overrides || {};
 
     const dayMap = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
     const isToday = dayMap[new Date().getDay()] === this._selectedDay;
@@ -1542,8 +1700,80 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
     const nowMinutes = now.getHours() * 60 + now.getMinutes();
     const nowPercent = (nowMinutes / 1440) * 100;
 
-    rowsContainer.innerHTML = zones.map(z => {
+    const gridAndLine = `
+      ${Array.from({ length: 12 }).map((_, i) => `
+        <div class="grid-line" style="left: ${(i + 1) * (100 / 12)}%;"></div>
+      `).join('')}
+      ${isToday ? `<div class="current-time-line" style="left: ${nowPercent}%;"></div>` : ''}
+    `;
+
+    const renderBaselineGapsHtml = (blocks) => {
+      const gaps = this._computeBaselineGaps(blocks, currentBaseline);
+      return gaps.map(g => {
+        const left = (g.startMin / 1440) * 100;
+        const width = ((g.endMin - g.startMin) / 1440) * 100;
+        if (width < 2) return '';
+        const presetClass = 'block-' + g.preset;
+        const baseWord = this._t('sched_base_tag');
+        return `
+          <div class="time-block baseline-block ${presetClass}" style="left: ${left}%; width: ${width}%;"
+               title="${g.preset.toUpperCase()} (${baseWord}): ${g.start} - ${g.end}">
+            ${g.preset.substring(0, 3).toUpperCase()} (${baseWord})
+          </div>
+        `;
+      }).join('');
+    };
+
+    const generalBlocks = this._computeGeneralDayBlocks(zones, daySchedule);
+    const generalRowHtml = zones.length > 0 ? `
+      <div class="matrix-row general-master-row" data-zone="__all__">
+        <div class="room-label-box">
+          <span class="room-title" title="${this._t('sched_all_zones_row')}">🏠 ${this._t('sched_all_zones_row')}</span>
+        </div>
+        <div class="timeline-track" data-zone="__all__">
+          ${gridAndLine}
+          ${renderBaselineGapsHtml(generalBlocks)}
+          ${generalBlocks.map(b => {
+            const left = (b.startMin / 1440) * 100;
+            const width = Math.max(1.5, ((b.endMin - b.startMin) / 1440) * 100);
+            const presetClass = 'block-' + b.preset;
+            const prefix = b.mixed ? '⚡ ' : '';
+            return `
+              <div class="time-block ${presetClass}" style="left: ${left}%; width: ${width}%;"
+                   data-zone="__all__" data-start="${b.start}" data-end="${b.end}" data-preset="${b.preset}"
+                   title="${b.preset.toUpperCase()}: ${b.start} - ${b.end}${b.mixed ? ' (Mixed)' : ''}">
+                ${prefix}${b.preset.substring(0, 3).toUpperCase()} ${b.start}-${b.end}
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    ` : '';
+
+    const zonesRowsHtml = zones.map(z => {
       const blocks = daySchedule[z.climate] || daySchedule[z.id] || [];
+      let overrideBlockHtml = '';
+      if (isToday && manualOverrides[z.climate]) {
+        const ov = manualOverrides[z.climate];
+        const untilDt = ov.until ? new Date(ov.until) : null;
+        if (untilDt && !isNaN(untilDt.getTime()) && untilDt > now && nowMinutes < 1440) {
+          const sameDay = untilDt.getDate() === now.getDate()
+            && untilDt.getMonth() === now.getMonth()
+            && untilDt.getFullYear() === now.getFullYear();
+          const untilMin = sameDay ? (untilDt.getHours() * 60 + untilDt.getMinutes()) : 1440;
+          const ovEnd = Math.min(1440, Math.max(nowMinutes + 15, untilMin));
+          const left = (nowMinutes / 1440) * 100;
+          const width = Math.max(2.0, ((ovEnd - nowMinutes) / 1440) * 100);
+          overrideBlockHtml = `
+            <div class="time-block manual-override-block" style="left: ${left}%; width: ${width}%;"
+                 data-zone="${z.climate}" data-override="1"
+                 title="Override manuale attivo: ${Number(ov.target_temp).toFixed(1)}°C">
+              ✋ ${Number(ov.target_temp).toFixed(1)}°C
+            </div>
+          `;
+        }
+      }
+
       return `
         <div class="matrix-row" data-zone="${z.climate}">
           <div class="room-label-box">
@@ -1553,15 +1783,11 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
             </button>
           </div>
           <div class="timeline-track" data-zone="${z.climate}">
-            ${Array.from({ length: 12 }).map((_, i) => `
-              <div class="grid-line" style="left: ${(i + 1) * (100 / 12)}%;"></div>
-            `).join('')}
-            ${isToday ? `
-              <div class="current-time-line" style="left: ${nowPercent}%;"></div>
-            ` : ''}
+            ${gridAndLine}
+            ${renderBaselineGapsHtml(blocks)}
             ${blocks.map((b, idx) => {
               const startMin = this._toMinutes(b.start);
-              const endMin = this._toMinutes(b.end);
+              const endMin = (b.end === '23:59' || b.end === '24:00') ? 1440 : this._toMinutes(b.end);
               const left = (startMin / 1440) * 100;
               const width = Math.max(1.5, ((endMin - startMin) / 1440) * 100);
               const presetClass = 'block-' + (b.preset || 'comfort');
@@ -1572,10 +1798,13 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
                 </div>
               `;
             }).join('')}
+            ${overrideBlockHtml}
           </div>
         </div>
       `;
     }).join('');
+
+    rowsContainer.innerHTML = generalRowHtml + zonesRowsHtml;
 
     rowsContainer.querySelectorAll('.btn-copy-room').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -1587,7 +1816,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
 
     rowsContainer.querySelectorAll('.timeline-track').forEach(track => {
       track.addEventListener('click', (e) => {
-        if (e.target.closest('.time-block')) return;
+        if (e.target.closest('.time-block:not(.baseline-block)')) return;
         const cid = track.getAttribute('data-zone');
         const rect = track.getBoundingClientRect();
         const clickX = e.clientX - rect.left;
@@ -1598,7 +1827,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
 
         this.openSlotModal({
           isEdit: false,
-          zoneId: cid,
+          zoneId: cid === '__all__' ? undefined : cid,
           day: this._selectedDay,
           start: this._toTimeStr(startMin),
           end: this._toTimeStr(endMin),
@@ -1607,10 +1836,29 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
       });
     });
 
-    rowsContainer.querySelectorAll('.time-block').forEach(block => {
+    rowsContainer.querySelectorAll('.time-block:not(.baseline-block)').forEach(block => {
       block.addEventListener('click', (e) => {
         e.stopPropagation();
         const cid = block.getAttribute('data-zone');
+        if (block.hasAttribute('data-override')) {
+          if (this._hass && confirm("Rimuovere l'override manuale temporaneo per questa stanza?")) {
+            this._hass.callService('multizone_thermostat', 'clear_zone_override', {
+              entity_id: cid
+            });
+          }
+          return;
+        }
+        if (cid === '__all__') {
+          this.openSlotModal({
+            isEdit: true,
+            day: this._selectedDay,
+            preset: block.getAttribute('data-preset') || 'comfort',
+            start: block.getAttribute('data-start'),
+            end: block.getAttribute('data-end'),
+            selectedDays: [this._selectedDay]
+          });
+          return;
+        }
         const idx = parseInt(block.getAttribute('data-index'), 10);
         const blocks = (sched.profiles?.[this._editorProfileId]?.days?.[this._selectedDay]?.[cid]) || [];
         const slot = blocks[idx];

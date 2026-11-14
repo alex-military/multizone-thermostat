@@ -17,8 +17,10 @@ from ..const import (
     DEFAULT_COOLING_PRESET_TEMPS,
     DEFAULT_SCHEDULE_PROFILE,
     DEFAULT_SMART_START_HEATING_RATE,
+    GLOBAL_PRESET_AWAY,
     KEY_ACTIVE_PROFILE,
     KEY_FALLBACK_PROFILE,
+    KEY_GEOFENCING_TOGGLE,
     KEY_MANUAL_OVERRIDES,
     KEY_PROFILE_EXPIRES_AT,
     KEY_SCHEDULE_PROFILES,
@@ -537,6 +539,7 @@ class ScheduleProfileManager:
             sr_plan = self.calculate_smart_return_plan(sr_arrival, sr_preset, sr_zones, now)
 
         zones = getattr(self.coordinator, "zones", [])
+        scheduled_zone_presets: list[str] = []
 
         for zone in zones:
             climate_id = zone.get("climate_id") or make_zone_entity_id(
@@ -608,6 +611,9 @@ class ScheduleProfileManager:
                                 "heating_rate": item["heating_rate"],
                                 "source": "smart_return",
                             }
+                            scheduled_zone_presets.append(
+                                str(self.smart_return.get("preset", "comfort")).lower()
+                            )
                             continue
 
             # 2. Explicit OFF check:
@@ -669,9 +675,58 @@ class ScheduleProfileManager:
                 else:
                     self._active_smart_starts.pop(climate_id, None)
 
+                active_ss_final = self.smart_start_info.get(climate_id)
+                zone_preset_name = (
+                    str(active_ss_final.get("preset", slot.get("preset", "eco"))).lower()
+                    if isinstance(active_ss_final, dict)
+                    else str(slot.get("preset", "eco")).lower()
+                )
+                scheduled_zone_presets.append(zone_preset_name)
+
+        preset_synced = False
+        zone_manager = getattr(self.coordinator, "zone_manager", None)
+        if (
+            (self.scheduler_enabled or sr_plan)
+            and scheduled_zone_presets
+            and zone_manager is not None
+            and hasattr(zone_manager, "set_global_preset")
+        ):
+            routine_mgr = getattr(self.coordinator, "routine_manager", None)
+            geo_enabled = True
+            if hasattr(self.coordinator, "get_persistent_data"):
+                raw_geo = self.coordinator.get_persistent_data(KEY_GEOFENCING_TOGGLE, True)
+                if isinstance(raw_geo, bool):
+                    geo_enabled = raw_geo
+            last_presence = getattr(routine_mgr, "_last_known_presence", None) if routine_mgr else None
+            is_away_active = (
+                geo_enabled
+                and routine_mgr is not None
+                and getattr(routine_mgr, "presence_sensor", None)
+                and isinstance(last_presence, str)
+                and routine_mgr._is_state_away(last_presence)
+            )
+            if not is_away_active:
+                counts: dict[str, int] = {}
+                for p in scheduled_zone_presets:
+                    counts[p] = counts.get(p, 0) + 1
+                priority = {"comfort": 0, "eco": 1, "sleep": 2, "away": 3}
+                dominant_preset = min(
+                    counts.keys(),
+                    key=lambda p: (-counts[p], priority.get(p, 99)),
+                )
+                cur_gp = getattr(zone_manager, "current_global_preset", None)
+                if cur_gp != dominant_preset and cur_gp != GLOBAL_PRESET_AWAY:
+                    zone_manager.set_global_preset(dominant_preset)
+                    preset_synced = True
+                elif cur_gp == GLOBAL_PRESET_AWAY and dominant_preset == GLOBAL_PRESET_AWAY:
+                    pass
+                elif cur_gp == GLOBAL_PRESET_AWAY:
+                    zone_manager.set_global_preset(dominant_preset)
+                    preset_synced = True
+
         target_changed = old_overrides != self.schedule_overrides
         smart_start_changed = old_smart_start != self.smart_start_info
-        if target_changed or smart_start_changed or profile_expired or smart_return_completed:
+        if target_changed or smart_start_changed or profile_expired or smart_return_completed or preset_synced:
             self._notify_climates()
 
     def get_effective_target(self, climate_id: str) -> float | None:
@@ -744,6 +799,7 @@ class ScheduleProfileManager:
 
         selects = getattr(self.coordinator, "_select_entities", {})
         if isinstance(selects, dict):
-            prof_select = selects.get("schedule_profile")
-            if prof_select and hasattr(prof_select, "async_write_ha_state"):
-                prof_select.async_write_ha_state()
+            for key in ("schedule_profile", "global_preset"):
+                sel_ent = selects.get(key)
+                if sel_ent and hasattr(sel_ent, "async_write_ha_state"):
+                    sel_ent.async_write_ha_state()

@@ -37,6 +37,7 @@ async def async_setup_entry(
         entities.append(MultizonePlantHealthSensor(hass, config_entry.entry_id, coordinator))
         entities.append(MultizoneBoilerCyclesSensor(hass, config_entry.entry_id, coordinator))
         entities.append(MultizoneBoilerDailyRuntimeSensor(hass, config_entry.entry_id, coordinator))
+        entities.append(MultizoneMasterDemandSensor(hass, config_entry.entry_id, coordinator))
 
     for zone in zones:
         climate_entity_id = make_zone_entity_id(zone[CONF_ZONE_NAME])
@@ -128,6 +129,11 @@ class AutotuneSensor(SensorEntity):
         if not tuner:
             return "unknown"
         season_label = "Freddo" if season_mode == "cool" else "Caldo"
+        overrides = getattr(tuner, "manual_overrides", None)
+        if overrides:
+            if tuner.state == tuner.STATE_COMPLETED:
+                return f"Smart PID Attivo ({season_label}) + Manual"
+            return f"Manual Override ({season_label})"
         if tuner.state == tuner.STATE_COMPLETED:
             return f"Smart PID Attivo ({season_label})"
         return f"Apprendimento {season_label} ({len(tuner.completed_cycles)}/{tuner.required_cycles})"
@@ -141,25 +147,35 @@ class AutotuneSensor(SensorEntity):
         tuner_cool = self._coordinator.zone_controller.get_autotuner(self._climate_entity_id, mode="cool")
 
         active_tuner = tuner_cool if season_mode == "cool" else tuner_heat
-        kp_active = round(active_tuner.kp, 2) if active_tuner and active_tuner.state == active_tuner.STATE_COMPLETED else 0.0
-        ki_active = round(active_tuner.ki, 4) if active_tuner and active_tuner.state == active_tuner.STATE_COMPLETED else 0.0
-        kd_active = round(active_tuner.kd, 2) if active_tuner and active_tuner.state == active_tuner.STATE_COMPLETED else 0.0
+        overrides = getattr(active_tuner, "manual_overrides", {}) or {} if active_tuner else {}
+        completed = bool(active_tuner and active_tuner.state == active_tuner.STATE_COMPLETED)
+        kp_active = round(active_tuner.kp, 2) if active_tuner and (completed or "Kp" in overrides) else 0.0
+        ki_active = round(active_tuner.ki, 4) if active_tuner and (completed or "Ki" in overrides) else 0.0
+        kd_active = round(active_tuner.kd, 2) if active_tuner and (completed or "Kd" in overrides) else 0.0
+
+        heat_overrides = getattr(tuner_heat, "manual_overrides", {}) or {} if tuner_heat else {}
+        cool_overrides = getattr(tuner_cool, "manual_overrides", {}) or {} if tuner_cool else {}
 
         attrs = {
             "active_season": season_mode,
             "Kp": kp_active,
             "Ki": ki_active,
             "Kd": kd_active,
+            "learned_kp": round(getattr(active_tuner, "_learned_kp", 0.0), 2) if active_tuner else 0.0,
+            "learned_ki": round(getattr(active_tuner, "_learned_ki", 0.0), 4) if active_tuner else 0.0,
+            "learned_kd": round(getattr(active_tuner, "_learned_kd", 0.0), 2) if active_tuner else 0.0,
+            "manual_overrides": sorted(overrides.keys()),
+            "weekly_candidates_count": len(getattr(active_tuner, "weekly_candidates", [])) if active_tuner else 0,
             "heat_status": tuner_heat.state if tuner_heat else "unknown",
             "heat_cycles": f"{len(tuner_heat.completed_cycles)}/{tuner_heat.required_cycles}" if tuner_heat else "0/3",
-            "heat_kp": round(tuner_heat.kp, 2) if tuner_heat and tuner_heat.state == tuner_heat.STATE_COMPLETED else 0.0,
-            "heat_ki": round(tuner_heat.ki, 4) if tuner_heat and tuner_heat.state == tuner_heat.STATE_COMPLETED else 0.0,
-            "heat_kd": round(tuner_heat.kd, 2) if tuner_heat and tuner_heat.state == tuner_heat.STATE_COMPLETED else 0.0,
+            "heat_kp": round(tuner_heat.kp, 2) if tuner_heat and (tuner_heat.state == tuner_heat.STATE_COMPLETED or "Kp" in heat_overrides) else 0.0,
+            "heat_ki": round(tuner_heat.ki, 4) if tuner_heat and (tuner_heat.state == tuner_heat.STATE_COMPLETED or "Ki" in heat_overrides) else 0.0,
+            "heat_kd": round(tuner_heat.kd, 2) if tuner_heat and (tuner_heat.state == tuner_heat.STATE_COMPLETED or "Kd" in heat_overrides) else 0.0,
             "cool_status": tuner_cool.state if tuner_cool else "unknown",
             "cool_cycles": f"{len(tuner_cool.completed_cycles)}/{tuner_cool.required_cycles}" if tuner_cool else "0/3",
-            "cool_kp": round(tuner_cool.kp, 2) if tuner_cool and tuner_cool.state == tuner_cool.STATE_COMPLETED else 0.0,
-            "cool_ki": round(tuner_cool.ki, 4) if tuner_cool and tuner_cool.state == tuner_cool.STATE_COMPLETED else 0.0,
-            "cool_kd": round(tuner_cool.kd, 2) if tuner_cool and tuner_cool.state == tuner_cool.STATE_COMPLETED else 0.0,
+            "cool_kp": round(tuner_cool.kp, 2) if tuner_cool and (tuner_cool.state == tuner_cool.STATE_COMPLETED or "Kp" in cool_overrides) else 0.0,
+            "cool_ki": round(tuner_cool.ki, 4) if tuner_cool and (tuner_cool.state == tuner_cool.STATE_COMPLETED or "Ki" in cool_overrides) else 0.0,
+            "cool_kd": round(tuner_cool.kd, 2) if tuner_cool and (tuner_cool.state == tuner_cool.STATE_COMPLETED or "Kd" in cool_overrides) else 0.0,
         }
         return attrs
 
@@ -173,7 +189,16 @@ class AutotuneSensor(SensorEntity):
                 self._async_on_climate_change
             )
         )
-        
+        if hasattr(self._coordinator, "register_pid_listener"):
+            self._coordinator.register_pid_listener(self._on_pid_change)
+            self.async_on_remove(
+                lambda: self._coordinator.unregister_pid_listener(self._on_pid_change)
+            )
+
+    @callback
+    def _on_pid_change(self) -> None:
+        self.async_write_ha_state()
+
     @callback
     def _async_on_climate_change(self, event):
         self.async_write_ha_state()
@@ -323,6 +348,94 @@ class MultizonePlantHealthSensor(SensorEntity):
                 self.hass, self._update_state, timedelta(seconds=60)
             )
         )
+
+
+class MultizoneMasterDemandSensor(SensorEntity):
+    """Aggregated demand actually sent to the plant (what the boiler/HP 'sees')."""
+
+    _attr_has_entity_name = True
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_icon = "mdi:gauge"
+
+    def __init__(self, hass: HomeAssistant, entry_id: str, coordinator) -> None:
+        self.hass = hass
+        self._coordinator = coordinator
+        self._attr_unique_id = f"{DOMAIN}_{entry_id}_master_demand"
+        self._attr_name = "Master Demand"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, entry_id)},
+            name="Master Control",
+            manufacturer="Custom Integration",
+            model="Master Control",
+        )
+
+    def _aggregate(self):
+        orch = getattr(self._coordinator, "plant_orchestrator", None)
+        agg = getattr(orch, "last_aggregate", None)
+        if agg is not None:
+            return agg
+        master_on = bool(self._coordinator.get_master_state())
+        frost_emergency = any(
+            self._coordinator.is_zone_in_frost_emergency(cid)
+            for cid in list(getattr(self._coordinator, "_climate_callbacks", {}).keys())
+        ) if hasattr(self._coordinator, "is_zone_in_frost_emergency") else False
+        if (master_on or frost_emergency) and hasattr(self._coordinator, "demand_aggregator"):
+            calc = getattr(self._coordinator.demand_aggregator, "calculate", None)
+            if callable(calc):
+                return calc(
+                    is_dhw_active=bool(getattr(self._coordinator, "is_dhw_active", False)),
+                    frost_emergency=frost_emergency,
+                )
+        return None
+
+    @property
+    def native_value(self) -> float:
+        agg = self._aggregate()
+        return round(agg.demand, 1) if agg is not None else 0.0
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        agg = self._aggregate()
+        backend = getattr(self._coordinator, "boiler_backend", None)
+        attrs: dict[str, Any] = {
+            "master_on": self._coordinator.get_master_state(),
+            "master_hvac_mode": getattr(self._coordinator, "master_hvac_mode", "heat"),
+            "boiler_status": getattr(self._coordinator, "boiler_status_reason", None) or getattr(backend, "status_reason", None),
+        }
+        if agg is not None:
+            attrs.update({
+                "peak_zone": agg.peak_zone,
+                "strategy": agg.strategy,
+                "dhw_active": agg.dhw_active,
+                "frost_emergency": agg.frost_emergency,
+                "primary_demands": {k: round(v, 1) for k, v in agg.primary_demands.items()},
+                "secondary_demands": {k: round(v, 1) for k, v in agg.secondary_demands.items()},
+            })
+        else:
+            attrs["reason"] = "Master OFF" if not attrs["master_on"] else "no data yet"
+        return attrs
+
+    @callback
+    def _on_demand_changed(self, _climate_id: str, _demand: float) -> None:
+        self.async_write_ha_state()
+
+    @callback
+    def _update_state(self, _) -> None:
+        self.async_write_ha_state()
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            async_track_time_interval(self.hass, self._update_state, timedelta(seconds=15))
+        )
+        agg = getattr(self._coordinator, "demand_aggregator", None)
+        if agg and hasattr(agg, "register_on_demand_changed"):
+            agg.register_on_demand_changed(self._on_demand_changed)
+            if hasattr(agg, "unregister_on_demand_changed"):
+                self.async_on_remove(
+                    lambda: agg.unregister_on_demand_changed(self._on_demand_changed)
+                )
 
 
 class MultizoneBoilerCyclesSensor(SensorEntity):

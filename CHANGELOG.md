@@ -1,5 +1,21 @@
 # Changelog
 
+## [6.1.0-beta.3] - 2026-11-14
+### Feature & Alignment: Dual-Season Manual PID & Weekly EMA, Master Demand Sensor Fix, Boiler Diagnostics & Scheduler Sync (#12)
+*(Full alignment of `v6.0.11`–`v6.0.14` fixes while preserving all Phase 11 dual-hydronic `heat`/`cool`, bivalent Heat Pump + Boiler, Room Split AC, and Solar Self-Consumption features.)*
+- **Dual-Season PID Manual Control, Safety Lock, Reset Autotuner & Weekly Smoothed EMA (`heat` & `cool`)**:
+  - Exposed per-zone season-aware `Kp`, `Ki`, `Kd` `number` entities (`MultizoneZonePIDNumber`), `PID Manual Unlock` safety `switch` (`MultizonePIDManualUnlockSwitch`), and `Reset Autotuner` `button` (`MultizoneResetAutotuneButton`) on the Master Control device (without adding PID fields to Config/Options Flow).
+  - Registered `multizone_thermostat.set_pid_parameters` and `multizone_thermostat.reset_autotune` services with optional `mode` (`heat`/`cool`) targeting the respective seasonal PID/autotuner track (`ZoneController`, `PassiveAutotuneObserver`, keeping `PIDAutotune` intact).
+  - Added weekly median-filtered smoothed EMA continuous autotuning (±10%/week clamp) after the initial 3 learning cycles, respecting any manually overridden PID parameters (`manual_overrides`), plus duty-normalized `ThermalObserver` learning (`demand >= 70%`).
+  - Added Frontend Zone/Energy card PID panel (3 read-only grey boxes + safety unlock/reset modals).
+- **Master Demand Sensor (`MultizoneMasterDemandSensor`), Proactive Zone Refresh & Canonical Entity Alias Resolution (`v6.0.13`–`v6.0.14`)**:
+  - Added `MultizoneMasterDemandSensor` on Master Control, proactive zone evaluation in `PlantOrchestrator` (preserving Phase 11 cooling, HP, split, and solar logic), and canonical zone ID resolution (`resolve_zone_id`) in `MultizoneCoordinator`, `ListenerManager`, and `ZoneController`.
+- **Boiler Relay Diagnostic Logging (`v6.0.11`)**:
+  - Promoted `Boiler forced ON/OFF (reason: ...)` and `_status_reason` transitions to `INFO`, added one-time `WARNING` when `boiler_switch` is missing/unavailable with demand > 0, and `_master_off_logged` tracking.
+- **Weekly Scheduler Timeline Alignment, General Master Row & Global Preset Sync without Preset Pollution (#12)**:
+  - Fixed `.time-ruler` 12-interval alignment (`leftPct = (i * 100) / 12`), added `"🏠 Tutte le Zone (Generale)"` master summary row, dashed baseline gap blocks, and amber manual override blocks in `scheduler_card.js` (preserving Phase 11 cooling badges).
+  - Synchronized `Global Preset` select with the active weekly schedule while respecting geofencing `away` and preventing manual slot temperature overrides (`async_set_temperature`) from overwriting scheduled base presets.
+
 ## [6.1.0-beta.2] - 2026-11-11
 ### Feature & Refactor: Centralized Condo Heating (#11), Complete SRP Decomposition & Physics/Safety Hardening
 - **Centralized / Condo Heating Support (`CentralizedBoilerBackend`, #11)**:

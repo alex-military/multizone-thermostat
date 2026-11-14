@@ -27,7 +27,13 @@ class ThermalObserver:
         self.cooling_rate = 0.0  # °C / hour
         self.thermal_inertia = 0.0  # °C overshoot
 
-    def update(self, current_temp: float, is_heating: bool, hvac_mode: str | None = None):
+    def update(
+        self,
+        current_temp: float,
+        is_heating: bool,
+        hvac_mode: str | None = None,
+        demand: float | None = None,
+    ):
         """Update the observer with the latest temperature and state."""
         if hvac_mode in ("cool", "COOL"):
             return
@@ -81,8 +87,14 @@ class ThermalObserver:
                 rate = abs(delta_temp) / time_elapsed_hours
                 
                 if self._is_heating and is_heating and delta_temp > 0:
-                    self._update_ema('heating_rate', rate, alpha=0.1)
-                    _LOGGER.debug("[%s] Heating rate updated: %.2f °C/hr", self.zone_id, self.heating_rate)
+                    if demand is None or demand >= 70.0:
+                        effective_rate = (
+                            rate / max(0.7, min(1.0, demand / 100.0))
+                            if demand is not None
+                            else rate
+                        )
+                        self._update_ema('heating_rate', effective_rate, alpha=0.1)
+                        _LOGGER.debug("[%s] Heating rate updated: %.2f °C/hr", self.zone_id, self.heating_rate)
                 elif not self._is_heating and not is_heating and delta_temp < 0:
                     self._update_ema('cooling_rate', rate, alpha=0.1)
                     _LOGGER.debug("[%s] Cooling rate updated: %.2f °C/hr", self.zone_id, self.cooling_rate)

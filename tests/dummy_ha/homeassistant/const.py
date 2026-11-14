@@ -25,6 +25,7 @@ class Platform(StrEnum):
     CLIMATE = "climate"
     SENSOR = "sensor"
     BINARY_SENSOR = "binary_sensor"
+    BUTTON = "button"
     SWITCH = "switch"
     SELECT = "select"
     NUMBER = "number"

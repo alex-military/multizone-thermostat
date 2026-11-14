@@ -33,7 +33,21 @@ class ListenerManager:
     def async_setup_listeners(self) -> None:
         """Set up state change listeners for all climate entities and timers."""
         coord = self.coordinator
-        climate_entities = [make_zone_entity_id(z[CONF_ZONE_NAME]) for z in coord.zones if z.get(CONF_ZONE_NAME)]
+        tracked_ids: set[str] = {
+            make_zone_entity_id(z[CONF_ZONE_NAME])
+            for z in coord.zones
+            if z.get(CONF_ZONE_NAME)
+        }
+        aliases = getattr(coord, "_entity_id_aliases", None)
+        if isinstance(aliases, dict):
+            tracked_ids.update(aliases.keys())
+        climates = getattr(coord, "_climate_entities", None)
+        if isinstance(climates, dict):
+            for ent in climates.values():
+                eid = getattr(ent, "entity_id", None)
+                if eid:
+                    tracked_ids.add(eid)
+        climate_entities = sorted(tracked_ids)
 
         if climate_entities:
             self._unsub_listeners.append(
@@ -142,8 +156,11 @@ class ListenerManager:
         new_state = event.data.get("new_state")
         if not new_state:
             return
-        demand = await self.coordinator.zone_controller.async_update_zone(entity_id, new_state)
-        self.coordinator.demand_aggregator.set_zone_demand(entity_id, demand)
+        resolve_fn = getattr(self.coordinator, "resolve_zone_id", None)
+        resolved = resolve_fn(entity_id) if callable(resolve_fn) else None
+        canon_id = resolved if isinstance(resolved, str) else entity_id
+        demand = await self.coordinator.zone_controller.async_update_zone(canon_id, new_state)
+        self.coordinator.demand_aggregator.set_zone_demand(canon_id, demand)
         # Immediately trigger boiler update to improve UI responsiveness when lowering target
         if hasattr(self.coordinator, "plant_orchestrator") and self.coordinator.plant_orchestrator:
             orch = self.coordinator.plant_orchestrator
