@@ -173,3 +173,80 @@ set_preset_temperature:
           min: 5.0
           max: 35.0
           step: 0.5
+
+set_pid_parameters:
+  name: Set PID Parameters
+  description: Manually override or restore automatic PID parameters (Kp, Ki, Kd) for a zone.
+  fields:
+    climate_entity:
+      name: Zone Climate Entity
+      description: Target multizone virtual thermostat climate entity.
+      required: true
+      example: climate.multizone_thermostat_soggiorno
+      selector:
+        entity:
+          domain: climate
+    kp:
+      name: Proportional Gain (Kp)
+      description: Manual Kp gain value.
+      required: false
+      selector:
+        number:
+          min: 0.1
+          max: 500.0
+          step: 0.1
+    ki:
+      name: Integral Gain (Ki)
+      description: Manual Ki gain value.
+      required: false
+      selector:
+        number:
+          min: 0.0
+          max: 1.0
+          step: 0.0001
+    kd:
+      name: Derivative Gain (Kd)
+      description: Manual Kd gain value.
+      required: false
+      selector:
+        number:
+          min: 0.0
+          max: 50000.0
+          step: 1.0
+    lock_parameter:
+      name: Restore Automatic Parameter
+      description: Restore a specific parameter (Kp, Ki, Kd) or all parameters back to the autotuner baseline.
+      required: false
+      selector:
+        select:
+          options:
+            - Kp
+            - Ki
+            - Kd
+            - all
+    unlock:
+      name: Manual Unlock Flag
+      description: Explicitly unlock or lock manual PID editing for this zone.
+      required: false
+      selector:
+        boolean:
+
+reset_autotune:
+  name: Reset Autotuner
+  description: Clear learned cycles and restart Smart PID autotuning for a zone.
+  fields:
+    climate_entity:
+      name: Zone Climate Entity
+      description: Target multizone virtual thermostat climate entity.
+      required: true
+      example: climate.multizone_thermostat_soggiorno
+      selector:
+        entity:
+          domain: climate
+    keep_manual_overrides:
+      name: Keep Manual Overrides
+      description: Retain existing manual PID parameter overrides after resetting learned cycles.
+      required: false
+      default: false
+      selector:
+        boolean:

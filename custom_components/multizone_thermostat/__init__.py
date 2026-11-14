@@ -1,6 +1,7 @@
 """Multizone Thermostat integration setup."""
 from __future__ import annotations
 
+import inspect
 import logging
 
 from homeassistant.components.http import StaticPathConfig
@@ -16,16 +17,18 @@ from .const import (
     CONF_BOILER_SWITCH,
     CONF_BOILER_MODE,
     CONF_OPENTHERM_ENTITY,
+    CONF_ZONE_NAME,
     MODE_RELAY,
     MODE_OPENTHERM,
     CONF_ZONES,
     DOMAIN,
+    make_zone_entity_id,
 )
 from .coordinator import MultizoneCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = ["climate", "switch", "number", "select", "time", "sensor", "binary_sensor"]
+PLATFORMS = ["climate", "switch", "number", "select", "time", "sensor", "binary_sensor", "button"]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -164,6 +167,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Set up state listeners
     coordinator.async_setup_listeners()
+
+    # Seed initial zone demands so Master Demand and demand sensors don't stall at 0% on startup
+    orch = getattr(coordinator, "plant_orchestrator", None)
+    if orch and inspect.iscoroutinefunction(getattr(orch, "_async_update_boiler", None)):
+        await orch._async_update_boiler()
 
     # Register static path for Lovelace custom card once per HA instance
     import os
@@ -318,6 +326,68 @@ async def _async_register_services(hass: HomeAssistant) -> None:
             if hasattr(coord, "schedule_manager"):
                 await coord.schedule_manager.async_evaluate_schedule()
 
+    def _find_zone_name_for_entity(coord: MultizoneCoordinator, climate_entity: str) -> str | None:
+        canon = coord.resolve_zone_id(climate_entity) if hasattr(coord, "resolve_zone_id") else climate_entity
+        for zone in getattr(coord, "zones", []) or []:
+            zname = zone.get(CONF_ZONE_NAME) if isinstance(zone, dict) else None
+            if zname and make_zone_entity_id(zname) == canon:
+                return zname
+        return None
+
+    async def handle_set_pid_parameters(call: ServiceCall) -> None:
+        climate_entity = call.data.get("climate_entity") or call.data.get("entity_id")
+        if not climate_entity:
+            return
+        kp = float(call.data["kp"]) if call.data.get("kp") is not None else None
+        ki = float(call.data["ki"]) if call.data.get("ki") is not None else None
+        kd = float(call.data["kd"]) if call.data.get("kd") is not None else None
+        lock_param = call.data.get("lock_parameter")
+        unlock_arg = call.data.get("unlock")
+
+        for coord in _get_active_coordinators(hass):
+            zc = getattr(coord, "zone_controller", None)
+            if not zc or not hasattr(zc, "async_set_zone_pid"):
+                continue
+            zname = _find_zone_name_for_entity(coord, climate_entity)
+            if unlock_arg is not None and zname and hasattr(coord, "async_set_pid_manual_unlock"):
+                await coord.async_set_pid_manual_unlock(zname, bool(unlock_arg))
+            updated = await zc.async_set_zone_pid(
+                climate_entity,
+                kp=kp,
+                ki=ki,
+                kd=kd,
+                lock_param=lock_param,
+            )
+            if updated:
+                if hasattr(coord, "async_notify_pid_entities"):
+                    coord.async_notify_pid_entities()
+                orch = getattr(coord, "plant_orchestrator", None)
+                if orch and inspect.iscoroutinefunction(getattr(orch, "_async_update_boiler", None)):
+                    await orch._async_update_boiler()
+
+    async def handle_reset_autotune(call: ServiceCall) -> None:
+        climate_entity = call.data.get("climate_entity") or call.data.get("entity_id")
+        if not climate_entity:
+            return
+        keep_manual = bool(call.data.get("keep_manual_overrides", False))
+        for coord in _get_active_coordinators(hass):
+            zc = getattr(coord, "zone_controller", None)
+            if not zc or not hasattr(zc, "async_reset_zone_autotuner"):
+                continue
+            ok = await zc.async_reset_zone_autotuner(
+                climate_entity,
+                keep_manual_overrides=keep_manual,
+            )
+            if ok:
+                zname = _find_zone_name_for_entity(coord, climate_entity)
+                if not keep_manual and zname and hasattr(coord, "async_set_pid_manual_unlock"):
+                    await coord.async_set_pid_manual_unlock(zname, False)
+                if hasattr(coord, "async_notify_pid_entities"):
+                    coord.async_notify_pid_entities()
+                orch = getattr(coord, "plant_orchestrator", None)
+                if orch and inspect.iscoroutinefunction(getattr(orch, "_async_update_boiler", None)):
+                    await orch._async_update_boiler()
+
     services = {
         "save_schedule_profile": handle_save_schedule_profile,
         "activate_schedule_profile": handle_activate_schedule_profile,
@@ -326,6 +396,8 @@ async def _async_register_services(hass: HomeAssistant) -> None:
         "cancel_smart_return": handle_cancel_smart_return,
         "clear_zone_override": handle_clear_zone_override,
         "set_preset_temperature": handle_set_preset_temperature,
+        "set_pid_parameters": handle_set_pid_parameters,
+        "reset_autotune": handle_reset_autotune,
     }
 
     if hasattr(hass, "services") and hasattr(hass.services, "async_register"):

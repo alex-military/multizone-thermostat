@@ -11,3 +11,8 @@ class NumberMode:
 class NumberEntity(Entity):
     pass
 
+
+class RestoreNumber(NumberEntity):
+    async def async_get_last_number_data(self):
+        return None
+

@@ -172,7 +172,24 @@ sched_nav_title: "Programmazione",
     day_sun: "Domenica",
     prof_standard: "Standard",
     prof_smart_working: "Smart Working",
-    prof_holiday: "Festivo"
+    prof_holiday: "Festivo",
+    pid_section_title: "PID & Autotuner",
+    pid_auto_badge: "Auto EMA",
+    pid_manual_badge: "Manuale",
+    pid_reset_btn: "Reset Autotuner",
+    pid_click_to_edit: "Clicca per sbloccare e modificare",
+    pid_modal_title: "Avviso di Sicurezza PID",
+    pid_modal_warn: "I guadagni Kp, Ki e Kd sono gestiti dall'autotuner adattivo settimanale. Sbloccare questo parametro sospende la calibrazione automatica su quel coefficiente e può causare oscillazioni se errato.",
+    pid_modal_value: "Nuovo valore",
+    pid_modal_save: "Sblocca e Salva",
+    pid_modal_restore: "Ripristina Automatico",
+    pid_modal_cancel: "Annulla",
+    pid_reset_title: "Conferma Reset Autotuner",
+    pid_reset_confirm_msg: "Azzerare i cicli appresi e riavviare la calibrazione iniziale (3 cicli) per questa zona?",
+    pid_reset_confirm_btn: "Resetta Autotuner",
+    pid_learning_status: "Apprendimento",
+    sched_all_zones_row: "Tutte le Zone (Generale)",
+    sched_base_tag: "Base"
   },
   en: {
     enabled: "Enabled",
@@ -288,7 +305,24 @@ sched_nav_title: "Schedule",
     day_sun: "Sunday",
     prof_standard: "Standard",
     prof_smart_working: "Smart Working",
-    prof_holiday: "Holiday"
+    prof_holiday: "Holiday",
+    pid_section_title: "PID & Autotuner",
+    pid_auto_badge: "Auto EMA",
+    pid_manual_badge: "Manual",
+    pid_reset_btn: "Reset Autotuner",
+    pid_click_to_edit: "Click to unlock and edit",
+    pid_modal_title: "PID Safety Warning",
+    pid_modal_warn: "Kp, Ki, and Kd gains are continuously tuned by the weekly adaptive autotuner. Unlocking a parameter pauses automatic tuning on it and may cause temperature oscillations if misconfigured.",
+    pid_modal_value: "New value",
+    pid_modal_save: "Unlock & Save",
+    pid_modal_restore: "Restore Automatic",
+    pid_modal_cancel: "Cancel",
+    pid_reset_title: "Confirm Autotuner Reset",
+    pid_reset_confirm_msg: "Clear learned cycles and restart the 3-cycle initial calibration for this zone?",
+    pid_reset_confirm_btn: "Reset Autotuner",
+    pid_learning_status: "Learning",
+    sched_all_zones_row: "All Zones (General)",
+    sched_base_tag: "Base"
   },
   ru: {
     enabled: "Включено",
@@ -404,7 +438,24 @@ sched_nav_title: "Расписание",
     day_sun: "Воскресенье",
     prof_standard: "Стандарт",
     prof_smart_working: "Удалённая работа",
-    prof_holiday: "Выходной"
+    prof_holiday: "Выходной",
+    pid_section_title: "PID и Автонастройка",
+    pid_auto_badge: "Авто EMA",
+    pid_manual_badge: "Вручную",
+    pid_reset_btn: "Сброс автонастройки",
+    pid_click_to_edit: "Нажмите для разблокировки",
+    pid_modal_title: "Предупреждение безопасности PID",
+    pid_modal_warn: "Параметры Kp, Ki и Kd автоматически калибруются каждую неделю. Ручное изменение отключает автонастройку для параметра и может вызвать колебания температуры.",
+    pid_modal_value: "Новое значение",
+    pid_modal_save: "Разблокировать и сохранить",
+    pid_modal_restore: "Вернуть авто",
+    pid_modal_cancel: "Отмена",
+    pid_reset_title: "Сброс автонастройки зоны",
+    pid_reset_confirm_msg: "Сбросить обученные циклы и перезапустить начальную калибровку (3 цикла)?",
+    pid_reset_confirm_btn: "Сбросить",
+    pid_learning_status: "Обучение",
+    sched_all_zones_row: "Все зоны (Общее)",
+    sched_base_tag: "База"
   },
   fr: {
     enabled: "Activé",
@@ -519,7 +570,24 @@ sched_nav_title: "Programmation",
     day_sun: "Dimanche",
     prof_standard: "Standard",
     prof_smart_working: "Télétravail",
-    prof_holiday: "Vacances"
+    prof_holiday: "Vacances",
+    pid_section_title: "PID & Autotuner",
+    pid_auto_badge: "Auto EMA",
+    pid_manual_badge: "Manuel",
+    pid_reset_btn: "Reset Autotuner",
+    pid_click_to_edit: "Cliquer pour déverrouiller",
+    pid_modal_title: "Avertissement de sécurité PID",
+    pid_modal_warn: "Les gains Kp, Ki et Kd sont ajustés par l'autotuner adaptatif hebdomadaire. Le déverrouillage manuel suspend la calibration automatique sur ce paramètre.",
+    pid_modal_value: "Nouvelle valeur",
+    pid_modal_save: "Déverrouiller et enregistrer",
+    pid_modal_restore: "Rétablir Auto",
+    pid_modal_cancel: "Annuler",
+    pid_reset_title: "Réinitialiser l'Autotuner",
+    pid_reset_confirm_msg: "Effacer les cycles appris et relancer la calibration initiale (3 cycles) ?",
+    pid_reset_confirm_btn: "Réinitialiser",
+    pid_learning_status: "Apprentissage",
+    sched_all_zones_row: "Toutes les Zones (Général)",
+    sched_base_tag: "Base"
   },
   de: {
     enabled: "Aktiviert",
@@ -633,7 +701,24 @@ sched_nav_title: "Zeitplan",
     day_sun: "Sonntag",
     prof_standard: "Standard",
     prof_smart_working: "Homeoffice",
-    prof_holiday: "Feiertag"
+    prof_holiday: "Feiertag",
+    pid_section_title: "PID & Autotuner",
+    pid_auto_badge: "Auto EMA",
+    pid_manual_badge: "Manuell",
+    pid_reset_btn: "Autotuner Zurücksetzen",
+    pid_click_to_edit: "Zum Entsperren klicken",
+    pid_modal_title: "PID-Sicherheitswarnung",
+    pid_modal_warn: "Kp, Ki und Kd werden wöchentlich automatisch angepasst. Manuelles Entsperren pausiert das Auto-Tuning für diesen Wert.",
+    pid_modal_value: "Neuer Wert",
+    pid_modal_save: "Entsperren & Speichern",
+    pid_modal_restore: "Automatik wiederherstellen",
+    pid_modal_cancel: "Abbrechen",
+    pid_reset_title: "Autotuner Zurücksetzen",
+    pid_reset_confirm_msg: "Gelernte Zyklen löschen und 3-Zyklus-Kalibrierung neu starten?",
+    pid_reset_confirm_btn: "Zurücksetzen",
+    pid_learning_status: "Lernen",
+    sched_all_zones_row: "Alle Zonen (Allgemein)",
+    sched_base_tag: "Basis"
   },
   es: {
     enabled: "Activado",
@@ -748,7 +833,24 @@ sched_nav_title: "Programación",
     day_sun: "Domingo",
     prof_standard: "Estándar",
     prof_smart_working: "Teletrabajo",
-    prof_holiday: "Festivo"
+    prof_holiday: "Festivo",
+    pid_section_title: "PID y Autotuner",
+    pid_auto_badge: "Auto EMA",
+    pid_manual_badge: "Manual",
+    pid_reset_btn: "Reiniciar Autotuner",
+    pid_click_to_edit: "Clic para desbloquear",
+    pid_modal_title: "Aviso de Seguridad PID",
+    pid_modal_warn: "Los valores Kp, Ki y Kd se calibran automáticamente cada semana. Desbloquearlos pausa el ajuste automático y puede causar oscilaciones.",
+    pid_modal_value: "Nuevo valor",
+    pid_modal_save: "Desbloquear y Guardar",
+    pid_modal_restore: "Restaurar Automático",
+    pid_modal_cancel: "Cancelar",
+    pid_reset_title: "Confirmar Reinicio Autotuner",
+    pid_reset_confirm_msg: "¿Borrar los ciclos aprendidos y reiniciar la calibración inicial de 3 ciclos?",
+    pid_reset_confirm_btn: "Reiniciar",
+    pid_learning_status: "Aprendiendo",
+    sched_all_zones_row: "Todas las Zonas (General)",
+    sched_base_tag: "Base"
   }
 };
 
@@ -5100,6 +5202,185 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
       .pulse-green { background: #10b981; }
       .pulse-red { background: #ef4444; animation: blink 1s infinite; }
       @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+      .pid-panel {
+        margin-top: 12px;
+        background: var(--secondary-background-color, rgba(15, 23, 42, 0.35));
+        border: 1px solid var(--divider-color, rgba(148, 163, 184, 0.16));
+        border-radius: 12px;
+        padding: 10px 12px;
+      }
+      .pid-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+        gap: 8px;
+      }
+      .pid-title-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.78em;
+        font-weight: 600;
+        color: var(--secondary-text-color, #94a3b8);
+      }
+      .pid-state-pill {
+        font-size: 0.78em;
+        padding: 2px 7px;
+        border-radius: 999px;
+        background: rgba(148, 163, 184, 0.16);
+        color: #cbd5e1;
+      }
+      .pid-reset-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.75em;
+        font-weight: 600;
+        padding: 4px 8px;
+        border-radius: 8px;
+        border: 1px solid rgba(239, 68, 68, 0.35);
+        background: rgba(239, 68, 68, 0.12);
+        color: #fca5a5;
+        cursor: pointer;
+        transition: background 0.15s ease;
+      }
+      .pid-reset-btn:hover {
+        background: rgba(239, 68, 68, 0.24);
+      }
+      .pid-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+      }
+      .pid-box {
+        background: rgba(148, 163, 184, 0.14);
+        border: 1px solid rgba(148, 163, 184, 0.28);
+        border-radius: 10px;
+        padding: 8px 6px;
+        text-align: center;
+        cursor: pointer;
+        color: #94a3b8;
+        transition: border-color 0.15s ease, transform 0.12s ease;
+      }
+      .pid-box:hover {
+        border-color: rgba(148, 163, 184, 0.55);
+        transform: translateY(-1px);
+      }
+      .pid-box.manual-override {
+        background: rgba(245, 158, 11, 0.14);
+        border-color: rgba(245, 158, 11, 0.55);
+        color: #fde68a;
+      }
+      .pid-box-top {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        font-size: 0.72em;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        margin-bottom: 3px;
+      }
+      .pid-box-val {
+        font-size: 0.95em;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+      }
+      .pid-modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(2, 6, 23, 0.72);
+        backdrop-filter: blur(4px);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        padding: 16px;
+      }
+      .pid-modal-backdrop.open {
+        display: flex;
+      }
+      .pid-modal {
+        width: 100%;
+        max-width: 360px;
+        background: var(--card-background-color, #1e293b);
+        color: var(--primary-text-color, #f1f5f9);
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        border-radius: 16px;
+        padding: 18px;
+        box-shadow: 0 20px 45px rgba(0, 0, 0, 0.45);
+      }
+      .pid-modal-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 1.02em;
+        font-weight: 700;
+        margin-bottom: 10px;
+        color: #fbbf24;
+      }
+      .pid-modal-warn {
+        font-size: 0.84em;
+        line-height: 1.45;
+        color: var(--secondary-text-color, #cbd5e1);
+        background: rgba(245, 158, 11, 0.1);
+        border: 1px solid rgba(245, 158, 11, 0.28);
+        border-radius: 10px;
+        padding: 10px;
+        margin-bottom: 12px;
+      }
+      .pid-modal-input-wrap {
+        margin-bottom: 14px;
+      }
+      .pid-modal-input-wrap label {
+        display: block;
+        font-size: 0.8em;
+        color: var(--secondary-text-color, #94a3b8);
+        margin-bottom: 4px;
+      }
+      .pid-modal-input-wrap input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 8px 10px;
+        border-radius: 8px;
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        background: rgba(15, 23, 42, 0.55);
+        color: var(--primary-text-color, #f8fafc);
+        font-size: 1em;
+        font-weight: 600;
+      }
+      .pid-modal-actions {
+        display: flex;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .pid-btn {
+        border: none;
+        border-radius: 8px;
+        padding: 8px 12px;
+        font-size: 0.82em;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .pid-btn-cancel {
+        background: rgba(148, 163, 184, 0.18);
+        color: #cbd5e1;
+      }
+      .pid-btn-restore {
+        background: rgba(56, 189, 248, 0.18);
+        color: #7dd3fc;
+      }
+      .pid-btn-save {
+        background: #f59e0b;
+        color: #0f172a;
+      }
+      .pid-btn-danger {
+        background: #ef4444;
+        color: #ffffff;
+      }
     `;
 
     const t = (k) => getTranslation(this._hass, k);
@@ -5146,6 +5427,33 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
         </div>
       </div>
 
+      <div class="pid-panel">
+        <div class="pid-header">
+          <div class="pid-title-row">
+            <span id="pid-section-title">${t('pid_section_title')}</span>
+            <span class="pid-state-pill" id="pid-state-pill">--</span>
+          </div>
+          <button type="button" class="pid-reset-btn" id="pid-reset-btn" title="${t('pid_reset_btn')}">
+            <ha-icon icon="mdi:restart-alert" style="--mdc-icon-size: 14px;"></ha-icon>
+            <span id="pid-reset-label">${t('pid_reset_btn')}</span>
+          </button>
+        </div>
+        <div class="pid-grid">
+          <div class="pid-box" id="pid-box-kp" data-param="Kp" title="${t('pid_click_to_edit')}">
+            <div class="pid-box-top"><span id="pid-lock-kp">🔒</span><span>Kp</span></div>
+            <div class="pid-box-val" id="pid-val-kp">--</div>
+          </div>
+          <div class="pid-box" id="pid-box-ki" data-param="Ki" title="${t('pid_click_to_edit')}">
+            <div class="pid-box-top"><span id="pid-lock-ki">🔒</span><span>Ki</span></div>
+            <div class="pid-box-val" id="pid-val-ki">--</div>
+          </div>
+          <div class="pid-box" id="pid-box-kd" data-param="Kd" title="${t('pid_click_to_edit')}">
+            <div class="pid-box-top"><span id="pid-lock-kd">🔒</span><span>Kd</span></div>
+            <div class="pid-box-val" id="pid-val-kd">--</div>
+          </div>
+        </div>
+      </div>
+
       <div class="bottom-row">
         <span style="color: var(--secondary-text-color, #94a3b8);" id="valve-status-label">${t('valve_status')}</span>
         <div class="valve-status" id="valve-status" style="margin-right: auto; padding-left: 10px;">
@@ -5157,11 +5465,174 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
           <span id="battery-text">--%</span>
         </div>
       </div>
+
+      <div class="pid-modal-backdrop" id="pid-modal-backdrop">
+        <div class="pid-modal">
+          <div class="pid-modal-title" id="pid-modal-title"></div>
+          <div class="pid-modal-warn" id="pid-modal-warn"></div>
+          <div class="pid-modal-input-wrap" id="pid-modal-input-wrap">
+            <label for="pid-modal-input" id="pid-modal-input-label"></label>
+            <input type="number" id="pid-modal-input" />
+          </div>
+          <div class="pid-modal-actions">
+            <button type="button" class="pid-btn pid-btn-cancel" id="pid-modal-cancel">${t('pid_modal_cancel')}</button>
+            <button type="button" class="pid-btn pid-btn-restore" id="pid-modal-restore">${t('pid_modal_restore')}</button>
+            <button type="button" class="pid-btn pid-btn-save" id="pid-modal-confirm">${t('pid_modal_save')}</button>
+          </div>
+        </div>
+      </div>
     `;
 
     this.shadowRoot.appendChild(style);
     this.shadowRoot.appendChild(card);
+    this._bindPidEvents();
     this._rendered = true;
+  }
+
+  _bindPidEvents() {
+    this._activePidParam = null;
+    this._modalMode = null;
+
+    const closeModal = () => {
+      const backdrop = this.shadowRoot.getElementById('pid-modal-backdrop');
+      if (backdrop) backdrop.classList.remove('open');
+      this._activePidParam = null;
+      this._modalMode = null;
+    };
+
+    ['kp', 'ki', 'kd'].forEach((paramLower) => {
+      const box = this.shadowRoot.getElementById(`pid-box-${paramLower}`);
+      if (!box) return;
+      box.addEventListener('click', () => {
+        if (!this._hass || !this._config || !this._config.entity) return;
+        const param = box.dataset.param;
+        this._openPidEditModal(param);
+      });
+    });
+
+    const resetBtn = this.shadowRoot.getElementById('pid-reset-btn');
+    if (resetBtn) {
+      resetBtn.addEventListener('click', () => {
+        if (!this._hass || !this._config || !this._config.entity) return;
+        this._openResetModal();
+      });
+    }
+
+    const cancelBtn = this.shadowRoot.getElementById('pid-modal-cancel');
+    if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+
+    const backdrop = this.shadowRoot.getElementById('pid-modal-backdrop');
+    if (backdrop) {
+      backdrop.addEventListener('click', (e) => {
+        if (e.target === backdrop) closeModal();
+      });
+    }
+
+    const restoreBtn = this.shadowRoot.getElementById('pid-modal-restore');
+    if (restoreBtn) {
+      restoreBtn.addEventListener('click', async () => {
+        if (!this._hass || !this._config || !this._activePidParam) return;
+        await this._hass.callService('multizone_thermostat', 'set_pid_parameters', {
+          climate_entity: this._config.entity,
+          lock_parameter: this._activePidParam,
+          unlock: false,
+        });
+        closeModal();
+      });
+    }
+
+    const confirmBtn = this.shadowRoot.getElementById('pid-modal-confirm');
+    if (confirmBtn) {
+      confirmBtn.addEventListener('click', async () => {
+        if (!this._hass || !this._config || !this._config.entity) return;
+        if (this._modalMode === 'reset') {
+          await this._hass.callService('multizone_thermostat', 'reset_autotune', {
+            climate_entity: this._config.entity,
+          });
+          closeModal();
+          return;
+        }
+        if (this._modalMode === 'edit' && this._activePidParam) {
+          const inputEl = this.shadowRoot.getElementById('pid-modal-input');
+          const parsed = inputEl ? parseFloat(inputEl.value) : NaN;
+          if (!isNaN(parsed)) {
+            await this._hass.callService('multizone_thermostat', 'set_pid_parameters', {
+              climate_entity: this._config.entity,
+              [this._activePidParam.toLowerCase()]: parsed,
+              unlock: true,
+            });
+          }
+          closeModal();
+        }
+      });
+    }
+  }
+
+  _openPidEditModal(param) {
+    const t = (k) => getTranslation(this._hass, k);
+    this._modalMode = 'edit';
+    this._activePidParam = param;
+
+    const specs = {
+      Kp: { min: 0.1, max: 500, step: 0.1 },
+      Ki: { min: 0, max: 1, step: 0.0001 },
+      Kd: { min: 0, max: 50000, step: 1 },
+    }[param];
+
+    const titleEl = this.shadowRoot.getElementById('pid-modal-title');
+    const warnEl = this.shadowRoot.getElementById('pid-modal-warn');
+    const inputWrap = this.shadowRoot.getElementById('pid-modal-input-wrap');
+    const labelEl = this.shadowRoot.getElementById('pid-modal-input-label');
+    const inputEl = this.shadowRoot.getElementById('pid-modal-input');
+    const restoreBtn = this.shadowRoot.getElementById('pid-modal-restore');
+    const confirmBtn = this.shadowRoot.getElementById('pid-modal-confirm');
+    const valEl = this.shadowRoot.getElementById(`pid-val-${param.toLowerCase()}`);
+    const backdrop = this.shadowRoot.getElementById('pid-modal-backdrop');
+
+    if (titleEl) titleEl.innerText = `⚠️ ${t('pid_modal_title')} (${param})`;
+    if (warnEl) warnEl.innerText = t('pid_modal_warn');
+    if (inputWrap) inputWrap.style.display = 'block';
+    if (labelEl) labelEl.innerText = `${t('pid_modal_value')} (${param})`;
+    if (inputEl && specs) {
+      inputEl.min = String(specs.min);
+      inputEl.max = String(specs.max);
+      inputEl.step = String(specs.step);
+      const curNum = valEl ? parseFloat(valEl.innerText) : NaN;
+      inputEl.value = isNaN(curNum) ? '0' : String(curNum);
+    }
+    if (restoreBtn) {
+      const overrides = (this._latestPidInfo && this._latestPidInfo.overrides) || [];
+      restoreBtn.style.display = overrides.includes(param) ? 'inline-block' : 'none';
+      restoreBtn.innerText = t('pid_modal_restore');
+    }
+    if (confirmBtn) {
+      confirmBtn.className = 'pid-btn pid-btn-save';
+      confirmBtn.innerText = t('pid_modal_save');
+    }
+    if (backdrop) backdrop.classList.add('open');
+  }
+
+  _openResetModal() {
+    const t = (k) => getTranslation(this._hass, k);
+    this._modalMode = 'reset';
+    this._activePidParam = null;
+
+    const titleEl = this.shadowRoot.getElementById('pid-modal-title');
+    const warnEl = this.shadowRoot.getElementById('pid-modal-warn');
+    const inputWrap = this.shadowRoot.getElementById('pid-modal-input-wrap');
+    const restoreBtn = this.shadowRoot.getElementById('pid-modal-restore');
+    const confirmBtn = this.shadowRoot.getElementById('pid-modal-confirm');
+    const backdrop = this.shadowRoot.getElementById('pid-modal-backdrop');
+
+    if (titleEl) titleEl.innerText = `🔄 ${t('pid_reset_title')}`;
+    if (warnEl) warnEl.innerText = t('pid_reset_confirm_msg');
+    if (inputWrap) inputWrap.style.display = 'none';
+    if (restoreBtn) restoreBtn.style.display = 'none';
+    if (confirmBtn) {
+      confirmBtn.className = 'pid-btn pid-btn-danger';
+      confirmBtn.innerText = t('pid_reset_confirm_btn');
+    }
+    if (backdrop) backdrop.classList.add('open');
   }
 
   updateCard() {
@@ -5467,6 +5938,72 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
           batteryIcon.style.color = "var(--secondary-text-color, #94a3b8)";
         }
       }
+
+      // PID & Autotuner Display
+      const attrs = climateState.attributes || {};
+      const autotuneSensorKey = this._hass && this._hass.states && Object.keys(this._hass.states).find(k =>
+        k.startsWith('sensor.') && k.includes('autotun') && k.includes(slug)
+      );
+      const autotuneStateObj = autotuneSensorKey ? this._hass.states[autotuneSensorKey] : null;
+      const autoAttrs = (autotuneStateObj && autotuneStateObj.attributes) || {};
+
+      const readNumFallback = (paramLower) => {
+        const numKey = Object.keys(this._hass.states).find(k =>
+          k.startsWith('number.') && k.includes(`pid_${paramLower}`) && k.includes(slug)
+        );
+        if (numKey && this._hass.states[numKey]) {
+          const parsed = parseFloat(this._hass.states[numKey].state);
+          if (!isNaN(parsed)) return parsed;
+        }
+        return null;
+      };
+
+      const kpVal = attrs.pid_kp !== undefined ? attrs.pid_kp : (autoAttrs.Kp !== undefined ? autoAttrs.Kp : readNumFallback('kp'));
+      const kiVal = attrs.pid_ki !== undefined ? attrs.pid_ki : (autoAttrs.Ki !== undefined ? autoAttrs.Ki : readNumFallback('ki'));
+      const kdVal = attrs.pid_kd !== undefined ? attrs.pid_kd : (autoAttrs.Kd !== undefined ? autoAttrs.Kd : readNumFallback('kd'));
+      const overrides = Array.isArray(attrs.pid_manual_overrides)
+        ? attrs.pid_manual_overrides
+        : (Array.isArray(autoAttrs.manual_overrides) ? autoAttrs.manual_overrides : []);
+      const autotuneState = attrs.autotune_state || (autotuneStateObj ? autotuneStateObj.state : null);
+
+      this._latestPidInfo = { kp: kpVal, ki: kiVal, kd: kdVal, overrides };
+
+      const pidTitleEl = this.shadowRoot.getElementById('pid-section-title');
+      if (pidTitleEl) pidTitleEl.innerText = t('pid_section_title');
+      const resetLabelEl = this.shadowRoot.getElementById('pid-reset-label');
+      if (resetLabelEl) resetLabelEl.innerText = t('pid_reset_btn');
+
+      const pillEl = this.shadowRoot.getElementById('pid-state-pill');
+      if (pillEl) {
+        if (overrides.length > 0) {
+          pillEl.innerText = t('pid_manual_badge');
+        } else if (autotuneState === 'completed' || autotuneState === 'Smart PID Active') {
+          pillEl.innerText = t('pid_auto_badge');
+        } else {
+          const cyc = attrs.autotune_cycles !== undefined ? attrs.autotune_cycles : 0;
+          const req = attrs.autotune_required_cycles !== undefined ? attrs.autotune_required_cycles : 3;
+          pillEl.innerText = `${t('pid_learning_status')} (${cyc}/${req})`;
+        }
+      }
+
+      const fmtMap = {
+        Kp: kpVal !== null && kpVal !== undefined ? Number(kpVal).toFixed(1) : '--',
+        Ki: kiVal !== null && kiVal !== undefined ? Number(kiVal).toFixed(4) : '--',
+        Kd: kdVal !== null && kdVal !== undefined ? Number(kdVal).toFixed(1) : '--',
+      };
+      ['Kp', 'Ki', 'Kd'].forEach((param) => {
+        const lower = param.toLowerCase();
+        const box = this.shadowRoot.getElementById(`pid-box-${lower}`);
+        const valEl = this.shadowRoot.getElementById(`pid-val-${lower}`);
+        const lockEl = this.shadowRoot.getElementById(`pid-lock-${lower}`);
+        const isOverride = overrides.includes(param);
+        if (valEl) valEl.innerText = fmtMap[param];
+        if (box) {
+          box.classList.toggle('manual-override', isOverride);
+          box.title = t('pid_click_to_edit');
+        }
+        if (lockEl) lockEl.innerText = isOverride ? '✏️' : '🔒';
+      });
     } catch (err) {
       console.error("Error updating MultizoneThermostatZoneEnergyCard:", err);
     }
@@ -5987,17 +6524,37 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
         }
         .time-ruler {
           display: flex;
-          margin-left: 180px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-          padding-bottom: 4px;
+          align-items: center;
+          gap: 10px;
           margin-bottom: 8px;
+        }
+        .ruler-spacer {
+          width: 170px;
+          flex-shrink: 0;
+        }
+        .ruler-track {
+          flex: 1;
           position: relative;
+          height: 20px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+          border-left: 1px solid transparent;
+          border-right: 1px solid transparent;
+          box-sizing: border-box;
         }
         .ruler-hour {
-          flex: 1;
-          text-align: left;
+          position: absolute;
+          top: 0;
+          transform: translateX(-50%);
           font-size: 0.75rem;
           color: rgba(255, 255, 255, 0.6);
+          white-space: nowrap;
+          user-select: none;
+        }
+        .ruler-hour.ruler-start {
+          transform: translateX(0);
+        }
+        .ruler-hour.ruler-end {
+          transform: translateX(-100%);
         }
         .matrix-row {
           display: flex;
@@ -6080,6 +6637,34 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
           transform: scaleY(1.08);
           filter: brightness(1.15);
           z-index: 5;
+        }
+        .time-block.baseline-block {
+          opacity: 0.36;
+          border: 1px dashed rgba(255, 255, 255, 0.35);
+          box-shadow: none;
+          font-weight: 500;
+          font-size: 0.68rem;
+          z-index: 1;
+          pointer-events: none;
+        }
+        .time-block.manual-override-block {
+          background: linear-gradient(135deg, rgba(245, 158, 11, 0.92), rgba(217, 119, 6, 0.92));
+          border: 1px solid #fde68a;
+          z-index: 6;
+          box-shadow: 0 0 8px rgba(245, 158, 11, 0.45);
+        }
+        .matrix-row.general-master-row {
+          padding-bottom: 8px;
+          margin-bottom: 10px;
+          border-bottom: 1px dashed rgba(56, 189, 248, 0.35);
+        }
+        .matrix-row.general-master-row .room-title {
+          color: #38bdf8;
+          font-weight: 700;
+        }
+        .matrix-row.general-master-row .timeline-track {
+          border-color: rgba(56, 189, 248, 0.35);
+          background: rgba(56, 189, 248, 0.06);
         }
         .block-comfort { background: linear-gradient(135deg, #f97316, #ea580c); }
         .block-eco { background: linear-gradient(135deg, #22c55e, #16a34a); }
@@ -6844,10 +7429,15 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
 
         <div class="matrix-container" id="matrix-scroll-area">
           <div class="time-ruler">
-            ${Array.from({ length: 13 }).map((_, i) => {
-              const h = String(i * 2).padStart(2, '0');
-              return `<div class="ruler-hour">${h}:00</div>`;
-            }).join('')}
+            <div class="ruler-spacer"></div>
+            <div class="ruler-track">
+              ${Array.from({ length: 13 }).map((_, i) => {
+                const h = String(i * 2).padStart(2, '0');
+                const leftPct = (i * 100) / 12;
+                const edgeCls = i === 0 ? 'ruler-start' : (i === 12 ? 'ruler-end' : '');
+                return `<div class="ruler-hour ${edgeCls}" style="left: ${leftPct}%;">${h}:00</div>`;
+              }).join('')}
+            </div>
           </div>
           <div id="matrix-rows-container"></div>
         </div>
@@ -6905,6 +7495,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
     sched.profiles[this._editorProfileId].baseline_preset = newPreset;
     this._localScheduleCache = sched;
     this._saveProfileToServer(this._editorProfileId, sched.profiles[this._editorProfileId]);
+    this.renderMatrixRows();
   }
 
   _copyDayToRange(targetDays) {
@@ -6923,6 +7514,108 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
     this.renderMatrixRows();
   }
 
+  _computeBaselineGaps(blocks, baselinePreset) {
+    const base = baselinePreset || 'eco';
+    const sorted = (blocks || [])
+      .map(b => {
+        const s = this._toMinutes(b.start);
+        const e = (b.end === '23:59' || b.end === '24:00') ? 1440 : this._toMinutes(b.end);
+        return { s, e };
+      })
+      .filter(b => b.e > b.s)
+      .sort((a, b) => a.s - b.s);
+
+    const gaps = [];
+    let cursor = 0;
+    for (const seg of sorted) {
+      if (seg.s > cursor) {
+        gaps.push({
+          startMin: cursor,
+          endMin: seg.s,
+          start: this._toTimeStr(cursor),
+          end: seg.s >= 1440 ? '24:00' : this._toTimeStr(seg.s),
+          preset: base,
+        });
+      }
+      cursor = Math.max(cursor, seg.e);
+    }
+    if (cursor < 1440) {
+      gaps.push({
+        startMin: cursor,
+        endMin: 1440,
+        start: this._toTimeStr(cursor),
+        end: '24:00',
+        preset: base,
+      });
+    }
+    return gaps;
+  }
+
+  _computeGeneralDayBlocks(zones, daySchedule) {
+    if (!zones || zones.length === 0) return [];
+    const points = new Set([0, 1440]);
+    const zoneIntervals = zones.map(z => {
+      const zBlocks = daySchedule[z.climate] || daySchedule[z.id] || [];
+      return zBlocks.map(b => {
+        const s = this._toMinutes(b.start);
+        const e = (b.end === '23:59' || b.end === '24:00') ? 1440 : this._toMinutes(b.end);
+        if (e > s) {
+          points.add(s);
+          points.add(e);
+        }
+        return { s, e, preset: b.preset || 'comfort' };
+      }).filter(b => b.e > b.s);
+    });
+
+    const sortedPoints = Array.from(points).sort((a, b) => a - b);
+    const priority = { comfort: 0, eco: 1, sleep: 2, away: 3 };
+    const slices = [];
+
+    for (let i = 0; i < sortedPoints.length - 1; i++) {
+      const t1 = sortedPoints[i];
+      const t2 = sortedPoints[i + 1];
+      if (t2 <= t1) continue;
+      const mid = (t1 + t2) / 2;
+      const counts = {};
+      let covered = 0;
+
+      for (const intervals of zoneIntervals) {
+        const hit = intervals.find(iv => iv.s <= mid && iv.e > mid);
+        if (hit) {
+          covered += 1;
+          counts[hit.preset] = (counts[hit.preset] || 0) + 1;
+        }
+      }
+      if (covered === 0) continue;
+
+      const topPreset = Object.keys(counts).sort((a, b) => {
+        if (counts[b] !== counts[a]) return counts[b] - counts[a];
+        return (priority[a] ?? 99) - (priority[b] ?? 99);
+      })[0];
+      const mixed = counts[topPreset] < zones.length;
+      slices.push({ startMin: t1, endMin: t2, preset: topPreset, mixed });
+    }
+
+    const merged = [];
+    for (const sl of slices) {
+      const prev = merged[merged.length - 1];
+      if (prev && prev.endMin === sl.startMin && prev.preset === sl.preset && prev.mixed === sl.mixed) {
+        prev.endMin = sl.endMin;
+      } else {
+        merged.push({ ...sl });
+      }
+    }
+
+    return merged.map(m => ({
+      start: this._toTimeStr(m.startMin),
+      end: m.endMin >= 1440 ? '24:00' : this._toTimeStr(m.endMin),
+      startMin: m.startMin,
+      endMin: m.endMin,
+      preset: m.preset,
+      mixed: m.mixed,
+    }));
+  }
+
   renderMatrixRows() {
     const rowsContainer = this.shadowRoot.querySelector('#matrix-rows-container');
     if (!rowsContainer) return;
@@ -6931,6 +7624,8 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
     const sched = this._getScheduleStatus();
     const prof = sched.profiles?.[this._editorProfileId] || {};
     const daySchedule = prof.days?.[this._selectedDay] || {};
+    const currentBaseline = prof.baseline_preset || 'eco';
+    const manualOverrides = sched.manual_overrides || {};
 
     const dayMap = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
     const isToday = dayMap[new Date().getDay()] === this._selectedDay;
@@ -6938,8 +7633,80 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
     const nowMinutes = now.getHours() * 60 + now.getMinutes();
     const nowPercent = (nowMinutes / 1440) * 100;
 
-    rowsContainer.innerHTML = zones.map(z => {
+    const gridAndLine = `
+      ${Array.from({ length: 12 }).map((_, i) => `
+        <div class="grid-line" style="left: ${(i + 1) * (100 / 12)}%;"></div>
+      `).join('')}
+      ${isToday ? `<div class="current-time-line" style="left: ${nowPercent}%;"></div>` : ''}
+    `;
+
+    const renderBaselineGapsHtml = (blocks) => {
+      const gaps = this._computeBaselineGaps(blocks, currentBaseline);
+      return gaps.map(g => {
+        const left = (g.startMin / 1440) * 100;
+        const width = ((g.endMin - g.startMin) / 1440) * 100;
+        if (width < 2) return '';
+        const presetClass = 'block-' + g.preset;
+        const baseWord = this._t('sched_base_tag');
+        return `
+          <div class="time-block baseline-block ${presetClass}" style="left: ${left}%; width: ${width}%;"
+               title="${g.preset.toUpperCase()} (${baseWord}): ${g.start} - ${g.end}">
+            ${g.preset.substring(0, 3).toUpperCase()} (${baseWord})
+          </div>
+        `;
+      }).join('');
+    };
+
+    const generalBlocks = this._computeGeneralDayBlocks(zones, daySchedule);
+    const generalRowHtml = zones.length > 0 ? `
+      <div class="matrix-row general-master-row" data-zone="__all__">
+        <div class="room-label-box">
+          <span class="room-title" title="${this._t('sched_all_zones_row')}">🏠 ${this._t('sched_all_zones_row')}</span>
+        </div>
+        <div class="timeline-track" data-zone="__all__">
+          ${gridAndLine}
+          ${renderBaselineGapsHtml(generalBlocks)}
+          ${generalBlocks.map(b => {
+            const left = (b.startMin / 1440) * 100;
+            const width = Math.max(1.5, ((b.endMin - b.startMin) / 1440) * 100);
+            const presetClass = 'block-' + b.preset;
+            const prefix = b.mixed ? '⚡ ' : '';
+            return `
+              <div class="time-block ${presetClass}" style="left: ${left}%; width: ${width}%;"
+                   data-zone="__all__" data-start="${b.start}" data-end="${b.end}" data-preset="${b.preset}"
+                   title="${b.preset.toUpperCase()}: ${b.start} - ${b.end}${b.mixed ? ' (Mixed)' : ''}">
+                ${prefix}${b.preset.substring(0, 3).toUpperCase()} ${b.start}-${b.end}
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    ` : '';
+
+    const zonesRowsHtml = zones.map(z => {
       const blocks = daySchedule[z.climate] || daySchedule[z.id] || [];
+      let overrideBlockHtml = '';
+      if (isToday && manualOverrides[z.climate]) {
+        const ov = manualOverrides[z.climate];
+        const untilDt = ov.until ? new Date(ov.until) : null;
+        if (untilDt && !isNaN(untilDt.getTime()) && untilDt > now && nowMinutes < 1440) {
+          const sameDay = untilDt.getDate() === now.getDate()
+            && untilDt.getMonth() === now.getMonth()
+            && untilDt.getFullYear() === now.getFullYear();
+          const untilMin = sameDay ? (untilDt.getHours() * 60 + untilDt.getMinutes()) : 1440;
+          const ovEnd = Math.min(1440, Math.max(nowMinutes + 15, untilMin));
+          const left = (nowMinutes / 1440) * 100;
+          const width = Math.max(2.0, ((ovEnd - nowMinutes) / 1440) * 100);
+          overrideBlockHtml = `
+            <div class="time-block manual-override-block" style="left: ${left}%; width: ${width}%;"
+                 data-zone="${z.climate}" data-override="1"
+                 title="Override manuale attivo: ${Number(ov.target_temp).toFixed(1)}°C">
+              ✋ ${Number(ov.target_temp).toFixed(1)}°C
+            </div>
+          `;
+        }
+      }
+
       return `
         <div class="matrix-row" data-zone="${z.climate}">
           <div class="room-label-box">
@@ -6949,15 +7716,11 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
             </button>
           </div>
           <div class="timeline-track" data-zone="${z.climate}">
-            ${Array.from({ length: 12 }).map((_, i) => `
-              <div class="grid-line" style="left: ${(i + 1) * (100 / 12)}%;"></div>
-            `).join('')}
-            ${isToday ? `
-              <div class="current-time-line" style="left: ${nowPercent}%;"></div>
-            ` : ''}
+            ${gridAndLine}
+            ${renderBaselineGapsHtml(blocks)}
             ${blocks.map((b, idx) => {
               const startMin = this._toMinutes(b.start);
-              const endMin = this._toMinutes(b.end);
+              const endMin = (b.end === '23:59' || b.end === '24:00') ? 1440 : this._toMinutes(b.end);
               const left = (startMin / 1440) * 100;
               const width = Math.max(1.5, ((endMin - startMin) / 1440) * 100);
               const presetClass = 'block-' + (b.preset || 'comfort');
@@ -6968,10 +7731,13 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
                 </div>
               `;
             }).join('')}
+            ${overrideBlockHtml}
           </div>
         </div>
       `;
     }).join('');
+
+    rowsContainer.innerHTML = generalRowHtml + zonesRowsHtml;
 
     rowsContainer.querySelectorAll('.btn-copy-room').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -6983,7 +7749,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
 
     rowsContainer.querySelectorAll('.timeline-track').forEach(track => {
       track.addEventListener('click', (e) => {
-        if (e.target.closest('.time-block')) return;
+        if (e.target.closest('.time-block:not(.baseline-block)')) return;
         const cid = track.getAttribute('data-zone');
         const rect = track.getBoundingClientRect();
         const clickX = e.clientX - rect.left;
@@ -6994,7 +7760,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
 
         this.openSlotModal({
           isEdit: false,
-          zoneId: cid,
+          zoneId: cid === '__all__' ? undefined : cid,
           day: this._selectedDay,
           start: this._toTimeStr(startMin),
           end: this._toTimeStr(endMin),
@@ -7003,10 +7769,29 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
       });
     });
 
-    rowsContainer.querySelectorAll('.time-block').forEach(block => {
+    rowsContainer.querySelectorAll('.time-block:not(.baseline-block)').forEach(block => {
       block.addEventListener('click', (e) => {
         e.stopPropagation();
         const cid = block.getAttribute('data-zone');
+        if (block.hasAttribute('data-override')) {
+          if (this._hass && confirm("Rimuovere l'override manuale temporaneo per questa stanza?")) {
+            this._hass.callService('multizone_thermostat', 'clear_zone_override', {
+              entity_id: cid
+            });
+          }
+          return;
+        }
+        if (cid === '__all__') {
+          this.openSlotModal({
+            isEdit: true,
+            day: this._selectedDay,
+            preset: block.getAttribute('data-preset') || 'comfort',
+            start: block.getAttribute('data-start'),
+            end: block.getAttribute('data-end'),
+            selectedDays: [this._selectedDay]
+          });
+          return;
+        }
         const idx = parseInt(block.getAttribute('data-index'), 10);
         const blocks = (sched.profiles?.[this._editorProfileId]?.days?.[this._selectedDay]?.[cid]) || [];
         const slot = blocks[idx];

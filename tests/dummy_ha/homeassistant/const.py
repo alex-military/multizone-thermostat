@@ -29,6 +29,7 @@ class Platform(StrEnum):
     SELECT = "select"
     NUMBER = "number"
     TIME = "time"
+    BUTTON = "button"
 
 class UnitOfTemperature(StrEnum):
     CELSIUS = "°C"

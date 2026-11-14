@@ -138,26 +138,33 @@ class AutotuneSensor(SensorEntity):
         tuner = self._coordinator.zone_controller.get_autotuner(self._climate_entity_id)
         if not tuner:
             return "unknown"
+        overrides = getattr(tuner, "manual_overrides", None)
+        if overrides:
+            return "Smart PID + Manual" if tuner.state == tuner.STATE_COMPLETED else "Manual Override"
         if tuner.state == tuner.STATE_COMPLETED:
             return "Smart PID Active"
         return f"Learning ({len(tuner.completed_cycles)}/{tuner.required_cycles})"
 
     @property
     def extra_state_attributes(self):
-        """Return computed PID parameters."""
+        """Return computed PID parameters and manual/weekly metadata."""
         tuner = self._coordinator.zone_controller.get_autotuner(self._climate_entity_id)
         if not tuner:
             return {}
-        if tuner.state == tuner.STATE_COMPLETED:
-            return {
-                "Kp": round(tuner.kp, 2),
-                "Ki": round(tuner.ki, 4),
-                "Kd": round(tuner.kd, 2)
-            }
+        overrides = getattr(tuner, "manual_overrides", {}) or {}
+        completed = tuner.state == tuner.STATE_COMPLETED
+        kp_val = round(tuner.kp, 2) if (completed or "Kp" in overrides) else 0.0
+        ki_val = round(tuner.ki, 4) if (completed or "Ki" in overrides) else 0.0
+        kd_val = round(tuner.kd, 2) if (completed or "Kd" in overrides) else 0.0
         return {
-            "Kp": 0.0,
-            "Ki": 0.0,
-            "Kd": 0.0
+            "Kp": kp_val,
+            "Ki": ki_val,
+            "Kd": kd_val,
+            "learned_kp": round(getattr(tuner, "_learned_kp", 0.0), 2),
+            "learned_ki": round(getattr(tuner, "_learned_ki", 0.0), 4),
+            "learned_kd": round(getattr(tuner, "_learned_kd", 0.0), 2),
+            "manual_overrides": sorted(overrides.keys()),
+            "weekly_candidates_count": len(getattr(tuner, "weekly_candidates", [])),
         }
 
     async def async_added_to_hass(self) -> None:
@@ -170,7 +177,16 @@ class AutotuneSensor(SensorEntity):
                 self._async_on_climate_change
             )
         )
+        if hasattr(self._coordinator, "register_pid_listener"):
+            self._coordinator.register_pid_listener(self._on_pid_change)
+            self.async_on_remove(
+                lambda: self._coordinator.unregister_pid_listener(self._on_pid_change)
+            )
         
+    @callback
+    def _on_pid_change(self):
+        self.async_write_ha_state()
+
     @callback
     def _async_on_climate_change(self, event):
         self.async_write_ha_state()
@@ -350,7 +366,22 @@ class MultizoneMasterDemandSensor(SensorEntity):
 
     def _aggregate(self):
         orch = getattr(self._coordinator, "plant_orchestrator", None)
-        return getattr(orch, "last_aggregate", None)
+        agg = getattr(orch, "last_aggregate", None)
+        if agg is not None:
+            return agg
+        master_on = bool(self._coordinator.get_master_state())
+        frost_emergency = any(
+            self._coordinator.is_zone_in_frost_emergency(cid)
+            for cid in list(getattr(self._coordinator, "_climate_callbacks", {}).keys())
+        ) if hasattr(self._coordinator, "is_zone_in_frost_emergency") else False
+        if (master_on or frost_emergency) and hasattr(self._coordinator, "demand_aggregator"):
+            calc = getattr(self._coordinator.demand_aggregator, "calculate", None)
+            if callable(calc):
+                return calc(
+                    is_dhw_active=bool(getattr(self._coordinator, "is_dhw_active", False)),
+                    frost_emergency=frost_emergency,
+                )
+        return None
 
     @property
     def native_value(self) -> float:
@@ -379,6 +410,10 @@ class MultizoneMasterDemandSensor(SensorEntity):
         return attrs
 
     @callback
+    def _on_demand_changed(self, _climate_id: str, _demand: float) -> None:
+        self.async_write_ha_state()
+
+    @callback
     def _update_state(self, _) -> None:
         self.async_write_ha_state()
 
@@ -387,6 +422,13 @@ class MultizoneMasterDemandSensor(SensorEntity):
         self.async_on_remove(
             async_track_time_interval(self.hass, self._update_state, timedelta(seconds=15))
         )
+        agg = getattr(self._coordinator, "demand_aggregator", None)
+        if agg and hasattr(agg, "register_on_demand_changed"):
+            agg.register_on_demand_changed(self._on_demand_changed)
+            if hasattr(agg, "unregister_on_demand_changed"):
+                self.async_on_remove(
+                    lambda: agg.unregister_on_demand_changed(self._on_demand_changed)
+                )
 
 
 class MultizoneBoilerCyclesSensor(SensorEntity):

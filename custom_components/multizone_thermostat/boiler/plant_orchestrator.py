@@ -1,7 +1,9 @@
+from collections.abc import Mapping
 from datetime import datetime
 import asyncio
 import inspect
 import logging
+from types import SimpleNamespace
 
 from ..const import CONF_ZONE_NAME, make_zone_entity_id
 
@@ -67,6 +69,53 @@ class PlantOrchestrator:
                     cid = make_zone_entity_id(zone_name)
                     if hasattr(plant_diag, "evaluate_zone_anomalies"):
                         plant_diag.evaluate_zone_anomalies(cid)
+
+        zone_ctrl = getattr(self.coordinator, "zone_controller", None)
+        if (
+            inspect.iscoroutinefunction(getattr(zone_ctrl, "async_update_zone", None))
+            and isinstance(zones, list)
+            and getattr(self.hass, "states", None) is not None
+        ):
+            for zone in zones:
+                zone_name = zone.get(CONF_ZONE_NAME) if isinstance(zone, dict) else None
+                if not zone_name:
+                    continue
+                cid = make_zone_entity_id(zone_name)
+                if (
+                    not frost_emergency
+                    and plant_diag
+                    and hasattr(plant_diag, "has_critical_sensor_fault")
+                    and plant_diag.has_critical_sensor_fault(cid) is True
+                ):
+                    self.demand_aggregator.set_zone_demand(cid, 0.0)
+                    continue
+                ent = climate_entities.get(cid) if isinstance(climate_entities, dict) else None
+                actual_eid = getattr(ent, "entity_id", cid)
+                state_obj = self.hass.states.get(actual_eid) or self.hass.states.get(cid)
+                if state_obj is None or not isinstance(getattr(state_obj, "attributes", None), Mapping):
+                    curr_t = getattr(ent, "current_temperature", None) if ent is not None else None
+                    targ_t = getattr(ent, "target_temperature", None) if ent is not None else None
+                    if isinstance(curr_t, (int, float)) and isinstance(targ_t, (int, float)):
+                        state_obj = SimpleNamespace(
+                            entity_id=actual_eid,
+                            state=getattr(ent, "hvac_mode", "heat"),
+                            attributes={
+                                "current_temperature": curr_t,
+                                "temperature": targ_t,
+                            },
+                            last_reported=None,
+                            last_updated=None,
+                        )
+                    else:
+                        state_obj = None
+                if state_obj is not None:
+                    await zone_ctrl.async_update_zone(cid, state_obj)
+
+        if plant_diag and isinstance(zones, list):
+            for zone in zones:
+                zone_name = zone.get(CONF_ZONE_NAME) if isinstance(zone, dict) else None
+                if zone_name:
+                    cid = make_zone_entity_id(zone_name)
                     if not frost_emergency and hasattr(plant_diag, "has_critical_sensor_fault"):
                         if plant_diag.has_critical_sensor_fault(cid) is True:
                             self.demand_aggregator.set_zone_demand(cid, 0.0)

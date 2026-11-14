@@ -83,6 +83,8 @@ async def async_setup_entry(
             entities.append(MultizonePhysicalSyncSwitch(coordinator, config_entry.entry_id, zone_name))
         # Per-Zone Passive Heat Switch (Dynamic Toggle for fancoils without valves / mezzanines)
         entities.append(MultizonePassiveHeatSwitch(coordinator, config_entry.entry_id, zone_name))
+        # Per-Zone PID Manual Unlock Switch (safety lock protecting internal autotuner gains)
+        entities.append(MultizonePIDManualUnlockSwitch(coordinator, config_entry.entry_id, zone_name))
 
     async_add_entities(entities, True)
 
@@ -416,4 +418,60 @@ class MultizoneSchedulerSwitch(RestoreEntity, SwitchEntity):
         """Turn off weekly scheduler."""
         if hasattr(self._coordinator, "schedule_manager"):
             await self._coordinator.schedule_manager.async_set_scheduler_enabled(False)
+        self.async_write_ha_state()
+
+
+class MultizonePIDManualUnlockSwitch(SwitchEntity):
+    """Safety switch unlocking manual PID parameter editing for a zone on Master Control."""
+
+    _attr_has_entity_name = True
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(self, coordinator: Any, entry_id: str, zone_name: str) -> None:
+        """Initialize the PID manual unlock switch."""
+        self._coordinator = coordinator
+        self._entry_id = entry_id
+        self._zone_name = zone_name
+        self._climate_id = make_zone_entity_id(zone_name)
+
+        safe_name = zone_name.lower().replace(" ", "_")
+        self._attr_unique_id = f"{DOMAIN}_{entry_id}_pid_manual_unlock_{safe_name}"
+        self._attr_name = f"{zone_name} PID Manual Unlock"
+        self._attr_device_info = _make_device_info(entry_id, getattr(coordinator, "master_device_id", None))
+
+    @property
+    def icon(self) -> str:
+        return "mdi:lock-open-alert" if self.is_on else "mdi:lock"
+
+    @property
+    def is_on(self) -> bool:
+        return bool(self._coordinator.get_pid_manual_unlock(self._zone_name))
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return {
+            "climate_entity": self._climate_id,
+            "zone_name": self._zone_name,
+            "warning": "Unlocking allows manual modification of Kp/Ki/Kd on Master Control.",
+        }
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        if hasattr(self._coordinator, "register_pid_listener"):
+            self._coordinator.register_pid_listener(self._on_pid_change)
+            self.async_on_remove(
+                lambda: self._coordinator.unregister_pid_listener(self._on_pid_change)
+            )
+
+    def _on_pid_change(self) -> None:
+        self.async_write_ha_state()
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Unlock manual PID editing for this zone."""
+        await self._coordinator.async_set_pid_manual_unlock(self._zone_name, True)
+        self.async_write_ha_state()
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Lock manual PID editing for this zone."""
+        await self._coordinator.async_set_pid_manual_unlock(self._zone_name, False)
         self.async_write_ha_state()

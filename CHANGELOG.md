@@ -1,5 +1,21 @@
 # Changelog
 
+## [6.0.14] - 2026-11-14
+### Feat: Manual PID Controls on Master Control, Continuous Weekly EMA Autotuning, Master Demand 0% Fix & Scheduler Timeline/Preset Sync (#12)
+- **Master Control PID Inspection, Manual Override with Safety Lock & Autotuner Reset**:
+  - Added per-zone `Kp`, `Ki`, and `Kd` `number` entities (`MultizoneZonePIDNumber`), per-zone `PID Manual Unlock` safety `switch` (`MultizonePIDManualUnlockSwitch`, locked/OFF by default), and `Reset Autotuner` `button` (`MultizoneResetAutotuneButton`) on the Master Control device — keeping Config Flow and Options Flow clean without PID setup prompts.
+  - Added Home Assistant services `multizone_thermostat.set_pid_parameters` and `multizone_thermostat.reset_autotune`.
+  - Added PID inspection panel in the Frontend Zone/Energy card showing 3 read-only grey boxes (`Kp`, `Ki`, `Kd`) with live autotuner gains and a safety confirmation modal to unlock/override or reset parameters.
+- **Continuous Weekly Smoothed EMA Autotuning**:
+  - After completing the initial 3 learning cycles, `PassiveAutotuneObserver` collects high-demand heating ramps (`demand >= 85%`) during normal operation and applies a weekly median-filtered EMA refinement clamped to ±10% per week, while preserving any manually overridden PID gain (`Kp`, `Ki`, `Kd`).
+  - `ThermalObserver` gates `heating_rate` EMA updates on high demand (`demand >= 70%`) with duty-cycle normalization.
+- **Master Demand Sensor 0% Fix & Canonical Entity Resolution**:
+  - Added proactive zone evaluation (`_async_refresh_zones_proactively()`) on `PlantOrchestrator` startup and periodic updates, fallback demand calculation in `MultizoneMasterDemandSensor`, and canonical zone ID resolution (`resolve_zone_id`) when Home Assistant climate entity IDs are renamed or aliased.
+- **Weekly Scheduler Timeline & Global Preset Sync (#12)**:
+  - Fixed `.time-ruler` 12-interval alignment (`leftPct = (i * 100) / 12`) in `scheduler_card.js` so hour labels, scheduled blocks, and the red current-time cursor align cleanly.
+  - Added the `"🏠 Tutte le Zone (Generale)"` master summary row, dashed baseline gap blocks, and amber manual override blocks on the timeline.
+  - Synchronized the `Global Preset` select entity with the active weekly schedule while respecting geofencing `away` and temporary manual overrides.
+
 ## [6.0.13] - 2026-11-12
 ### Feat: Master Demand sensor
 - New `Master Demand` sensor (Master Control device, Sensors tab): aggregated demand (%) actually sent to the boiler. Attributes: `master_on`, `boiler_status` (reason), `peak_zone`, `strategy`, `dhw_active`, `frost_emergency`, per-zone primary/secondary demands. Shows 0 with reason `Master OFF` when the Master is off.
