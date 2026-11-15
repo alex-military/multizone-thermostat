@@ -117,6 +117,8 @@ class MasterController:
             self.coordinator._master_switch.async_write_ha_state()
 
         await self.coordinator.async_update_all_climates()
+        if callable(getattr(self.coordinator, "async_notify_pid_entities", None)):
+            self.coordinator.async_notify_pid_entities()
 
     async def async_apply_master_on(self) -> None:
         """Master turned ON: set current master HVAC mode (heat or cool) for capable enabled zones."""

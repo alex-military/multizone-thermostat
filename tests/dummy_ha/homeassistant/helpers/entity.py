@@ -23,6 +23,10 @@ class Entity:
     def name(self):
         return getattr(self, "_attr_name", None)
 
+    @property
+    def entity_category(self):
+        return getattr(self, "_attr_entity_category", None)
+
     async def async_added_to_hass(self):
         pass
 

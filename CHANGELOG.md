@@ -1,5 +1,26 @@
 # Changelog
 
+## [6.1.0-beta.5] - 2026-11-15
+### Feature & Architecture: Per-Zone Device Organization & Entity Categories, Dual-PID Sync & Zero Warnings
+- **Per-Zone Device Organization & Entity Categories**:
+  - Moved per-zone PID tuning controls (`MultizoneZonePIDNumber` for `PID Kp/Ki/Kd`, `MultizonePIDManualUnlockSwitch` for `PID Manual Unlock`, and `MultizoneResetAutotuneButton` for `Reset Autotuner`) from the generic "Master Control" device to their respective zone device (`Zona <Nome>` via `make_zone_device_info`).
+  - Preserved existing `unique_id` strings across all entities, ensuring seamless migration without orphaned entities or duplicates.
+  - Simplified entity names by removing redundant zone name prefixes (e.g. `PID Kp`, `PID Manual Unlock`, `Reset Autotuner` with `_attr_has_entity_name = True`).
+  - Standardized entity categories across all zone entities:
+    - **Controls** (`None`): `MultizoneVirtualThermostat` (`climate.*`) and `MultizoneZoneModeSelect` (`select.*`).
+    - **Configuration** (`EntityCategory.CONFIG`): `MultizonePIDManualUnlockSwitch`, `MultizoneZonePIDNumber`, `MultizoneResetAutotuneButton`, `MultizonePhysicalSyncSwitch`, and `MultizonePassiveHeatSwitch`.
+    - **Diagnostics** (`EntityCategory.DIAGNOSTIC`): `DemandSensor`, `AutotuneSensor`, `HeatingRateSensor`, `CoolingRateSensor`, `ThermalInertiaSensor`, `MultizoneZoneEnergyClassSensor`, `MultizoneZoneRetentionTimeSensor`, `MultizoneZoneRadiatorSizingSensor`, and `MultizoneZoneAnomalyBinarySensor`.
+  - Removed unused legacy `zone_modes` device branch in `switch.py`.
+- **Dual-Season PID (`heat` / `cool`) Synchronization & Reset Hardening**:
+  - Extended `coordinator.async_notify_pid_entities()` to also notify registered climate entities (`_climate_callbacks`), updating PID parameters (`pid_kp`, `pid_ki`, `pid_kd`, `pid_active_mode`) in real-time on `zone_energy_card.js`.
+  - Added fallback to `master_hvac_mode` in `climate.extra_state_attributes` when the zone is `HVACMode.OFF`, properly exposing `pid_active_mode` according to the active season.
+  - Linked `MasterController.async_set_master_hvac_mode()` to `async_notify_pid_entities()` to propagate season switches immediately; exposed `season_mode` in `MultizoneZonePIDNumber.extra_state_attributes`.
+  - Hardened `MultizoneResetAutotuneButton.async_press()` to automatically relock `pid_manual_unlock` to `False` (matching service behavior) and reset only the active seasonal PID track.
+- **Tests & Quality Assurance**:
+  - Eliminated all 4 unawaited coroutine `RuntimeWarning`s in unit tests by introducing safe coroutine cleanup side-effects in mock task creators.
+  - Added regression test `test_dual_season_pid_switch_and_button_relock` covering dual-season PID switching, climate callback propagation, and button safety relock.
+  - Added test `test_zone_entities_device_info_and_category_mapping` validating zone device attribution, entity categories, and clean entity naming.
+
 ## [6.1.0-beta.4] - 2026-11-15
 ### Fix: Prevent Duplicated Zone Dial Cards & False "Zona Esclusa / Bypass" Cards on Dashboard
 - **Root Cause**: `MultizonePIDManualUnlockSwitch` and `MultizoneZonePIDNumber` exposed a `climate_entity` state attribute; frontend discovery in `dashboard_strategy.js`, `autoDiscoverSwitch` (`02_helpers.js`), and `scheduler_card.js` treated `switch.*`/`select.*` entities carrying `climate_entity` as zone mode controllers, risking false "Zona Esclusa / Bypass" bindings or duplicate cards because PID Manual Unlock defaults to `OFF`.

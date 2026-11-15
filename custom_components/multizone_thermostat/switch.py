@@ -105,14 +105,6 @@ def _make_device_info(entry_id: str, master_device_id: str | None = None, device
             model="Time & Geofencing Settings",
             **via_kwargs,
         )
-    elif device_type == "zone_modes":
-        return DeviceInfo(
-            identifiers={(DOMAIN, f"{entry_id}_zone_modes")},
-            name="Zone Modes",
-            manufacturer="Custom Integration",
-            model="Zone Modes",
-            **via_kwargs,
-        )
         
     return DeviceInfo(
         identifiers={(DOMAIN, entry_id)},
@@ -527,8 +519,9 @@ class MultizonePIDManualUnlockSwitch(SwitchEntity):
         safe_name = zone_name.lower().replace(" ", "_").replace("-", "_")
         safe_name = "".join(c for c in safe_name if c.isalnum() or c == "_")
         self._attr_unique_id = f"{DOMAIN}_{entry_id}_pid_manual_unlock_{safe_name}"
-        self._attr_name = f"{zone_name} PID Manual Unlock"
-        self._attr_device_info = _make_device_info(entry_id, getattr(coordinator, "master_device_id", None))
+        self._attr_name = "PID Manual Unlock"
+        master_dev_id = getattr(coordinator, "master_device_id", None)
+        self._attr_device_info = make_zone_device_info(entry_id, zone_name, master_dev_id)
 
     @property
     def icon(self) -> str:
@@ -544,7 +537,7 @@ class MultizonePIDManualUnlockSwitch(SwitchEntity):
             "target_climate_entity": self._climate_id,
             "multizone_type": "pid_manual_unlock",
             "zone_name": self._zone_name,
-            "warning": "Unlocking allows manual modification of Kp/Ki/Kd on Master Control.",
+            "warning": "Unlocking allows manual modification of Kp/Ki/Kd for this zone.",
         }
 
     async def async_added_to_hass(self) -> None:

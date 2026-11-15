@@ -300,7 +300,14 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             if isinstance(cr, (int, float)):
                 attrs["cooling_rate"] = cr
 
-        active_mode = "cool" if self._hvac_mode == HVACMode.COOL else "heat"
+        if self._hvac_mode == HVACMode.COOL:
+            active_mode = "cool"
+        elif self._hvac_mode == HVACMode.HEAT:
+            active_mode = "heat"
+        else:
+            season = getattr(self._coordinator, "master_hvac_mode", "heat") or "heat"
+            active_mode = "cool" if str(season).lower() == "cool" else "heat"
+        attrs["pid_active_mode"] = active_mode
         tuner_getter = getattr(self._coordinator, "get_autotuner", None)
         cid_lookup = getattr(self, "_canonical_id", None) or self.entity_id
         tuner = None

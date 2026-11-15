@@ -12,6 +12,11 @@ from custom_components.multizone_thermostat.const import CONF_ZONE_NAME, CONF_ZO
 async def test_listener_manager_setup_and_teardown():
     coord = MagicMock()
     coord.hass = MagicMock()
+    def _create_task(coro):
+        if hasattr(coro, "close"):
+            coro.close()
+        return MagicMock()
+    coord.hass.async_create_task = MagicMock(side_effect=_create_task)
     coord._unsub_listeners = []
     coord.zones = [
         {CONF_ZONE_NAME: "Living", CONF_ZONE_WINDOW_SENSOR: "binary_sensor.window_living"},

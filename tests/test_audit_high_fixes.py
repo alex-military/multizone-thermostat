@@ -148,7 +148,11 @@ async def test_bug04_anti_seize_trigger_manually_reuses_running_task():
 
     dummy_task = MagicMock()
     dummy_task.done.return_value = False
-    hass.async_create_task = MagicMock(return_value=dummy_task)
+    def _create_task(coro):
+        if hasattr(coro, "close"):
+            coro.close()
+        return dummy_task
+    hass.async_create_task = MagicMock(side_effect=_create_task)
 
     mgr = AntiSeizeManager(hass, coord)
     t1 = mgr.trigger_manually()

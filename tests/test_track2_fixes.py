@@ -189,6 +189,11 @@ async def test_options_flow_save_options_no_double_reload():
 async def test_zone_manager_window_restore_off_state():
     """Verify that a zone turned OFF before window opened is restored to OFF upon window close."""
     hass = MagicMock()
+    def _create_task(coro):
+        if hasattr(coro, "close"):
+            coro.close()
+        return MagicMock()
+    hass.async_create_task = MagicMock(side_effect=_create_task)
     coordinator = MagicMock()
     coordinator.zones = [{CONF_ZONE_NAME: "Living", CONF_ZONE_WINDOW_SENSOR: "binary_sensor.window"}]
     coordinator.is_zone_in_frost_emergency.return_value = False
@@ -235,6 +240,11 @@ async def test_zone_manager_window_restore_off_state():
 async def test_zone_manager_window_backward_compatibility():
     """Verify that a legacy string saved in _pre_window_state restores cleanly."""
     hass = MagicMock()
+    def _create_task(coro):
+        if hasattr(coro, "close"):
+            coro.close()
+        return MagicMock()
+    hass.async_create_task = MagicMock(side_effect=_create_task)
     coordinator = MagicMock()
     coordinator.zones = [{CONF_ZONE_NAME: "Bed", CONF_ZONE_WINDOW_SENSOR: "binary_sensor.bed_window"}]
     coordinator.is_zone_in_frost_emergency.return_value = False
@@ -392,6 +402,11 @@ async def test_diagnostics_telemetry():
 def test_sensor_and_select_entity_naming():
     """Verify sensor returns English 'Energy Class' and select uses translation key."""
     hass = MagicMock()
+    def _create_task(coro):
+        if hasattr(coro, "close"):
+            coro.close()
+        return MagicMock()
+    hass.async_create_task = MagicMock(side_effect=_create_task)
     coordinator = MagicMock()
     sensor = MultizoneZoneEnergyClassSensor(hass, "entry1", "Salotto", "climate.salotto", coordinator)
     assert sensor.name == "Energy Class"

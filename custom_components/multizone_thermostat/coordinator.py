@@ -110,8 +110,13 @@ class MultizoneCoordinator:
             self._pid_listeners.remove(callback_fn)
 
     def async_notify_pid_entities(self) -> None:
-        """Notify registered PID/autotuner UI entities of updated values."""
+        """Notify registered PID/autotuner UI entities and climate entities of updated values."""
         for cb in list(self._pid_listeners):
+            try:
+                cb()
+            except Exception:
+                pass
+        for cb in list(self._climate_callbacks.values()):
             try:
                 cb()
             except Exception:

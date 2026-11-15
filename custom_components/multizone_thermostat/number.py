@@ -45,6 +45,7 @@ from .const import (
     KEY_HP_MIN_CYCLE_OFF,
     DEFAULT_HP_MIN_CYCLE_ON,
     DEFAULT_HP_MIN_CYCLE_OFF,
+    make_zone_device_info,
     make_zone_entity_id,
 )
 
@@ -215,6 +216,11 @@ async def async_setup_entry(
         zone_name = zone.get(CONF_ZONE_NAME) if isinstance(zone, dict) else None
         if not zone_name:
             continue
+        zone_device_info = make_zone_device_info(
+            config_entry.entry_id,
+            zone_name,
+            getattr(coordinator, "master_device_id", None),
+        )
         for param, min_v, max_v, step_v, precision in PID_PARAM_SPECS:
             entities.append(
                 MultizoneZonePIDNumber(
@@ -226,7 +232,7 @@ async def async_setup_entry(
                     max_value=max_v,
                     step=step_v,
                     precision=precision,
-                    device_info=device_info,
+                    device_info=zone_device_info,
                 )
             )
 
@@ -375,7 +381,7 @@ class MultizoneZonePIDNumber(NumberEntity):
         max_value: float,
         step: float,
         precision: int,
-        device_info: DeviceInfo,
+        device_info: DeviceInfo | None = None,
     ) -> None:
         """Initialize the zone PID parameter number entity."""
         self._coordinator = coordinator
@@ -389,18 +395,24 @@ class MultizoneZonePIDNumber(NumberEntity):
         safe_name = zone_name.lower().replace(" ", "_").replace("-", "_")
         safe_name = "".join(c for c in safe_name if c.isalnum() or c == "_")
         self._attr_unique_id = f"{DOMAIN}_{entry_id}_pid_{self._attr_lower}_{safe_name}"
-        self._attr_name = f"{zone_name} PID {param}"
+        self._attr_name = f"PID {param}"
         self._attr_native_min_value = min_value
         self._attr_native_max_value = max_value
         self._attr_native_step = step
+        if device_info is None:
+            master_dev_id = getattr(coordinator, "master_device_id", None)
+            device_info = make_zone_device_info(entry_id, zone_name, master_dev_id)
         self._attr_device_info = device_info
+
+    def _get_season_mode(self) -> str:
+        season = getattr(self._coordinator, "master_hvac_mode", "heat") or "heat"
+        return "cool" if str(season).lower() == "cool" else "heat"
 
     def _get_active_tuner(self):
         zc = getattr(self._coordinator, "zone_controller", None)
         if zc is None or not callable(getattr(zc, "get_autotuner", None)):
             return None
-        season = getattr(self._coordinator, "master_hvac_mode", "heat") or "heat"
-        season_mode = "cool" if str(season).lower() == "cool" else "heat"
+        season_mode = self._get_season_mode()
         try:
             return zc.get_autotuner(self._climate_id, mode=season_mode)
         except TypeError:
@@ -431,6 +443,7 @@ class MultizoneZonePIDNumber(NumberEntity):
             "multizone_type": "pid_parameter",
             "zone_name": self._zone_name,
             "parameter": self._param,
+            "season_mode": self._get_season_mode(),
             "locked": not unlocked,
             "manual_override": self._param in overrides,
             "learned_value": learned_val,
@@ -469,7 +482,7 @@ class MultizoneZonePIDNumber(NumberEntity):
                             "title": f"Multizone Thermostat - {self._zone_name} PID Locked",
                             "message": (
                                 f"Manual modification of PID parameter {self._param} is blocked for safety. "
-                                f"Enable '{self._zone_name} PID Manual Unlock' on the Master Control device "
+                                "Enable 'PID Manual Unlock' on the zone device "
                                 "before changing internal autotuner gains."
                             ),
                             "notification_id": f"{DOMAIN}_pid_lock_{self._zone_name.lower().replace(' ', '_')}",

@@ -271,12 +271,11 @@ async def test_pid_entities_safety_lock_button_and_services():
     coord.zone_controller._apply_tuner_pid_to_controller(canon_id)
     initial_kp = tuner.kp
 
-    device_info = MagicMock()
     unlock_sw = MultizonePIDManualUnlockSwitch(coord, entry.entry_id, "Soggiorno")
     kp_num = MultizoneZonePIDNumber(
-        coord, entry.entry_id, "Soggiorno", "Kp", 0.1, 500.0, 0.1, 2, device_info
+        coord, entry.entry_id, "Soggiorno", "Kp", 0.1, 500.0, 0.1, 2, device_info=None
     )
-    reset_btn = MultizoneResetAutotuneButton(coord, entry.entry_id, "Soggiorno", device_info)
+    reset_btn = MultizoneResetAutotuneButton(coord, entry.entry_id, "Soggiorno", device_info=None)
     auto_sensor = AutotuneSensor(hass, entry.entry_id, "Soggiorno", canon_id, coord)
 
     unlock_sw.hass = hass
@@ -286,6 +285,18 @@ async def test_pid_entities_safety_lock_button_and_services():
     unlock_sw.async_write_ha_state = MagicMock()
     kp_num.async_write_ha_state = MagicMock()
     auto_sensor.async_write_ha_state = MagicMock()
+
+    expected_zone_device_id = {(DOMAIN, f"{entry.entry_id}_zone_soggiorno")}
+    assert unlock_sw._attr_device_info["identifiers"] == expected_zone_device_id
+    assert unlock_sw.name == "PID Manual Unlock"
+    assert unlock_sw.extra_state_attributes["warning"] == "Unlocking allows manual modification of Kp/Ki/Kd for this zone."
+
+    assert kp_num._attr_device_info["identifiers"] == expected_zone_device_id
+    assert kp_num.name == "PID Kp"
+
+    assert reset_btn._attr_device_info["identifiers"] == expected_zone_device_id
+    assert reset_btn.name == "Reset Autotuner"
+    assert reset_btn.extra_state_attributes["multizone_type"] == "reset_autotune"
 
     # Safety lock defaults OFF -> edit attempt is blocked + creates persistent_notification
     assert unlock_sw.is_on is False
@@ -402,3 +413,249 @@ def test_frontend_bundle_contains_pid_controls_and_is_current():
         "reset_autotune",
     ):
         assert marker in content
+
+
+@pytest.mark.asyncio
+async def test_dual_season_pid_switch_and_button_relock():
+    """Verify dual-season PID sync, notification propagation, and button safety relock."""
+    from homeassistant.components.climate import HVACMode
+    from custom_components.multizone_thermostat.climate import MultizoneVirtualThermostat
+    from custom_components.multizone_thermostat.const import HVAC_MODE_COOL, HVAC_MODE_HEAT
+
+    hass = _make_fake_hass(
+        {
+            "sensor.temp_soggiorno": SimpleNamespace(
+                entity_id="sensor.temp_soggiorno",
+                state="20.0",
+                attributes={},
+                last_reported=None,
+                last_updated=None,
+            ),
+        }
+    )
+    entry = _make_entry()
+    coord = MultizoneCoordinator(hass, entry)
+    coord.storage._settings_store = MagicMock()
+    coord.storage._settings_store.async_save = AsyncMock()
+    coord.get_persistent_data = lambda k, d=None: coord._settings.get(k, d)
+    coord.async_set_persistent_data = AsyncMock(
+        side_effect=lambda k, v: coord._settings.__setitem__(k, v)
+    )
+    coord.zone_controller.async_save_autotuner_states = AsyncMock()
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {"coordinator": coord}
+
+    canon_id = make_zone_entity_id("Soggiorno")
+    device_info = MagicMock()
+
+    # 1. Setup heat and cool tuners with distinct gains and completed cycles
+    heat_tuner = coord.get_autotuner(canon_id, mode="heat")
+    cool_tuner = coord.get_autotuner(canon_id, mode="cool")
+    assert heat_tuner is not None
+    assert cool_tuner is not None
+
+    _complete_initial_cycles(heat_tuner)
+    cool_tuner.state = PassiveAutotuneObserver.STATE_COMPLETED
+    cool_tuner.completed_cycles = [{"cycle": 1}, {"cycle": 2}]
+    assert heat_tuner.state == PassiveAutotuneObserver.STATE_COMPLETED
+    assert cool_tuner.state == PassiveAutotuneObserver.STATE_COMPLETED
+
+    heat_tuner.kp = 105.0
+    heat_tuner.ki = 0.0055
+    heat_tuner.kd = 52.0
+    heat_tuner._learned_kp = 105.0
+    heat_tuner._learned_ki = 0.0055
+    heat_tuner._learned_kd = 52.0
+
+    cool_tuner.kp = 175.0
+    cool_tuner.ki = 0.0085
+    cool_tuner.kd = 88.0
+    cool_tuner._learned_kp = 175.0
+    cool_tuner._learned_ki = 0.0085
+    cool_tuner._learned_kd = 88.0
+
+    # 2. Instantiate entities: PID Number, Climate (HVACMode.OFF), Reset Button
+    kp_num = MultizoneZonePIDNumber(
+        coord, entry.entry_id, "Soggiorno", "Kp", 0.1, 500.0, 0.1, 2, device_info
+    )
+    kp_num.hass = hass
+    kp_num.async_write_ha_state = MagicMock()
+
+    climate = MultizoneVirtualThermostat(
+        hass=hass,
+        entry_id=entry.entry_id,
+        zone_data=entry.data[CONF_ZONES][0],
+    )
+    climate._coordinator = coord
+    climate._hvac_mode = HVACMode.OFF
+    climate.async_write_ha_state = MagicMock()
+
+    reset_btn = MultizoneResetAutotuneButton(coord, entry.entry_id, "Soggiorno", device_info)
+    reset_btn.hass = hass
+
+    # Register listeners
+    pid_listener_called = False
+    climate_cb_called = False
+
+    def _pid_listener():
+        nonlocal pid_listener_called
+        pid_listener_called = True
+
+    def _climate_cb():
+        nonlocal climate_cb_called
+        climate_cb_called = True
+
+    coord.register_pid_listener(_pid_listener)
+    coord.register_climate(climate.entity_id, _climate_cb, climate, canonical_id=canon_id)
+
+    # 3. Test coordinator.async_notify_pid_entities invokes both _pid_listeners and _climate_callbacks
+    pid_listener_called = False
+    climate_cb_called = False
+    coord.async_notify_pid_entities()
+    assert pid_listener_called is True
+    assert climate_cb_called is True
+
+    # 4. Check initial Heat mode attributes (zone is HVACMode.OFF)
+    coord.master_hvac_mode = HVAC_MODE_HEAT
+    assert kp_num.extra_state_attributes["season_mode"] == "heat"
+    assert kp_num.native_value == pytest.approx(105.0)
+
+    attrs_heat = climate.extra_state_attributes
+    assert attrs_heat["pid_active_mode"] == "heat"
+    assert attrs_heat["pid_kp"] == pytest.approx(105.0)
+    assert attrs_heat["pid_ki"] == pytest.approx(0.0055)
+    assert attrs_heat["pid_kd"] == pytest.approx(52.0)
+
+    # 5. Switch to Cool mode via master_controller
+    pid_listener_called = False
+    climate_cb_called = False
+    await coord.master_controller.async_set_master_hvac_mode(HVAC_MODE_COOL)
+
+    # Master switch notification invoked both callbacks
+    assert pid_listener_called is True
+    assert climate_cb_called is True
+    assert coord.master_hvac_mode == HVAC_MODE_COOL
+
+    # MultizoneZonePIDNumber and Climate reflect Cool mode PID gains even with zone HVACMode.OFF
+    assert kp_num.extra_state_attributes["season_mode"] == "cool"
+    assert kp_num.native_value == pytest.approx(175.0)
+
+    attrs_cool = climate.extra_state_attributes
+    assert attrs_cool["pid_active_mode"] == "cool"
+    assert attrs_cool["pid_kp"] == pytest.approx(175.0)
+    assert attrs_cool["pid_ki"] == pytest.approx(0.0085)
+    assert attrs_cool["pid_kd"] == pytest.approx(88.0)
+
+    # 6. Test MultizoneResetAutotuneButton.async_press():
+    # Unlock manual PID first
+    await coord.async_set_pid_manual_unlock("Soggiorno", True)
+    assert coord.get_pid_manual_unlock("Soggiorno") is True
+
+    # Reset while Cool mode is active:
+    # Must reset only the active season tuner (cool_tuner) and lock pid_manual_unlock to False
+    await reset_btn.async_press()
+    assert cool_tuner.state == PassiveAutotuneObserver.STATE_IDLE
+    assert cool_tuner.completed_cycles == []
+    # Heat tuner must remain untouched in STATE_COMPLETED
+    assert heat_tuner.state == PassiveAutotuneObserver.STATE_COMPLETED
+    assert len(heat_tuner.completed_cycles) == 3
+    # Safety lock re-engaged
+    assert coord.get_pid_manual_unlock("Soggiorno") is False
+
+
+@pytest.mark.asyncio
+async def test_zone_entities_device_info_and_category_mapping():
+    """Verify all per-zone entities attach to zone device info with correct category and concise names."""
+    from homeassistant.const import EntityCategory
+    from custom_components.multizone_thermostat import button as button_platform
+    from custom_components.multizone_thermostat import number as number_platform
+    from custom_components.multizone_thermostat.binary_sensor import MultizoneZoneAnomalyBinarySensor
+    from custom_components.multizone_thermostat.sensor import (
+        AutotuneSensor,
+        DemandSensor,
+        HeatingRateSensor,
+        MultizoneZoneEnergyClassSensor,
+    )
+
+    hass = _make_fake_hass()
+    entry = _make_entry()
+    coord = MultizoneCoordinator(hass, entry)
+    coord.storage._settings_store = MagicMock()
+    coord.storage._settings_store.async_save = AsyncMock()
+    coord.get_persistent_data = lambda k, d=None: coord._settings.get(k, d)
+    coord.async_set_persistent_data = AsyncMock(
+        side_effect=lambda k, v: coord._settings.__setitem__(k, v)
+    )
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {"coordinator": coord}
+
+    expected_zone_device_id = {(DOMAIN, f"{entry.entry_id}_zone_soggiorno")}
+    canon_id = make_zone_entity_id("Soggiorno")
+
+    # 1. Number platform async_setup_entry
+    added_numbers = []
+    await number_platform.async_setup_entry(hass, entry, added_numbers.extend)
+    pid_numbers = [n for n in added_numbers if isinstance(n, MultizoneZonePIDNumber)]
+    assert len(pid_numbers) == 3
+    for num in pid_numbers:
+        assert num._attr_device_info["identifiers"] == expected_zone_device_id
+        assert num.entity_category == EntityCategory.CONFIG
+        assert num.name in ["PID Kp", "PID Ki", "PID Kd"]
+
+    # Test fallback when device_info=None passed to constructor
+    num_fallback = MultizoneZonePIDNumber(
+        coord, entry.entry_id, "Soggiorno", "Kp", 0.1, 500.0, 0.1, 2, device_info=None
+    )
+    assert num_fallback._attr_device_info["identifiers"] == expected_zone_device_id
+    assert num_fallback.name == "PID Kp"
+    assert num_fallback.entity_category == EntityCategory.CONFIG
+
+    # 2. Button platform async_setup_entry
+    added_buttons = []
+    await button_platform.async_setup_entry(hass, entry, added_buttons.extend)
+    assert len(added_buttons) == 1
+    reset_btn_entry = added_buttons[0]
+    assert reset_btn_entry._attr_device_info["identifiers"] == expected_zone_device_id
+    assert reset_btn_entry.entity_category == EntityCategory.CONFIG
+    assert reset_btn_entry.name == "Reset Autotuner"
+    assert reset_btn_entry.extra_state_attributes == {
+        "target_climate_entity": canon_id,
+        "multizone_type": "reset_autotune",
+        "zone_name": "Soggiorno",
+    }
+
+    # Test fallback when device_info=None passed to constructor
+    reset_btn_fallback = MultizoneResetAutotuneButton(
+        coord, entry.entry_id, "Soggiorno", device_info=None
+    )
+    assert reset_btn_fallback._attr_device_info["identifiers"] == expected_zone_device_id
+    assert reset_btn_fallback.name == "Reset Autotuner"
+    assert reset_btn_fallback.entity_category == EntityCategory.CONFIG
+
+    # 3. Switch entity
+    unlock_sw = MultizonePIDManualUnlockSwitch(coord, entry.entry_id, "Soggiorno")
+    assert unlock_sw._attr_device_info["identifiers"] == expected_zone_device_id
+    assert unlock_sw.name == "PID Manual Unlock"
+    assert unlock_sw.entity_category == EntityCategory.CONFIG
+    assert unlock_sw.extra_state_attributes["warning"] == (
+        "Unlocking allows manual modification of Kp/Ki/Kd for this zone."
+    )
+
+    # 4. Diagnostic sensors on zone device
+    demand_sensor = DemandSensor(hass, entry.entry_id, "Soggiorno", canon_id, coord)
+    assert demand_sensor._attr_device_info["identifiers"] == expected_zone_device_id
+    assert demand_sensor.entity_category == EntityCategory.DIAGNOSTIC
+
+    autotune_sensor = AutotuneSensor(hass, entry.entry_id, "Soggiorno", canon_id, coord)
+    assert autotune_sensor._attr_device_info["identifiers"] == expected_zone_device_id
+    assert autotune_sensor.entity_category == EntityCategory.DIAGNOSTIC
+
+    heating_rate_sensor = HeatingRateSensor(hass, entry.entry_id, "Soggiorno", canon_id, coord)
+    assert heating_rate_sensor._attr_device_info["identifiers"] == expected_zone_device_id
+    assert heating_rate_sensor.entity_category == EntityCategory.DIAGNOSTIC
+
+    energy_class_sensor = MultizoneZoneEnergyClassSensor(hass, entry.entry_id, "Soggiorno", canon_id, coord)
+    assert energy_class_sensor._attr_device_info["identifiers"] == expected_zone_device_id
+    assert energy_class_sensor.entity_category == EntityCategory.DIAGNOSTIC
+
+    anomaly_sensor = MultizoneZoneAnomalyBinarySensor(coord, entry.entry_id, "Soggiorno", canon_id)
+    assert anomaly_sensor._attr_device_info["identifiers"] == expected_zone_device_id
+    assert anomaly_sensor.entity_category == EntityCategory.DIAGNOSTIC

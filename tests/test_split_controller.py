@@ -43,6 +43,11 @@ class TestSplitZoneManager(unittest.IsolatedAsyncioTestCase):
 
     async def asyncSetUp(self):
         self.hass = MagicMock()
+        def _create_task(coro):
+            if hasattr(coro, "close"):
+                coro.close()
+            return MagicMock()
+        self.hass.async_create_task = MagicMock(side_effect=_create_task)
         self.hass.services.async_call = AsyncMock()
 
         self.zones_config = [
