@@ -288,6 +288,9 @@ async def test_pid_entities_safety_lock_button_and_services():
 
     # Safety lock defaults OFF -> edit attempt is blocked + creates persistent_notification
     assert unlock_sw.is_on is False
+    assert "climate_entity" not in unlock_sw.extra_state_attributes
+    assert unlock_sw.extra_state_attributes["target_climate_entity"] == canon_id
+    assert "climate_entity" not in kp_num.extra_state_attributes
     assert kp_num.extra_state_attributes["locked"] is True
     await kp_num.async_set_native_value(222.0)
     assert tuner.kp == pytest.approx(initial_kp)

@@ -345,7 +345,8 @@ class MultizoneZonePIDNumber(NumberEntity):
         learned_attr = f"_learned_{self._attr_lower}"
         learned_val = round(float(getattr(tuner, learned_attr, 0.0)), self._precision) if tuner else 0.0
         return {
-            "climate_entity": self._climate_id,
+            "target_climate_entity": self._climate_id,
+            "multizone_type": "pid_parameter",
             "zone_name": self._zone_name,
             "parameter": self._param,
             "locked": not unlocked,

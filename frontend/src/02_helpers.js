@@ -1,26 +1,41 @@
-// Helper function to auto-discover the bypass switch for a climate entity
+// Helper function to check whether an auxiliary switch/select should never be treated as zone mode
+function _isAuxiliaryZoneEntity(entityId, stateObj) {
+  if (!entityId) return false;
+  if (entityId.includes("pid_") || entityId.includes("split_")) return true;
+  const mType = stateObj && stateObj.attributes && stateObj.attributes.multizone_type;
+  return mType === "pid_manual_unlock" || mType === "pid_parameter" || mType === "master";
+}
+
+// Helper function to auto-discover the bypass switch / zone_mode select for a climate entity
 function autoDiscoverSwitch(hass, climateId) {
   if (!hass || !hass.states || !climateId) return "";
+  // Prefer select.* zone_mode entities before legacy switch.* entities
+  let legacySwitchFallback = "";
   for (const entityId of Object.keys(hass.states)) {
-    // Check both legacy switches and new select entities for the climate_entity attribute
-    if ((entityId.startsWith("select.") || entityId.startsWith("switch.")) && 
-        hass.states[entityId].attributes && 
-        hass.states[entityId].attributes.climate_entity === climateId) {
-      return entityId;
+    const stateObj = hass.states[entityId];
+    if (_isAuxiliaryZoneEntity(entityId, stateObj)) continue;
+    if ((entityId.startsWith("select.") || entityId.startsWith("switch.")) &&
+        stateObj && stateObj.attributes &&
+        stateObj.attributes.climate_entity === climateId) {
+      if (entityId.startsWith("select.")) return entityId;
+      if (!legacySwitchFallback) legacySwitchFallback = entityId;
     }
   }
-  
+  if (legacySwitchFallback) return legacySwitchFallback;
+
   // Fallback: check if the entityId contains the climate device name AND is a zone_mode entity
   const rawName = climateId.split('.')[1] || "";
   const slug = rawName.replace(/^multizone_thermostat_/, "");
   for (const entityId of Object.keys(hass.states)) {
-    if (entityId.startsWith("select.") && 
+    const stateObj = hass.states[entityId];
+    if (_isAuxiliaryZoneEntity(entityId, stateObj)) continue;
+    if (entityId.startsWith("select.") &&
         (entityId.includes(slug) || (rawName && entityId.includes(rawName))) &&
         (entityId.includes("mode") || entityId.includes("zone"))) {
       return entityId;
     }
   }
-  
+
   return "";
 }
 

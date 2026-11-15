@@ -136,7 +136,9 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
     const seenClimates = new Set();
 
     for (const eid of Object.keys(this._hass.states)) {
+      if (!eid.startsWith('select.') && !eid.startsWith('switch.')) continue;
       const s = this._hass.states[eid];
+      if (eid.includes('pid_') || s.attributes?.multizone_type === 'pid_manual_unlock') continue;
       const climateId = s.attributes ? s.attributes.climate_entity : null;
       if (climateId && this._hass.states[climateId] && !seenClimates.has(climateId)) {
         seenClimates.add(climateId);

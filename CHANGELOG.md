@@ -1,5 +1,11 @@
 # Changelog
 
+## [6.0.15] - 2026-11-15
+### Fix: Prevent Duplicated Zone Dial Cards & False "Zona Esclusa / Bypass" Cards on Dashboard
+- **Root Cause**: `MultizonePIDManualUnlockSwitch` and `MultizoneZonePIDNumber` exposed a `climate_entity` state attribute; the Lovelace dashboard strategy (`dashboard_strategy.js`), `autoDiscoverSwitch` (`02_helpers.js`), and `scheduler_card.js` treated every `switch.*`/`select.*` with `climate_entity` as a zone mode controller, spawning a duplicate Dial Card per zone locked as "Zona Esclusa / Bypass" because PID Manual Unlock defaults to `OFF`.
+- **Backend Fix**: Replaced `climate_entity` with `target_climate_entity` and added `multizone_type` (`pid_manual_unlock` / `pid_parameter`) on PID control entities (`switch.py`, `number.py`).
+- **Frontend Fix**: Excluded `pid_*`/`split_*` and PID auxiliary entities across `dashboard_strategy.js`, `02_helpers.js`, and `scheduler_card.js`, deduplicated zone discovery in `generateView`, and prioritized `select.*` zone mode entities over legacy `switch.*` fallbacks.
+
 ## [6.0.14] - 2026-11-14
 ### Feat: Manual PID Controls on Master Control, Continuous Weekly EMA Autotuning, Master Demand 0% Fix & Scheduler Timeline/Preset Sync (#12)
 - **Master Control PID Inspection, Manual Override with Safety Lock & Autotuner Reset**:

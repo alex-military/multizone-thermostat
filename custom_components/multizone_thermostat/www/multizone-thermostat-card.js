@@ -860,29 +860,44 @@ function getTranslation(hass, key) {
   return translations[key] || TRANSLATIONS['en'][key] || key;
 }
 
-// Helper function to auto-discover the bypass switch for a climate entity
+// Helper function to check whether an auxiliary switch/select should never be treated as zone mode
+function _isAuxiliaryZoneEntity(entityId, stateObj) {
+  if (!entityId) return false;
+  if (entityId.includes("pid_") || entityId.includes("split_")) return true;
+  const mType = stateObj && stateObj.attributes && stateObj.attributes.multizone_type;
+  return mType === "pid_manual_unlock" || mType === "pid_parameter" || mType === "master";
+}
+
+// Helper function to auto-discover the bypass switch / zone_mode select for a climate entity
 function autoDiscoverSwitch(hass, climateId) {
   if (!hass || !hass.states || !climateId) return "";
+  // Prefer select.* zone_mode entities before legacy switch.* entities
+  let legacySwitchFallback = "";
   for (const entityId of Object.keys(hass.states)) {
-    // Check both legacy switches and new select entities for the climate_entity attribute
-    if ((entityId.startsWith("select.") || entityId.startsWith("switch.")) && 
-        hass.states[entityId].attributes && 
-        hass.states[entityId].attributes.climate_entity === climateId) {
-      return entityId;
+    const stateObj = hass.states[entityId];
+    if (_isAuxiliaryZoneEntity(entityId, stateObj)) continue;
+    if ((entityId.startsWith("select.") || entityId.startsWith("switch.")) &&
+        stateObj && stateObj.attributes &&
+        stateObj.attributes.climate_entity === climateId) {
+      if (entityId.startsWith("select.")) return entityId;
+      if (!legacySwitchFallback) legacySwitchFallback = entityId;
     }
   }
-  
+  if (legacySwitchFallback) return legacySwitchFallback;
+
   // Fallback: check if the entityId contains the climate device name AND is a zone_mode entity
   const rawName = climateId.split('.')[1] || "";
   const slug = rawName.replace(/^multizone_thermostat_/, "");
   for (const entityId of Object.keys(hass.states)) {
-    if (entityId.startsWith("select.") && 
+    const stateObj = hass.states[entityId];
+    if (_isAuxiliaryZoneEntity(entityId, stateObj)) continue;
+    if (entityId.startsWith("select.") &&
         (entityId.includes(slug) || (rawName && entityId.includes(rawName))) &&
         (entityId.includes("mode") || entityId.includes("zone"))) {
       return entityId;
     }
   }
-  
+
   return "";
 }
 
@@ -6155,7 +6170,9 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
     const seenClimates = new Set();
 
     for (const eid of Object.keys(this._hass.states)) {
+      if (!eid.startsWith('select.') && !eid.startsWith('switch.')) continue;
       const s = this._hass.states[eid];
+      if (eid.includes('pid_') || s.attributes?.multizone_type === 'pid_manual_unlock') continue;
       const climateId = s.attributes ? s.attributes.climate_entity : null;
       if (climateId && this._hass.states[climateId] && !seenClimates.has(climateId)) {
         seenClimates.add(climateId);
@@ -9362,6 +9379,7 @@ class MultizoneThermostatDashboardStrategy extends HTMLElement {
     for (const entityId of Object.keys(hass.states)) {
       if (entityId.startsWith("select.") || entityId.startsWith("switch.")) {
         const stateObj = hass.states[entityId];
+        if (entityId.includes("pid_") || stateObj?.attributes?.multizone_type === "pid_manual_unlock") continue;
         const climateId = stateObj.attributes ? stateObj.attributes.climate_entity : null;
         if (climateId) {
           const climateState = hass.states[climateId];
@@ -9421,15 +9439,23 @@ class MultizoneThermostatDashboardStrategy extends HTMLElement {
     // Find preset entity
     const presetEntity = findPresetEntity(hass);
     
-    // Find all zones (by checking for climate_entity attribute)
+    // Find all zones (by checking for climate_entity attribute on zone_mode select/switch)
     const zones = [];
     for (const entityId of Object.keys(hass.states)) {
       if (entityId.startsWith("select.") || entityId.startsWith("switch.")) {
         const stateObj = hass.states[entityId];
+        if (entityId.includes("pid_") || stateObj?.attributes?.multizone_type === "pid_manual_unlock") continue;
         const climateId = stateObj.attributes ? stateObj.attributes.climate_entity : null;
         if (climateId) {
           const climateState = hass.states[climateId];
           if (climateState) {
+            const existing = zones.find(z => z.climate === climateId);
+            if (existing) {
+              if (entityId.startsWith("select.") && existing.switch && existing.switch.startsWith("switch.")) {
+                existing.switch = entityId;
+              }
+              continue;
+            }
             let title = climateState.attributes.friendly_name || climateId;
             title = title.replace(/^Virtual Thermostats VT /i, '').replace(/^Heating Zones(?: Zone)? /i, '');
             zones.push({
