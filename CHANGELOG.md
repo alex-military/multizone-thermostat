@@ -1,5 +1,11 @@
 # Changelog
 
+## [6.1.0-beta.4] - 2026-11-15
+### Fix: Prevent Duplicated Zone Dial Cards & False "Zona Esclusa / Bypass" Cards on Dashboard
+- **Root Cause**: `MultizonePIDManualUnlockSwitch` and `MultizoneZonePIDNumber` exposed a `climate_entity` state attribute; frontend discovery in `dashboard_strategy.js`, `autoDiscoverSwitch` (`02_helpers.js`), and `scheduler_card.js` treated `switch.*`/`select.*` entities carrying `climate_entity` as zone mode controllers, risking false "Zona Esclusa / Bypass" bindings or duplicate cards because PID Manual Unlock defaults to `OFF`.
+- **Backend Fix**: Replaced `climate_entity` with `target_climate_entity` and added `multizone_type` (`pid_manual_unlock` / `pid_parameter`) on PID control entities (`switch.py`, `number.py`).
+- **Frontend Fix**: Excluded `pid_*`, `split_*`, and PID auxiliary entities across `dashboard_strategy.js`, `02_helpers.js`, and `scheduler_card.js`, and prioritized `select.*` zone mode entities over legacy `switch.*` fallbacks.
+
 ## [6.1.0-beta.3] - 2026-11-14
 ### Feature & Alignment: Dual-Season Manual PID & Weekly EMA, Master Demand Sensor Fix, Boiler Diagnostics & Scheduler Sync (#12)
 *(Full alignment of `v6.0.11`–`v6.0.14` fixes while preserving all Phase 11 dual-hydronic `heat`/`cool`, bivalent Heat Pump + Boiler, Room Split AC, and Solar Self-Consumption features.)*

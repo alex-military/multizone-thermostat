@@ -541,7 +541,8 @@ class MultizonePIDManualUnlockSwitch(SwitchEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         return {
-            "climate_entity": self._climate_id,
+            "target_climate_entity": self._climate_id,
+            "multizone_type": "pid_manual_unlock",
             "zone_name": self._zone_name,
             "warning": "Unlocking allows manual modification of Kp/Ki/Kd on Master Control.",
         }

@@ -58,6 +58,7 @@ class MultizoneThermostatDashboardStrategy extends HTMLElement {
     for (const entityId of Object.keys(hass.states)) {
       if (entityId.startsWith("select.") || entityId.startsWith("switch.")) {
         const stateObj = hass.states[entityId];
+        if (entityId.includes("pid_") || entityId.includes("split_") || stateObj?.attributes?.multizone_type === "pid_manual_unlock") continue;
         const climateId = stateObj.attributes ? stateObj.attributes.climate_entity : null;
         if (climateId) {
           const climateState = hass.states[climateId];
@@ -135,15 +136,23 @@ class MultizoneThermostatDashboardStrategy extends HTMLElement {
     // Find preset entity
     const presetEntity = findPresetEntity(hass);
     
-    // Find all zones (by checking for climate_entity attribute)
+    // Find all zones (by checking for climate_entity attribute on zone_mode select/switch)
     const zones = [];
     for (const entityId of Object.keys(hass.states)) {
       if (entityId.startsWith("select.") || entityId.startsWith("switch.")) {
         const stateObj = hass.states[entityId];
+        if (entityId.includes("pid_") || entityId.includes("split_") || stateObj?.attributes?.multizone_type === "pid_manual_unlock") continue;
         const climateId = stateObj.attributes ? stateObj.attributes.climate_entity : null;
-        if (climateId && !zones.some(z => z.climate === climateId)) {
+        if (climateId) {
           const climateState = hass.states[climateId];
           if (climateState) {
+            const existing = zones.find(z => z.climate === climateId);
+            if (existing) {
+              if (entityId.startsWith("select.") && existing.switch && existing.switch.startsWith("switch.")) {
+                existing.switch = entityId;
+              }
+              continue;
+            }
             let title = climateState.attributes.friendly_name || climateId;
             title = title.replace(/^Virtual Thermostats VT /i, '').replace(/^Heating Zones(?: Zone)? /i, '');
             zones.push({
