@@ -128,18 +128,25 @@ def test_thermal_observer_gates_heating_rate_on_high_demand():
     model._last_temp_time = 100.0
     model._is_heating = True
 
-    # Simulate low-duty maintenance (40%): must NOT update heating_rate
     orig_monotonic = sys.modules["custom_components.multizone_thermostat.thermal_model"].time.monotonic
     try:
         sys.modules["custom_components.multizone_thermostat.thermal_model"].time.monotonic = lambda: 1900.0
-        model.update(19.4, is_heating=True, demand=40.0)
+        # Low duty (< 30%): must NOT update heating_rate
+        model.update(19.4, is_heating=True, demand=20.0)
         assert model.heating_rate == 0.0
 
-        # Next update at high demand (80% over 0.5h = 0.8 C/hr -> normalized 0.8/0.8 = 1.0 C/hr)
+        # Update with demand=50.0: (over 0.5h, delta=0.4 -> raw 0.8 C/hr -> normalized 0.8 / 0.5 = 1.6 C/hr)
+        model._last_temp = 19.0
+        model._last_temp_time = 100.0
+        model.update(19.4, is_heating=True, demand=50.0)
+        assert model.heating_rate == pytest.approx(1.6, rel=1e-3)
+
+        # Next update with demand=80.0 (raw 0.8 C/hr -> normalized 0.8 / 0.8 = 1.0 C/hr)
+        # EMA: 0.1 * 1.0 + 0.9 * 1.6 = 1.54 C/hr
         model._last_temp = 19.0
         model._last_temp_time = 100.0
         model.update(19.4, is_heating=True, demand=80.0)
-        assert model.heating_rate == pytest.approx(1.0, rel=1e-3)
+        assert model.heating_rate == pytest.approx(1.54, rel=1e-3)
     finally:
         sys.modules["custom_components.multizone_thermostat.thermal_model"].time.monotonic = orig_monotonic
 

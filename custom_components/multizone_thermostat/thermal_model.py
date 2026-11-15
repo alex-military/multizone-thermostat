@@ -87,12 +87,9 @@ class ThermalObserver:
                 rate = abs(delta_temp) / time_elapsed_hours
                 
                 if self._is_heating and is_heating and delta_temp > 0:
-                    if demand is None or demand >= 70.0:
-                        effective_rate = (
-                            rate / max(0.7, min(1.0, demand / 100.0))
-                            if demand is not None
-                            else rate
-                        )
+                    if demand is None or demand >= 30.0:
+                        duty = max(0.30, min(1.0, float(demand) / 100.0)) if demand is not None else 1.0
+                        effective_rate = rate / duty
                         self._update_ema('heating_rate', effective_rate, alpha=0.1)
                         _LOGGER.debug("[%s] Heating rate updated: %.2f °C/hr", self.zone_id, self.heating_rate)
                 elif not self._is_heating and not is_heating and delta_temp < 0:

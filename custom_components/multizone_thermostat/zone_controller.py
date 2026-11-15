@@ -566,22 +566,13 @@ class ZoneController:
             tuner = self._autotuners_cool[entity_id] if track_mode == "cool" else self._autotuners_heat[entity_id]
             was_completed = tuner.state == tuner.STATE_COMPLETED
             prev_cycles = len(tuner.completed_cycles)
-            tuner_update_fn = tuner.update
-            try:
-                t_params = inspect.signature(tuner_update_fn).parameters
-                if "demand" in t_params or any(
-                    p.kind == inspect.Parameter.VAR_KEYWORD for p in t_params.values()
-                ):
-                    tuner_update_fn(
-                        current_temp,
-                        demand > 0,
-                        demand=demand,
-                        cooling_rate=thermal_model.cooling_rate,
-                    )
-                else:
-                    tuner_update_fn(current_temp, demand > 0)
-            except (ValueError, TypeError):
-                tuner_update_fn(current_temp, demand > 0)
+            cooling_rate_val = getattr(thermal_model, "cooling_rate", 0.0) if thermal_model else 0.0
+            tuner.update(
+                current_temp,
+                demand > 0,
+                demand=demand,
+                cooling_rate=cooling_rate_val,
+            )
             just_completed = not was_completed and tuner.state == tuner.STATE_COMPLETED
             if just_completed or getattr(tuner, "weekly_updated_last_tick", False):
                 self._apply_tuner_pid_to_controller(entity_id, mode=track_mode)
@@ -608,17 +599,7 @@ class ZoneController:
 
         # Feed Thermal Observer (with effective demand gating for heating_rate)
         if hvac_mode != HVAC_MODE_COOL and hvac_mode != "cool":
-            model_update_fn = thermal_model.update
-            try:
-                m_params = inspect.signature(model_update_fn).parameters
-                if "demand" in m_params or any(
-                    p.kind == inspect.Parameter.VAR_KEYWORD for p in m_params.values()
-                ):
-                    model_update_fn(current_temp, demand > 0, hvac_mode=hvac_mode, demand=demand)
-                else:
-                    model_update_fn(current_temp, demand > 0, hvac_mode=hvac_mode)
-            except (ValueError, TypeError):
-                model_update_fn(current_temp, demand > 0, hvac_mode=hvac_mode)
+            thermal_model.update(current_temp, demand > 0, hvac_mode=hvac_mode, demand=demand)
             if hasattr(self.coordinator, "storage"):
                 self.coordinator.debounced_save_thermal_states(self._thermal_models)
 

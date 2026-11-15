@@ -196,26 +196,25 @@ async def test_opentherm_dynamic_weather_curve():
         blocking=False,
     )
 
-    # 2. With weather_curve = 2.0 and outdoor_temp = 0.0°C (delta_ext = 15.0):
-    # weather_flow_offset = min(15.0, 15.0 * 2.0 * 0.5 * 1.0) = 15.0°C
-    # target_temp = 55.0 + 15.0 = 70.0°C (within [35.0, 75.0])
+    # 2. With weather_curve = 1.0 and outdoor_temp = 12.0°C, FlowCurve dynamically modulates ceiling
     hass.services.async_call.reset_mock()
-    settings["weather_curve"] = 2.0
+    states_map["weather.home"] = State("weather.home", "sunny", {"temperature": 12.0})
+    settings["weather_curve"] = 1.0
+    await backend.async_update(demand=100.0, peak_zone="Living", frost_emergency=False)
+    hass.services.async_call.assert_any_call(
+        "climate",
+        "set_temperature",
+        {"entity_id": "climate.ot_boiler", "temperature": 42.9},
+        blocking=False,
+    )
+
+    # 3. At 50% demand with outdoor_temp = 12.0°C, flow is modulated between t_min (35.0) and top (42.8) -> 38.9°C
+    hass.services.async_call.reset_mock()
     await backend.async_update(demand=50.0, peak_zone="Living", frost_emergency=False)
     hass.services.async_call.assert_any_call(
         "climate",
         "set_temperature",
-        {"entity_id": "climate.ot_boiler", "temperature": 70.0},
-        blocking=False,
-    )
-
-    # 3. Clamping to max_temp (75.0°C) when demand is 80% (base 67.0°C + 15.0°C -> 75.0°C)
-    hass.services.async_call.reset_mock()
-    await backend.async_update(demand=80.0, peak_zone="Living", frost_emergency=False)
-    hass.services.async_call.assert_any_call(
-        "climate",
-        "set_temperature",
-        {"entity_id": "climate.ot_boiler", "temperature": 75.0},
+        {"entity_id": "climate.ot_boiler", "temperature": 38.9},
         blocking=False,
     )
 

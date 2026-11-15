@@ -27,6 +27,7 @@ class PassiveAutotuneObserver:
     WEEKLY_MAX_STEP_PCT = 0.10
     WEEKLY_MIN_CANDIDATES = 3
     WEEKLY_MIN_DEMAND = 85.0
+    WEEKLY_DEMAND_THRESHOLD = 85.0
     WEEKLY_MIN_DURATION = 300.0
     WEEKLY_MIN_DT = 0.4
 
@@ -55,9 +56,18 @@ class PassiveAutotuneObserver:
         self._last_ramp_hist_time = None
         self._last_ramp_hist_temp = None
 
+        self._was_idle_before_ramp: bool = True
+        self._last_sample_mono: float | None = None
+        self._baseline_kp: float = 0.0
+        self._baseline_ki: float = 0.0
+        self._baseline_kd: float = 0.0
+
         self.kp = 0.0
         self.ki = 0.0
         self.kd = 0.0
+        self.best_kp = 0.0
+        self.best_ki = 0.0
+        self.best_kd = 0.0
         self._learned_kp = 0.0
         self._learned_ki = 0.0
         self._learned_kd = 0.0
@@ -81,6 +91,12 @@ class PassiveAutotuneObserver:
             if norm and raw_val is not None:
                 self.manual_overrides[norm] = float(raw_val)
 
+        baseline = data.get("baseline_pid")
+        if isinstance(baseline, dict) and baseline.get("Kp"):
+            self._baseline_kp = float(baseline.get("Kp", 0.0) or 0.0)
+            self._baseline_ki = float(baseline.get("Ki", 0.0) or 0.0)
+            self._baseline_kd = float(baseline.get("Kd", 0.0) or 0.0)
+
         if len(self.completed_cycles) >= self.required_cycles:
             self.state = self.STATE_COMPLETED
             learned = data.get("learned_pid")
@@ -88,6 +104,10 @@ class PassiveAutotuneObserver:
                 self._learned_kp = float(learned.get("Kp", 0.0))
                 self._learned_ki = float(learned.get("Ki", 0.0))
                 self._learned_kd = float(learned.get("Kd", 0.0))
+                if self._baseline_kp == 0.0:
+                    self._baseline_kp = self._learned_kp
+                    self._baseline_ki = self._learned_ki
+                    self._baseline_kd = self._learned_kd
                 self._sync_effective_pid()
             else:
                 self._compute_final_pid()
@@ -102,6 +122,11 @@ class PassiveAutotuneObserver:
             "manual_overrides": dict(self.manual_overrides),
             "weekly_candidates": list(self.weekly_candidates),
             "last_weekly_update": self.last_weekly_update,
+            "baseline_pid": {
+                "Kp": self._baseline_kp,
+                "Ki": self._baseline_ki,
+                "Kd": self._baseline_kd,
+            },
             "learned_pid": {
                 "Kp": self._learned_kp,
                 "Ki": self._learned_ki,
@@ -114,6 +139,39 @@ class PassiveAutotuneObserver:
         self.kp = self.manual_overrides.get("Kp", self._learned_kp)
         self.ki = self.manual_overrides.get("Ki", self._learned_ki)
         self.kd = self.manual_overrides.get("Kd", self._learned_kd)
+        self.best_kp = self.kp
+        self.best_ki = self.ki
+        self.best_kd = self.kd
+
+    def rollback_to_baseline(self) -> None:
+        """Restore learned gains (and effective gains if not manually overridden) to baseline."""
+        if self._baseline_kp > 0.0:
+            self._learned_kp = self._baseline_kp
+            self._learned_ki = self._baseline_ki
+            self._learned_kd = self._baseline_kd
+            self._sync_effective_pid()
+            self.weekly_candidates.clear()
+            self.needs_save = True
+            _LOGGER.info(
+                "Autotune [%s - %s]: Rolled back gains to baseline: Kp=%.1f, Ki=%.4f, Kd=%.1f",
+                self.zone_name,
+                self.mode,
+                self._baseline_kp,
+                self._baseline_ki,
+                self._baseline_kd,
+            )
+
+    @property
+    def baseline_kp(self) -> float:
+        return self._baseline_kp
+
+    @property
+    def baseline_ki(self) -> float:
+        return self._baseline_ki
+
+    @property
+    def baseline_kd(self) -> float:
+        return self._baseline_kd
 
     def set_manual_pid(
         self,
@@ -162,6 +220,11 @@ class PassiveAutotuneObserver:
         self._last_hist_time = None
         self._last_hist_temp = None
         self._reset_ramp()
+        self._was_idle_before_ramp = True
+        self._last_sample_mono = None
+        self._baseline_kp = 0.0
+        self._baseline_ki = 0.0
+        self._baseline_kd = 0.0
         self._learned_kp = 0.0
         self._learned_ki = 0.0
         self._learned_kd = 0.0
@@ -304,7 +367,7 @@ class PassiveAutotuneObserver:
             _LOGGER.info("Autotune [%s - %s]: Dead time too short (%.1fs), clamping to 60s.", self.zone_name, self.mode, L)
             L = 60.0
 
-        if L > 7200.0:
+        if L > 14400.0:
             _LOGGER.warning("Autotune [%s - %s]: Dead time too long (%.1fs). Cycle discarded.", self.zone_name, self.mode, L)
             return None
 
@@ -314,11 +377,11 @@ class PassiveAutotuneObserver:
         kp_calc = 120.0 / (effective_slope * L)
         # Clamp Kp to reasonable bounds before deriving Ki and Kd so Ti/Td ratios hold
         kp_calc = min(max(kp_calc, 10.0), 500.0)
-        ti_calc = 2.0 * L
-        td_calc = 0.5 * L
+        ti_calc = max(600.0, 2.0 * L)
+        td_calc = min(60.0, 0.25 * L)
 
-        ki_calc = kp_calc / ti_calc if ti_calc > 0 else 0
-        kd_calc = kp_calc * td_calc
+        ki_calc = round(kp_calc / ti_calc, 5) if ti_calc > 0 else 0.0
+        kd_calc = round(min(500.0, kp_calc * td_calc), 2)
 
         return {
             "L": L,
@@ -367,6 +430,41 @@ class PassiveAutotuneObserver:
         """Backward-compatible alias."""
         self._stop_cycle(now, temp, wall_time=wall_time)
 
+    def _finalize_weekly_ramp(
+        self,
+        now_mono: float,
+        current_temp: float,
+        wall_time: float,
+        cooling_rate: float,
+    ) -> dict | None:
+        """Finalize an active high-demand weekly ramp candidate."""
+        if not self._ramp_history or now_mono > self._ramp_history[-1][0]:
+            self._ramp_history.append((now_mono, current_temp))
+        duration = now_mono - self._ramp_start_mono if self._ramp_start_mono is not None else 0.0
+        delta_t = (
+            (self._ramp_start_temp - current_temp)
+            if self.mode == "cool"
+            else (current_temp - self._ramp_start_temp)
+        ) if self._ramp_start_temp is not None else 0.0
+        candidate = None
+        if duration >= self.WEEKLY_MIN_DURATION and delta_t >= self.WEEKLY_MIN_DT:
+            u_avg = (self._ramp_demand_sum / max(1, self._ramp_demand_count)) / 100.0
+            candidate = self._analyze_reaction_curve(
+                list(self._ramp_history),
+                self._ramp_start_mono,
+                self._ramp_start_temp,
+                wall_time=wall_time,
+                u_avg=u_avg,
+                cooling_rate_c_per_hr=cooling_rate,
+            )
+            if candidate is not None:
+                self.weekly_candidates.append(candidate)
+                if len(self.weekly_candidates) > 50:
+                    self.weekly_candidates = self.weekly_candidates[-50:]
+                self.needs_save = True
+        self._reset_ramp()
+        return candidate
+
     def _update_weekly_learning(
         self,
         current_temp: float,
@@ -377,19 +475,29 @@ class PassiveAutotuneObserver:
         cooling_rate: float,
     ) -> None:
         """Continuously observe high-demand ramps and refine PID weekly via smoothed EMA."""
+        if self._last_sample_mono is not None and (now_mono - self._last_sample_mono) >= 1800.0:
+            self._was_idle_before_ramp = True
+        self._last_sample_mono = now_mono
+
         if demand is not None:
-            high_demand = is_active and demand >= self.WEEKLY_MIN_DEMAND
-            if high_demand:
+            if not is_active or demand < 20.0:
+                self._was_idle_before_ramp = True
+            elif is_active and demand < self.WEEKLY_DEMAND_THRESHOLD and not self._ramp_active:
+                self._was_idle_before_ramp = False
+
+            if is_active and demand >= self.WEEKLY_DEMAND_THRESHOLD:
                 if not self._ramp_active:
-                    self._ramp_active = True
-                    self._ramp_start_mono = now_mono
-                    self._ramp_start_temp = current_temp
-                    self._ramp_history.clear()
-                    self._ramp_history.append((now_mono, current_temp))
-                    self._ramp_demand_sum = float(demand)
-                    self._ramp_demand_count = 1
-                    self._last_ramp_hist_time = now_mono
-                    self._last_ramp_hist_temp = current_temp
+                    if self._was_idle_before_ramp:
+                        self._ramp_active = True
+                        self._was_idle_before_ramp = False
+                        self._ramp_start_mono = now_mono
+                        self._ramp_start_temp = current_temp
+                        self._ramp_history.clear()
+                        self._ramp_history.append((now_mono, current_temp))
+                        self._ramp_demand_sum = float(demand)
+                        self._ramp_demand_count = 1
+                        self._last_ramp_hist_time = now_mono
+                        self._last_ramp_hist_temp = current_temp
                 else:
                     self._ramp_demand_sum += float(demand)
                     self._ramp_demand_count += 1
@@ -402,30 +510,14 @@ class PassiveAutotuneObserver:
                         self._last_ramp_hist_time = now_mono
                         self._last_ramp_hist_temp = current_temp
             elif self._ramp_active:
-                if not self._ramp_history or now_mono > self._ramp_history[-1][0]:
-                    self._ramp_history.append((now_mono, current_temp))
-                duration = now_mono - self._ramp_start_mono
-                delta_t = (
-                    (self._ramp_start_temp - current_temp)
-                    if self.mode == "cool"
-                    else (current_temp - self._ramp_start_temp)
-                )
-                if duration >= self.WEEKLY_MIN_DURATION and delta_t >= self.WEEKLY_MIN_DT:
-                    u_avg = (self._ramp_demand_sum / max(1, self._ramp_demand_count)) / 100.0
-                    candidate = self._analyze_reaction_curve(
-                        list(self._ramp_history),
-                        self._ramp_start_mono,
-                        self._ramp_start_temp,
-                        wall_time=wall_time,
-                        u_avg=u_avg,
-                        cooling_rate_c_per_hr=cooling_rate,
-                    )
-                    if candidate is not None:
-                        self.weekly_candidates.append(candidate)
-                        if len(self.weekly_candidates) > 50:
-                            self.weekly_candidates = self.weekly_candidates[-50:]
-                        self.needs_save = True
-                self._reset_ramp()
+                self._finalize_weekly_ramp(now_mono, current_temp, wall_time, cooling_rate)
+                if is_active and demand >= 20.0:
+                    self._was_idle_before_ramp = False
+        else:
+            if not is_active:
+                self._was_idle_before_ramp = True
+                if self._ramp_active:
+                    self._finalize_weekly_ramp(now_mono, current_temp, wall_time, cooling_rate)
 
         if self.last_weekly_update <= 0.0:
             self.last_weekly_update = wall_time
@@ -438,12 +530,13 @@ class PassiveAutotuneObserver:
             med_ki = statistics.median(c["Ki"] for c in self.weekly_candidates)
             med_kd = statistics.median(c["Kd"] for c in self.weekly_candidates)
 
-            for attr, target in (
-                ("_learned_kp", med_kp),
-                ("_learned_ki", med_ki),
-                ("_learned_kd", med_kd),
+            for attr, baseline_attr, target in (
+                ("_learned_kp", "_baseline_kp", med_kp),
+                ("_learned_ki", "_baseline_ki", med_ki),
+                ("_learned_kd", "_baseline_kd", med_kd),
             ):
                 prev = getattr(self, attr)
+                baseline = getattr(self, baseline_attr, 0.0)
                 if prev > 0.0:
                     ema = (1.0 - self.WEEKLY_EMA_ALPHA) * prev + self.WEEKLY_EMA_ALPHA * target
                     min_allowed = prev * (1.0 - self.WEEKLY_MAX_STEP_PCT)
@@ -453,6 +546,8 @@ class PassiveAutotuneObserver:
                     new_val = target
                 if attr == "_learned_kp":
                     new_val = min(max(new_val, 10.0), 500.0)
+                if baseline > 0.0:
+                    new_val = min(max(new_val, 0.5 * baseline), 2.0 * baseline)
                 setattr(self, attr, new_val)
 
             self._sync_effective_pid()
@@ -481,6 +576,10 @@ class PassiveAutotuneObserver:
         self._learned_kp = avg_kp
         self._learned_ki = avg_ki
         self._learned_kd = avg_kd
+        if self._baseline_kp == 0.0:
+            self._baseline_kp = avg_kp
+            self._baseline_ki = avg_ki
+            self._baseline_kd = avg_kd
         self._sync_effective_pid()
 
         _LOGGER.info("Autotune [%s - %s]: FINAL PID: Kp=%.1f, Ki=%.4f, Kd=%.1f", self.zone_name, self.mode, self.kp, self.ki, self.kd)

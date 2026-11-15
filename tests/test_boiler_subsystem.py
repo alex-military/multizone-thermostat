@@ -143,10 +143,14 @@ def test_autotune_clamps_kp_before_ki_kd():
     assert len(obs.completed_cycles) == 1
     cycle = obs.completed_cycles[0]
     assert cycle["Kp"] == 500.0
-    # Verify Ki = Kp / (2 * L) and Kd = Kp * (0.5 * L) use clamped Kp=500.0
+    # Verify Ti = max(600.0, 2.0 * L) and Kd = min(500.0, kp * min(60.0, 0.25 * L))
     L = cycle["L"]
-    assert abs(cycle["Ki"] - (500.0 / (2.0 * L))) < 1e-6
-    assert abs(cycle["Kd"] - (500.0 * 0.5 * L)) < 1e-6
+    expected_ti = max(600.0, 2.0 * L)
+    expected_ki = round(500.0 / expected_ti, 5)
+    expected_td = min(60.0, 0.25 * L)
+    expected_kd = round(min(500.0, 500.0 * expected_td), 2)
+    assert abs(cycle["Ki"] - expected_ki) < 1e-6
+    assert abs(cycle["Kd"] - expected_kd) < 1e-6
 
 
 @pytest.mark.asyncio

@@ -70,6 +70,9 @@ CONF_PRESENCE_SENSOR = "presence_sensor"
 CONF_MIN_CYCLE_ON = "min_cycle_on"
 CONF_MIN_CYCLE_OFF = "min_cycle_off"
 CONF_VALVE_DELAY = "valve_opening_delay"
+KEY_MIN_CYCLE_ON = CONF_MIN_CYCLE_ON
+KEY_MIN_CYCLE_OFF = CONF_MIN_CYCLE_OFF
+KEY_VALVE_DELAY = CONF_VALVE_DELAY
 
 # Anti-seize configuration constants
 CONF_ANTI_SEIZE_ENABLED = "anti_seize_enabled"
@@ -138,6 +141,8 @@ CONF_BATTERY_MAX_DISCHARGE_TIME = "battery_max_discharge_time"
 DEFAULT_BATTERY_MAX_DISCHARGE_TIME = 5
 CONF_BATTERY_POWER_INVERTED = "battery_power_inverted"
 DEFAULT_BATTERY_POWER_INVERTED = False
+CONF_GRID_EXPORT_INVERTED = "grid_export_inverted"
+DEFAULT_GRID_EXPORT_INVERTED = False
 
 # Phase 11 — Runtime Master Keys & Priority
 KEY_ALLOW_SPLIT_HEATING = "allow_split_heating"

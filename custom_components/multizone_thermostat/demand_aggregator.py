@@ -409,8 +409,10 @@ class DemandAggregator:
                 # Peak zone is the one with highest demand among primary
                 peak_item = max(active_items, key=lambda item: item[2])
                 peak_zone = peak_item[1]
+                peak_floor = peak_item[2] * DEFAULT_WEIGHTED_AVERAGE_PEAK_FLOOR
+                effective_demand = max(raw_avg, peak_floor)
 
-                final_demand = min(100.0, max(0.0, round(raw_avg, 2)))
+                final_demand = min(100.0, max(0.0, round(effective_demand, 2)))
 
         elif self._strategy == DEMAND_STRATEGY_SUM_CAPPED:
             total_sum = sum(primary_demands.values())

@@ -32,6 +32,8 @@ from ..const import (
     KEY_HP_MIN_CYCLE_OFF,
     DEFAULT_HP_MIN_CYCLE_ON,
     DEFAULT_HP_MIN_CYCLE_OFF,
+    SPLIT_ROLE_COOLING_ONLY,
+    make_zone_entity_id,
 )
 
 HP_TYPE_WATER_HEATER = "water_heater"
@@ -79,24 +81,41 @@ class CentralHeatPumpBackend(BoilerBackend):
             if hasattr(self.coordinator, "get_persistent_data")
             else None
         )
-        if raw_on is None:
+        if raw_on is None or not isinstance(raw_on, (int, float, str)) or isinstance(raw_on, bool):
             raw_on = getattr(self.coordinator, "hp_min_cycle_on", None)
-        if raw_on is None:
+        if raw_on is None or not isinstance(raw_on, (int, float, str)) or isinstance(raw_on, bool):
             raw_on = getattr(self.coordinator, "_min_cycle_on", 0.0)
-        self.min_cycle_on: float = float(raw_on if isinstance(raw_on, (int, float)) else 0.0)
+        self.min_cycle_on: float = self._to_seconds(raw_on)
 
         raw_off = (
             self.coordinator.get_persistent_data(KEY_HP_MIN_CYCLE_OFF, None)
             if hasattr(self.coordinator, "get_persistent_data")
             else None
         )
-        if raw_off is None:
+        if raw_off is None or not isinstance(raw_off, (int, float, str)) or isinstance(raw_off, bool):
             raw_off = getattr(self.coordinator, "hp_min_cycle_off", None)
-        if raw_off is None:
+        if raw_off is None or not isinstance(raw_off, (int, float, str)) or isinstance(raw_off, bool):
             raw_off = getattr(self.coordinator, "_min_cycle_off", 0.0)
-        self.min_cycle_off: float = float(raw_off if isinstance(raw_off, (int, float)) else 0.0)
+        self.min_cycle_off: float = self._to_seconds(raw_off)
         self._last_switch_time: float = 0.0
         self._current_running_state: bool = False
+
+    @staticmethod
+    def _to_seconds(val: Any) -> float:
+        """Convert minutes to seconds if > 0 and <= 60.0, else return seconds clamped to >= 0."""
+        if isinstance(val, bool) or val is None:
+            return 0.0
+        if not isinstance(val, (int, float, str)):
+            return 0.0
+        try:
+            f_val = float(val)
+        except (ValueError, TypeError):
+            return 0.0
+        if math.isnan(f_val) or math.isinf(f_val):
+            return 0.0
+        if 0.0 < f_val <= 60.0:
+            return f_val * 60.0
+        return max(0.0, f_val)
 
     def _is_currently_on(self, entity_id: str | None = None) -> bool:
         """Check if target entity is currently considered ON."""
@@ -129,11 +148,11 @@ class CentralHeatPumpBackend(BoilerBackend):
 
     def set_min_cycle_on(self, minutes: float) -> None:
         """Set min cycle ON time for heat pump compressor."""
-        self.min_cycle_on = float(minutes) * 60.0 if float(minutes) <= 60.0 else float(minutes)
+        self.min_cycle_on = self._to_seconds(minutes)
 
     def set_min_cycle_off(self, minutes: float) -> None:
         """Set min cycle OFF time for heat pump compressor."""
-        self.min_cycle_off = float(minutes) * 60.0 if float(minutes) <= 60.0 else float(minutes)
+        self.min_cycle_off = self._to_seconds(minutes)
 
     @property
     def status_reason(self) -> str:
@@ -310,6 +329,64 @@ class CentralHeatPumpBackend(BoilerBackend):
         )
         return has_underfloor and has_high_temp
 
+    def _is_zone_cooling_candidate(self, z: dict[str, Any]) -> bool:
+        """Return True if zone is an active hydronic cooling candidate for dew point floor calculation."""
+        if not isinstance(z, dict):
+            return False
+
+        if z.get("split_role") == SPLIT_ROLE_COOLING_ONLY or z.get("split_role") == "cooling_only" or z.get("cooling_only"):
+            return False
+
+        cid = z.get("climate_id") or make_zone_entity_id(z.get("name") or z.get("zone_name") or "")
+
+        get_zone_mode_fn = getattr(self.coordinator, "get_zone_mode", None)
+        if callable(get_zone_mode_fn):
+            try:
+                z_mode = get_zone_mode_fn(cid)
+                if isinstance(z_mode, str) and z_mode == "bypass":
+                    return False
+            except Exception:
+                pass
+
+        climates = getattr(self.coordinator, "_climate_entities", None)
+        if isinstance(climates, dict) and climates:
+            c_obj = climates.get(cid)
+            if c_obj is not None:
+                raw_hvac = getattr(c_obj, "hvac_mode", None)
+                if hasattr(raw_hvac, "value"):
+                    raw_hvac = raw_hvac.value
+                if isinstance(raw_hvac, str):
+                    raw_hvac = raw_hvac.lower()
+                if raw_hvac in ("off", "heat"):
+                    return False
+            else:
+                z_name = z.get("name")
+                if z_name:
+                    for c_key, c_val in climates.items():
+                        if z_name in c_key:
+                            raw_hvac = getattr(c_val, "hvac_mode", None)
+                            if hasattr(raw_hvac, "value"):
+                                raw_hvac = raw_hvac.value
+                            if isinstance(raw_hvac, str):
+                                raw_hvac = raw_hvac.lower()
+                            if raw_hvac in ("off", "heat"):
+                                return False
+                            break
+
+        split_mgr = getattr(self.coordinator, "split_manager", None)
+        if split_mgr is not None and hasattr(split_mgr, "has_split") and hasattr(split_mgr, "is_split_active"):
+            try:
+                if (
+                    split_mgr.has_split(cid) is True
+                    and split_mgr.is_split_active(cid) is True
+                    and z.get("emitter_type") != EMITTER_UNDERFLOOR
+                ):
+                    return False
+            except Exception:
+                pass
+
+        return True
+
     def _calculate_safe_cooling_min_temp(self) -> float:
         """Calculate safe minimum cooling water temperature to prevent internal condensation (L4).
         
@@ -326,6 +403,8 @@ class CentralHeatPumpBackend(BoilerBackend):
         zones = getattr(self.coordinator, "zones", []) or []
 
         for z in zones:
+            if not self._is_zone_cooling_candidate(z):
+                continue
             t_val: float | None = None
             h_val: float | None = None
 

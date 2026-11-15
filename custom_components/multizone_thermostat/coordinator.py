@@ -89,6 +89,8 @@ class MultizoneCoordinator:
 
         self._min_cycle_on = cfg.min_cycle_on
         self._min_cycle_off = cfg.min_cycle_off
+        self._hp_min_cycle_on = getattr(cfg, "hp_min_cycle_on", cfg.min_cycle_on)
+        self._hp_min_cycle_off = getattr(cfg, "hp_min_cycle_off", cfg.min_cycle_off)
         self._valve_delay = cfg.valve_delay
 
     def register_master_switch(self, switch_entity) -> None:
@@ -114,13 +116,13 @@ class MultizoneCoordinator:
         for cb in list(self._pid_listeners):
             try:
                 cb()
-            except Exception:
-                pass
+            except Exception as err:
+                _LOGGER.debug("Error notifying PID entity listener: %s", err)
         for cb in list(self._climate_callbacks.values()):
             try:
                 cb()
-            except Exception:
-                pass
+            except Exception as err:
+                _LOGGER.debug("Error notifying PID entity listener: %s", err)
 
     def _pid_unlock_storage_key(self, zone_name: str) -> str:
         resolved = self.resolve_zone_id(zone_name)
@@ -342,11 +344,13 @@ class MultizoneCoordinator:
         return self._min_cycle_on
 
     def set_min_cycle_on(self, value: float) -> None:
-        self._min_cycle_on = value
-        if hasattr(self, "boiler_backend") and hasattr(self.boiler_backend, "set_min_cycle_on"):
-            self.boiler_backend.set_min_cycle_on(int(value))
-        if hasattr(self, "heat_pump_backend") and hasattr(self.heat_pump_backend, "set_min_cycle_on"):
-            self.heat_pump_backend.set_min_cycle_on(value)
+        self._min_cycle_on = float(value)
+        bb = getattr(self, "boiler_backend", None)
+        if bb is not None and hasattr(bb, "set_min_cycle_on"):
+            bb.set_min_cycle_on(int(value))
+        hp = getattr(self, "heat_pump_backend", None)
+        if hp is not None and hasattr(hp, "set_min_cycle_on"):
+            hp.set_min_cycle_on(float(value))
 
     @property
     def min_cycle_off(self) -> float:
@@ -354,11 +358,35 @@ class MultizoneCoordinator:
         return self._min_cycle_off
 
     def set_min_cycle_off(self, value: float) -> None:
-        self._min_cycle_off = value
-        if hasattr(self, "boiler_backend") and hasattr(self.boiler_backend, "set_min_cycle_off"):
-            self.boiler_backend.set_min_cycle_off(int(value))
-        if hasattr(self, "heat_pump_backend") and hasattr(self.heat_pump_backend, "set_min_cycle_off"):
-            self.heat_pump_backend.set_min_cycle_off(value)
+        self._min_cycle_off = float(value)
+        bb = getattr(self, "boiler_backend", None)
+        if bb is not None and hasattr(bb, "set_min_cycle_off"):
+            bb.set_min_cycle_off(int(value))
+        hp = getattr(self, "heat_pump_backend", None)
+        if hp is not None and hasattr(hp, "set_min_cycle_off"):
+            hp.set_min_cycle_off(float(value))
+
+    @property
+    def hp_min_cycle_on(self) -> float:
+        """Return heat pump minimum cycle on time in minutes."""
+        return getattr(self, "_hp_min_cycle_on", self._min_cycle_on)
+
+    def set_hp_min_cycle_on(self, value: float) -> None:
+        self._hp_min_cycle_on = float(value)
+        hp = getattr(self, "heat_pump_backend", None)
+        if hp is not None and hasattr(hp, "set_min_cycle_on"):
+            hp.set_min_cycle_on(float(value))
+
+    @property
+    def hp_min_cycle_off(self) -> float:
+        """Return heat pump minimum cycle off time in minutes."""
+        return getattr(self, "_hp_min_cycle_off", self._min_cycle_off)
+
+    def set_hp_min_cycle_off(self, value: float) -> None:
+        self._hp_min_cycle_off = float(value)
+        hp = getattr(self, "heat_pump_backend", None)
+        if hp is not None and hasattr(hp, "set_min_cycle_off"):
+            hp.set_min_cycle_off(float(value))
 
     @property
     def valve_delay(self) -> float:
@@ -366,11 +394,13 @@ class MultizoneCoordinator:
         return self._valve_delay
 
     def set_valve_delay(self, value: float) -> None:
-        self._valve_delay = value
-        if hasattr(self, "boiler_backend") and hasattr(self.boiler_backend, "set_valve_delay"):
-            self.boiler_backend.set_valve_delay(int(value))
-        if hasattr(self, "heat_pump_backend") and hasattr(self.heat_pump_backend, "set_valve_delay"):
-            self.heat_pump_backend.set_valve_delay(int(value))
+        self._valve_delay = float(value)
+        bb = getattr(self, "boiler_backend", None)
+        if bb is not None and hasattr(bb, "set_valve_delay"):
+            bb.set_valve_delay(int(value))
+        hp = getattr(self, "heat_pump_backend", None)
+        if hp is not None and hasattr(hp, "set_valve_delay"):
+            hp.set_valve_delay(int(value))
 
     @property
     def master_enabled(self) -> bool:

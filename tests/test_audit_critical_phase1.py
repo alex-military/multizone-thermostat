@@ -33,13 +33,19 @@ def test_l1_monotonic_weighted_average():
     da.set_zone_demand(z_a, 100.0)
     da.set_zone_demand(z_b, 0.0)
     res_single = da.calculate()
-    assert res_single.demand == 50.0  # 100 * 1.0 / (1.0 + 1.0)
+    assert res_single.demand == 70.0  # Peak floor applies: max(50.0 raw_avg, 100.0 * 0.70)
 
-    # When Zone B wakes up with tiny 1% demand, total demand must NOT drop to 70% or less!
+    # When Zone B wakes up with tiny 1% demand, total demand must NOT drop
     da.set_zone_demand(z_b, 1.0)
     res_both = da.calculate()
-    assert res_both.demand == 50.5
+    assert res_both.demand == 70.0
     assert res_both.demand >= res_single.demand, "Monotonicity violated!"
+
+    # When Zone B demand increases to 60%, average exceeds peak floor
+    da.set_zone_demand(z_b, 60.0)
+    res_high = da.calculate()
+    assert res_high.demand == 80.0
+    assert res_high.demand > 70.0
 
 
 def test_emitter_preset_hard_safety_ceiling():
@@ -508,8 +514,8 @@ def test_heat_pump_dedicated_min_cycles():
         hp_type="climate",
         hp_entity="climate.hp",
     )
-    assert hp.min_cycle_on == 12.0
-    assert hp.min_cycle_off == 8.0
+    assert hp.min_cycle_on == 720.0
+    assert hp.min_cycle_off == 480.0
 
 
 

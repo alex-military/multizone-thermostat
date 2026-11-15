@@ -86,7 +86,8 @@ class MultizonePID:
             set_point = target_temp
 
         # Calculate PID with tracked last_input_time to ensure proper dt calculation without jumps
-        demand, _ = self._pid.calc(input_val, set_point, input_time=now, last_input_time=self._last_input_time)
-        self._last_input_time = now
+        demand, updated = self._pid.calc(input_val, set_point, input_time=now, last_input_time=self._last_input_time)
+        if updated:
+            self._last_input_time = now
         self._last_demand = demand
         return self._last_demand

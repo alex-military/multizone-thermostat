@@ -7,7 +7,7 @@ It uses Time-Proportional dt calculation to natively support irregular sensor up
 """
 import math
 import logging
-from time import time
+from time import monotonic
 from collections import deque, namedtuple
 
 _LOGGER = logging.getLogger(__name__)
@@ -19,7 +19,7 @@ class PID:
     error: float
 
     def __init__(self, kp, ki, kd, ke=0, out_min=float('-inf'), out_max=float('+inf'),
-                 sampling_period=0, cold_tolerance=0.3, hot_tolerance=0.3):
+                 sampling_period=0, cold_tolerance=0.3, hot_tolerance=0.3, max_dt=600.0):
         """A proportional-integral-derivative controller.
             :param kp: Proportional coefficient.
             :type kp: float
@@ -39,6 +39,8 @@ class PID:
             :type cold_tolerance: float
             :param hot_tolerance: time period between two PID calculations in seconds
             :type hot_tolerance: float
+            :param max_dt: Upper bound on dt for integral accumulation in seconds
+            :type max_dt: float
         """
         if kp is None:
             raise ValueError('kp must be specified')
@@ -55,6 +57,7 @@ class PID:
         self._Ke = ke
         self._out_min = out_min
         self._out_max = out_max
+        self._max_dt = float(max_dt)
         self._proportional = 0.0
         self._integral = 0.0
         self._derivative = 0.0
@@ -138,6 +141,14 @@ class PID:
     def dt(self):
         return self._dt
 
+    @property
+    def max_dt(self):
+        return self._max_dt
+
+    @max_dt.setter
+    def max_dt(self, val):
+        self._max_dt = float(val)
+
     def set_pid_param(self, kp=None, ki=None, kd=None, ke=None):
         """Set PID parameters."""
         if kp is not None and isinstance(kp, (int, float)):
@@ -156,6 +167,7 @@ class PID:
         self._input_time = None
         self._last_input = None
         self._last_input_time = None
+        self._derivative = 0.0
         
     def calc(self, input_val, set_point, input_time=None, last_input_time=None, ext_temp=None):
         """Adjusts and holds the given setpoint.
@@ -171,11 +183,11 @@ class PID:
         Returns:
             A value between `out_min` and `out_max`.
         """
-        if math.isnan(input_val) or math.isnan(set_point):
-            return self._last_output, False
+        if not math.isfinite(input_val) or not math.isfinite(set_point):
+            return self._output, False
 
         if self._sampling_period != 0 and self._last_input_time is not None and \
-                time() - self._input_time < self._sampling_period:
+                monotonic() - self._input_time < self._sampling_period:
             return self._output, False  # If last sample is too young, keep last output value
 
         self._last_input = self._input
@@ -190,7 +202,7 @@ class PID:
         if self._sampling_period == 0:
             self._input_time = input_time
         else:
-            self._input_time = time()
+            self._input_time = monotonic()
         self._last_set_point = self._set_point
         self._set_point = set_point
 
@@ -216,7 +228,7 @@ class PID:
             self._dt = self._input_time - self._last_input_time
         else:
             self._dt = 0
-        if ext_temp is not None and not math.isnan(ext_temp):
+        if ext_temp is not None and math.isfinite(ext_temp):
             self._dext = set_point - ext_temp
         else:
             self._dext = 0
@@ -228,17 +240,21 @@ class PID:
         # Reset integral on large setpoint change (>= 1.5°C) to allow faster convergence
         # without wiping integral on minor thermal-inertia effective_target shifts
         if self._last_set_point is not None and abs(self._last_set_point - self._set_point) >= 1.5:
-            self._integral = 0  # Reset integral if set point has changed significantly
+            self._integral = 0.0  # Reset integral if set point has changed significantly
         else:
-            self._integral += self._Ki * self._error * self._dt
+            dt_int = max(0.0, min(self._dt, self._max_dt))
+            self._integral += self._Ki * self._error * dt_int
             # Clamp integral to output bounds (accounting for external compensation)
             self._integral = max(min(self._integral, self._out_max - self._external), self._out_min - self._external)
 
         self._proportional = self._Kp * self._error
-        if self._dt >= 1.0:
-            self._derivative = -(self._Kd * self._input_diff) / self._dt
-        elif self._last_input is None:
+        if self._dt < 1.0 or self._last_input is None:
             self._derivative = 0.0
+        else:
+            raw_deriv = -(self._Kd * (self._input - self._last_input)) / self._dt
+            alpha = self._dt / (self._dt + 60.0)
+            filtered_deriv = alpha * raw_deriv + (1.0 - alpha) * self._derivative
+            self._derivative = max(-15.0, min(15.0, filtered_deriv))
 
         # Compute PID Output
         output = self._proportional + self._integral + self._derivative + self._external

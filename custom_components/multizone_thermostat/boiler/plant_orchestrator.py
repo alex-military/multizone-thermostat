@@ -102,7 +102,7 @@ class PlantOrchestrator:
         self._master_off_logged = False
         self.last_aggregate = None
 
-    async def _async_refresh_zones_proactively(self) -> None:
+    async def _async_refresh_zones_proactively(self, force: bool = False) -> None:
         """Proactively re-evaluate zone PID demands before plant aggregation."""
         zone_ctrl = getattr(self.coordinator, "zone_controller", None)
         if zone_ctrl is None or not callable(getattr(zone_ctrl, "async_update_zone", None)):
@@ -114,6 +114,7 @@ class PlantOrchestrator:
         zones = getattr(self.coordinator, "zones", None)
         resolve_fn = getattr(self.coordinator, "resolve_zone_id", None)
         set_dem_fn = getattr(self.demand_aggregator, "set_zone_demand", None)
+        existing_demands = getattr(self.demand_aggregator, "_zone_demands", None)
 
         ordered_cids: list[str] = []
         if isinstance(zones, list):
@@ -126,6 +127,31 @@ class PlantOrchestrator:
         unique_cids = list(dict.fromkeys(ordered_cids))
 
         for cid in unique_cids:
+            if not force and isinstance(existing_demands, dict) and cid in existing_demands:
+                pid_evaluated = False
+                if hasattr(zone_ctrl, "get_pid") and callable(zone_ctrl.get_pid):
+                    try:
+                        pid_heat = zone_ctrl.get_pid(cid, "heat")
+                    except TypeError:
+                        try:
+                            pid_heat = zone_ctrl.get_pid(cid)
+                        except Exception:
+                            pid_heat = None
+                    except Exception:
+                        pid_heat = None
+                    try:
+                        pid_cool = zone_ctrl.get_pid(cid, "cool")
+                    except Exception:
+                        pid_cool = None
+                    if (
+                        getattr(pid_heat, "_last_input_time", None) is not None
+                        or getattr(pid_cool, "_last_input_time", None) is not None
+                    ):
+                        pid_evaluated = True
+
+                if existing_demands[cid] > 0.0 or pid_evaluated:
+                    continue
+
             ent = climates_map.get(cid)
             real_eid = getattr(ent, "entity_id", None) if ent is not None else None
             st = None
@@ -183,9 +209,9 @@ class PlantOrchestrator:
         """Return human-readable explanation of why the boiler is currently in its state."""
         return check_boiler_status_reason(self.coordinator, self.boiler_backend, self._get_hp_backend())
 
-    async def async_refresh(self) -> None:
+    async def async_refresh(self, force_refresh_zones: bool = False) -> None:
         """Refresh plant state by updating boiler and central heat pump."""
-        await self._async_update_boiler()
+        await self._async_update_boiler(force_refresh_zones=force_refresh_zones)
 
     @property
     def last_plant_command(self):
@@ -247,7 +273,7 @@ class PlantOrchestrator:
         except Exception as err:
             _LOGGER.error("Error in PlantOrchestrator.async_tick: %s", err)
 
-    async def _async_update_boiler(self) -> None:
+    async def _async_update_boiler(self, force_refresh_zones: bool = False) -> None:
         """Handle the logic for pushing demand to boiler and central heat pump backends."""
         climate_entities = getattr(self.coordinator, "_climate_entities", None)
         if isinstance(climate_entities, dict):
@@ -281,7 +307,7 @@ class PlantOrchestrator:
             return
         self._master_off_logged = False
 
-        await self._async_refresh_zones_proactively()
+        await self._async_refresh_zones_proactively(force=force_refresh_zones)
 
         master_mode = getattr(self.coordinator, "master_hvac_mode", HVAC_MODE_HEAT)
         if master_mode == HVAC_MODE_COOL and not frost_emergency:

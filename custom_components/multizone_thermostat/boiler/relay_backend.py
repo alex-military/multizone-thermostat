@@ -48,6 +48,7 @@ class RelayBoilerBackend(BoilerBackend):
         self._last_boiler_change = 0.0
         self._pending_boiler_task: asyncio.Task | None = None
         self._status_reason_value = "INIT"
+        self._last_logged_reason_key: str = "INIT"
         self._unavailable_warned: bool = False
         self._last_demand = 0.0
         self._last_frost_emergency = False
@@ -64,11 +65,20 @@ class RelayBoilerBackend(BoilerBackend):
     @_status_reason.setter
     def _status_reason(self, reason: str) -> None:
         if reason != getattr(self, "_status_reason_value", None):
-            _LOGGER.info(
-                "Boiler status reason changed: %s -> %s",
-                getattr(self, "_status_reason_value", "INIT"),
-                reason,
-            )
+            reason_key = reason.split("(")[0].split("Demand")[0].strip() if reason else ""
+            if reason_key != getattr(self, "_last_logged_reason_key", "INIT"):
+                _LOGGER.info(
+                    "Boiler status reason changed: %s -> %s",
+                    getattr(self, "_status_reason_value", "INIT"),
+                    reason,
+                )
+                self._last_logged_reason_key = reason_key
+            else:
+                _LOGGER.debug(
+                    "Boiler status reason changed (minor tick): %s -> %s",
+                    getattr(self, "_status_reason_value", "INIT"),
+                    reason,
+                )
             self._status_reason_value = reason
 
     @property

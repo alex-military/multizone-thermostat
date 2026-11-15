@@ -1,8 +1,12 @@
 """Multizone Thermostat integration setup."""
 from __future__ import annotations
 
+from collections.abc import Mapping
 import inspect
 import logging
+import math
+
+import voluptuous as vol
 
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
@@ -280,6 +284,73 @@ def _get_active_coordinators(hass: HomeAssistant) -> list[MultizoneCoordinator]:
     return coordinators
 
 
+def _extract_entity_ids(data: Mapping[str, Any]) -> list[str]:
+    """Extract and validate a list of entity IDs from service call data."""
+    raw = data.get("climate_entity")
+    if raw is None:
+        raw = data.get("entity_id")
+    if raw is None:
+        raise vol.Invalid("Missing required parameter: climate_entity or entity_id")
+    if isinstance(raw, str):
+        v = raw.strip()
+        if not v:
+            raise vol.Invalid("climate_entity or entity_id cannot be empty")
+        return [v]
+    if isinstance(raw, (list, tuple, set)):
+        result = [str(x).strip() for x in raw if isinstance(x, str) and str(x).strip()]
+        if not result:
+            raise vol.Invalid("climate_entity or entity_id list contained no valid entity IDs")
+        return result
+    raise vol.Invalid(f"Invalid climate_entity or entity_id type: {type(raw)}")
+
+
+def _validate_has_target_entity(data: Mapping[str, Any]) -> Mapping[str, Any]:
+    """Validate that at least one of climate_entity or entity_id is specified."""
+    if not data.get("climate_entity") and not data.get("entity_id"):
+        raise vol.Invalid("Must specify either 'climate_entity' or 'entity_id'")
+    return data
+
+
+def _finite_float(val: Any) -> float:
+    """Validate that a value can be coerced to a finite float."""
+    try:
+        f = float(val)
+    except (ValueError, TypeError):
+        raise vol.Invalid(f"Value {val} cannot be converted to float")
+    if not math.isfinite(f):
+        raise vol.Invalid(f"Value {val} must be finite")
+    return f
+
+
+SERVICE_SET_PID_SCHEMA = vol.All(
+    vol.Schema(
+        {
+            vol.Optional("climate_entity"): vol.Any(str, [str]),
+            vol.Optional("entity_id"): vol.Any(str, [str]),
+            vol.Optional("kp"): vol.All(_finite_float, vol.Range(min=0.1, max=500.0)),
+            vol.Optional("ki"): vol.All(_finite_float, vol.Range(min=0.0, max=10.0)),
+            vol.Optional("kd"): vol.All(_finite_float, vol.Range(min=0.0, max=50000.0)),
+            vol.Optional("lock_parameter"): vol.In(["Kp", "Ki", "Kd", "kp", "ki", "kd"]),
+            vol.Optional("unlock"): bool,
+            vol.Optional("mode"): vol.In(["heat", "cool"]),
+        }
+    ),
+    _validate_has_target_entity,
+)
+
+SERVICE_RESET_AUTOTUNE_SCHEMA = vol.All(
+    vol.Schema(
+        {
+            vol.Optional("climate_entity"): vol.Any(str, [str]),
+            vol.Optional("entity_id"): vol.Any(str, [str]),
+            vol.Optional("keep_manual_overrides"): bool,
+            vol.Optional("mode"): vol.In(["heat", "cool"]),
+        }
+    ),
+    _validate_has_target_entity,
+)
+
+
 async def _async_register_services(hass: HomeAssistant) -> None:
     """Register all Phase 6 schedule and profile services."""
     if hass.data[DOMAIN].get("_services_registered"):
@@ -380,79 +451,115 @@ async def _async_register_services(hass: HomeAssistant) -> None:
         return None
 
     async def handle_set_pid_parameters(call: ServiceCall) -> None:
-        climate_entity = call.data.get("climate_entity") or call.data.get("entity_id")
-        if not climate_entity:
-            return
-        kp = float(call.data["kp"]) if call.data.get("kp") is not None else None
-        ki = float(call.data["ki"]) if call.data.get("ki") is not None else None
-        kd = float(call.data["kd"]) if call.data.get("kd") is not None else None
-        lock_param = call.data.get("lock_parameter")
-        unlock_arg = call.data.get("unlock")
-        mode_arg = call.data.get("mode")
+        data = dict(call.data) if hasattr(call, "data") and isinstance(call.data, Mapping) else {}
+        entity_ids = _extract_entity_ids(data)
+
+        def _val_finite_range(v: Any, name: str, min_v: float, max_v: float) -> float | None:
+            if v is None:
+                return None
+            try:
+                f = float(v)
+            except (ValueError, TypeError):
+                raise vol.Invalid(f"Parameter '{name}' must be a float, got {v!r}")
+            if not math.isfinite(f):
+                raise vol.Invalid(f"Parameter '{name}' must be finite, got {f}")
+            if not (min_v <= f <= max_v):
+                raise vol.Invalid(f"Parameter '{name}' must be between {min_v} and {max_v}, got {f}")
+            return f
+
+        kp = _val_finite_range(data.get("kp"), "kp", 0.1, 500.0)
+        ki = _val_finite_range(data.get("ki"), "ki", 0.0, 10.0)
+        kd = _val_finite_range(data.get("kd"), "kd", 0.0, 50000.0)
+
+        lock_param = data.get("lock_parameter")
+        if lock_param is not None and lock_param not in ("Kp", "Ki", "Kd", "kp", "ki", "kd"):
+            raise vol.Invalid(f"Invalid lock_parameter: {lock_param}")
+
+        unlock_arg = data.get("unlock")
+        if unlock_arg is not None and not isinstance(unlock_arg, bool):
+            raise vol.Invalid(f"Parameter 'unlock' must be a boolean, got {unlock_arg!r}")
+
+        mode_arg = data.get("mode")
+        if mode_arg is not None and mode_arg not in ("heat", "cool"):
+            raise vol.Invalid(f"Invalid mode: {mode_arg}")
 
         for coord in _get_active_coordinators(hass):
             zc = getattr(coord, "zone_controller", None)
             if not zc or not hasattr(zc, "async_set_zone_pid"):
                 continue
-            zname = _find_zone_name_for_entity(coord, climate_entity)
-            if unlock_arg is not None and zname and hasattr(coord, "async_set_pid_manual_unlock"):
-                await coord.async_set_pid_manual_unlock(zname, bool(unlock_arg))
-            kwargs: dict[str, object] = {
-                "kp": kp,
-                "ki": ki,
-                "kd": kd,
-                "lock_param": lock_param,
-            }
-            if mode_arg is not None:
-                kwargs["mode"] = mode_arg
-            updated = await zc.async_set_zone_pid(climate_entity, **kwargs)
-            if updated:
-                if hasattr(coord, "async_notify_pid_entities"):
-                    coord.async_notify_pid_entities()
-                orch = getattr(coord, "plant_orchestrator", None)
-                if orch and inspect.iscoroutinefunction(getattr(orch, "_async_update_boiler", None)):
-                    await orch._async_update_boiler()
+            for climate_entity in entity_ids:
+                zname = _find_zone_name_for_entity(coord, climate_entity)
+                if unlock_arg is not None and zname and hasattr(coord, "async_set_pid_manual_unlock"):
+                    await coord.async_set_pid_manual_unlock(zname, bool(unlock_arg))
+                kwargs: dict[str, object] = {
+                    "kp": kp,
+                    "ki": ki,
+                    "kd": kd,
+                    "lock_param": lock_param,
+                }
+                if mode_arg is not None:
+                    kwargs["mode"] = mode_arg
+                updated = await zc.async_set_zone_pid(climate_entity, **kwargs)
+                if updated:
+                    if hasattr(coord, "async_notify_pid_entities"):
+                        coord.async_notify_pid_entities()
+                    orch = getattr(coord, "plant_orchestrator", None)
+                    if orch and inspect.iscoroutinefunction(getattr(orch, "_async_update_boiler", None)):
+                        await orch._async_update_boiler()
 
     async def handle_reset_autotune(call: ServiceCall) -> None:
-        climate_entity = call.data.get("climate_entity") or call.data.get("entity_id")
-        if not climate_entity:
-            return
-        keep_manual = bool(call.data.get("keep_manual_overrides", False))
-        mode_arg = call.data.get("mode")
+        data = dict(call.data) if hasattr(call, "data") and isinstance(call.data, Mapping) else {}
+        entity_ids = _extract_entity_ids(data)
+        raw_keep = data.get("keep_manual_overrides")
+        if raw_keep is not None and not isinstance(raw_keep, bool):
+            raise vol.Invalid(f"Parameter 'keep_manual_overrides' must be a boolean, got {raw_keep!r}")
+        keep_manual = bool(raw_keep) if raw_keep is not None else False
+
+        mode_arg = data.get("mode")
+        if mode_arg is not None and mode_arg not in ("heat", "cool"):
+            raise vol.Invalid(f"Invalid mode: {mode_arg}")
+
         for coord in _get_active_coordinators(hass):
             zc = getattr(coord, "zone_controller", None)
             if not zc or not hasattr(zc, "async_reset_zone_autotuner"):
                 continue
-            kwargs: dict[str, object] = {"keep_manual_overrides": keep_manual}
-            if mode_arg is not None:
-                kwargs["mode"] = mode_arg
-            ok = await zc.async_reset_zone_autotuner(climate_entity, **kwargs)
-            if ok:
-                zname = _find_zone_name_for_entity(coord, climate_entity)
-                if not keep_manual and zname and hasattr(coord, "async_set_pid_manual_unlock"):
-                    await coord.async_set_pid_manual_unlock(zname, False)
-                if hasattr(coord, "async_notify_pid_entities"):
-                    coord.async_notify_pid_entities()
-                orch = getattr(coord, "plant_orchestrator", None)
-                if orch and inspect.iscoroutinefunction(getattr(orch, "_async_update_boiler", None)):
-                    await orch._async_update_boiler()
+            for climate_entity in entity_ids:
+                kwargs: dict[str, object] = {"keep_manual_overrides": keep_manual}
+                if mode_arg is not None:
+                    kwargs["mode"] = mode_arg
+                ok = await zc.async_reset_zone_autotuner(climate_entity, **kwargs)
+                if ok:
+                    zname = _find_zone_name_for_entity(coord, climate_entity)
+                    if not keep_manual and zname and hasattr(coord, "async_set_pid_manual_unlock"):
+                        await coord.async_set_pid_manual_unlock(zname, False)
+                    if hasattr(coord, "async_notify_pid_entities"):
+                        coord.async_notify_pid_entities()
+                    orch = getattr(coord, "plant_orchestrator", None)
+                    if orch and inspect.iscoroutinefunction(getattr(orch, "_async_update_boiler", None)):
+                        await orch._async_update_boiler()
 
     services = {
-        "save_schedule_profile": handle_save_schedule_profile,
-        "activate_schedule_profile": handle_activate_schedule_profile,
-        "duplicate_schedule_profile": handle_duplicate_schedule_profile,
-        "set_smart_return": handle_set_smart_return,
-        "cancel_smart_return": handle_cancel_smart_return,
-        "clear_zone_override": handle_clear_zone_override,
-        "set_preset_temperature": handle_set_preset_temperature,
-        "set_master_operation_mode": handle_set_master_operation_mode,
-        "set_pid_parameters": handle_set_pid_parameters,
-        "reset_autotune": handle_reset_autotune,
+        "save_schedule_profile": (handle_save_schedule_profile, None),
+        "activate_schedule_profile": (handle_activate_schedule_profile, None),
+        "duplicate_schedule_profile": (handle_duplicate_schedule_profile, None),
+        "set_smart_return": (handle_set_smart_return, None),
+        "cancel_smart_return": (handle_cancel_smart_return, None),
+        "clear_zone_override": (handle_clear_zone_override, None),
+        "set_preset_temperature": (handle_set_preset_temperature, None),
+        "set_master_operation_mode": (handle_set_master_operation_mode, None),
+        "set_pid_parameters": (handle_set_pid_parameters, SERVICE_SET_PID_SCHEMA),
+        "reset_autotune": (handle_reset_autotune, SERVICE_RESET_AUTOTUNE_SCHEMA),
     }
 
     if hasattr(hass, "services") and hasattr(hass.services, "async_register"):
-        for svc_name, handler in services.items():
-            hass.services.async_register(DOMAIN, svc_name, handler)
+        for svc_name, (handler, schema) in services.items():
+            if schema is not None:
+                try:
+                    hass.services.async_register(DOMAIN, svc_name, handler, schema=schema)
+                except TypeError:
+                    hass.services.async_register(DOMAIN, svc_name, handler)
+            else:
+                hass.services.async_register(DOMAIN, svc_name, handler)
 
     hass.data[DOMAIN]["_services_registered"] = True
 

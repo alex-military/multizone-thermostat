@@ -43,6 +43,9 @@ from .const import (
     DEFAULT_FROST_FLOW_TEMP,
     KEY_HP_MIN_CYCLE_ON,
     KEY_HP_MIN_CYCLE_OFF,
+    KEY_MIN_CYCLE_ON,
+    KEY_MIN_CYCLE_OFF,
+    KEY_VALVE_DELAY,
     DEFAULT_HP_MIN_CYCLE_ON,
     DEFAULT_HP_MIN_CYCLE_OFF,
     make_zone_device_info,
@@ -351,6 +354,25 @@ class MultizonePersistentNumber(NumberEntity):
     async def async_set_native_value(self, value: float) -> None:
         """Update the value."""
         await self._coordinator.async_set_persistent_data(self._key, value)
+        if self._key in (KEY_HP_MIN_CYCLE_ON, "hp_min_cycle_on"):
+            if hasattr(self._coordinator, "set_hp_min_cycle_on"):
+                self._coordinator.set_hp_min_cycle_on(value)
+            elif hasattr(self._coordinator, "set_min_cycle_on"):
+                self._coordinator.set_min_cycle_on(value)
+        elif self._key in (KEY_HP_MIN_CYCLE_OFF, "hp_min_cycle_off"):
+            if hasattr(self._coordinator, "set_hp_min_cycle_off"):
+                self._coordinator.set_hp_min_cycle_off(value)
+            elif hasattr(self._coordinator, "set_min_cycle_off"):
+                self._coordinator.set_min_cycle_off(value)
+        elif self._key in (KEY_MIN_CYCLE_ON, CONF_MIN_CYCLE_ON, "min_cycle_on"):
+            if hasattr(self._coordinator, "set_min_cycle_on"):
+                self._coordinator.set_min_cycle_on(value)
+        elif self._key in (KEY_MIN_CYCLE_OFF, CONF_MIN_CYCLE_OFF, "min_cycle_off"):
+            if hasattr(self._coordinator, "set_min_cycle_off"):
+                self._coordinator.set_min_cycle_off(value)
+        elif self._key in (KEY_VALVE_DELAY, CONF_VALVE_DELAY, "valve_opening_delay", "valve_delay"):
+            if hasattr(self._coordinator, "set_valve_delay"):
+                self._coordinator.set_valve_delay(value)
         self.async_write_ha_state()
 
 

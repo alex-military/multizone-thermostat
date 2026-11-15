@@ -1,5 +1,27 @@
 # Changelog
 
+## [6.1.0-beta.6] - 2026-11-15
+### Safety, PID/Autotune, Plant Coordination & Energy Hardening
+- **Plant & Heat Pump Backend Safety**:
+  - OpenTherm: Strict 40°C floor max water temp protection in mixed radiator/underfloor systems without mixing valves when peak zone is radiator.
+  - Heat Pump: Safe cooling dew point protection only considers zones actively demanding cooling (`hvac_mode == cool` and target <= current); ignores zones in `heat` or `off` even with high humidity.
+  - Demand Aggregator: `WEIGHTED_AVERAGE` algorithm applies a minimum 70% peak floor guarantee and monotonic responsiveness.
+  - Anti-Seize: Task guard to prevent concurrent/duplicate anti-seize tasks.
+- **PID Controller, Autotune & Thermal Observer**:
+  - PID: Monotonic time source (`time.monotonic`), strict rejection of non-finite inputs (`NaN`/`inf`), anti-windup clamping `max_dt = 600.0s`, derivative reset when `dt < 1.0s`, and Kd step output filtering & clamping (`<= 15.0`).
+  - Autotune: Extended dead time support up to 4 hours (`L <= 14400s`), integral time lower bound `Ti >= 600s`, `Kd <= 500`, ramp detection blocked when already active at intermediate demand, cumulative drift bounded to `[0.5x, 2.0x]` baseline, and rollback to baseline capability (`rollback_to_baseline()`).
+  - Thermal Observer: Learning heating rate at intermediate demand (`demand >= 40%`).
+  - Relay Boiler Backend: Clean logging with numeric fluctuations silenced inside parentheses/percentages, state category transitions logged at INFO.
+- **Energy Management & Solar Surplus**:
+  - Inverted solar grid export sensor support (`grid_export_inverted=True`).
+  - Solar minimum run time hysteresis and hold in `is_solar_surplus()`.
+- **Coordinator, Orchestrator & Services Hardening**:
+  - Coordinator & Number: Live updates for heat pump min cycle on/off (`KEY_HP_MIN_CYCLE_ON`, `KEY_HP_MIN_CYCLE_OFF`) and synchronized valve delay updates across both boiler and heat pump backends; debug logging on entity notification errors.
+  - Plant Orchestrator: Eliminated O(N^2) duplicate zone evaluation on climate state events by proactively updating only unevaluated zones unless forced.
+  - Services: `set_pid_parameters` and `reset_autotune` handle entity lists (`list[str]`) and reject non-finite/out-of-range parameters (`NaN`, `inf`).
+- **Comprehensive Test Coverage**:
+  - Full suite verified with 0 failures and 0 warnings across all test suites (`multizone_thermostat` and `multizone_lab`).
+
 ## [6.1.0-beta.5] - 2026-11-15
 ### Feature & Architecture: Per-Zone Device Organization & Entity Categories, Dual-PID Sync & Zero Warnings
 - **Per-Zone Device Organization & Entity Categories**:

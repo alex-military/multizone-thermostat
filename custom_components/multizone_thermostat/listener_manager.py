@@ -167,15 +167,11 @@ class ListenerManager:
             from .boiler.plant_orchestrator import PlantOrchestrator
             if isinstance(orch, PlantOrchestrator):
                 await orch.async_refresh()
-            elif "async_refresh" in getattr(orch, "_mock_children", {}) or "async_refresh" in getattr(orch, "__dict__", {}):
-                res = orch.async_refresh()
-                if inspect.isawaitable(res):
-                    await res
-            elif hasattr(orch, "_async_update_boiler"):
-                res = orch._async_update_boiler()
-                if inspect.isawaitable(res):
-                    await res
-            elif hasattr(orch, "async_refresh"):
+            elif inspect.iscoroutinefunction(getattr(orch, "async_refresh", None)):
+                await orch.async_refresh()
+            elif inspect.iscoroutinefunction(getattr(orch, "_async_update_boiler", None)):
+                await orch._async_update_boiler()
+            elif callable(getattr(orch, "async_refresh", None)):
                 res = orch.async_refresh()
                 if inspect.isawaitable(res):
                     await res

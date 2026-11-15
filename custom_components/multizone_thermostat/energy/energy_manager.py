@@ -37,6 +37,8 @@ from ..const import (
     DEFAULT_BATTERY_MAX_DISCHARGE_TIME,
     CONF_BATTERY_POWER_INVERTED,
     DEFAULT_BATTERY_POWER_INVERTED,
+    CONF_GRID_EXPORT_INVERTED,
+    DEFAULT_GRID_EXPORT_INVERTED,
     KEY_ALLOW_SPLIT_HEATING,
     KEY_ALLOW_SPLIT_COOLING,
     KEY_HEAT_SOURCE_PRIORITY,
@@ -71,6 +73,7 @@ class EnergyManager:
         self.irradiance_sensor: str | None = config.get(CONF_SOLAR_IRRADIANCE_SENSOR)
         self.override_entity: str | None = config.get(CONF_EXTERNAL_SOLAR_OVERRIDE_ENTITY)
         self.battery_power_inverted: bool = bool(config.get(CONF_BATTERY_POWER_INVERTED, DEFAULT_BATTERY_POWER_INVERTED))
+        self.export_power_inverted: bool = bool(config.get(CONF_GRID_EXPORT_INVERTED, DEFAULT_GRID_EXPORT_INVERTED))
 
         try:
             self.export_threshold: float = float(
@@ -112,6 +115,8 @@ class EnergyManager:
         self._unsub_listeners: list[Any] = []
         self._last_surplus_state: bool = False
         self._discharge_start_timestamp: float | None = None
+        self._surplus_active_since: float | None = None
+        self._surplus_hold_active: bool = False
 
     def is_energy_management_enabled(self) -> bool:
         """Return True if energy management is active."""
@@ -153,7 +158,9 @@ class EnergyManager:
             return None
         unit = st.attributes.get("unit_of_measurement", "").lower() if getattr(st, "attributes", None) else ""
         if unit == "kw":
-            return val * 1000.0
+            val *= 1000.0
+        if self.export_power_inverted:
+            val = -val
         return val
 
     def get_battery_soc(self) -> float | None:
@@ -268,11 +275,15 @@ class EnergyManager:
         3. Energy management enabled with sensor telemetry:
            - Battery reserve check: if battery SOC < min_reserve_soc, surplus is suppressed (reserve for the night).
            - Off-Grid / Battery Saturated Clipping: if SOC >= 95% and PV >= 300W (or battery charging >= 500W), surplus is True.
-           - Grid export check: if exporting >= export_threshold, surplus is True.
-           - Solar power check: if solar power >= export_threshold and no export sensor configured.
+           - Grid export check: if exporting >= export_threshold (with 0.7 hysteresis on hold), surplus is True.
+           - Solar power check: if solar power >= export_threshold (with 0.7 hysteresis on hold) and no export sensor configured.
+           - Solar min run time hold: keeps surplus active until min run time elapses.
         """
         # 1. Battery discharge guard has top priority against wasting stored energy
         if self.is_battery_discharging_too_long():
+            self._surplus_hold_active = False
+            self._surplus_active_since = None
+            self._last_surplus_state = False
             return False
 
         # 2. External override
@@ -281,6 +292,9 @@ class EnergyManager:
             return True
 
         if not self.enabled:
+            self._surplus_hold_active = False
+            self._surplus_active_since = None
+            self._last_surplus_state = False
             return False
 
         # 3. Night reserve protection (SoC check)
@@ -291,11 +305,17 @@ class EnergyManager:
                 soc,
                 self.min_reserve_soc,
             )
+            self._surplus_hold_active = False
+            self._surplus_active_since = None
+            self._last_surplus_state = False
             return False
 
-        # 4. Off-Grid & Zero-Export Clipping (Battery high >= 95% & PV generating >= 300W or charging)
+        # 4. Sensor telemetry evaluation
         solar_w = self.get_solar_power()
         bat_p = self.get_battery_power()
+        export_w = self.get_grid_export()
+
+        raw_surplus = False
         if soc is not None and soc >= 95.0:
             if (solar_w is not None and solar_w >= 300.0) or (bat_p is not None and bat_p >= 400.0):
                 _LOGGER.debug(
@@ -304,31 +324,58 @@ class EnergyManager:
                     solar_w,
                     bat_p,
                 )
+                raw_surplus = True
+
+        threshold = (
+            0.7 * self.export_threshold if self._surplus_hold_active else self.export_threshold
+        )
+
+        if not raw_surplus:
+            if export_w is not None:
+                raw_surplus = export_w >= threshold
+                _LOGGER.debug(
+                    "Solar surplus check (export): %.1fW >= %.1fW (hold=%s) -> %s",
+                    export_w,
+                    threshold,
+                    self._surplus_hold_active,
+                    raw_surplus,
+                )
+            elif solar_w is not None:
+                raw_surplus = solar_w >= threshold
+                _LOGGER.debug(
+                    "Solar surplus check (generation): %.1fW >= %.1fW (hold=%s) -> %s",
+                    solar_w,
+                    threshold,
+                    self._surplus_hold_active,
+                    raw_surplus,
+                )
+
+        now_mono = time.monotonic()
+        if raw_surplus:
+            if self._surplus_active_since is None:
+                self._surplus_active_since = now_mono
+            self._surplus_hold_active = True
+            self._last_surplus_state = True
+            return True
+
+        if self._surplus_hold_active and self._surplus_active_since is not None:
+            elapsed_min = (now_mono - self._surplus_active_since) / 60.0
+            if elapsed_min < self.solar_min_run_time:
+                _LOGGER.debug(
+                    "Solar surplus held active by solar_min_run_time (%.1f / %.1f min)",
+                    elapsed_min,
+                    self.solar_min_run_time,
+                )
                 return True
+            else:
+                self._surplus_hold_active = False
+                self._surplus_active_since = None
+                self._last_surplus_state = False
+                return False
 
-        # 5. Grid Export (if export sensor is available)
-        export_w = self.get_grid_export()
-        if export_w is not None:
-            is_surplus = export_w >= self.export_threshold
-            _LOGGER.debug(
-                "Solar surplus check (export): %.1fW >= %.1fW -> %s",
-                export_w,
-                self.export_threshold,
-                is_surplus,
-            )
-            return is_surplus
-
-        # 6. Solar Generation fallback (pure Off-Grid without export sensor)
-        if solar_w is not None:
-            is_surplus = solar_w >= self.export_threshold
-            _LOGGER.debug(
-                "Solar surplus check (generation): %.1fW >= %.1fW -> %s",
-                solar_w,
-                self.export_threshold,
-                is_surplus,
-            )
-            return is_surplus
-
+        self._surplus_hold_active = False
+        self._surplus_active_since = None
+        self._last_surplus_state = False
         return False
 
     def is_split_heating_allowed(self) -> bool:

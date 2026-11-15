@@ -49,7 +49,7 @@ class AntiSeizeManager:
         if not self.coordinator.get_persistent_data(KEY_ANTI_SEIZE_ENABLED, False):
             return
 
-        if self._running:
+        if self._running or (self._task is not None and not self._task.done()):
             return
 
         idle_seconds = time.monotonic() - self.coordinator.last_active_time
@@ -66,7 +66,7 @@ class AntiSeizeManager:
 
     def trigger_manually(self) -> asyncio.Task:
         """Manually trigger anti-seize routine safely without competing tasks."""
-        if self._task and not self._task.done():
+        if self._running or (self._task is not None and not self._task.done()):
             return self._task
         self._task = self.hass.async_create_task(self.async_execute())
         return self._task
@@ -111,6 +111,8 @@ class AntiSeizeManager:
 
     async def async_execute(self) -> None:
         """Execute the anti-seize routine."""
+        if self._running:
+            return
         self._running = True
 
         try:
@@ -218,6 +220,7 @@ class AntiSeizeManager:
                 _LOGGER.error("Error during anti-seize emergency cleanup: %s", cleanup_err)
         finally:
             self._running = False
+            self._task = None
 
     def stop(self) -> None:
         """Cancel running anti-seize task if any."""

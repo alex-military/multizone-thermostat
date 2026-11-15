@@ -89,13 +89,13 @@ class OpenThermBoilerBackend(BoilerBackend):
         """Check if plant has mixed underfloor and high-temperature emitters."""
         zones = getattr(self.coordinator, "zones", None)
         if not isinstance(zones, list):
-            zones = []
-        has_underfloor = any(z.get("emitter_type") == EMITTER_UNDERFLOOR for z in zones)
+            return False
+        has_underfloor = any(isinstance(z, dict) and z.get("emitter_type") == EMITTER_UNDERFLOOR for z in zones)
         has_high_temp = any(
-            z.get("emitter_type") in (EMITTER_RADIATOR, EMITTER_FANCOIL) or z.get("is_fancoil")
+            isinstance(z, dict) and (z.get("emitter_type") in (EMITTER_RADIATOR, EMITTER_FANCOIL) or z.get("is_fancoil"))
             for z in zones
         )
-        return has_underfloor and has_high_temp
+        return bool(has_underfloor and has_high_temp)
 
     async def async_update(self, demand: float, peak_zone: str | None, frost_emergency: bool) -> None:
         """Map demand to OpenTherm target temperature."""
@@ -135,23 +135,18 @@ class OpenThermBoilerBackend(BoilerBackend):
                 frost_flow = float(getattr(self.coordinator, "frost_flow_temp", 45.0))
             target_temp = max(self.opentherm_min_temp, min(self.opentherm_max_temp, frost_flow))
         elif norm_demand > 0.0 and outdoor_temp is not None and curve_val > 0.0:
-            if has_mixing or emitter != EMITTER_RADIATOR:
-                curve = create_flow_curve_for_emitter(
-                    emitter_type=emitter,
-                    t_min=self.opentherm_min_temp,
-                    t_max=self.opentherm_max_temp,
-                    curve_multiplier=curve_val,
-                    has_mixing_valve=has_mixing,
-                    is_mixed_underfloor=self._has_mixed_underfloor(),
-                )
-                target_temp = curve.flow_for_demand(demand, outdoor_temp)
-            elif outdoor_temp < 15.0:
-                delta_ext = 15.0 - outdoor_temp
-                weather_flow_offset = min(15.0, max(0.0, delta_ext * curve_val * 0.5))
-                target_temp = max(
-                    self.opentherm_min_temp,
-                    min(self.opentherm_max_temp, target_temp + weather_flow_offset),
-                )
+            curve = create_flow_curve_for_emitter(
+                emitter_type=emitter,
+                t_min=self.opentherm_min_temp,
+                t_max=self.opentherm_max_temp,
+                curve_multiplier=curve_val,
+                has_mixing_valve=has_mixing,
+                is_mixed_underfloor=self._has_mixed_underfloor(),
+            )
+            target_temp = curve.flow_for_demand(demand, outdoor_temp)
+
+        if (emitter == EMITTER_UNDERFLOOR or self._has_mixed_underfloor()) and not has_mixing:
+            target_temp = min(target_temp, 40.0)
 
         target_temp = round(target_temp, 1)
 
