@@ -233,10 +233,13 @@ class PID:
             self._integral = max(min(self._integral, self._out_max - self._external), self._out_min - self._external)
 
         self._proportional = self._Kp * self._error
-        if self._dt >= 1.0:
-            self._derivative = -(self._Kd * self._input_diff) / self._dt
-        elif self._last_input is None:
+        if self._dt < 1.0 or self._last_input is None:
             self._derivative = 0.0
+        else:
+            raw_deriv = -(self._Kd * self._input_diff) / self._dt
+            alpha = self._dt / (self._dt + 60.0)
+            filtered_deriv = alpha * raw_deriv + (1.0 - alpha) * self._derivative
+            self._derivative = max(-15.0, min(15.0, filtered_deriv))
 
         # Compute PID Output
         output = self._proportional + self._integral + self._derivative + self._external

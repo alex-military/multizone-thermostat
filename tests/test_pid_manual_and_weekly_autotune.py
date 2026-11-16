@@ -383,3 +383,19 @@ def test_frontend_bundle_contains_pid_controls_and_is_current():
         "reset_autotune",
     ):
         assert marker in content
+
+
+def test_pid_derivative_lowpass_prevents_short_dt_spikes():
+    """Issue #14: 0.1C quantization drop over 1.5s-10s dt must not spike PID output to 100%."""
+    from custom_components.multizone_thermostat.pid import PID
+
+    pid = PID(kp=40.0, ki=0.0, kd=1500.0, out_min=0.0, out_max=100.0, sampling_period=0)
+    # Initial reading at setpoint (20.0C)
+    out0, _ = pid.calc(20.0, 20.0, input_time=100.0, last_input_time=None)
+    assert out0 == 0.0
+
+    # 1.5s later, sensor drops by 0.1C (e.g. TRV quantization step right before 10s tick)
+    out1, _ = pid.calc(19.9, 20.0, input_time=101.5, last_input_time=100.0)
+    # Without filtering, -(1500 * -0.1) / 1.5 = +100.0; with EMA + clamp it stays bounded
+    assert pid.derivative <= 15.0
+    assert out1 < 20.0
