@@ -14,7 +14,7 @@ To launch the setup wizard:
 ```mermaid
 flowchart TD
     S1["Step 1: Central Generators (Gas / Heat Pump)"] --> S1a{"Gas Boiler Enabled?"}
-    S1a -->|Yes| C_Gas["Step 1a: Gas Boiler Config<br>(Relay PWM or OpenTherm)"]
+    S1a -->|Yes| C_Gas["Step 1a: Boiler Mode<br>(Relay PWM, OpenTherm, or Centralized/Condo)"]
     S1a -->|No| S1b{"Heat Pump Enabled?"}
     C_Gas --> S1b
     S1b -->|Yes| C_PDC["Step 1b: Central Heat Pump Config<br>(Climate, Switch or OpenTherm)"]
@@ -51,7 +51,11 @@ Select the physical generators present in your heating plant:
 * **OpenTherm Modulating Mode**:
   * `opentherm_entity`: Select the OpenTherm gateway entity (`climate`, `water_heater`, or `number`).
   * `opentherm_ch_switch`: Optional central heating enable switch (CH switch).
+  * `dhw_active_sensor`: Optional custom DHW (Domestic Hot Water) active sensor (supports EMS-ESP multi-device charging detection).
+  * `has_mixing_valve`: Indicates whether a hydraulic mixing valve is installed on mixed radiator/underfloor circuits (otherwise a strict 40.0 °C cap protects unmixed underfloor loops).
   * `opentherm_min_temp` / `opentherm_max_temp`: Water flow temperature limits (e.g. 35 °C – 75 °C for radiators, 25 °C – 45 °C for underfloor).
+* **Centralized / No Boiler (Condo)**:
+  * `central` mode: Skips boiler entity selection and drives TRVs and zone actuators directly—ideal for centralized condominium or district heating plants.
 
 #### Step 1b: Central Heat Pump Configuration
 <span class="badge-beta">BETA</span>
@@ -71,6 +75,8 @@ Organized into collapsible accordion sections:
 * **Main Settings**:
   * **Room Name**: Display label in the dashboard (e.g. "Living Room", "Master Bedroom").
   * **Primary Temperature Sensor (`temp_sensor`)**: Eye-level reference thermometer (`sensor.*`).
+  * **Humidity Sensor (`humidity_sensor`)** *(Optional)*: Used for indoor dew-point anti-condensation protection during hydronic cooling.
+  * **Emitter Type (`emitter_type`)**: Choose `radiator`, `underfloor`, or `fancoil` to tailor flow curves and safety ceilings.
   * **Base Target Temperature**: Initial setpoint (e.g. 20.5 °C).
 * **▶ Smart Radiator TRVs (Standard)** <span class="badge-stable">STABLE</span>:
   * Select smart radiator valves (`climate.*`). The system synchronizes setpoints and averages temperatures.
@@ -95,7 +101,7 @@ Organized into collapsible accordion sections:
 <span class="badge-beta">BETA</span>
 
 * **Solar Generation Sensor**: Real-time rooftop PV power in Watts (`sensor.*`).
-* **Grid Export Sensor**: Export power in Watts (optional for off-grid setups).
+* **Grid Export Sensor**: Export power in Watts (optional for off-grid setups), with **Invert Grid Export (`grid_export_inverted`)** toggle if your meter reports export as negative.
 * **Battery SoC Sensor**: Household battery state of charge percentage (`sensor.*`).
 * **Battery Power Sensor**: Charge/discharge power in Watts with automatic polarity detection.
 * **Minimum Night Reserve SoC (`battery_min_reserve_soc`)**: Threshold (recommended 80–85%) below which electric heating is locked out.

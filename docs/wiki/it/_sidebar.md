@@ -2,7 +2,7 @@
 * [📥 Installazione & Requisiti](/it/installation.md)
 * [⚙️ Procedura Guidata (Config Flow)](/it/setup_wizard.md)
 
-* **Novità Fase 11 (Beta)**
+* **Funzionalità Beta (v6.1.0-beta)**
   * [🔥 Centrale Bivalente & Solare](/it/hybrid_energy.md)
   * [❄️ Climatizzatori Split d'Ambiente](/it/split_climate.md)
   * [🔄 Raffrescamento & Doppio Binario](/it/cooling_season.md)

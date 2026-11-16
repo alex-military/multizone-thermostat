@@ -142,18 +142,18 @@ graph TD
 
 ---
 
-## 🎮 Interactive Live Simulator & Diagnostics Showcase
+## 📚 Official Documentation Wiki & Live Simulator
 
-Experience the diagnostic supervision and building energy calculation features directly inside your browser. Multizone Thermostat provides a standalone web simulator running the exact same frontend algorithms as the Home Assistant Lovelace cards:
+Explore the complete **Bilingual Official Wiki (🇬🇧 English / 🇮🇹 Italiano)** and test the interactive **Live Web Simulator** directly in your browser (running the exact same frontend bundle as the Home Assistant Lovelace cards):
 
-[![Launch Live Simulator](https://img.shields.io/badge/Launch%20Live%20Simulator-GitHub%20Pages-0ea5e9?style=for-the-badge&logo=googlechrome&logoColor=white)](https://alex-military.github.io/multizone-thermostat/)
+[![Launch Official Wiki & Simulator](https://img.shields.io/badge/Official%20Wiki%20%26%20Simulator-GitHub%20Pages-0ea5e9?style=for-the-badge&logo=googlechrome&logoColor=white)](https://alex-military.github.io/multizone-thermostat/)
 
-- **Live Web App**: [https://alex-military.github.io/multizone-thermostat/](https://alex-military.github.io/multizone-thermostat/)
-- **Offline / Local**: Open [`docs/index.html`](docs/index.html) directly in any browser.
-- **Multilingual Support**: Instant toggle between 🇬🇧 English, 🇮🇹 Italian, and 🇷🇺 Russian.
+- **Official Wiki (English)**: [https://alex-military.github.io/multizone-thermostat/](https://alex-military.github.io/multizone-thermostat/)
+- **Wiki Ufficiale (Italiano)**: [https://alex-military.github.io/multizone-thermostat/wiki/index.html#/it/home](https://alex-military.github.io/multizone-thermostat/wiki/index.html#/it/home)
+- **Interactive Live Simulator**: [https://alex-military.github.io/multizone-thermostat/wiki/simulator.html](https://alex-military.github.io/multizone-thermostat/wiki/simulator.html) (6 languages: 🇬🇧 🇮🇹 🇪🇸 🇫🇷 🇩🇪 🇷🇺)
 
 > [!TIP]
-> The live simulator is hosted directly on this repository via **GitHub Pages** (`docs/index.html`).
+> The official documentation and simulator are hosted on **GitHub Pages** (`docs/`).
 > *To enable GitHub Pages on your fork*: Navigate to **Settings** → **Pages** → under **Build and deployment**, set Source to **Deploy from a branch**, Branch to `master` and folder to `/docs`.
 
 ### 🔍 Interactive Scenario Showcase
@@ -236,10 +236,10 @@ Explore how the central plant supervision and zone energy evaluation react to re
 
 ## Documentation Hub
 
-Explore our dedicated documentation pages for deep dives:
+Explore the official documentation on our **GitHub Pages Wiki**:
 
-- ⚙️ **[Configuration & Setup Guide](configuration.md)**: Hardware aggregation, setup wizard, virtual thermostats, geofencing, calendar scheduling, anti-frost, and summer protection.
-- 🎨 **[Lovelace Custom Cards & Dashboard](cards.md)**: Detailed configuration, YAML examples, and strategies for all 6 custom cards.
+- 📖 **[Official Bilingual Wiki (EN / IT)](https://alex-military.github.io/multizone-thermostat/)**: Installation, Setup Wizard, Autotuning & PID, Hybrid Plants & Solar, Room Split AC, Summer Cooling, Diagnostics & Safety, Entities & Services, and Lovelace Cards Guide.
+- 🎮 **[Interactive Live Simulator](https://alex-military.github.io/multizone-thermostat/wiki/simulator.html)**: Try all dashboards and cards live in 6 languages.
 - 🚀 **[Project Roadmap](ROADMAP.md)**: Development phases, completed milestones, and future features.
 
 ---

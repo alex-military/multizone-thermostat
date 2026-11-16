@@ -23,11 +23,15 @@ Queste entità coordinano lo stato globale dell'abitazione, i parametri di sicur
 | `select.master_control_demand_strategy` | Select | `max`, `weighted_average`, `sum_capped` | Formula di calcolo del fabbisogno termico centrale aggregato. |
 | `number.master_control_min_cycle_on` | Number | 1 – 30 min (default: 5) | Durata minima di marcia continua del bruciatore (protezione anti-pendolamento). |
 | `number.master_control_min_cycle_off` | Number | 1 – 30 min (default: 5) | Durata minima di riposo della caldaia prima di una riaccensione. |
+| `number.master_control_hp_min_cycle_on` | Number | 1 – 30 min | <span class="badge-beta">BETA</span> Durata minima di marcia continua del compressore della Pompa di Calore. |
+| `number.master_control_hp_min_cycle_off` | Number | 1 – 30 min | <span class="badge-beta">BETA</span> Durata minima di riposo del compressore della Pompa di Calore. |
 | `number.master_control_valve_delay` | Number | 0 – 300 sec (default: 0) | Ritardo avvio circolatore per attendere la completa apertura meccanica delle valvole. |
 | `number.master_control_anti_seize_idle_days` | Number | 1 – 60 giorni (default: 15) | Giorni di inattività prima di avviare il ciclo anti-bloccaggio estivo. |
 | `number.master_control_anti_seize_duration` | Number | 1 – 15 min (default: 2) | Durata in minuti dell'apertura completa delle valvole durante l'anti-seize. |
 | `number.master_control_weather_curve` | Number | 0.0 – 3.0 (default: 0.0) | Coefficiente moltiplicatore della curva climatica esterna (feed-forward). |
 | `number.master_control_anti_frost_temperature` | Number | 3.0 – 12.0 °C (default: 7.0) | Temperatura soglia di emergenza sotto la quale scatta il riscaldamento forzato antigelo. |
+| `number.master_control_frost_flow_temp` | Number | °C | Temperatura di mandata configurabile durante l'emergenza antigelo. |
+| `sensor.master_control_master_demand` | Sensor | 0.0 – 100.0% | Fabbisogno centrale aggregato dell'impianto (attivo sia in `heat` sia in `cool`). |
 | `sensor.master_control_stato_salute_impianto` | Sensor | 0 – 100% | Indice diagnostico globale della salute dell'impianto idraulico. |
 | `sensor.master_control_frequenza_accensioni_caldaia` | Sensor | cicli/ora | Frequenza oraria delle accensioni del bruciatore con allarme short-cycle (> 5 c/h). |
 | `sensor.master_control_ore_funzionamento_caldaia_24h` | Sensor | ore | Tempo totale cumulativo di attività della caldaia nelle ultime 24 ore. |
@@ -37,23 +41,26 @@ Queste entità coordinano lo stato globale dell'abitazione, i parametri di sicur
 
 ## 2. Entità di Singola Zona Termica
 
-Create per ogni stanza configurata all'interno del sistema:
+Tutte le entità di stanza sono raggruppate sotto il dispositivo Home Assistant dedicato alla singola zona (`Zona <Nome>`), suddivise nelle categorie **Controlli**, **Configurazione** e **Diagnostica**:
 
-| Entity ID (Esempio per "Salone") | Dominio | Tipo / Valori | Descrizione |
+| Entity ID (Esempio per "Salone") | Dominio / Categoria | Tipo / Valori | Descrizione |
 |---|---|---|---|
-| `climate.multizone_thermostat_salone` | Climate | hvac_modes, setpoint, presets | **Termostato Principale di Stanza**: regola temperatura, modalità HVAC e visualizza lo stato. |
-| `select.zone_modes_salone_mode` | Select | `primary`, `secondary`, `bypass` | **Ruolo Termico della Stanza**: determina se la stanza comanda l'accensione della caldaia. |
-| `switch.zone_modes_sync_controlli_fisici_salone` | Switch | `on` / `off` | Sincronizzazione bidirezionale se qualcuno modifica manualmente la manopola fisica della valvola TRV. |
-| `switch.zone_modes_apporto_passivo_salone` | Switch | `on` / `off` | Modalità apporto passivo (la stanza riceve calore senza richiedere esplicitamente accensione alla caldaia). |
-| `sensor.multizone_brain_salone_fabbisogno` | Sensor | 0.0 – 100.0% | Fabbisogno termico istantaneo calcolato dall'algoritmo (Isteresi o PID). |
-| `sensor.multizone_brain_salone_autotuning` | Sensor | stato e parametri | Stato del motore di auto-apprendimento e guadagni PID correnti ($Kp, Ki, Kd$). |
-| `sensor.multizone_brain_salone_velocita_riscaldamento`| Sensor | °C/ora | Pendenza $R$ misurata durante la fase di riscaldamento a pieno carico. |
-| `sensor.multizone_brain_salone_dispersione` | Sensor | °C/ora | Tasso di dispersione termica naturale $D$ a riscaldamento spento. |
-| `sensor.multizone_brain_salone_inerzia_termica` | Sensor | minuti | Stima dell'inerzia termica della stanza per il calcolo anticipato dello Smart Return. |
-| `sensor.multizone_brain_salone_classe_energetica` | Sensor | A4, A, B, C, D, E, F, G | Classe energetica stimata dell'involucro edilizio della stanza. |
-| `sensor.multizone_brain_salone_tempo_ritenzione_termica` | Sensor | ore | Ore necessarie all'ambiente per perdere $1.0^\circ\text{C}$ in assenza di riscaldamento. |
-| `sensor.multizone_brain_salone_dimensionamento_radiatore`| Sensor | Sottodimensionato, Ottimale, Sovradimensionato | Valutazione quantitativa della potenza dei corpi scaldanti rispetto al volume della stanza. |
-| `binary_sensor.heating_zones_salone_anomaly` | Binary Sensor | `on` / `off` | Segnala anomalie idrauliche locali (valvola bloccata, trafilamento di calore o perdita sensore). |
+| `climate.multizone_thermostat_salone` | Climate (Controllo) | hvac_modes, setpoint, presets | **Termostato Principale di Stanza**: regola temperatura, modalità HVAC e visualizza lo stato. |
+| `select.zone_modes_salone_mode` | Select (Controllo) | `primary`, `secondary`, `bypass` | **Ruolo Termico della Stanza**: determina se la stanza comanda l'accensione della caldaia. |
+| `switch.salone_pid_manual_unlock` | Switch (Config) | `on` / `off` | Sblocca la modifica manuale dei parametri PID stagionali (`Kp`, `Ki`, `Kd`). Bloccato di default. |
+| `number.salone_pid_kp` / `ki` / `kd` | Number (Config) | float | Guadagni PID stagionali della stanza per la stagione attiva (`heat` o `cool`). |
+| `button.salone_reset_autotuner` | Button (Config) | press | Resetta l'autotuner della sola stagione attiva e riblocca automaticamente `PID Manual Unlock`. |
+| `switch.zone_modes_sync_controlli_fisici_salone` | Switch (Config) | `on` / `off` | Sincronizzazione bidirezionale se qualcuno modifica manualmente la manopola fisica della valvola TRV. |
+| `switch.zone_modes_apporto_passivo_salone` | Switch (Config) | `on` / `off` | Modalità apporto passivo (la stanza riceve calore senza richiedere esplicitamente accensione alla caldaia). |
+| `sensor.multizone_brain_salone_fabbisogno` | Sensor (Diagnostica) | 0.0 – 100.0% | Fabbisogno termico istantaneo calcolato dall'algoritmo (Isteresi o PID). |
+| `sensor.multizone_brain_salone_autotuning` | Sensor (Diagnostica) | stato e parametri | Stato del motore di auto-apprendimento e guadagni PID correnti ($Kp, Ki, Kd$). |
+| `sensor.multizone_brain_salone_velocita_riscaldamento`| Sensor (Diagnostica) | °C/ora | Pendenza $R$ misurata durante la fase di riscaldamento a pieno carico. |
+| `sensor.multizone_brain_salone_dispersione` | Sensor (Diagnostica) | °C/ora | Tasso di dispersione termica naturale $D$ o velocità di raffrescamento. |
+| `sensor.multizone_brain_salone_inerzia_termica` | Sensor (Diagnostica) | minuti | Stima dell'inerzia termica della stanza per il calcolo anticipato dello Smart Return. |
+| `sensor.multizone_brain_salone_classe_energetica` | Sensor (Diagnostica) | A4, A, B, C, D, E, F, G | Classe energetica stimata dell'involucro edilizio della stanza. |
+| `sensor.multizone_brain_salone_tempo_ritenzione_termica` | Sensor (Diagnostica) | ore | Ore necessarie all'ambiente per perdere $1.0^\circ\text{C}$ in assenza di riscaldamento. |
+| `sensor.multizone_brain_salone_dimensionamento_radiatore`| Sensor (Diagnostica) | Sottodimensionato, Ottimale, Sovradimensionato | Valutazione quantitativa della potenza dei corpi scaldanti rispetto al volume della stanza. |
+| `binary_sensor.heating_zones_salone_anomaly` | Binary Sensor (Diagnostica) | `on` / `off` | Segnala anomalie idrauliche locali (valvola bloccata, trafilamento di calore o perdita sensore). |
 
 ---
 
@@ -153,4 +160,60 @@ data:
   entity_id: climate.multizone_thermostat_camera
   preset: comfort
   temperature: 20.5
+```
+
+---
+
+### `multizone_thermostat.set_pid_parameters`
+Imposta manualmente i guadagni PID stagionali (`kp`, `ki`, `kd`) per una o più zone, specificando opzionalmente la stagione (`heat` o `cool`) o il seeding della baseline Auto EMA (`seed_autotuner`):
+
+```yaml
+service: multizone_thermostat.set_pid_parameters
+data:
+  entity_id:
+    - climate.multizone_thermostat_salone
+  mode: heat            # Opzionale: 'heat' o 'cool' (default: stagione attiva)
+  seed_autotuner: false # Opzionale: true per applicarli come baseline Auto EMA appresa
+  kp: 12.0
+  ki: 0.015
+  kd: 120.0
+```
+
+---
+
+### `multizone_thermostat.reset_autotune`
+Resetta l'autotuner passivo per una o più zone sulla stagione indicata (salvando prima un backup automatico) e riblocca `PID Manual Unlock`:
+
+```yaml
+service: multizone_thermostat.reset_autotune
+data:
+  entity_id:
+    - climate.multizone_thermostat_salone
+  mode: heat   # Opzionale: 'heat' o 'cool'
+```
+
+---
+
+### `multizone_thermostat.restore_autotune`
+Ripristina i parametri Smart PID appresi e i cicli salvati prima dell'ultimo reset dell'autotuner:
+
+```yaml
+service: multizone_thermostat.restore_autotune
+data:
+  climate_entity: climate.multizone_thermostat_salone
+  keep_manual_overrides: false # Opzionale: mantieni eventuali override manuali
+  mode: heat                   # Opzionale: 'heat' o 'cool'
+```
+
+---
+
+### `multizone_thermostat.duplicate_schedule_profile`
+Duplica un profilo di programmazione settimanale esistente con un nuovo ID e nome:
+
+```yaml
+service: multizone_thermostat.duplicate_schedule_profile
+data:
+  source_profile_id: standard
+  target_profile_id: smart_working
+  target_name: "Smart Working"
 ```

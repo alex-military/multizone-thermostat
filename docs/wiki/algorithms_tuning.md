@@ -68,8 +68,15 @@ From $L$, $R$, and $D$, the autotuner derives the controller gains:
 * **Integral Time**: $T_i = 2.0 \cdot L \quad \implies \quad K_i = \frac{K_p}{T_i}$
 * **Derivative Time**: $T_d = 0.5 \cdot L \quad \implies \quad K_d = K_p \cdot T_d$
 
-* **Integral Anti-Windup**: The $K_i$ term is mathematically clamped to prevent error accumulation when the boiler is off or during prolonged absences.
-* **Low-Pass Derivative Filter**: The $K_d$ term is filtered to ignore high-frequency sensor noise from wireless Zigbee thermometers or transient drafts.
+* **Integral Anti-Windup**: The $K_i$ term is mathematically clamped (including `max_dt = 600s` and `Ti >= 600s` bounds) to prevent error accumulation when the boiler is off or during prolonged absences.
+* **Low-Pass Derivative Filter**: The $K_d$ term (`Kd <= 500`, step output clamped to `<= 15.0`) is filtered to ignore high-frequency sensor noise from wireless Zigbee thermometers or transient drafts.
+* **Extended Dead Time & Intermediate Learning**: Supports slow radiant slabs with dead times up to 4 hours (`L <= 14400s`), thermal observer learning at intermediate demand (`>= 40%`), and duty-normalized learning (`>= 70%`).
+
+### Weekly Smoothed EMA & Dual-Season Manual PID (v6.1.0-beta)
+* **Weekly Median-Filtered EMA**: After the initial 3 learning cycles, the observer continues refining gains with a weekly smoothed EMA (clamped to `±10%/week` and bounded to `[0.5x, 2.0x]` of baseline) to track seasonal building drift, with `rollback_to_baseline` safety.
+* **Per-Zone Manual Override & Safety Lock**: Each zone device (`Zone <Name>`) exposes **Configuration** entities for `PID Kp`, `PID Ki`, `PID Kd` (`number`), `PID Manual Unlock` (`switch`, defaults to locked), and `Reset Autotuner` (`button`).
+* **Dual-Season Isolation**: Heating (`heat`) and cooling (`cool`) PID tracks are stored and tuned independently; manual edits or resets only affect the active season (or the `mode` specified in `multizone_thermostat.set_pid_parameters` / `multizone_thermostat.reset_autotune`). Manually overridden gains are preserved from automatic EMA updates.
+* **Seed Autotuner & Pre-Reset Backup (`v6.1.0-beta.10`)**: You can seed `Kp/Ki/Kd` directly as the learned Auto EMA baseline (`seed_autotuner: true`) so continuous weekly optimization continues from those values. Before any autotuner reset, a snapshot of the learned parameters and cycles is automatically backed up and can be restored anytime via `multizone_thermostat.restore_autotune` (or the Zone Energy Card UI).
 
 ---
 
@@ -103,6 +110,6 @@ Configured via `select.master_control_demand_strategy`:
 1. **`max` (Maximum Zone Demand)**:
    Boiler demand matches the highest single active zone. Ideal for high-temperature radiator systems.
 2. **`weighted_average` (Weighted Average)**:
-   Zones contribute proportionally to their volume weight (`weight`, default 1.0), preventing boiler ignition for small closets.
+   Zones contribute proportionally to their configured primary weight (`weight`, default 1.0) divided by total configured primary weights, guaranteeing strictly monotonic plant demand with a minimum 70% peak floor. Prevents full boiler ignition for small closets.
 3. **`sum_capped` (Sum Capped at 100%)**:
    Demands across all zones sum together up to 100%. Ideal for multi-circuit underfloor manifolds.

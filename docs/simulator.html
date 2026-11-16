@@ -322,7 +322,7 @@
   </script>
 
   <!-- Load Official Card Bundle with cache bust -->
-  <script src="multizone-thermostat-card.js?v=beta11_rev6"></script>
+  <script src="multizone-thermostat-card.js?v=6.1.0-beta.10-i18n"></script>
 </head>
 <body>
 
@@ -482,7 +482,12 @@
             split_hydronic_suppressed: false,
             heating_rate: 1.5,
             cooling_rate: 0.3,
-            battery_level: 92
+            battery_level: 92,
+            pid_kp: 12.4,
+            pid_ki: 0.014,
+            pid_kd: 110.0,
+            pid_active_mode: 'heat',
+            pid_manual_unlock: false
           }
         },
         'climate.split_test_1': {
@@ -516,7 +521,12 @@
             can_cool: true,
             heating_rate: 1.2,
             cooling_rate: 0.25,
-            battery_level: 85
+            battery_level: 85,
+            pid_kp: 10.8,
+            pid_ki: 0.012,
+            pid_kd: 95.0,
+            pid_active_mode: 'heat',
+            pid_manual_unlock: false
           }
         },
         'select.multizone_thermostat_zona_test_2_zone_mode': {
@@ -545,7 +555,12 @@
             can_cool: false,
             heating_rate: 0.9,
             cooling_rate: 0.4,
-            battery_level: 70
+            battery_level: 70,
+            pid_kp: 14.2,
+            pid_ki: 0.018,
+            pid_kd: 130.0,
+            pid_active_mode: 'heat',
+            pid_manual_unlock: false
           }
         },
         'select.multizone_thermostat_zona_test_3_zone_mode': {
@@ -847,7 +862,6 @@
       dial1.setConfig({
         entity: 'climate.multizone_thermostat_zona_test_1',
         switch: 'select.multizone_thermostat_zona_test_1_zone_mode',
-        title: 'Living Room',
         hide_if_cannot_cool: true,
         border_radius: '20px'
       });
@@ -859,7 +873,6 @@
       dial2.setConfig({
         entity: 'climate.multizone_thermostat_zona_test_2',
         switch: 'select.multizone_thermostat_zona_test_2_zone_mode',
-        title: 'Kitchen',
         hide_if_cannot_cool: true,
         border_radius: '20px'
       });
@@ -871,7 +884,6 @@
       dial3.setConfig({
         entity: 'climate.multizone_thermostat_zona_test_3',
         switch: 'select.multizone_thermostat_zona_test_3_zone_mode',
-        title: 'Office',
         hide_if_cannot_cool: true,
         border_radius: '20px'
       });
@@ -912,6 +924,7 @@
     function updateAllCards() {
       const hassCopy = {
         language: MOCK_HASS.language,
+        locale: { language: MOCK_HASS.language },
         states: Object.assign({}, MOCK_HASS.states),
         callService: MOCK_HASS.callService
       };
@@ -970,7 +983,11 @@
         style_classic: "Style: Classic",
         living_room: "Living Room",
         kitchen: "Kitchen",
-        office: "Office"
+        office: "Office",
+        optimal: "Optimal",
+        undersized: "Undersized",
+        cycles_unit: "cycles/h",
+        boiler_name: "Central Boiler"
       },
       it: {
         tab_thermostats: "Termostati",
@@ -982,7 +999,11 @@
         style_classic: "Stile: Classic",
         living_room: "Soggiorno",
         kitchen: "Cucina",
-        office: "Studio"
+        office: "Studio",
+        optimal: "Ottimale",
+        undersized: "Sottodimensionato",
+        cycles_unit: "cicli/h",
+        boiler_name: "Caldaia Centrale"
       },
       es: {
         tab_thermostats: "Termostatos",
@@ -994,7 +1015,11 @@
         style_classic: "Estilo: Classic",
         living_room: "Salón",
         kitchen: "Cocina",
-        office: "Despacho"
+        office: "Despacho",
+        optimal: "Óptimo",
+        undersized: "Subdimensionado",
+        cycles_unit: "ciclos/h",
+        boiler_name: "Caldera Central"
       },
       fr: {
         tab_thermostats: "Thermostats",
@@ -1006,7 +1031,11 @@
         style_classic: "Style: Classic",
         living_room: "Salon",
         kitchen: "Cuisine",
-        office: "Bureau"
+        office: "Bureau",
+        optimal: "Optimal",
+        undersized: "Sous-dimensionné",
+        cycles_unit: "cycles/h",
+        boiler_name: "Chaudière Centrale"
       },
       de: {
         tab_thermostats: "Thermostate",
@@ -1018,7 +1047,11 @@
         style_classic: "Stil: Classic",
         living_room: "Wohnzimmer",
         kitchen: "Küche",
-        office: "Arbeitszimmer"
+        office: "Arbeitszimmer",
+        optimal: "Optimal",
+        undersized: "Unterdimensioniert",
+        cycles_unit: "Zyklen/h",
+        boiler_name: "Zentralheizung"
       },
       ru: {
         tab_thermostats: "Термостаты",
@@ -1030,7 +1063,11 @@
         style_classic: "Стиль: Classic",
         living_room: "Гостиная",
         kitchen: "Кухня",
-        office: "Кабинет"
+        office: "Кабинет",
+        optimal: "Оптимально",
+        undersized: "Недостаточный",
+        cycles_unit: "циклов/ч",
+        boiler_name: "Центральный котёл"
       }
     };
 
@@ -1061,6 +1098,21 @@
       }
       if (MOCK_HASS.states['climate.multizone_thermostat_zona_test_3']) {
         MOCK_HASS.states['climate.multizone_thermostat_zona_test_3'].attributes.friendly_name = t.office;
+      }
+      if (MOCK_HASS.states['switch.caldaia']) {
+        MOCK_HASS.states['switch.caldaia'].attributes.friendly_name = t.boiler_name;
+      }
+      if (MOCK_HASS.states['sensor.master_control_frequenza_accensioni_caldaia']) {
+        MOCK_HASS.states['sensor.master_control_frequenza_accensioni_caldaia'].attributes.unit_of_measurement = t.cycles_unit;
+      }
+      if (MOCK_HASS.states['sensor.multizone_brain_zona_test_1_dimensionamento_radiatore']) {
+        MOCK_HASS.states['sensor.multizone_brain_zona_test_1_dimensionamento_radiatore'].state = t.optimal;
+      }
+      if (MOCK_HASS.states['sensor.multizone_brain_zona_test_2_dimensionamento_radiatore']) {
+        MOCK_HASS.states['sensor.multizone_brain_zona_test_2_dimensionamento_radiatore'].state = t.optimal;
+      }
+      if (MOCK_HASS.states['sensor.multizone_brain_zona_test_3_dimensionamento_radiatore']) {
+        MOCK_HASS.states['sensor.multizone_brain_zona_test_3_dimensionamento_radiatore'].state = t.undersized;
       }
 
       updateAllCards();

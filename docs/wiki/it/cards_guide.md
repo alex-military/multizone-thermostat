@@ -99,7 +99,7 @@ title: Camera Matrimoniale
 
 L'interfaccia visuale della programmazione oraria settimanale:
 
-* **Timeline 24h a Matrice di Colori**: Mostra graficamente la sequenza dei blocchi orari per tutte le zone.
+* **Timeline 24h a Matrice di Colori**: Mostra graficamente la sequenza dei blocchi orari per tutte le zone, inclusa la riga master **"🏠 Tutte le Zone (Generale)"**, blocchi tratteggiati di baseline, blocchi ambra di override manuale e layout responsive con etichette fisse su mobile/colonne strette.
 * **Modifica al Tocco**: Regolazione intuitiva di orari e preset associati per ogni stanza.
 * **Pianificazione Rientro Intelligente ("Smart Return")**: Pulsante integrato per impostare l'orario di rientro desiderato con calcolo automatico dell'anticipo termico per ciascuna stanza.
 
@@ -132,6 +132,7 @@ Visualizza le prestazioni dell'involucro edilizio e i parametri termici fisici d
 * **Tempo di Ritenzione Termica**: Numero di ore necessarie all'ambiente per perdere $1.0^\circ\text{C}$ a riscaldamento spento.
 * **Dimensionamento Radiatore**: Valutazione dell'adeguatezza della potenza installata (Sottodimensionato, Ottimale, Sovradimensionato).
 * **Livello Batteria TRV**: Monitoraggio universale dello stato di carica delle valvole termostatiche Zigbee / Z-Wave.
+* **Pannello PID Stagionale Live**: Mostra i guadagni `Kp`, `Ki`, `Kd` della stagione attiva (`heat`/`cool`) in 3 riquadri di sola lettura con modali protette per sblocco manuale, seeding Auto EMA (`seed_autotuner`) e backup/ripristino pre-reset dell'autotuner.
 * **Controlli Interattivi**: Possibilità di ciclare la modalità della stanza o abilitare l'Apporto Passivo direttamente dalla card.
 
 ```yaml

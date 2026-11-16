@@ -60,11 +60,11 @@ function openMzStandaloneModal(type, hass) {
   const titleEl = document.createElement('div');
   titleEl.style.cssText = 'font-size: 1.2rem; font-weight: 700; color: #ffffff; display: flex; align-items: center; gap: 10px;';
   titleEl.innerHTML = type === 'scheduler'
-    ? '<ha-icon icon="mdi:calendar-clock" style="color:#38bdf8;"></ha-icon> <span>Programmazione Fasce Orarie</span>'
-    : '<ha-icon icon="mdi:chart-box-outline" style="color:#10b981;"></ha-icon> <span>Diagnostica & Impianto</span>';
+    ? `<ha-icon icon="mdi:calendar-clock" style="color:#38bdf8;"></ha-icon> <span>${getTranslation(hass, 'sched_modal_title') || 'Weekly Schedule'}</span>`
+    : `<ha-icon icon="mdi:chart-box-outline" style="color:#10b981;"></ha-icon> <span>${getTranslation(hass, 'diag_modal_title') || 'Plant & Diagnostics'}</span>`;
 
   const closeBtn = document.createElement('button');
-  closeBtn.innerHTML = '✕ Chiudi';
+  closeBtn.innerHTML = `✕ ${getTranslation(hass, 'close_btn') || 'Close'}`;
   closeBtn.style.cssText = [
     'background: rgba(255, 255, 255, 0.14)',
     'color: #ffffff',
@@ -453,7 +453,7 @@ class MultizoneThermostatScheduleSummaryCard extends HTMLElement {
           <div class="icon-box" id="icon-box">
             <ha-icon icon="mdi:calendar-clock"></ha-icon>
           </div>
-          <div class="badge-title">Programmazione</div>
+          <div class="badge-title" id="sched-badge-title">${getTranslation(this._hass, 'sched_nav_title') || 'Scheduling'}</div>
           <div class="badge-pill" id="pill">
             <span class="badge-dot" id="dot"></span>
             <span id="label">In Pausa</span>
@@ -480,6 +480,8 @@ class MultizoneThermostatScheduleSummaryCard extends HTMLElement {
 
   updateCard() {
     if (!this._hass || !this._rendered) return;
+    const titleEl = this.shadowRoot.getElementById('sched-badge-title');
+    if (titleEl) titleEl.textContent = getTranslation(this._hass, 'sched_nav_title') || 'Scheduling';
     const pill = this.shadowRoot.getElementById('pill');
     const label = this.shadowRoot.getElementById('label');
     const dot = this.shadowRoot.getElementById('dot');
@@ -720,10 +722,10 @@ class MultizoneThermostatHealthSummaryCard extends HTMLElement {
           <div class="icon-box" id="icon-box">
             <ha-icon icon="mdi:shield-check"></ha-icon>
           </div>
-          <div class="badge-title">Diagnostica</div>
+          <div class="badge-title" id="diag-badge-title">${getTranslation(this._hass, 'diag_nav_title') || 'Diagnostics'}</div>
           <div class="badge-pill" id="pill">
             <span class="badge-dot" id="dot"></span>
-            <span id="label">Sistema OK</span>
+            <span id="label">${getTranslation(this._hass, 'system_ok') || 'System OK'}</span>
           </div>
         </div>
       </ha-card>
@@ -747,6 +749,8 @@ class MultizoneThermostatHealthSummaryCard extends HTMLElement {
 
   updateCard() {
     if (!this._hass || !this._rendered) return;
+    const titleEl = this.shadowRoot.getElementById('diag-badge-title');
+    if (titleEl) titleEl.textContent = getTranslation(this._hass, 'diag_nav_title') || 'Diagnostics';
     const pill = this.shadowRoot.getElementById('pill');
     const label = this.shadowRoot.getElementById('label');
     const dot = this.shadowRoot.getElementById('dot');
@@ -768,14 +772,14 @@ class MultizoneThermostatHealthSummaryCard extends HTMLElement {
     }
 
     if (hasAnomaly) {
-      label.textContent = 'Allarme';
+      label.textContent = getTranslation(this._hass, 'fault_detected') || 'Alert';
       pill.style.background = 'rgba(239, 68, 68, 0.18)';
       pill.style.color = '#ef4444';
       pill.style.borderColor = 'rgba(239, 68, 68, 0.4)';
       if (dot) dot.style.background = '#ef4444';
       if (iconBox) iconBox.style.color = '#ef4444';
     } else {
-      label.textContent = 'Sistema Ok';
+      label.textContent = getTranslation(this._hass, 'system_ok') || 'System OK';
       pill.style.background = 'rgba(16, 185, 129, 0.15)';
       pill.style.color = '#10b981';
       pill.style.borderColor = 'rgba(16, 185, 129, 0.35)';

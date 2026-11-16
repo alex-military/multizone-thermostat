@@ -2,7 +2,7 @@
 
 <span class="badge-beta">BETA</span>
 
-With Phase 11, Multizone Thermostat becomes a complete four-season climate solution, managing winter heating and summer cooling with equal precision (via direct-expansion split AC units or central reversible hydronic heat pumps).
+With `v6.1.0-beta`, Multizone Thermostat becomes a complete four-season climate solution, managing winter heating and summer cooling with equal precision (via direct-expansion split AC units or central reversible hydronic heat pumps).
 
 ---
 
@@ -61,8 +61,11 @@ The passive observer analyzes natural temperature drops during air conditioner o
 | Cooling Architecture | Actuators Used | System Behavior |
 |---|---|---|
 | **Room Split AC Units** | Split entity `climate.*` | The split responds directly to room cooling demand. The hydronic radiator valve remains closed at 0%. |
-| **Radiant Floor + Reversible Heat Pump** | Proportional valves / relays + central heat pump | The heat pump chills water (e.g. 18 °C); valves modulate flow using summer PID. Requires dehumidifiers to prevent condensation. |
+| **Radiant Floor + Reversible Heat Pump** | Proportional valves / relays + central heat pump | The heat pump chills water (e.g. 18 °C); valves modulate flow using summer PID. Includes **Indoor Dew-Point Anti-Condensation** (+2.0 °C above worst-case dew point using per-zone `humidity_sensor`, evaluated only on zones actively demanding cooling). |
 | **Central Fancoils** | 0–10V valves + fan coils | Chilled water flow (7–12 °C) with continuous modulation of fans and valves. |
+
+> [!NOTE]
+> In `cool` mode, `Master Demand` accurately reflects aggregated cooling demand across active cooling zones, and Smart Return automatically skips non-cooling zones.
 
 ---
 

@@ -295,14 +295,14 @@ class MultizoneThermostatStatusCard extends HTMLElement {
           <ha-icon id="master-icon" icon="mdi:power"></ha-icon>
         </div>
         <div class="info-container">
-          <div class="sub-title">Impianto Centrale</div>
-          <div class="name" id="master-name">Riscaldamento</div>
+          <div class="sub-title" id="master-sub-title">${getTranslation(this._hass, 'central_plant') || 'Central Plant'}</div>
+          <div class="name" id="master-name">${getTranslation(this._hass, 'heating_label') || 'Heating'}</div>
           <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
             <div class="status-pill" id="master-pill">
               <span class="status-dot"></span>
-              <span id="master-state-text">Caricamento...</span>
+              <span id="master-state-text">...</span>
             </div>
-            <div class="telemetry" id="master-telemetry">Caldaia: OFF</div>
+            <div class="telemetry" id="master-telemetry">${getTranslation(this._hass, 'boiler_label') || 'Boiler'}: OFF</div>
           </div>
         </div>
       </div>
@@ -433,40 +433,52 @@ class MultizoneThermostatStatusCard extends HTMLElement {
     const stateText = this.shadowRoot.getElementById('master-state-text');
     const telemetry = this.shadowRoot.getElementById('master-telemetry');
 
+    const subTitleEl = this.shadowRoot.getElementById('master-sub-title');
+    if (subTitleEl) {
+      subTitleEl.textContent = getTranslation(this._hass, 'central_plant') || 'Central Plant';
+    }
+
     if (nameEl) {
       nameEl.textContent = isCoolMode
-        ? (getTranslation(this._hass, 'cooling_active') ? 'Raffrescamento' : 'Raffrescamento')
-        : 'Riscaldamento';
+        ? (getTranslation(this._hass, 'cooling_label') || 'Cooling')
+        : (getTranslation(this._hass, 'heating_label') || 'Heating');
     }
+
+    const tBoiler = getTranslation(this._hass, 'boiler_label') || 'Boiler';
+    const tHp = getTranslation(this._hass, 'hp_label') || 'HP';
+    const tBoilerHp = getTranslation(this._hass, 'boiler_hp_label') || 'Boiler + HP';
+    const tBoilerOrHp = getTranslation(this._hass, 'boiler_or_hp_label') || 'Boiler / HP';
+    const tSplitElec = getTranslation(this._hass, 'split_electric_label') || 'Electric Split';
+    const tActiveZones = getTranslation(this._hass, 'active_zones') || 'Active zones';
 
     if (telemetry) {
       if (isCoolMode) {
         telemetry.textContent = activeCoolingZones > 0
-          ? `Zone attive: ${activeCoolingZones}`
-          : `Split / PDC: Standby`;
+          ? `${tActiveZones}: ${activeCoolingZones}`
+          : `Split / ${tHp}: Standby`;
       } else if (activeSplits > 0 && !isBoilerActive && !isCentralHpActive) {
-        telemetry.textContent = `Split Elettrico: ON`;
+        telemetry.textContent = `${tSplitElec}: ON`;
       } else if (activeSplits > 0 && isBoilerActive && !isCentralHpActive) {
-        telemetry.textContent = `Caldaia: ON + Split`;
+        telemetry.textContent = `${tBoiler}: ON + Split`;
       } else if (activeSplits > 0 && isCentralHpActive && !isBoilerActive) {
-        telemetry.textContent = `PDC: ON + Split`;
+        telemetry.textContent = `${tHp}: ON + Split`;
       } else if (activeSplits > 0 && isCentralHpActive && isBoilerActive) {
-        telemetry.textContent = `Caldaia + PDC: ON + Split`;
+        telemetry.textContent = `${tBoilerHp}: ON + Split`;
       } else if (isCentralHpActive && isBoilerActive) {
-        telemetry.textContent = `Caldaia + PDC: ON`;
+        telemetry.textContent = `${tBoilerHp}: ON`;
       } else if (isCentralHpActive) {
-        telemetry.textContent = `PDC: ON`;
+        telemetry.textContent = `${tHp}: ON`;
       } else if (isBoilerActive) {
-        telemetry.textContent = `Caldaia: ${boilerText}`;
+        telemetry.textContent = `${tBoiler}: ${boilerText}`;
       } else if (hasCentralHp && hasBoiler) {
-        telemetry.textContent = `Caldaia / PDC: OFF`;
+        telemetry.textContent = `${tBoilerOrHp}: OFF`;
       } else if (hasCentralHp && !hasBoiler) {
-        telemetry.textContent = `PDC: OFF`;
+        telemetry.textContent = `${tHp}: OFF`;
       } else if (activeHeatingZones > 0 && !isBoilerActive) {
         // Heating is active across zones without boiler switch: PDC or integrated central heating
-        telemetry.textContent = hasCentralHp ? `PDC: ON` : `Caldaia / PDC: ON`;
+        telemetry.textContent = hasCentralHp ? `${tHp}: ON` : `${tBoilerOrHp}: ON`;
       } else {
-        telemetry.textContent = `Caldaia: ${boilerText}`;
+        telemetry.textContent = `${tBoiler}: ${boilerText}`;
       }
     }
 
@@ -488,7 +500,7 @@ class MultizoneThermostatStatusCard extends HTMLElement {
         pill.style.color = "var(--secondary-text-color, #94a3b8)";
         pill.style.borderColor = "var(--divider-color, rgba(148, 163, 184, 0.25))";
       }
-      if (stateText) stateText.textContent = "SPENTO";
+      if (stateText) stateText.textContent = getTranslation(this._hass, 'state_off_upper') || "OFF";
     } else if (isCoolMode) {
       if (isCoolingSystemActive) {
         if (card && !isClassic) card.className = "cooling-aura";
@@ -506,7 +518,7 @@ class MultizoneThermostatStatusCard extends HTMLElement {
           pill.style.color = "#38bdf8";
           pill.style.borderColor = "rgba(56, 189, 248, 0.45)";
         }
-        if (stateText) stateText.textContent = "RAFFRESCAMENTO ATTIVO";
+        if (stateText) stateText.textContent = getTranslation(this._hass, 'cooling_active') || "COOLING ACTIVE";
       } else {
         if (card && !isClassic) card.className = "cool-idle-aura";
         if (icon) {
@@ -523,7 +535,7 @@ class MultizoneThermostatStatusCard extends HTMLElement {
           pill.style.color = "#7dd3fc";
           pill.style.borderColor = "rgba(56, 189, 248, 0.3)";
         }
-        if (stateText) stateText.textContent = "STANDBY (FREDDO)";
+        if (stateText) stateText.textContent = `${getTranslation(this._hass, 'standby_idle') || 'STANDBY'} (${getTranslation(this._hass, 'cool_mode') || 'COOL'})`;
       }
     } else {
       if (isHeatingSystemActive) {
@@ -542,7 +554,7 @@ class MultizoneThermostatStatusCard extends HTMLElement {
           pill.style.color = "#f97316";
           pill.style.borderColor = "rgba(249, 115, 22, 0.45)";
         }
-        if (stateText) stateText.textContent = "RISCALDAMENTO ATTIVO";
+        if (stateText) stateText.textContent = getTranslation(this._hass, 'heating_active') || "HEATING ACTIVE";
       } else {
         if (card && !isClassic) card.className = "idle-aura";
         if (icon) {
@@ -559,7 +571,7 @@ class MultizoneThermostatStatusCard extends HTMLElement {
           pill.style.color = "#f59e0b";
           pill.style.borderColor = "rgba(245, 158, 11, 0.35)";
         }
-        if (stateText) stateText.textContent = "STANDBY (ACCESO)";
+        if (stateText) stateText.textContent = getTranslation(this._hass, 'state_standby_upper') || "STANDBY (ON)";
       }
     }
   }

@@ -221,7 +221,55 @@ sched_nav_title: "Programmazione",
     pid_restore_backup_confirm_btn: "Ripristina PID",
     pid_learning_status: "Apprendimento",
     sched_all_zones_row: "Tutte le Zone (Generale)",
-    sched_base_tag: "Base"
+    sched_base_tag: "Base",
+    prio_hybrid: "Ibrido",
+    prio_hybrid_title: "Ibrido (Split solo se surplus solare)",
+    prio_combined: "Combinato",
+    prio_combined_title: "Combinato (Caldaia + Split insieme)",
+    prio_electric: "Elettrico",
+    prio_electric_title: "Solo Elettrico (Blocca Caldaia)",
+    electric_cooling: "Raffrescamento Elettrico",
+    toggle_season_title: "Commuta Riscaldamento / Raffrescamento",
+    central_plant: "Impianto Centrale",
+    heating_label: "Riscaldamento",
+    cooling_label: "Raffrescamento",
+    boiler_label: "Caldaia",
+    hp_label: "PDC",
+    boiler_hp_label: "Caldaia + PDC",
+    boiler_or_hp_label: "Caldaia / PDC",
+    split_electric_label: "Split Elettrico",
+    state_off_upper: "SPENTO",
+    state_standby_upper: "STANDBY (ACCESO)",
+    sched_nav_title: "Programmazione",
+    diag_nav_title: "Diagnostica",
+    system_ok: "Sistema OK",
+    sched_modal_title: "Programmazione Fasce Orarie",
+    diag_modal_title: "Diagnostica & Impianto",
+    close_btn: "Chiudi",
+    split_master_locked_title: "Gestito da Impianto Master (Controllo manuale disabilitato)",
+    split_cool_on_title: "Accendi Split Climatizzazione",
+    split_heat_on_title: "Accendi Split Riscaldamento",
+    cooling_subtext: "In Raffrescamento",
+    heating_subtext: "Riscaldamento",
+    cooling_valve: "Raffrescamento",
+    sched_cancel_expiry: "Annulla scadenza",
+    sched_cancel_sr: "Annulla Smart Return",
+    sched_return_at: "Rientro ore",
+    sched_no_zones: "Nessuna zona termostato configurata.",
+    sched_copy_room_title: "Copia/Incolla programmazione stanza",
+    sched_confirm_clear_override: "Rimuovere l'override manuale temporaneo per questa stanza?",
+    sched_copied_alert: "Programmazione stanza copiata! Clicca di nuovo 📋 su un'altra stanza per incollare.",
+    sched_preset_sync_note: "Valori di riferimento sincronizzati dai Preset Standard dell'impianto",
+    sched_plant_mode: "Modalità Impianto:",
+    sched_cool_mode_label: "❄️ Raffrescamento (Cool)",
+    sched_heat_mode_label: "🔥 Riscaldamento (Heat)",
+    btn_cancel: "Annulla",
+    btn_save: "Salva",
+    sched_no_change_baseline: "⏸️ Nessuna modifica / Baseline",
+    sched_save_slot: "💾 Salva Fascia",
+    sched_permanent: "Permanente (Nessuna scadenza)",
+    sched_arrival_label: "Orario di Rientro Previsto:",
+    sched_plan_return: "Pianifica Rientro"
   },
   en: {
     heat_source_gas: "Gas",
@@ -367,7 +415,55 @@ sched_nav_title: "Schedule",
     pid_restore_backup_confirm_btn: "Restore PID",
     pid_learning_status: "Learning",
     sched_all_zones_row: "All Zones (General)",
-    sched_base_tag: "Base"
+    sched_base_tag: "Base",
+    prio_hybrid: "Hybrid",
+    prio_hybrid_title: "Hybrid (Split on solar surplus only)",
+    prio_combined: "Combined",
+    prio_combined_title: "Combined (Boiler + Split together)",
+    prio_electric: "Electric",
+    prio_electric_title: "Electric Only (Lock Boiler)",
+    electric_cooling: "Electric Cooling",
+    toggle_season_title: "Switch Heating / Cooling",
+    central_plant: "Central Plant",
+    heating_label: "Heating",
+    cooling_label: "Cooling",
+    boiler_label: "Boiler",
+    hp_label: "HP",
+    boiler_hp_label: "Boiler + HP",
+    boiler_or_hp_label: "Boiler / HP",
+    split_electric_label: "Electric Split",
+    state_off_upper: "OFF",
+    state_standby_upper: "STANDBY (ON)",
+    sched_nav_title: "Scheduling",
+    diag_nav_title: "Diagnostics",
+    system_ok: "System OK",
+    sched_modal_title: "Weekly Schedule",
+    diag_modal_title: "Plant & Diagnostics",
+    close_btn: "Close",
+    split_master_locked_title: "Managed by Master Plant (Manual control disabled)",
+    split_cool_on_title: "Turn ON Split Cooling",
+    split_heat_on_title: "Turn ON Split Heating",
+    cooling_subtext: "Cooling",
+    heating_subtext: "Heating",
+    cooling_valve: "Cooling",
+    sched_cancel_expiry: "Cancel expiration",
+    sched_cancel_sr: "Cancel Smart Return",
+    sched_return_at: "Return at",
+    sched_no_zones: "No thermostat zones configured.",
+    sched_copy_room_title: "Copy/Paste room schedule",
+    sched_confirm_clear_override: "Remove temporary manual override for this room?",
+    sched_copied_alert: "Room schedule copied! Click 📋 again on another room to paste.",
+    sched_preset_sync_note: "Reference values synced from Plant Standard Presets",
+    sched_plant_mode: "Plant Mode:",
+    sched_cool_mode_label: "❄️ Cooling (Cool)",
+    sched_heat_mode_label: "🔥 Heating (Heat)",
+    btn_cancel: "Cancel",
+    btn_save: "Save",
+    sched_no_change_baseline: "⏸️ No change / Baseline",
+    sched_save_slot: "💾 Save Slot",
+    sched_permanent: "Permanent (No expiration)",
+    sched_arrival_label: "Expected Arrival Time:",
+    sched_plan_return: "Plan Return"
   },
   ru: {
     heat_source_gas: "Газ",
@@ -513,7 +609,55 @@ sched_nav_title: "Расписание",
     pid_restore_backup_confirm_btn: "Восстановить PID",
     pid_learning_status: "Обучение",
     sched_all_zones_row: "Все зоны (Общее)",
-    sched_base_tag: "База"
+    sched_base_tag: "База",
+    prio_hybrid: "Гибрид",
+    prio_hybrid_title: "Гибрид (Сплит только при избытке солнца)",
+    prio_combined: "Комби",
+    prio_combined_title: "Комбинированный (Котёл + Сплит вместе)",
+    prio_electric: "Электро",
+    prio_electric_title: "Только электро (Блокировать котёл)",
+    electric_cooling: "Электроохлаждение",
+    toggle_season_title: "Переключить Нагрев / Охлаждение",
+    central_plant: "Котельная",
+    heating_label: "Отопление",
+    cooling_label: "Охлаждение",
+    boiler_label: "Котёл",
+    hp_label: "ТН",
+    boiler_hp_label: "Котёл + ТН",
+    boiler_or_hp_label: "Котёл / ТН",
+    split_electric_label: "Электро-сплит",
+    state_off_upper: "ВЫКЛ",
+    state_standby_upper: "ОЖИДАНИЕ (ВКЛ)",
+    sched_nav_title: "Расписание",
+    diag_nav_title: "Диагностика",
+    system_ok: "Система ОК",
+    sched_modal_title: "Недельное расписание",
+    diag_modal_title: "Диагностика системы",
+    close_btn: "Закрыть",
+    split_master_locked_title: "Управляется главным контроллером (Ручное управление отключено)",
+    split_cool_on_title: "Включить сплит на охлаждение",
+    split_heat_on_title: "Включить сплит на обогрев",
+    cooling_subtext: "Охлаждение",
+    heating_subtext: "Отопление",
+    cooling_valve: "Охлаждение",
+    sched_cancel_expiry: "Отменить срок",
+    sched_cancel_sr: "Отменить Smart Return",
+    sched_return_at: "Возврат в",
+    sched_no_zones: "Зоны термостата не настроены.",
+    sched_copy_room_title: "Копировать/Вставить расписание комнаты",
+    sched_confirm_clear_override: "Удалить временное ручное переопределение для этой комнаты?",
+    sched_copied_alert: "Расписание скопировано! Нажмите 📋 на другой комнате для вставки.",
+    sched_preset_sync_note: "Эталонные значения синхронизированы с пресетами системы",
+    sched_plant_mode: "Режим системы:",
+    sched_cool_mode_label: "❄️ Охлаждение (Cool)",
+    sched_heat_mode_label: "🔥 Нагрев (Heat)",
+    btn_cancel: "Отмена",
+    btn_save: "Сохранить",
+    sched_no_change_baseline: "⏸️ Без изменений / База",
+    sched_save_slot: "💾 Сохранить слот",
+    sched_permanent: "Постоянно (Без срока)",
+    sched_arrival_label: "Ожидаемое время возврата:",
+    sched_plan_return: "Запланировать возврат"
   },
   fr: {
     heat_source_gas: "Gaz",
@@ -658,7 +802,55 @@ sched_nav_title: "Programmation",
     pid_restore_backup_confirm_btn: "Restaurer PID",
     pid_learning_status: "Apprentissage",
     sched_all_zones_row: "Toutes les Zones (Général)",
-    sched_base_tag: "Base"
+    sched_base_tag: "Base",
+    prio_hybrid: "Hybride",
+    prio_hybrid_title: "Hybride (Split sur surplus solaire uniquement)",
+    prio_combined: "Combiné",
+    prio_combined_title: "Combiné (Chaudière + Split ensemble)",
+    prio_electric: "Électrique",
+    prio_electric_title: "Électrique seul (Bloquer chaudière)",
+    electric_cooling: "Refroidissement électrique",
+    toggle_season_title: "Basculer Chauffage / Climatisation",
+    central_plant: "Centrale Thermique",
+    heating_label: "Chauffage",
+    cooling_label: "Climatisation",
+    boiler_label: "Chaudière",
+    hp_label: "PAC",
+    boiler_hp_label: "Chaudière + PAC",
+    boiler_or_hp_label: "Chaudière / PAC",
+    split_electric_label: "Split Électrique",
+    state_off_upper: "ARRÊT",
+    state_standby_upper: "VEILLE (ACTIF)",
+    sched_nav_title: "Programmation",
+    diag_nav_title: "Diagnostic",
+    system_ok: "Système OK",
+    sched_modal_title: "Programmation Hebdomadaire",
+    diag_modal_title: "Diagnostic & Installation",
+    close_btn: "Fermer",
+    split_master_locked_title: "Géré par le système Master (Contrôle manuel désactivé)",
+    split_cool_on_title: "Allumer Split Climatisation",
+    split_heat_on_title: "Allumer Split Chauffage",
+    cooling_subtext: "Climatisation",
+    heating_subtext: "Chauffage",
+    cooling_valve: "Climatisation",
+    sched_cancel_expiry: "Annuler expiration",
+    sched_cancel_sr: "Annuler Smart Return",
+    sched_return_at: "Retour à",
+    sched_no_zones: "Aucune zone configurée.",
+    sched_copy_room_title: "Copier/Coller programmation pièce",
+    sched_confirm_clear_override: "Supprimer la dérogation manuelle temporaire pour cette pièce ?",
+    sched_copied_alert: "Programmation copiée ! Cliquez sur 📋 sur une autre pièce pour coller.",
+    sched_preset_sync_note: "Valeurs de référence synchronisées avec les préréglages système",
+    sched_plant_mode: "Mode Système :",
+    sched_cool_mode_label: "❄️ Climatisation (Cool)",
+    sched_heat_mode_label: "🔥 Chauffage (Heat)",
+    btn_cancel: "Annuler",
+    btn_save: "Enregistrer",
+    sched_no_change_baseline: "⏸️ Aucun changement / Base",
+    sched_save_slot: "💾 Enregistrer créneau",
+    sched_permanent: "Permanent (Sans expiration)",
+    sched_arrival_label: "Heure de retour prévue :",
+    sched_plan_return: "Planifier le retour"
   },
   de: {
     heat_source_gas: "Gas",
@@ -802,7 +994,55 @@ sched_nav_title: "Zeitplan",
     pid_restore_backup_confirm_btn: "PID Wiederherstellen",
     pid_learning_status: "Lernen",
     sched_all_zones_row: "Alle Zonen (Allgemein)",
-    sched_base_tag: "Basis"
+    sched_base_tag: "Basis",
+    prio_hybrid: "Hybrid",
+    prio_hybrid_title: "Hybrid (Split nur bei Solarüberschuss)",
+    prio_combined: "Kombiniert",
+    prio_combined_title: "Kombiniert (Kessel + Split zusammen)",
+    prio_electric: "Elektrisch",
+    prio_electric_title: "Nur Elektrisch (Kessel sperren)",
+    electric_cooling: "Elektrische Kühlung",
+    toggle_season_title: "Heizen / Kühlen umschalten",
+    central_plant: "Heizzentrale",
+    heating_label: "Heizen",
+    cooling_label: "Kühlen",
+    boiler_label: "Kessel",
+    hp_label: "WP",
+    boiler_hp_label: "Kessel + WP",
+    boiler_or_hp_label: "Kessel / WP",
+    split_electric_label: "Elektro-Split",
+    state_off_upper: "AUS",
+    state_standby_upper: "BEREITSCHAFT (EIN)",
+    sched_nav_title: "Zeitplan",
+    diag_nav_title: "Diagnose",
+    system_ok: "System OK",
+    sched_modal_title: "Wochenzeitplan",
+    diag_modal_title: "Anlage & Diagnose",
+    close_btn: "Schließen",
+    split_master_locked_title: "Von Master-Anlage gesteuert (Manuelle Steuerung deaktiviert)",
+    split_cool_on_title: "Split Kühlung einschalten",
+    split_heat_on_title: "Split Heizen einschalten",
+    cooling_subtext: "Kühlen",
+    heating_subtext: "Heizen",
+    cooling_valve: "Kühlen",
+    sched_cancel_expiry: "Ablauf abbrechen",
+    sched_cancel_sr: "Smart Return abbrechen",
+    sched_return_at: "Rückkehr um",
+    sched_no_zones: "Keine Thermostat-Zonen konfiguriert.",
+    sched_copy_room_title: "Raumzeitplan kopieren/einfügen",
+    sched_confirm_clear_override: "Temporäre manuelle Übersteuerung für diesen Raum entfernen?",
+    sched_copied_alert: "Raumzeitplan kopiert! Klicken Sie auf 📋 in einem anderen Raum zum Einfügen.",
+    sched_preset_sync_note: "Referenzwerte mit Standard-Voreinstellungen synchronisiert",
+    sched_plant_mode: "Anlagenmodus:",
+    sched_cool_mode_label: "❄️ Kühlen (Cool)",
+    sched_heat_mode_label: "🔥 Heizen (Heat)",
+    btn_cancel: "Abbrechen",
+    btn_save: "Speichern",
+    sched_no_change_baseline: "⏸️ Keine Änderung / Basis",
+    sched_save_slot: "💾 Zeitfenster speichern",
+    sched_permanent: "Dauerhaft (Kein Ablauf)",
+    sched_arrival_label: "Erwartete Rückkehrzeit:",
+    sched_plan_return: "Rückkehr planen"
   },
   es: {
     heat_source_gas: "Gas",
@@ -947,7 +1187,55 @@ sched_nav_title: "Programación",
     pid_restore_backup_confirm_btn: "Restaurar PID",
     pid_learning_status: "Aprendiendo",
     sched_all_zones_row: "Todas las Zonas (General)",
-    sched_base_tag: "Base"
+    sched_base_tag: "Base",
+    prio_hybrid: "Híbrido",
+    prio_hybrid_title: "Híbrido (Split solo con excedente solar)",
+    prio_combined: "Combinado",
+    prio_combined_title: "Combinado (Caldera + Split juntos)",
+    prio_electric: "Eléctrico",
+    prio_electric_title: "Solo Eléctrico (Bloquear Caldera)",
+    electric_cooling: "Refrigeración Eléctrica",
+    toggle_season_title: "Cambiar Calefacción / Refrigeración",
+    central_plant: "Planta Central",
+    heating_label: "Calefacción",
+    cooling_label: "Refrigeración",
+    boiler_label: "Caldera",
+    hp_label: "BC",
+    boiler_hp_label: "Caldera + BC",
+    boiler_or_hp_label: "Caldera / BC",
+    split_electric_label: "Split Eléctrico",
+    state_off_upper: "APAGADO",
+    state_standby_upper: "EN ESPERA (ACTIVO)",
+    sched_nav_title: "Programación",
+    diag_nav_title: "Diagnóstico",
+    system_ok: "Sistema OK",
+    sched_modal_title: "Programación Semanal",
+    diag_modal_title: "Diagnóstico y Planta",
+    close_btn: "Cerrar",
+    split_master_locked_title: "Gestionado por Planta Master (Control manual desactivado)",
+    split_cool_on_title: "Encender Split Refrigeración",
+    split_heat_on_title: "Encender Split Calefacción",
+    cooling_subtext: "Refrigeración",
+    heating_subtext: "Calefacción",
+    cooling_valve: "Refrigeración",
+    sched_cancel_expiry: "Cancelar caducidad",
+    sched_cancel_sr: "Cancelar Smart Return",
+    sched_return_at: "Regreso a las",
+    sched_no_zones: "No hay zonas configuradas.",
+    sched_copy_room_title: "Copiar/Pegar programación de habitación",
+    sched_confirm_clear_override: "¿Eliminar la anulación manual temporal de esta habitación?",
+    sched_copied_alert: "¡Programación copiada! Pulsa 📋 en otra habitación para pegar.",
+    sched_preset_sync_note: "Valores de referencia sincronizados con los preajustes de planta",
+    sched_plant_mode: "Modo de Planta:",
+    sched_cool_mode_label: "❄️ Refrigeración (Cool)",
+    sched_heat_mode_label: "🔥 Calefacción (Heat)",
+    btn_cancel: "Cancelar",
+    btn_save: "Guardar",
+    sched_no_change_baseline: "⏸️ Sin cambios / Base",
+    sched_save_slot: "💾 Guardar Franja",
+    sched_permanent: "Permanente (Sin caducidad)",
+    sched_arrival_label: "Hora prevista de llegada:",
+    sched_plan_return: "Planificar Regreso"
   }
 };
 
@@ -3158,7 +3446,7 @@ class MultizoneThermostatDialCard extends HTMLElement {
           btnSplitToggle.style.pointerEvents = 'none';
           btnSplitToggle.style.opacity = '0.45';
           btnSplitToggle.style.cursor = 'not-allowed';
-          btnSplitToggle.setAttribute('title', 'Gestito da Impianto Master (Controllo manuale disabilitato)');
+          btnSplitToggle.setAttribute('title', getTranslation(this._hass, 'split_master_locked_title') || 'Managed by Master Plant (Manual control disabled)');
           btnSplitToggle.className = isSplitOn ? (isSummer ? 'split-pill-btn active cool disabled' : 'split-pill-btn active heat disabled') : 'split-pill-btn disabled';
         } else {
           btnSplitToggle.disabled = false;
@@ -3167,10 +3455,10 @@ class MultizoneThermostatDialCard extends HTMLElement {
           btnSplitToggle.style.cursor = 'pointer';
           if (isSplitOn) {
             btnSplitToggle.className = isSummer ? 'split-pill-btn active cool' : 'split-pill-btn active heat';
-            btnSplitToggle.setAttribute('title', isSummer ? 'Split Acceso (Clicca per spegnere)' : 'Split Acceso (Clicca per spegnere)');
+            btnSplitToggle.setAttribute('title', 'Split ON');
           } else {
             btnSplitToggle.className = 'split-pill-btn';
-            btnSplitToggle.setAttribute('title', isSummer ? 'Accendi Split Climatizzazione' : 'Accendi Split Riscaldamento');
+            btnSplitToggle.setAttribute('title', isSummer ? (getTranslation(this._hass, 'split_cool_on_title') || 'Turn ON Split Cooling') : (getTranslation(this._hass, 'split_heat_on_title') || 'Turn ON Split Heating'));
           }
         }
       }
@@ -3194,7 +3482,7 @@ class MultizoneThermostatDialCard extends HTMLElement {
           btnSplitClassic.style.pointerEvents = 'none';
           btnSplitClassic.style.opacity = '0.45';
           btnSplitClassic.style.cursor = 'not-allowed';
-          btnSplitClassic.setAttribute('title', 'Gestito da Impianto Master (Controllo manuale disabilitato)');
+          btnSplitClassic.setAttribute('title', getTranslation(this._hass, 'split_master_locked_title') || 'Managed by Master Plant (Manual control disabled)');
           btnSplitClassic.className = isSplitOn ? (isSummer ? 'split-pill-btn active cool disabled' : 'split-pill-btn active heat disabled') : 'split-pill-btn disabled';
         } else {
           btnSplitClassic.disabled = false;
@@ -3203,10 +3491,10 @@ class MultizoneThermostatDialCard extends HTMLElement {
           btnSplitClassic.style.cursor = 'pointer';
           if (isSplitOn) {
             btnSplitClassic.className = isSummer ? 'split-pill-btn active cool' : 'split-pill-btn active heat';
-            btnSplitClassic.setAttribute('title', isSummer ? 'Split Acceso (Clicca per spegnere)' : 'Split Acceso (Clicca per spegnere)');
+            btnSplitClassic.setAttribute('title', 'Split ON');
           } else {
             btnSplitClassic.className = 'split-pill-btn';
-            btnSplitClassic.setAttribute('title', isSummer ? 'Accendi Split Climatizzazione' : 'Accendi Split Riscaldamento');
+            btnSplitClassic.setAttribute('title', isSummer ? (getTranslation(this._hass, 'split_cool_on_title') || 'Turn ON Split Cooling') : (getTranslation(this._hass, 'split_heat_on_title') || 'Turn ON Split Heating'));
           }
         }
       }
@@ -3339,15 +3627,16 @@ class MultizoneThermostatDialCard extends HTMLElement {
         subText.textContent = getTranslation(this._hass, 'off') || "Spento";
       } else if (this._isCooling) {
         subText.className = "dial-sub-text cooling-text";
-        subText.textContent = "In Raffrescamento";
+        subText.textContent = getTranslation(this._hass, 'cooling_subtext') || "Cooling";
       } else if (this._isHeating) {
         subText.className = "dial-sub-text heating-text";
+        const tHeating = getTranslation(this._hass, 'heating_subtext') || "Heating";
         if (heatSource === "electric") {
-          subText.textContent = "Riscaldamento (" + (getTranslation(this._hass, 'heat_source_electric') || "Split") + ")";
+          subText.textContent = tHeating + " (" + (getTranslation(this._hass, 'heat_source_electric') || "Split") + ")";
         } else if (heatSource === "dual") {
-          subText.textContent = "Riscaldamento (" + (getTranslation(this._hass, 'heat_source_dual') || "Gas + Split") + ")";
+          subText.textContent = tHeating + " (" + (getTranslation(this._hass, 'heat_source_dual') || "Gas + Split") + ")";
         } else {
-          subText.textContent = "Riscaldamento (" + (getTranslation(this._hass, 'heat_source_gas') || "Gas") + ")";
+          subText.textContent = tHeating + " (" + (getTranslation(this._hass, 'heat_source_gas') || "Gas") + ")";
         }
       } else {
         subText.className = "dial-sub-text standby-text";
@@ -3367,21 +3656,21 @@ class MultizoneThermostatDialCard extends HTMLElement {
     const valveEl = this.shadowRoot.querySelector('#valve-val');
     if (valveEl) {
       if (typeof climateState.attributes.valve_position === 'number') {
-        valveEl.textContent = "Valvola " + Math.round(climateState.attributes.valve_position) + "%";
+        valveEl.textContent = (getTranslation(this._hass, 'valve_label') || "Valve") + " " + Math.round(climateState.attributes.valve_position) + "%";
         valveEl.style.color = "#38bdf8";
       } else if (this._isHeating) {
         if (heatSource === "electric") {
-          valveEl.textContent = "Attivo (Split/PDC)";
+          valveEl.textContent = "ON (Split/HP)";
           valveEl.style.color = "#38bdf8";
         } else if (heatSource === "dual") {
-          valveEl.textContent = "Attivo (Gas + Split)";
+          valveEl.textContent = "ON (Gas + Split)";
           valveEl.style.color = "#fcd34d";
         } else {
-          valveEl.textContent = "Attivo (Gas)";
+          valveEl.textContent = "ON (Gas)";
           valveEl.style.color = "#f97316";
         }
       } else if (this._isCooling) {
-        valveEl.textContent = "Raffrescamento";
+        valveEl.textContent = getTranslation(this._hass, 'cooling_valve') || "Cooling";
         valveEl.style.color = "#38bdf8";
       } else {
         valveEl.textContent = "Standby";
@@ -3896,14 +4185,14 @@ class MultizoneThermostatStatusCard extends HTMLElement {
           <ha-icon id="master-icon" icon="mdi:power"></ha-icon>
         </div>
         <div class="info-container">
-          <div class="sub-title">Impianto Centrale</div>
-          <div class="name" id="master-name">Riscaldamento</div>
+          <div class="sub-title" id="master-sub-title">${getTranslation(this._hass, 'central_plant') || 'Central Plant'}</div>
+          <div class="name" id="master-name">${getTranslation(this._hass, 'heating_label') || 'Heating'}</div>
           <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
             <div class="status-pill" id="master-pill">
               <span class="status-dot"></span>
-              <span id="master-state-text">Caricamento...</span>
+              <span id="master-state-text">...</span>
             </div>
-            <div class="telemetry" id="master-telemetry">Caldaia: OFF</div>
+            <div class="telemetry" id="master-telemetry">${getTranslation(this._hass, 'boiler_label') || 'Boiler'}: OFF</div>
           </div>
         </div>
       </div>
@@ -4034,40 +4323,52 @@ class MultizoneThermostatStatusCard extends HTMLElement {
     const stateText = this.shadowRoot.getElementById('master-state-text');
     const telemetry = this.shadowRoot.getElementById('master-telemetry');
 
+    const subTitleEl = this.shadowRoot.getElementById('master-sub-title');
+    if (subTitleEl) {
+      subTitleEl.textContent = getTranslation(this._hass, 'central_plant') || 'Central Plant';
+    }
+
     if (nameEl) {
       nameEl.textContent = isCoolMode
-        ? (getTranslation(this._hass, 'cooling_active') ? 'Raffrescamento' : 'Raffrescamento')
-        : 'Riscaldamento';
+        ? (getTranslation(this._hass, 'cooling_label') || 'Cooling')
+        : (getTranslation(this._hass, 'heating_label') || 'Heating');
     }
+
+    const tBoiler = getTranslation(this._hass, 'boiler_label') || 'Boiler';
+    const tHp = getTranslation(this._hass, 'hp_label') || 'HP';
+    const tBoilerHp = getTranslation(this._hass, 'boiler_hp_label') || 'Boiler + HP';
+    const tBoilerOrHp = getTranslation(this._hass, 'boiler_or_hp_label') || 'Boiler / HP';
+    const tSplitElec = getTranslation(this._hass, 'split_electric_label') || 'Electric Split';
+    const tActiveZones = getTranslation(this._hass, 'active_zones') || 'Active zones';
 
     if (telemetry) {
       if (isCoolMode) {
         telemetry.textContent = activeCoolingZones > 0
-          ? `Zone attive: ${activeCoolingZones}`
-          : `Split / PDC: Standby`;
+          ? `${tActiveZones}: ${activeCoolingZones}`
+          : `Split / ${tHp}: Standby`;
       } else if (activeSplits > 0 && !isBoilerActive && !isCentralHpActive) {
-        telemetry.textContent = `Split Elettrico: ON`;
+        telemetry.textContent = `${tSplitElec}: ON`;
       } else if (activeSplits > 0 && isBoilerActive && !isCentralHpActive) {
-        telemetry.textContent = `Caldaia: ON + Split`;
+        telemetry.textContent = `${tBoiler}: ON + Split`;
       } else if (activeSplits > 0 && isCentralHpActive && !isBoilerActive) {
-        telemetry.textContent = `PDC: ON + Split`;
+        telemetry.textContent = `${tHp}: ON + Split`;
       } else if (activeSplits > 0 && isCentralHpActive && isBoilerActive) {
-        telemetry.textContent = `Caldaia + PDC: ON + Split`;
+        telemetry.textContent = `${tBoilerHp}: ON + Split`;
       } else if (isCentralHpActive && isBoilerActive) {
-        telemetry.textContent = `Caldaia + PDC: ON`;
+        telemetry.textContent = `${tBoilerHp}: ON`;
       } else if (isCentralHpActive) {
-        telemetry.textContent = `PDC: ON`;
+        telemetry.textContent = `${tHp}: ON`;
       } else if (isBoilerActive) {
-        telemetry.textContent = `Caldaia: ${boilerText}`;
+        telemetry.textContent = `${tBoiler}: ${boilerText}`;
       } else if (hasCentralHp && hasBoiler) {
-        telemetry.textContent = `Caldaia / PDC: OFF`;
+        telemetry.textContent = `${tBoilerOrHp}: OFF`;
       } else if (hasCentralHp && !hasBoiler) {
-        telemetry.textContent = `PDC: OFF`;
+        telemetry.textContent = `${tHp}: OFF`;
       } else if (activeHeatingZones > 0 && !isBoilerActive) {
         // Heating is active across zones without boiler switch: PDC or integrated central heating
-        telemetry.textContent = hasCentralHp ? `PDC: ON` : `Caldaia / PDC: ON`;
+        telemetry.textContent = hasCentralHp ? `${tHp}: ON` : `${tBoilerOrHp}: ON`;
       } else {
-        telemetry.textContent = `Caldaia: ${boilerText}`;
+        telemetry.textContent = `${tBoiler}: ${boilerText}`;
       }
     }
 
@@ -4089,7 +4390,7 @@ class MultizoneThermostatStatusCard extends HTMLElement {
         pill.style.color = "var(--secondary-text-color, #94a3b8)";
         pill.style.borderColor = "var(--divider-color, rgba(148, 163, 184, 0.25))";
       }
-      if (stateText) stateText.textContent = "SPENTO";
+      if (stateText) stateText.textContent = getTranslation(this._hass, 'state_off_upper') || "OFF";
     } else if (isCoolMode) {
       if (isCoolingSystemActive) {
         if (card && !isClassic) card.className = "cooling-aura";
@@ -4107,7 +4408,7 @@ class MultizoneThermostatStatusCard extends HTMLElement {
           pill.style.color = "#38bdf8";
           pill.style.borderColor = "rgba(56, 189, 248, 0.45)";
         }
-        if (stateText) stateText.textContent = "RAFFRESCAMENTO ATTIVO";
+        if (stateText) stateText.textContent = getTranslation(this._hass, 'cooling_active') || "COOLING ACTIVE";
       } else {
         if (card && !isClassic) card.className = "cool-idle-aura";
         if (icon) {
@@ -4124,7 +4425,7 @@ class MultizoneThermostatStatusCard extends HTMLElement {
           pill.style.color = "#7dd3fc";
           pill.style.borderColor = "rgba(56, 189, 248, 0.3)";
         }
-        if (stateText) stateText.textContent = "STANDBY (FREDDO)";
+        if (stateText) stateText.textContent = `${getTranslation(this._hass, 'standby_idle') || 'STANDBY'} (${getTranslation(this._hass, 'cool_mode') || 'COOL'})`;
       }
     } else {
       if (isHeatingSystemActive) {
@@ -4143,7 +4444,7 @@ class MultizoneThermostatStatusCard extends HTMLElement {
           pill.style.color = "#f97316";
           pill.style.borderColor = "rgba(249, 115, 22, 0.45)";
         }
-        if (stateText) stateText.textContent = "RISCALDAMENTO ATTIVO";
+        if (stateText) stateText.textContent = getTranslation(this._hass, 'heating_active') || "HEATING ACTIVE";
       } else {
         if (card && !isClassic) card.className = "idle-aura";
         if (icon) {
@@ -4160,7 +4461,7 @@ class MultizoneThermostatStatusCard extends HTMLElement {
           pill.style.color = "#f59e0b";
           pill.style.borderColor = "rgba(245, 158, 11, 0.35)";
         }
-        if (stateText) stateText.textContent = "STANDBY (ACCESO)";
+        if (stateText) stateText.textContent = getTranslation(this._hass, 'state_standby_upper') || "STANDBY (ON)";
       }
     }
   }
@@ -4748,18 +5049,18 @@ class MultizoneThermostatPresetCard extends HTMLElement {
         <div class="header">
           <div class="header-left">
             <div class="priority-segmented" id="priority-segmented">
-              <button class="priority-btn" data-priority="auto" id="pbtn-auto" title="Automatica (Solare + Gas)">Auto</button>
-              <button class="priority-btn" data-priority="hybrid" id="pbtn-hybrid" title="Ibrido (Split solo se surplus solare)">Ibrido</button>
-              <button class="priority-btn" data-priority="combined" id="pbtn-combined" title="Combinato (Caldaia + Split insieme)">Combinato</button>
-              <button class="priority-btn" data-priority="electric_only" id="pbtn-electric" title="Solo Elettrico (Blocca Caldaia)">Elettrico</button>
-              <button class="priority-btn" data-priority="gas_only" id="pbtn-gas" title="Solo Gas (Split spenti in caldo)">Gas</button>
+              <button class="priority-btn" data-priority="auto" id="pbtn-auto" title="Auto">Auto</button>
+              <button class="priority-btn" data-priority="hybrid" id="pbtn-hybrid" title="${getTranslation(this._hass, 'prio_hybrid_title') || 'Ibrido'}">${getTranslation(this._hass, 'prio_hybrid') || 'Ibrido'}</button>
+              <button class="priority-btn" data-priority="combined" id="pbtn-combined" title="${getTranslation(this._hass, 'prio_combined_title') || 'Combinato'}">${getTranslation(this._hass, 'prio_combined') || 'Combinato'}</button>
+              <button class="priority-btn" data-priority="electric_only" id="pbtn-electric" title="${getTranslation(this._hass, 'prio_electric_title') || 'Elettrico'}">${getTranslation(this._hass, 'prio_electric') || 'Elettrico'}</button>
+              <button class="priority-btn" data-priority="gas_only" id="pbtn-gas" title="Gas">Gas</button>
             </div>
             <div class="summer-indicator" id="summer-indicator" style="display: none;">
               <ha-icon icon="mdi:snowflake" style="--mdc-icon-size: 15px; color: #38bdf8;"></ha-icon>
-              <span>Raffrescamento Elettrico</span>
+              <span id="summer-indicator-label">${getTranslation(this._hass, 'electric_cooling') || 'Raffrescamento Elettrico'}</span>
             </div>
           </div>
-          <div class="mode-switch-wrap heat" id="btn-mode-toggle" role="switch" aria-checked="false" title="Commuta Riscaldamento / Raffrescamento">
+          <div class="mode-switch-wrap heat" id="btn-mode-toggle" role="switch" aria-checked="false" title="${getTranslation(this._hass, 'toggle_season_title') || 'Commuta Riscaldamento / Raffrescamento'}">
             <span class="mode-switch-label" id="mode-toggle-label">${getTranslation(this._hass, 'master_mode_heat') || 'Caldo'}</span>
             <div class="mode-switch-track">
               <ha-icon class="track-icon fire" icon="mdi:fire"></ha-icon>
@@ -4875,6 +5176,26 @@ class MultizoneThermostatPresetCard extends HTMLElement {
     const modeBtn = this.shadowRoot.querySelector('#btn-mode-toggle');
     const modeIcon = this.shadowRoot.querySelector('#mode-toggle-icon');
     const modeLabel = this.shadowRoot.querySelector('#mode-toggle-label');
+
+    // Dynamic i18n refresh for header labels
+    const pHybrid = this.shadowRoot.querySelector('#pbtn-hybrid');
+    if (pHybrid) {
+      pHybrid.textContent = getTranslation(this._hass, 'prio_hybrid') || 'Hybrid';
+      pHybrid.title = getTranslation(this._hass, 'prio_hybrid_title') || 'Hybrid';
+    }
+    const pCombined = this.shadowRoot.querySelector('#pbtn-combined');
+    if (pCombined) {
+      pCombined.textContent = getTranslation(this._hass, 'prio_combined') || 'Combined';
+      pCombined.title = getTranslation(this._hass, 'prio_combined_title') || 'Combined';
+    }
+    const pElectric = this.shadowRoot.querySelector('#pbtn-electric');
+    if (pElectric) {
+      pElectric.textContent = getTranslation(this._hass, 'prio_electric') || 'Electric';
+      pElectric.title = getTranslation(this._hass, 'prio_electric_title') || 'Electric';
+    }
+    const summerLbl = this.shadowRoot.querySelector('#summer-indicator-label');
+    if (summerLbl) summerLbl.textContent = getTranslation(this._hass, 'electric_cooling') || 'Electric Cooling';
+    if (modeBtn) modeBtn.title = getTranslation(this._hass, 'toggle_season_title') || 'Switch Heating / Cooling';
 
     if (card) {
       if (isCool) {
@@ -5153,11 +5474,11 @@ function openMzStandaloneModal(type, hass) {
   const titleEl = document.createElement('div');
   titleEl.style.cssText = 'font-size: 1.2rem; font-weight: 700; color: #ffffff; display: flex; align-items: center; gap: 10px;';
   titleEl.innerHTML = type === 'scheduler'
-    ? '<ha-icon icon="mdi:calendar-clock" style="color:#38bdf8;"></ha-icon> <span>Programmazione Fasce Orarie</span>'
-    : '<ha-icon icon="mdi:chart-box-outline" style="color:#10b981;"></ha-icon> <span>Diagnostica & Impianto</span>';
+    ? `<ha-icon icon="mdi:calendar-clock" style="color:#38bdf8;"></ha-icon> <span>${getTranslation(hass, 'sched_modal_title') || 'Weekly Schedule'}</span>`
+    : `<ha-icon icon="mdi:chart-box-outline" style="color:#10b981;"></ha-icon> <span>${getTranslation(hass, 'diag_modal_title') || 'Plant & Diagnostics'}</span>`;
 
   const closeBtn = document.createElement('button');
-  closeBtn.innerHTML = '✕ Chiudi';
+  closeBtn.innerHTML = `✕ ${getTranslation(hass, 'close_btn') || 'Close'}`;
   closeBtn.style.cssText = [
     'background: rgba(255, 255, 255, 0.14)',
     'color: #ffffff',
@@ -5546,7 +5867,7 @@ class MultizoneThermostatScheduleSummaryCard extends HTMLElement {
           <div class="icon-box" id="icon-box">
             <ha-icon icon="mdi:calendar-clock"></ha-icon>
           </div>
-          <div class="badge-title">Programmazione</div>
+          <div class="badge-title" id="sched-badge-title">${getTranslation(this._hass, 'sched_nav_title') || 'Scheduling'}</div>
           <div class="badge-pill" id="pill">
             <span class="badge-dot" id="dot"></span>
             <span id="label">In Pausa</span>
@@ -5573,6 +5894,8 @@ class MultizoneThermostatScheduleSummaryCard extends HTMLElement {
 
   updateCard() {
     if (!this._hass || !this._rendered) return;
+    const titleEl = this.shadowRoot.getElementById('sched-badge-title');
+    if (titleEl) titleEl.textContent = getTranslation(this._hass, 'sched_nav_title') || 'Scheduling';
     const pill = this.shadowRoot.getElementById('pill');
     const label = this.shadowRoot.getElementById('label');
     const dot = this.shadowRoot.getElementById('dot');
@@ -5813,10 +6136,10 @@ class MultizoneThermostatHealthSummaryCard extends HTMLElement {
           <div class="icon-box" id="icon-box">
             <ha-icon icon="mdi:shield-check"></ha-icon>
           </div>
-          <div class="badge-title">Diagnostica</div>
+          <div class="badge-title" id="diag-badge-title">${getTranslation(this._hass, 'diag_nav_title') || 'Diagnostics'}</div>
           <div class="badge-pill" id="pill">
             <span class="badge-dot" id="dot"></span>
-            <span id="label">Sistema OK</span>
+            <span id="label">${getTranslation(this._hass, 'system_ok') || 'System OK'}</span>
           </div>
         </div>
       </ha-card>
@@ -5840,6 +6163,8 @@ class MultizoneThermostatHealthSummaryCard extends HTMLElement {
 
   updateCard() {
     if (!this._hass || !this._rendered) return;
+    const titleEl = this.shadowRoot.getElementById('diag-badge-title');
+    if (titleEl) titleEl.textContent = getTranslation(this._hass, 'diag_nav_title') || 'Diagnostics';
     const pill = this.shadowRoot.getElementById('pill');
     const label = this.shadowRoot.getElementById('label');
     const dot = this.shadowRoot.getElementById('dot');
@@ -5861,14 +6186,14 @@ class MultizoneThermostatHealthSummaryCard extends HTMLElement {
     }
 
     if (hasAnomaly) {
-      label.textContent = 'Allarme';
+      label.textContent = getTranslation(this._hass, 'fault_detected') || 'Alert';
       pill.style.background = 'rgba(239, 68, 68, 0.18)';
       pill.style.color = '#ef4444';
       pill.style.borderColor = 'rgba(239, 68, 68, 0.4)';
       if (dot) dot.style.background = '#ef4444';
       if (iconBox) iconBox.style.color = '#ef4444';
     } else {
-      label.textContent = 'Sistema Ok';
+      label.textContent = getTranslation(this._hass, 'system_ok') || 'System OK';
       pill.style.background = 'rgba(16, 185, 129, 0.15)';
       pill.style.color = '#10b981';
       pill.style.borderColor = 'rgba(16, 185, 129, 0.35)';
@@ -8935,8 +9260,8 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
       const expDate = new Date(sched.profile_expires_at);
       const expStr = isNaN(expDate.getTime()) ? String(sched.profile_expires_at) : expDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       expiryHtml = `
-        <span class="badge badge-amber badge-btn" id="btn-cancel-expiry" title="Annulla scadenza">
-          ⏳ Fino a ${expStr} ✕
+        <span class="badge badge-amber badge-btn" id="btn-cancel-expiry" title="${getTranslation(this._hass, 'sched_cancel_expiry') || 'Cancel expiration'}">
+          ⏳ ${expStr} ✕
         </span>
       `;
     }
@@ -8946,8 +9271,8 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
     if (sr && sr.active) {
       const arr = sr.arrival_time ? sr.arrival_time.substring(0, 5) : '';
       srHtml = `
-        <span class="badge badge-orange badge-btn" id="btn-cancel-sr" title="Annulla Smart Return">
-          🚗 Rientro ore ${arr} ✕
+        <span class="badge badge-orange badge-btn" id="btn-cancel-sr" title="${getTranslation(this._hass, 'sched_cancel_sr') || 'Cancel Smart Return'}">
+          🚗 ${getTranslation(this._hass, 'sched_return_at') || 'Return at'} ${arr} ✕
         </span>
       `;
     }
@@ -9046,7 +9371,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
     const isCoolMode = (typeof getMasterHVACMode === 'function' && getMasterHVACMode(this._hass) === 'cool');
     const zones = this._getZones();
     if (zones.length === 0) {
-      container.innerHTML = `<div style="opacity:0.6; margin-bottom: 20px;">Nessuna zona termostato configurata.</div>`;
+      container.innerHTML = `<div style="opacity:0.6; margin-bottom: 20px;">${getTranslation(this._hass, 'sched_no_zones') || 'No thermostat zones configured.'}</div>`;
       return;
     }
 
@@ -9530,7 +9855,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
         <div class="matrix-row" data-zone="${z.climate}">
           <div class="room-label-box">
             <span class="room-title" title="${z.name}">${z.name}</span>
-            <button class="room-copy-btn btn-copy-room" data-zone="${z.climate}" title="Copia/Incolla programmazione stanza">
+            <button class="room-copy-btn btn-copy-room" data-zone="${z.climate}" title="${getTranslation(this._hass, 'sched_copy_room_title') || 'Copy/Paste room schedule'}">
               📋
             </button>
           </div>
@@ -9593,7 +9918,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
         e.stopPropagation();
         const cid = block.getAttribute('data-zone');
         if (block.hasAttribute('data-override')) {
-          if (this._hass && confirm("Rimuovere l'override manuale temporaneo per questa stanza?")) {
+          if (this._hass && confirm(getTranslation(this._hass, 'sched_confirm_clear_override') || "Remove temporary manual override for this room?")) {
             this._hass.callService('multizone_thermostat', 'clear_zone_override', {
               entity_id: cid
             });
@@ -9641,7 +9966,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
         sourceZone: zoneId,
         blocks: JSON.parse(JSON.stringify(blocks))
       };
-      alert("Programmazione stanza copiata! Clicca di nuovo 📋 su un'altra stanza per incollare.");
+      alert(getTranslation(this._hass, 'sched_copied_alert') || "Room schedule copied! Click 📋 again on another room to paste.");
     } else {
       if (!prof.days) prof.days = {};
       if (!prof.days[this._selectedDay]) prof.days[this._selectedDay] = {};
@@ -9862,19 +10187,19 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
           </div>
           <div class="modal-body">
             <div class="form-row">
-              <label class="form-label">Modalità Impianto:</label>
+              <label class="form-label">${getTranslation(this._hass, 'sched_plant_mode') || 'Plant Mode:'}</label>
               <div style="font-weight:600; color: ${isCoolMode ? '#38bdf8' : '#fb923c'}; margin-bottom: 8px;">
-                ${isCoolMode ? '❄️ Raffrescamento (Cool)' : '🔥 Riscaldamento (Heat)'}
+                ${isCoolMode ? (getTranslation(this._hass, 'sched_cool_mode_label') || '❄️ Cooling (Cool)') : (getTranslation(this._hass, 'sched_heat_mode_label') || '🔥 Heating (Heat)')}
               </div>
             </div>
             <div class="form-row">
-              <label class="form-label">Temperatura Obiettivo (°C):</label>
+              <label class="form-label">${getTranslation(this._hass, 'target_temp') || 'Target Temperature'} (°C):</label>
               <input type="number" id="input-preset-temp" class="form-control" step="0.5" min="10" max="35" value="${safeTemp.toFixed(1)}" style="font-size:1.2rem; font-weight:700; text-align:center; padding:8px;">
             </div>
           </div>
           <div class="modal-actions">
-            <button class="btn" id="btn-cancel-modal">Annulla</button>
-            <button class="btn btn-primary" id="btn-save-preset">Salva</button>
+            <button class="btn" id="btn-cancel-modal">${getTranslation(this._hass, 'btn_cancel') || 'Cancel'}</button>
+            <button class="btn btn-primary" id="btn-save-preset">${getTranslation(this._hass, 'btn_save') || 'Save'}</button>
           </div>
         </div>
       </div>
@@ -10132,7 +10457,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
                         <option value="eco" ${initialVal === 'eco' ? 'selected' : ''}>🌿 Eco (${eTemp.toFixed(1)}°C)</option>
                         <option value="sleep" ${initialVal === 'sleep' ? 'selected' : ''}>🌙 Notte (${sTemp.toFixed(1)}°C)</option>
                         <option value="away" ${initialVal === 'away' ? 'selected' : ''}>🚶 Away (${aTemp.toFixed(1)}°C)</option>
-                        <option value="none" ${initialVal === 'none' ? 'selected' : ''}>⏸️ Nessuna modifica / Baseline (${baseTemp.toFixed(1)}°C)</option>
+                        <option value="none" ${initialVal === 'none' ? 'selected' : ''}>${getTranslation(this._hass, 'sched_no_change_baseline') || '⏸️ No change / Baseline'} (${baseTemp.toFixed(1)}°C)</option>
                       </select>
                     </div>
                   </div>
@@ -10145,14 +10470,14 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
           <div class="modal-actions">
             ${isEdit ? `
               <button type="button" class="btn btn-danger" id="btn-delete-slot">
-                🗑️ Elimina Fascia
+                🗑️ ${getTranslation(this._hass, 'sched_delete') || 'Delete'}
               </button>
             ` : ''}
             <button type="button" class="btn" id="btn-cancel-modal">
-              Annulla
+              ${getTranslation(this._hass, 'btn_cancel') || 'Cancel'}
             </button>
             <button type="button" class="btn btn-primary" id="btn-save-slot">
-              💾 Salva Fascia
+              ${getTranslation(this._hass, 'sched_save_slot') || '💾 Save Slot'}
             </button>
           </div>
         </div>
@@ -10459,11 +10784,11 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
 
           <div style="display:flex; gap:12px;">
             <div class="form-group" style="flex:1;">
-              <label class="form-label">Orario di Rientro Previsto:</label>
+              <label class="form-label">${getTranslation(this._hass, 'sched_arrival_label') || 'Expected Arrival Time:'}</label>
               <input type="time" id="sr-arrival-time" value="${defArrStr}">
             </div>
             <div class="form-group" style="flex:1;">
-              <label class="form-label">Preset Obiettivo:</label>
+              <label class="form-label">${getTranslation(this._hass, 'preset') || 'Preset'}:</label>
               <select id="sr-preset-select">
                 <option value="comfort" selected>${isCoolMode ? '❄️' : '🔥'} Comfort</option>
                 <option value="eco">🌿 Eco</option>
@@ -10472,19 +10797,19 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
           </div>
 
           <div style="display:flex; gap:6px; margin-bottom:12px;">
-            <button class="btn" id="btn-sr-add-1h" style="padding:4px 8px; font-size:0.8rem;">+1 ora</button>
-            <button class="btn" id="btn-sr-add-2h" style="padding:4px 8px; font-size:0.8rem;">+2 ore</button>
-            <button class="btn" id="btn-sr-add-3h" style="padding:4px 8px; font-size:0.8rem;">+3 ore</button>
+            <button class="btn" id="btn-sr-add-1h" style="padding:4px 8px; font-size:0.8rem;">+1h</button>
+            <button class="btn" id="btn-sr-add-2h" style="padding:4px 8px; font-size:0.8rem;">+2h</button>
+            <button class="btn" id="btn-sr-add-3h" style="padding:4px 8px; font-size:0.8rem;">+3h</button>
           </div>
 
           <div class="form-group">
-            <label class="form-label">Radar Termico & Accensione Scaglionata (Anteprima Live):</label>
+            <label class="form-label">${getTranslation(this._hass, 'sched_smart_return') || 'Smart Return'}:</label>
             <div class="radar-list" id="sr-radar-preview"></div>
           </div>
 
           <div class="modal-actions">
-            <button class="btn" id="btn-cancel-modal">Annulla</button>
-            <button class="btn btn-amber" id="btn-confirm-sr">${isCoolMode ? '❄️' : '🔥'} Pianifica Rientro</button>
+            <button class="btn" id="btn-cancel-modal">${getTranslation(this._hass, 'btn_cancel') || 'Cancel'}</button>
+            <button class="btn btn-amber" id="btn-confirm-sr">${isCoolMode ? '❄️' : '🔥'} ${getTranslation(this._hass, 'sched_plan_return') || 'Plan Return'}</button>
           </div>
         </div>
       </div>

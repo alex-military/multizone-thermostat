@@ -2,7 +2,7 @@
 
 <span class="badge-beta">BETA</span>
 
-Phase 11 allows each thermal zone to bind an individual room split air conditioner (`climate.*`), orchestrating it in harmony with hydronic radiators and zone valves.
+The `v6.1.0-beta` release allows each thermal zone to bind an individual room split air conditioner (`climate.*`), orchestrating it in harmony with hydronic radiators and zone valves.
 
 ---
 
@@ -35,7 +35,7 @@ $$T_{\text{split\_injected}} = T_{\text{desired}} + \left(T_{\text{split\_sensor
 * **Real Measured Temperature at Eye Level**: 19.0 °C (room is still cold)
 * **Temperature Measured by Ceiling Split Sensor**: 22.0 °C (heat pooled near ceiling)
 * **Calculation**: $T_{\text{split\_injected}} = 20.5 + (22.0 - 19.0) = 23.5\ ^\circ\text{C}$
-* **Result**: Multizone Thermostat commands the split unit to target 23.5 °C. The split continues heating until the eye-level sensor reaches 20.5 °C, eliminating cold feet and temperature swings.
+* **Result**: Multizone Thermostat commands the split unit to target 23.5 °C. The split continues heating until the eye-level sensor reaches 20.5 °C, eliminating cold feet and temperature swings. When the ceiling probe is not stratified (sensors reading close together), the injection scales proportionally to avoid unnecessary setpoint jumps.
 
 ---
 
@@ -71,8 +71,9 @@ On the Lovelace **Dial Card**, centered in the header, is a dedicated split butt
   * The card immediately displays the **`⚡ ELECTRIC`** badge and cyan glow.
 * **Master ON Safety Lockout**:
   * When central heating is ON, the button is disabled to prevent accidental clicks from interfering with whole-house orchestration.
-* **Automatic Resync**:
+* **Automatic Resync & Window Safety**:
   * Turning ON master heating resets the local override and aligns the room with the global household preset.
+  * Opening a room window sensor immediately clears zone demand and cancels any local split manual override.
 
 ---
 

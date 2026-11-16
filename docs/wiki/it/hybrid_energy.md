@@ -2,7 +2,7 @@
 
 <span class="badge-beta">BETA</span>
 
-La **Fase 11** trasforma Multizone Thermostat da un termostato tradizionale monogeneratore a un avanzato motore di orchestrazione termico ed energetico (`PlantOrchestrator` & `EnergyManager`), capace di coordinare contemporaneamente generatori a combustibile e pompe di calore idroniche, ottimizzando l'autoconsumo da fonti rinnovabili anche in contesti totalmente **Off-Grid** o con inverter a immissione zero.
+La versione **`v6.1.0-beta`** trasforma Multizone Thermostat da un termostato tradizionale monogeneratore a un avanzato motore di orchestrazione termico ed energetico (`PlantOrchestrator` & `EnergyManager`), capace di coordinare contemporaneamente generatori a combustibile e pompe di calore idroniche, ottimizzando l'autoconsumo da fonti rinnovabili anche in contesti totalmente **Off-Grid** o con inverter a immissione zero.
 
 ---
 
@@ -28,6 +28,7 @@ flowchart TD
 1. **Impianto Ibrido Standard (Bivalente)**: Caldaia a gas per la stagione rigida invernale e Pompa di Calore per le mezze stagioni o per il freddo estivo.
 2. **Impianto Full-Electric (Solo PDC)**: Disabilitando la caldaia (`enable_gas_heater: False`), la PDC gestisce il 100% dell'abitazione in caldo e in freddo.
 3. **Impianto a Gas Tradizionale + Split d'Ambiente**: Caldaia per radiatori con ausilio di climatizzatori split nelle stanze principali per sfruttare l'energia solare.
+4. **Riscaldamento Centralizzato Condominiale (`CentralizedBoilerBackend`)**: Per appartamenti con impianto condominiale o teleriscaldamento (`boiler_mode: central` o `enable_gas_heater: False` senza PDC) privi di switch caldaia locale: pilota direttamente TRV e valvole di zona.
 
 ---
 
@@ -39,7 +40,7 @@ Configurabili istantaneamente dalla barra Lovelace (Preset Card) o tramite l'ent
 |---|---|---|---|
 | **`auto`** | Copre il fabbisogno di base dell'abitazione. | Interviene automaticamente con **Surplus Solare**, pianificazione EMHASS o avvio rapido **Quick Boost** (ΔT ≥ 1.5 °C). | Massima flessibilità quotidiana senza pensieri. |
 | **`hybrid`** | Riscalda tutte le stanze convenzionali. | Le stanze con split usano l'elettrico **solo se c'è sole**; se il sole manca, tornano a gas per non consumare la batteria. | Impianti fotovoltaici con batteria da preservare per la sera. |
-| **`combined`** | Lavora stabilmente a regime idronico. | Lavora in parallelo continuo al gas in caso di surplus o forte dislivello termico per riscaldare la casa nel minor tempo possibile. | Abitazioni con grande volumetria o rientri da assenze prolungate. |
+| **`combined`** | Lavora stabilmente a regime idronico. | Lavora in parallelo continuo al gas in caso di surplus o forte dislivello termico (escludendo zone `OFF` e `BYPASS`) per riscaldare la casa nel minor tempo possibile. | Abitazioni con grande volumetria o rientri da assenze prolungate. |
 | **`electric_only`** | **Forzata a 0%** (zero gas bruciato). | 100% della richiesta termica gestito da Pompa di Calore centrale e split d'ambiente. | Case Full-Electric, allarmi fornitura gas o giornate di sole pieno. |
 | **`gas_only`** | 100% della richiesta termica erogata a gas. | Split e pompe di calore disattivati in riscaldamento. | Blackout solare o manutenzione condizionatori. |
 
@@ -99,6 +100,7 @@ Puoi collegare direttamente l'entità di output del tuo ottimizzatore economico 
 | Gestione Solare | `energy_management_enabled` | `False` | Interruttore principale dell'Energy Manager. |
 | Sensore Produzione PV | `solar_power_sensor` | `None` | Potenza istantanea generata dai pannelli in Watt. |
 | Sensore Immissione Rete | `grid_export_sensor` | `None` | Potenza esportata verso la rete in Watt (facoltativo). |
+| Inverti Segno Export | `grid_export_inverted` | `False` | Abilita se il contatore segnala l'immissione in rete con valori negativi. |
 | Soglia Minima Export | `solar_export_threshold` | `500.0 W` | Potenza esportata minima per avviare il surplus a rete. |
 | Sensore Carica Batteria | `battery_soc_sensor` | `None` | Percentuale di carica della batteria domestica (SoC). |
 | Sensore Potenza Batteria | `battery_power_sensor` | `None` | Potenza di carica/scarica della batteria in Watt. |

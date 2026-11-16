@@ -34,7 +34,7 @@ HACS (Home Assistant Community Store) gestisce in automatico il download dei fil
 
 ---
 
-### Installazione Versione Beta (Fase 11 / v6.1.0-beta)
+### Installazione Versione Beta (v6.1.0-beta)
 
 <span class="badge-beta">BETA</span>
 
@@ -42,7 +42,7 @@ Se vuoi testare in anteprima la centrale bivalente, i condizionatori split, il s
 1. Accedi alla scheda di **Multizone Thermostat** già presente all'interno di HACS.
 2. Fai clic sui **tre puntini in alto a destra** della pagina dell'integrazione e seleziona **Riscarica** (*Redownload*).
 3. Attiva la casella **"Mostra versioni beta"** (*Show beta versions*).
-4. Nel menu a tendina delle versioni, seleziona l'ultima release beta disponibile (es. `v6.1.0-beta.1`).
+4. Nel menu a tendina delle versioni, seleziona l'ultima release beta disponibile (es. `v6.1.0-beta.10`).
 5. Clicca su **Scarica**.
 6. Riavvia Home Assistant per caricare il nuovo componente Python.
 
@@ -68,7 +68,7 @@ Se non utilizzi HACS o desideri lavorare direttamente con Git:
      cp -r /tmp/mzt/custom_components/multizone_thermostat custom_components/
      rm -rf /tmp/mzt
      ```
-   * **Per la versione Beta (Fase 11)**:
+   * **Per la versione Beta (`v6.1.0-beta`)**:
      ```bash
      git clone -b beta https://github.com/alex-military/multizone-thermostat.git /tmp/mzt
      cp -r /tmp/mzt/custom_components/multizone_thermostat custom_components/

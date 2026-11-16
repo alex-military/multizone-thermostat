@@ -34,15 +34,15 @@ HACS (Home Assistant Community Store) automatically manages downloading and noti
 
 ---
 
-### Beta Testing Installation (Phase 11 / v6.1.0-beta)
+### Beta Testing Installation (v6.1.0-beta)
 
 <span class="badge-beta">BETA</span>
 
-To test Phase 11 features (bivalent central plant, room split AC, solar off-grid surplus, and summer cooling):
+To test v6.1.0-beta features (bivalent central plant, room split AC, solar off-grid surplus, and summer cooling):
 1. Navigate to the **Multizone Thermostat** page within HACS.
 2. Click the **three dots in the top right corner** and select **Redownload**.
 3. Enable the **"Show beta versions"** toggle.
-4. Select the latest pre-release version (e.g. `v6.1.0-beta.1`).
+4. Select the latest pre-release version (e.g. `v6.1.0-beta.10`).
 5. Click **Download**.
 6. Restart Home Assistant to load the updated integration.
 
@@ -68,7 +68,7 @@ If you prefer installing directly from source via Git:
      cp -r /tmp/mzt/custom_components/multizone_thermostat custom_components/
      rm -rf /tmp/mzt
      ```
-   * **For Beta Branch (Phase 11)**:
+   * **For Beta Branch (`v6.1.0-beta`)**:
      ```bash
      git clone -b beta https://github.com/alex-military/multizone-thermostat.git /tmp/mzt
      cp -r /tmp/mzt/custom_components/multizone_thermostat custom_components/

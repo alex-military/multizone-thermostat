@@ -14,7 +14,7 @@ Per avviare la procedura guidata iniziale:
 ```mermaid
 flowchart TD
     S1["Passo 1: Selezione Generatori (Gas / PDC)"] --> S1a{"Abilitato Gas?"}
-    S1a -->|Si| C_Gas["Passo 1a: Configurazione Caldaia Gas<br>(Relè PWM o OpenTherm)"]
+    S1a -->|Si| C_Gas["Passo 1a: Modalità Caldaia<br>(Relè PWM, OpenTherm o Centralizzato/Condominio)"]
     S1a -->|No| S1b{"Abilitata PDC?"}
     C_Gas --> S1b
     S1b -->|Si| C_PDC["Passo 1b: Configurazione Pompa di Calore<br>(Climate, Switch o OpenTherm)"]
@@ -51,7 +51,11 @@ Seleziona i generatori fisici presenti nella tua centrale termica:
 * **Modalità OpenTherm (Modulante)**:
   * `opentherm_entity`: Seleziona l'entità termostato o riscaldatore del gateway OpenTherm (`climate`, `water_heater` o `number`).
   * `opentherm_ch_switch`: Interruttore opzionale di consenso riscaldamento (CH switch).
+  * `dhw_active_sensor`: Sensore opzionale per priorità Acqua Calda Sanitaria (supporta anche rilevamento multi-dispositivo EMS-ESP).
+  * `has_mixing_valve`: Indica la presenza di valvola miscelatrice su impianti misti radiatori/pavimento (in assenza, vige il tetto di sicurezza a 40.0 °C sul pavimento).
   * `opentherm_min_temp` / `opentherm_max_temp`: Limiti di mandata dell'acqua (es. 35°C – 75°C per radiatori, 25°C – 45°C per pavimento).
+* **Centralizzato / Senza Caldaia (Condominiale)**:
+  * Modalità `central`: salta la selezione di switch/gateway caldaia e pilota direttamente TRV e valvole di zona—ideale per riscaldamento condominiale centralizzato o teleriscaldamento.
 
 #### Passo 1b: Configurazione Pompa di Calore Idronica
 <span class="badge-beta">BETA</span>
@@ -71,6 +75,8 @@ La schermata di creazione della stanza raccoglie tutti i componenti tramite sezi
 * **Impostazioni Principali**:
   * **Nome Stanza**: Etichetta visualizzata nella dashboard (es. "Salone", "Camera Matrimoniale").
   * **Sensore Temperatura Principale (`temp_sensor`)**: Il termometro di riferimento posto ad altezza d'uomo (`sensor.*`).
+  * **Sensore Umidità (`humidity_sensor`)** *(Opzionale)*: Usato per il calcolo del punto di rugiada e protezione anti-condensa in raffrescamento idronico.
+  * **Tipo Terminale (`emitter_type`)**: Seleziona `radiator` (radiatori), `underfloor` (pavimento radiante) o `fancoil` per calibrare curve di mandata e limiti di sicurezza.
   * **Temperatura Target di Base**: Setpoint iniziale (es. 20.5°C).
 * **▶ Teste Termostatiche TRV (Standard)** <span class="badge-stable">STABILE</span>:
   * Seleziona una o più valvole termostatiche (`climate.*`). Il sistema calcolerà la media e manterrà sincronizzati i setpoint.
@@ -95,7 +101,7 @@ La schermata di creazione della stanza raccoglie tutti i componenti tramite sezi
 <span class="badge-beta">BETA</span>
 
 * **Sensore Produzione Fotovoltaica**: Potenza istantanea in Watt generata dai pannelli (`sensor.*`).
-* **Sensore Immissione in Rete**: Potenza esportata in Watt (facoltativo per impianti Off-Grid).
+* **Sensore Immissione in Rete**: Potenza esportata in Watt (facoltativo per impianti Off-Grid), con opzione **Inverti Segno Export (`grid_export_inverted`)** se il contatore riporta l'immissione come valore negativo.
 * **Sensore Percentuale Carica Batteria (SoC)**: Percentuale da 0% a 100% (`sensor.*`).
 * **Sensore Potenza Batteria**: Watt in ingresso/uscita con rilevamento segno di carica/scarica.
 * **Riserva Minima Notturna (`battery_min_reserve_soc`)**: Soglia minima (consigliato 80–85%) al di sotto della quale l'elettrico non può riscaldare la casa.

@@ -3,8 +3,8 @@
 Benvenuto nella documentazione ufficiale di **Multizone Thermostat**, l'integrazione personalizzata più avanzata, modulare e completa mai realizzata per la termoregolazione e la climatizzazione intelligente in Home Assistant.
 
 <div class="callout-beta">
-  <strong>Novità Fase 11 (v6.1.0-beta.1 — Ramo Beta)</strong><br>
-  La Fase 11 introduce il supporto completo a <strong>centrali termiche bivalenti (Caldaia + Pompa di Calore)</strong>, gestione dei <strong>climatizzatori split per singola stanza</strong> con bypass sonda a soffitto, ottimizzazione per <strong>fotovoltaico e batterie Off-Grid</strong> con bridge EMHASS/Predbat, commutazione stagionale <strong>Caldo 🔥 / Freddo ❄️</strong> con doppio binario di preset e schede grafiche <strong>Visual Twin 1-a-1</strong> con il termostato nativo di Home Assistant.
+  <strong>Novità v6.1.0-beta.10 (Ramo Beta)</strong><br>
+  La versione v6.1.0-beta introduce il supporto completo a <strong>centrali termiche bivalenti (Caldaia + Pompa di Calore)</strong>, <strong>riscaldamento centralizzato condominiale</strong> (senza switch caldaia), gestione dei <strong>climatizzatori split per singola stanza</strong> con bypass sonda a soffitto, ottimizzazione per <strong>fotovoltaico e batterie Off-Grid</strong> con bridge EMHASS/Predbat, commutazione stagionale <strong>Caldo 🔥 / Freddo ❄️</strong> con doppio binario di preset e PID (controlli manuali per zona ed EMA settimanale), <strong>protezione punto di rugiada e tetto pavimento 40 °C</strong> e schede grafiche <strong>Visual Twin 1-a-1</strong> con il termostato nativo di Home Assistant.
 </div>
 
 ---
@@ -108,7 +108,8 @@ Schede custom gemelle del termostato nativo di Home Assistant:
 
 ### Centrale Bivalente & Climatizzazione Ibrida (v6.1.0-beta)
 * 🔄 **Arbitraggio Multi-Generatore (`PlantOrchestrator`)**: Gestione gerarchica tra Caldaia a Gas e Pompa di Calore Idronica basata su 5 modalità di priorità: `auto`, `hybrid`, `combined`, `electric_only` e `gas_only`.
-* ❄️ **Raffrescamento Idronico Reversibile (`heat_pump_cooling`)**: Gestione fancoil e pavimento radiante in estate, con blocco rigoroso della caldaia a gas a 0%.
+* 🏢 **Riscaldamento Centralizzato Condominiale (`CentralizedBoilerBackend`)**: Supporto nativo per impianti centralizzati privi di relè caldaia locale (`boiler_mode: central`), pilotando direttamente TRV e attuatori di zona.
+* ❄️ **Raffrescamento Idronico Reversibile (`heat_pump_cooling`)**: Gestione fancoil e pavimento radiante in estate, con blocco rigoroso della caldaia a gas a 0%, **protezione anti-condensa da punto di rugiada interno** (margine +2.0 °C) e **tetto termico fisso a 40.0 °C** per pavimento non miscelato.
 * ⚡ **Modalità Full Electric**: Funzionamento al 100% solo con pompe di calore o split, senza alcuna caldaia a gas configurata.
 
 ### Integrazione Climatizzatori Split d'Ambiente (v6.1.0-beta)
@@ -219,7 +220,7 @@ flowchart TD
 * **Installazione & Setup**:
   * [📥 Guida all'Installazione & Requisiti](installation.md)
   * [⚙️ Configurazione Guidata (Config Flow & Opzioni)](setup_wizard.md)
-* **Novità Fase 11 (Beta)**:
+* **Funzionalità Beta (v6.1.0-beta)**:
   * [🔥 Centrale Bivalente & Gestione Energetica](hybrid_energy.md)
   * [❄️ Climatizzatori Split d'Ambiente](split_climate.md)
   * [🔄 Raffrescamento Estivo & Doppio Binario](cooling_season.md)

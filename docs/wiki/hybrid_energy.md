@@ -2,7 +2,7 @@
 
 <span class="badge-beta">BETA</span>
 
-Phase 11 transforms Multizone Thermostat into an advanced thermal and energy orchestration platform (`PlantOrchestrator` & `EnergyManager`), coordinating combustion boilers and hydronic heat pumps while maximizing renewable solar self-consumption—even in completely **off-grid** or zero-export environments.
+The `v6.1.0-beta` release transforms Multizone Thermostat into an advanced thermal and energy orchestration platform (`PlantOrchestrator` & `EnergyManager`), coordinating combustion boilers and hydronic heat pumps while maximizing renewable solar self-consumption—even in completely **off-grid** or zero-export environments.
 
 ---
 
@@ -28,6 +28,7 @@ flowchart TD
 1. **Standard Bivalent Hybrid System**: Gas boiler handles cold winter baselines; heat pump engages during mild shoulder seasons or summer cooling.
 2. **Full-Electric Installation (Heat Pump Only)**: By disabling the boiler (`enable_gas_heater: False`), the heat pump manages 100% of the home's heating and cooling.
 3. **Traditional Gas Boiler + Room Split AC Units**: Central boiler serves hydronic radiators while individual room splits leverage free rooftop solar power.
+4. **Centralized Condo / District Heating (`CentralizedBoilerBackend`)**: For apartments on centralized building heating (`boiler_mode: central` or `enable_gas_heater: False` without a heat pump) with no local boiler switch—drives TRVs and zone actuators directly.
 
 ---
 
@@ -39,7 +40,7 @@ Configurable from the Lovelace Preset Card or via `select.master_control_heat_so
 |---|---|---|---|
 | **`auto`** | Covers household baseline heating. | Engages automatically during **Free Solar Surplus**, EMHASS dispatch, or cold **Quick Heat Boost** (ΔT ≥ 1.5 °C). | Set-and-forget everyday comfort. |
 | **`hybrid`** | Heats conventional rooms via hydronics. | Rooms with split units use electric heating **only when solar surplus is available**; falls back to gas without sun to preserve batteries. | Homes with home batteries to preserve for the night. |
-| **`combined`** | Maintains steady hydronic heating. | Operates in parallel with gas during solar surplus or large temperature drops to warm the house as quickly as possible. | Large houses or returning from prolonged absence. |
+| **`combined`** | Maintains steady hydronic heating. | Operates in parallel with gas during solar surplus or large temperature drops (`OFF` and `BYPASS` zones excluded) to warm the house as quickly as possible. | Large houses or returning from prolonged absence. |
 | **`electric_only`** | **Locked at 0%** (zero gas burned). | 100% of heat demand directed to central heat pump and room split units. | All-electric homes, gas supply outages, or peak sunny days. |
 | **`gas_only`** | 100% of heat demand supplied by gas. | Splits and heat pumps disabled in heating mode. | Prolonged bad weather or AC maintenance. |
 
@@ -99,6 +100,7 @@ Connect your local economic optimizer directly:
 | Energy Management | `energy_management_enabled` | `False` | Master switch for the Energy Manager. |
 | Solar PV Sensor | `solar_power_sensor` | `None` | Real-time rooftop solar generation in Watts. |
 | Grid Export Sensor | `grid_export_sensor` | `None` | Grid feed-in sensor in Watts (optional). |
+| Invert Grid Export | `grid_export_inverted` | `False` | Enable if your meter reports grid export as negative values. |
 | Export Threshold | `solar_export_threshold` | `500.0 W` | Minimum export power to trigger surplus mode. |
 | Battery SoC Sensor | `battery_soc_sensor` | `None` | Battery state of charge percentage (0-100%). |
 | Battery Power Sensor | `battery_power_sensor` | `None` | Battery charge/discharge power in Watts. |

@@ -2,7 +2,7 @@
 * [📥 Installation & Requirements](installation.md)
 * [⚙️ Setup Wizard (Config Flow)](setup_wizard.md)
 
-* **Phase 11 (Beta Features)**
+* **Beta Features (v6.1.0-beta)**
   * [🔥 Bivalent Plant & Solar](hybrid_energy.md)
   * [❄️ Room Split Air Conditioners](split_climate.md)
   * [🔄 Summer Cooling & Dual-Track](cooling_season.md)

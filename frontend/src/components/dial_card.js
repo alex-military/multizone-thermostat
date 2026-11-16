@@ -1204,7 +1204,7 @@ class MultizoneThermostatDialCard extends HTMLElement {
           btnSplitToggle.style.pointerEvents = 'none';
           btnSplitToggle.style.opacity = '0.45';
           btnSplitToggle.style.cursor = 'not-allowed';
-          btnSplitToggle.setAttribute('title', 'Gestito da Impianto Master (Controllo manuale disabilitato)');
+          btnSplitToggle.setAttribute('title', getTranslation(this._hass, 'split_master_locked_title') || 'Managed by Master Plant (Manual control disabled)');
           btnSplitToggle.className = isSplitOn ? (isSummer ? 'split-pill-btn active cool disabled' : 'split-pill-btn active heat disabled') : 'split-pill-btn disabled';
         } else {
           btnSplitToggle.disabled = false;
@@ -1213,10 +1213,10 @@ class MultizoneThermostatDialCard extends HTMLElement {
           btnSplitToggle.style.cursor = 'pointer';
           if (isSplitOn) {
             btnSplitToggle.className = isSummer ? 'split-pill-btn active cool' : 'split-pill-btn active heat';
-            btnSplitToggle.setAttribute('title', isSummer ? 'Split Acceso (Clicca per spegnere)' : 'Split Acceso (Clicca per spegnere)');
+            btnSplitToggle.setAttribute('title', 'Split ON');
           } else {
             btnSplitToggle.className = 'split-pill-btn';
-            btnSplitToggle.setAttribute('title', isSummer ? 'Accendi Split Climatizzazione' : 'Accendi Split Riscaldamento');
+            btnSplitToggle.setAttribute('title', isSummer ? (getTranslation(this._hass, 'split_cool_on_title') || 'Turn ON Split Cooling') : (getTranslation(this._hass, 'split_heat_on_title') || 'Turn ON Split Heating'));
           }
         }
       }
@@ -1240,7 +1240,7 @@ class MultizoneThermostatDialCard extends HTMLElement {
           btnSplitClassic.style.pointerEvents = 'none';
           btnSplitClassic.style.opacity = '0.45';
           btnSplitClassic.style.cursor = 'not-allowed';
-          btnSplitClassic.setAttribute('title', 'Gestito da Impianto Master (Controllo manuale disabilitato)');
+          btnSplitClassic.setAttribute('title', getTranslation(this._hass, 'split_master_locked_title') || 'Managed by Master Plant (Manual control disabled)');
           btnSplitClassic.className = isSplitOn ? (isSummer ? 'split-pill-btn active cool disabled' : 'split-pill-btn active heat disabled') : 'split-pill-btn disabled';
         } else {
           btnSplitClassic.disabled = false;
@@ -1249,10 +1249,10 @@ class MultizoneThermostatDialCard extends HTMLElement {
           btnSplitClassic.style.cursor = 'pointer';
           if (isSplitOn) {
             btnSplitClassic.className = isSummer ? 'split-pill-btn active cool' : 'split-pill-btn active heat';
-            btnSplitClassic.setAttribute('title', isSummer ? 'Split Acceso (Clicca per spegnere)' : 'Split Acceso (Clicca per spegnere)');
+            btnSplitClassic.setAttribute('title', 'Split ON');
           } else {
             btnSplitClassic.className = 'split-pill-btn';
-            btnSplitClassic.setAttribute('title', isSummer ? 'Accendi Split Climatizzazione' : 'Accendi Split Riscaldamento');
+            btnSplitClassic.setAttribute('title', isSummer ? (getTranslation(this._hass, 'split_cool_on_title') || 'Turn ON Split Cooling') : (getTranslation(this._hass, 'split_heat_on_title') || 'Turn ON Split Heating'));
           }
         }
       }
@@ -1385,15 +1385,16 @@ class MultizoneThermostatDialCard extends HTMLElement {
         subText.textContent = getTranslation(this._hass, 'off') || "Spento";
       } else if (this._isCooling) {
         subText.className = "dial-sub-text cooling-text";
-        subText.textContent = "In Raffrescamento";
+        subText.textContent = getTranslation(this._hass, 'cooling_subtext') || "Cooling";
       } else if (this._isHeating) {
         subText.className = "dial-sub-text heating-text";
+        const tHeating = getTranslation(this._hass, 'heating_subtext') || "Heating";
         if (heatSource === "electric") {
-          subText.textContent = "Riscaldamento (" + (getTranslation(this._hass, 'heat_source_electric') || "Split") + ")";
+          subText.textContent = tHeating + " (" + (getTranslation(this._hass, 'heat_source_electric') || "Split") + ")";
         } else if (heatSource === "dual") {
-          subText.textContent = "Riscaldamento (" + (getTranslation(this._hass, 'heat_source_dual') || "Gas + Split") + ")";
+          subText.textContent = tHeating + " (" + (getTranslation(this._hass, 'heat_source_dual') || "Gas + Split") + ")";
         } else {
-          subText.textContent = "Riscaldamento (" + (getTranslation(this._hass, 'heat_source_gas') || "Gas") + ")";
+          subText.textContent = tHeating + " (" + (getTranslation(this._hass, 'heat_source_gas') || "Gas") + ")";
         }
       } else {
         subText.className = "dial-sub-text standby-text";
@@ -1413,21 +1414,21 @@ class MultizoneThermostatDialCard extends HTMLElement {
     const valveEl = this.shadowRoot.querySelector('#valve-val');
     if (valveEl) {
       if (typeof climateState.attributes.valve_position === 'number') {
-        valveEl.textContent = "Valvola " + Math.round(climateState.attributes.valve_position) + "%";
+        valveEl.textContent = (getTranslation(this._hass, 'valve_label') || "Valve") + " " + Math.round(climateState.attributes.valve_position) + "%";
         valveEl.style.color = "#38bdf8";
       } else if (this._isHeating) {
         if (heatSource === "electric") {
-          valveEl.textContent = "Attivo (Split/PDC)";
+          valveEl.textContent = "ON (Split/HP)";
           valveEl.style.color = "#38bdf8";
         } else if (heatSource === "dual") {
-          valveEl.textContent = "Attivo (Gas + Split)";
+          valveEl.textContent = "ON (Gas + Split)";
           valveEl.style.color = "#fcd34d";
         } else {
-          valveEl.textContent = "Attivo (Gas)";
+          valveEl.textContent = "ON (Gas)";
           valveEl.style.color = "#f97316";
         }
       } else if (this._isCooling) {
-        valveEl.textContent = "Raffrescamento";
+        valveEl.textContent = getTranslation(this._hass, 'cooling_valve') || "Cooling";
         valveEl.style.color = "#38bdf8";
       } else {
         valveEl.textContent = "Standby";

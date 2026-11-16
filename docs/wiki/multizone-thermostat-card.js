@@ -200,7 +200,76 @@ sched_nav_title: "Programmazione",
     day_sun: "Domenica",
     prof_standard: "Standard",
     prof_smart_working: "Smart Working",
-    prof_holiday: "Festivo"
+    prof_holiday: "Festivo",
+    pid_section_title: "PID & Autotuner",
+    pid_auto_badge: "Auto EMA",
+    pid_manual_badge: "Manuale",
+    pid_reset_btn: "Reset Autotuner",
+    pid_click_to_edit: "Clicca per sbloccare e modificare",
+    pid_modal_title: "Avviso di Sicurezza PID",
+    pid_modal_warn: "I guadagni Kp, Ki e Kd sono gestiti dall'autotuner adattivo settimanale. Sbloccare questo parametro sospende la calibrazione automatica su quel coefficiente e può causare oscillazioni se errato.",
+    pid_modal_value: "Nuovo valore",
+    pid_modal_save: "Sblocca e Salva",
+    pid_modal_restore: "Ripristina Automatico",
+    pid_modal_cancel: "Annulla",
+    pid_reset_title: "Conferma Reset Autotuner",
+    pid_reset_confirm_msg: "Azzerare i cicli appresi e riavviare la calibrazione iniziale (3 cicli) per questa zona?",
+    pid_reset_confirm_btn: "Resetta Autotuner",
+    pid_restore_backup_btn: "Ripristina PID",
+    pid_restore_backup_title: "Ripristina PID Autotuner",
+    pid_restore_backup_confirm_msg: "Ripristinare i parametri PID calcolati dall'autotuner prima dell'ultimo reset?",
+    pid_restore_backup_confirm_btn: "Ripristina PID",
+    pid_learning_status: "Apprendimento",
+    sched_all_zones_row: "Tutte le Zone (Generale)",
+    sched_base_tag: "Base",
+    prio_hybrid: "Ibrido",
+    prio_hybrid_title: "Ibrido (Split solo se surplus solare)",
+    prio_combined: "Combinato",
+    prio_combined_title: "Combinato (Caldaia + Split insieme)",
+    prio_electric: "Elettrico",
+    prio_electric_title: "Solo Elettrico (Blocca Caldaia)",
+    electric_cooling: "Raffrescamento Elettrico",
+    toggle_season_title: "Commuta Riscaldamento / Raffrescamento",
+    central_plant: "Impianto Centrale",
+    heating_label: "Riscaldamento",
+    cooling_label: "Raffrescamento",
+    boiler_label: "Caldaia",
+    hp_label: "PDC",
+    boiler_hp_label: "Caldaia + PDC",
+    boiler_or_hp_label: "Caldaia / PDC",
+    split_electric_label: "Split Elettrico",
+    state_off_upper: "SPENTO",
+    state_standby_upper: "STANDBY (ACCESO)",
+    sched_nav_title: "Programmazione",
+    diag_nav_title: "Diagnostica",
+    system_ok: "Sistema OK",
+    sched_modal_title: "Programmazione Fasce Orarie",
+    diag_modal_title: "Diagnostica & Impianto",
+    close_btn: "Chiudi",
+    split_master_locked_title: "Gestito da Impianto Master (Controllo manuale disabilitato)",
+    split_cool_on_title: "Accendi Split Climatizzazione",
+    split_heat_on_title: "Accendi Split Riscaldamento",
+    cooling_subtext: "In Raffrescamento",
+    heating_subtext: "Riscaldamento",
+    cooling_valve: "Raffrescamento",
+    sched_cancel_expiry: "Annulla scadenza",
+    sched_cancel_sr: "Annulla Smart Return",
+    sched_return_at: "Rientro ore",
+    sched_no_zones: "Nessuna zona termostato configurata.",
+    sched_copy_room_title: "Copia/Incolla programmazione stanza",
+    sched_confirm_clear_override: "Rimuovere l'override manuale temporaneo per questa stanza?",
+    sched_copied_alert: "Programmazione stanza copiata! Clicca di nuovo 📋 su un'altra stanza per incollare.",
+    sched_preset_sync_note: "Valori di riferimento sincronizzati dai Preset Standard dell'impianto",
+    sched_plant_mode: "Modalità Impianto:",
+    sched_cool_mode_label: "❄️ Raffrescamento (Cool)",
+    sched_heat_mode_label: "🔥 Riscaldamento (Heat)",
+    btn_cancel: "Annulla",
+    btn_save: "Salva",
+    sched_no_change_baseline: "⏸️ Nessuna modifica / Baseline",
+    sched_save_slot: "💾 Salva Fascia",
+    sched_permanent: "Permanente (Nessuna scadenza)",
+    sched_arrival_label: "Orario di Rientro Previsto:",
+    sched_plan_return: "Pianifica Rientro"
   },
   en: {
     heat_source_gas: "Gas",
@@ -325,7 +394,76 @@ sched_nav_title: "Schedule",
     day_sun: "Sunday",
     prof_standard: "Standard",
     prof_smart_working: "Smart Working",
-    prof_holiday: "Holiday"
+    prof_holiday: "Holiday",
+    pid_section_title: "PID & Autotuner",
+    pid_auto_badge: "Auto EMA",
+    pid_manual_badge: "Manual",
+    pid_reset_btn: "Reset Autotuner",
+    pid_click_to_edit: "Click to unlock and edit",
+    pid_modal_title: "PID Safety Warning",
+    pid_modal_warn: "Kp, Ki, and Kd gains are continuously tuned by the weekly adaptive autotuner. Unlocking a parameter pauses automatic tuning on it and may cause temperature oscillations if misconfigured.",
+    pid_modal_value: "New value",
+    pid_modal_save: "Unlock & Save",
+    pid_modal_restore: "Restore Automatic",
+    pid_modal_cancel: "Cancel",
+    pid_reset_title: "Confirm Autotuner Reset",
+    pid_reset_confirm_msg: "Clear learned cycles and restart the 3-cycle initial calibration for this zone?",
+    pid_reset_confirm_btn: "Reset Autotuner",
+    pid_restore_backup_btn: "Restore PID",
+    pid_restore_backup_title: "Restore Autotuner PID",
+    pid_restore_backup_confirm_msg: "Restore the PID parameters learned by the autotuner before the last reset?",
+    pid_restore_backup_confirm_btn: "Restore PID",
+    pid_learning_status: "Learning",
+    sched_all_zones_row: "All Zones (General)",
+    sched_base_tag: "Base",
+    prio_hybrid: "Hybrid",
+    prio_hybrid_title: "Hybrid (Split on solar surplus only)",
+    prio_combined: "Combined",
+    prio_combined_title: "Combined (Boiler + Split together)",
+    prio_electric: "Electric",
+    prio_electric_title: "Electric Only (Lock Boiler)",
+    electric_cooling: "Electric Cooling",
+    toggle_season_title: "Switch Heating / Cooling",
+    central_plant: "Central Plant",
+    heating_label: "Heating",
+    cooling_label: "Cooling",
+    boiler_label: "Boiler",
+    hp_label: "HP",
+    boiler_hp_label: "Boiler + HP",
+    boiler_or_hp_label: "Boiler / HP",
+    split_electric_label: "Electric Split",
+    state_off_upper: "OFF",
+    state_standby_upper: "STANDBY (ON)",
+    sched_nav_title: "Scheduling",
+    diag_nav_title: "Diagnostics",
+    system_ok: "System OK",
+    sched_modal_title: "Weekly Schedule",
+    diag_modal_title: "Plant & Diagnostics",
+    close_btn: "Close",
+    split_master_locked_title: "Managed by Master Plant (Manual control disabled)",
+    split_cool_on_title: "Turn ON Split Cooling",
+    split_heat_on_title: "Turn ON Split Heating",
+    cooling_subtext: "Cooling",
+    heating_subtext: "Heating",
+    cooling_valve: "Cooling",
+    sched_cancel_expiry: "Cancel expiration",
+    sched_cancel_sr: "Cancel Smart Return",
+    sched_return_at: "Return at",
+    sched_no_zones: "No thermostat zones configured.",
+    sched_copy_room_title: "Copy/Paste room schedule",
+    sched_confirm_clear_override: "Remove temporary manual override for this room?",
+    sched_copied_alert: "Room schedule copied! Click 📋 again on another room to paste.",
+    sched_preset_sync_note: "Reference values synced from Plant Standard Presets",
+    sched_plant_mode: "Plant Mode:",
+    sched_cool_mode_label: "❄️ Cooling (Cool)",
+    sched_heat_mode_label: "🔥 Heating (Heat)",
+    btn_cancel: "Cancel",
+    btn_save: "Save",
+    sched_no_change_baseline: "⏸️ No change / Baseline",
+    sched_save_slot: "💾 Save Slot",
+    sched_permanent: "Permanent (No expiration)",
+    sched_arrival_label: "Expected Arrival Time:",
+    sched_plan_return: "Plan Return"
   },
   ru: {
     heat_source_gas: "Газ",
@@ -450,7 +588,76 @@ sched_nav_title: "Расписание",
     day_sun: "Воскресенье",
     prof_standard: "Стандарт",
     prof_smart_working: "Удалённая работа",
-    prof_holiday: "Выходной"
+    prof_holiday: "Выходной",
+    pid_section_title: "PID и Автонастройка",
+    pid_auto_badge: "Авто EMA",
+    pid_manual_badge: "Вручную",
+    pid_reset_btn: "Сброс автонастройки",
+    pid_click_to_edit: "Нажмите для разблокировки",
+    pid_modal_title: "Предупреждение безопасности PID",
+    pid_modal_warn: "Параметры Kp, Ki и Kd автоматически калибруются каждую неделю. Ручное изменение отключает автонастройку для параметра и может вызвать колебания температуры.",
+    pid_modal_value: "Новое значение",
+    pid_modal_save: "Разблокировать и сохранить",
+    pid_modal_restore: "Вернуть авто",
+    pid_modal_cancel: "Отмена",
+    pid_reset_title: "Сброс автонастройки зоны",
+    pid_reset_confirm_msg: "Сбросить обученные циклы и перезапустить начальную калибровку (3 цикла)?",
+    pid_reset_confirm_btn: "Сбросить",
+    pid_restore_backup_btn: "Восстановить PID",
+    pid_restore_backup_title: "Восстановить PID автонастройки",
+    pid_restore_backup_confirm_msg: "Восстановить параметры PID, вычисленные автонастройкой до последнего сброса?",
+    pid_restore_backup_confirm_btn: "Восстановить PID",
+    pid_learning_status: "Обучение",
+    sched_all_zones_row: "Все зоны (Общее)",
+    sched_base_tag: "База",
+    prio_hybrid: "Гибрид",
+    prio_hybrid_title: "Гибрид (Сплит только при избытке солнца)",
+    prio_combined: "Комби",
+    prio_combined_title: "Комбинированный (Котёл + Сплит вместе)",
+    prio_electric: "Электро",
+    prio_electric_title: "Только электро (Блокировать котёл)",
+    electric_cooling: "Электроохлаждение",
+    toggle_season_title: "Переключить Нагрев / Охлаждение",
+    central_plant: "Котельная",
+    heating_label: "Отопление",
+    cooling_label: "Охлаждение",
+    boiler_label: "Котёл",
+    hp_label: "ТН",
+    boiler_hp_label: "Котёл + ТН",
+    boiler_or_hp_label: "Котёл / ТН",
+    split_electric_label: "Электро-сплит",
+    state_off_upper: "ВЫКЛ",
+    state_standby_upper: "ОЖИДАНИЕ (ВКЛ)",
+    sched_nav_title: "Расписание",
+    diag_nav_title: "Диагностика",
+    system_ok: "Система ОК",
+    sched_modal_title: "Недельное расписание",
+    diag_modal_title: "Диагностика системы",
+    close_btn: "Закрыть",
+    split_master_locked_title: "Управляется главным контроллером (Ручное управление отключено)",
+    split_cool_on_title: "Включить сплит на охлаждение",
+    split_heat_on_title: "Включить сплит на обогрев",
+    cooling_subtext: "Охлаждение",
+    heating_subtext: "Отопление",
+    cooling_valve: "Охлаждение",
+    sched_cancel_expiry: "Отменить срок",
+    sched_cancel_sr: "Отменить Smart Return",
+    sched_return_at: "Возврат в",
+    sched_no_zones: "Зоны термостата не настроены.",
+    sched_copy_room_title: "Копировать/Вставить расписание комнаты",
+    sched_confirm_clear_override: "Удалить временное ручное переопределение для этой комнаты?",
+    sched_copied_alert: "Расписание скопировано! Нажмите 📋 на другой комнате для вставки.",
+    sched_preset_sync_note: "Эталонные значения синхронизированы с пресетами системы",
+    sched_plant_mode: "Режим системы:",
+    sched_cool_mode_label: "❄️ Охлаждение (Cool)",
+    sched_heat_mode_label: "🔥 Нагрев (Heat)",
+    btn_cancel: "Отмена",
+    btn_save: "Сохранить",
+    sched_no_change_baseline: "⏸️ Без изменений / База",
+    sched_save_slot: "💾 Сохранить слот",
+    sched_permanent: "Постоянно (Без срока)",
+    sched_arrival_label: "Ожидаемое время возврата:",
+    sched_plan_return: "Запланировать возврат"
   },
   fr: {
     heat_source_gas: "Gaz",
@@ -574,7 +781,76 @@ sched_nav_title: "Programmation",
     day_sun: "Dimanche",
     prof_standard: "Standard",
     prof_smart_working: "Télétravail",
-    prof_holiday: "Vacances"
+    prof_holiday: "Vacances",
+    pid_section_title: "PID & Autotuner",
+    pid_auto_badge: "Auto EMA",
+    pid_manual_badge: "Manuel",
+    pid_reset_btn: "Reset Autotuner",
+    pid_click_to_edit: "Cliquer pour déverrouiller",
+    pid_modal_title: "Avertissement de sécurité PID",
+    pid_modal_warn: "Les gains Kp, Ki et Kd sont ajustés par l'autotuner adaptatif hebdomadaire. Le déverrouillage manuel suspend la calibration automatique sur ce paramètre.",
+    pid_modal_value: "Nouvelle valeur",
+    pid_modal_save: "Déverrouiller et enregistrer",
+    pid_modal_restore: "Rétablir Auto",
+    pid_modal_cancel: "Annuler",
+    pid_reset_title: "Réinitialiser l'Autotuner",
+    pid_reset_confirm_msg: "Effacer les cycles appris et relancer la calibration initiale (3 cycles) ?",
+    pid_reset_confirm_btn: "Réinitialiser",
+    pid_restore_backup_btn: "Restaurer PID",
+    pid_restore_backup_title: "Restaurer le PID Autotuner",
+    pid_restore_backup_confirm_msg: "Restaurer les paramètres PID calculés par l'autotuner avant la dernière réinitialisation ?",
+    pid_restore_backup_confirm_btn: "Restaurer PID",
+    pid_learning_status: "Apprentissage",
+    sched_all_zones_row: "Toutes les Zones (Général)",
+    sched_base_tag: "Base",
+    prio_hybrid: "Hybride",
+    prio_hybrid_title: "Hybride (Split sur surplus solaire uniquement)",
+    prio_combined: "Combiné",
+    prio_combined_title: "Combiné (Chaudière + Split ensemble)",
+    prio_electric: "Électrique",
+    prio_electric_title: "Électrique seul (Bloquer chaudière)",
+    electric_cooling: "Refroidissement électrique",
+    toggle_season_title: "Basculer Chauffage / Climatisation",
+    central_plant: "Centrale Thermique",
+    heating_label: "Chauffage",
+    cooling_label: "Climatisation",
+    boiler_label: "Chaudière",
+    hp_label: "PAC",
+    boiler_hp_label: "Chaudière + PAC",
+    boiler_or_hp_label: "Chaudière / PAC",
+    split_electric_label: "Split Électrique",
+    state_off_upper: "ARRÊT",
+    state_standby_upper: "VEILLE (ACTIF)",
+    sched_nav_title: "Programmation",
+    diag_nav_title: "Diagnostic",
+    system_ok: "Système OK",
+    sched_modal_title: "Programmation Hebdomadaire",
+    diag_modal_title: "Diagnostic & Installation",
+    close_btn: "Fermer",
+    split_master_locked_title: "Géré par le système Master (Contrôle manuel désactivé)",
+    split_cool_on_title: "Allumer Split Climatisation",
+    split_heat_on_title: "Allumer Split Chauffage",
+    cooling_subtext: "Climatisation",
+    heating_subtext: "Chauffage",
+    cooling_valve: "Climatisation",
+    sched_cancel_expiry: "Annuler expiration",
+    sched_cancel_sr: "Annuler Smart Return",
+    sched_return_at: "Retour à",
+    sched_no_zones: "Aucune zone configurée.",
+    sched_copy_room_title: "Copier/Coller programmation pièce",
+    sched_confirm_clear_override: "Supprimer la dérogation manuelle temporaire pour cette pièce ?",
+    sched_copied_alert: "Programmation copiée ! Cliquez sur 📋 sur une autre pièce pour coller.",
+    sched_preset_sync_note: "Valeurs de référence synchronisées avec les préréglages système",
+    sched_plant_mode: "Mode Système :",
+    sched_cool_mode_label: "❄️ Climatisation (Cool)",
+    sched_heat_mode_label: "🔥 Chauffage (Heat)",
+    btn_cancel: "Annuler",
+    btn_save: "Enregistrer",
+    sched_no_change_baseline: "⏸️ Aucun changement / Base",
+    sched_save_slot: "💾 Enregistrer créneau",
+    sched_permanent: "Permanent (Sans expiration)",
+    sched_arrival_label: "Heure de retour prévue :",
+    sched_plan_return: "Planifier le retour"
   },
   de: {
     heat_source_gas: "Gas",
@@ -697,7 +973,76 @@ sched_nav_title: "Zeitplan",
     day_sun: "Sonntag",
     prof_standard: "Standard",
     prof_smart_working: "Homeoffice",
-    prof_holiday: "Feiertag"
+    prof_holiday: "Feiertag",
+    pid_section_title: "PID & Autotuner",
+    pid_auto_badge: "Auto EMA",
+    pid_manual_badge: "Manuell",
+    pid_reset_btn: "Autotuner Zurücksetzen",
+    pid_click_to_edit: "Zum Entsperren klicken",
+    pid_modal_title: "PID-Sicherheitswarnung",
+    pid_modal_warn: "Kp, Ki und Kd werden wöchentlich automatisch angepasst. Manuelles Entsperren pausiert das Auto-Tuning für diesen Wert.",
+    pid_modal_value: "Neuer Wert",
+    pid_modal_save: "Entsperren & Speichern",
+    pid_modal_restore: "Automatik wiederherstellen",
+    pid_modal_cancel: "Abbrechen",
+    pid_reset_title: "Autotuner Zurücksetzen",
+    pid_reset_confirm_msg: "Gelernte Zyklen löschen und 3-Zyklus-Kalibrierung neu starten?",
+    pid_reset_confirm_btn: "Zurücksetzen",
+    pid_restore_backup_btn: "PID Wiederherstellen",
+    pid_restore_backup_title: "Autotuner-PID wiederherstellen",
+    pid_restore_backup_confirm_msg: "Die vor dem letzten Zurücksetzen vom Autotuner gelernten PID-Parameter wiederherstellen?",
+    pid_restore_backup_confirm_btn: "PID Wiederherstellen",
+    pid_learning_status: "Lernen",
+    sched_all_zones_row: "Alle Zonen (Allgemein)",
+    sched_base_tag: "Basis",
+    prio_hybrid: "Hybrid",
+    prio_hybrid_title: "Hybrid (Split nur bei Solarüberschuss)",
+    prio_combined: "Kombiniert",
+    prio_combined_title: "Kombiniert (Kessel + Split zusammen)",
+    prio_electric: "Elektrisch",
+    prio_electric_title: "Nur Elektrisch (Kessel sperren)",
+    electric_cooling: "Elektrische Kühlung",
+    toggle_season_title: "Heizen / Kühlen umschalten",
+    central_plant: "Heizzentrale",
+    heating_label: "Heizen",
+    cooling_label: "Kühlen",
+    boiler_label: "Kessel",
+    hp_label: "WP",
+    boiler_hp_label: "Kessel + WP",
+    boiler_or_hp_label: "Kessel / WP",
+    split_electric_label: "Elektro-Split",
+    state_off_upper: "AUS",
+    state_standby_upper: "BEREITSCHAFT (EIN)",
+    sched_nav_title: "Zeitplan",
+    diag_nav_title: "Diagnose",
+    system_ok: "System OK",
+    sched_modal_title: "Wochenzeitplan",
+    diag_modal_title: "Anlage & Diagnose",
+    close_btn: "Schließen",
+    split_master_locked_title: "Von Master-Anlage gesteuert (Manuelle Steuerung deaktiviert)",
+    split_cool_on_title: "Split Kühlung einschalten",
+    split_heat_on_title: "Split Heizen einschalten",
+    cooling_subtext: "Kühlen",
+    heating_subtext: "Heizen",
+    cooling_valve: "Kühlen",
+    sched_cancel_expiry: "Ablauf abbrechen",
+    sched_cancel_sr: "Smart Return abbrechen",
+    sched_return_at: "Rückkehr um",
+    sched_no_zones: "Keine Thermostat-Zonen konfiguriert.",
+    sched_copy_room_title: "Raumzeitplan kopieren/einfügen",
+    sched_confirm_clear_override: "Temporäre manuelle Übersteuerung für diesen Raum entfernen?",
+    sched_copied_alert: "Raumzeitplan kopiert! Klicken Sie auf 📋 in einem anderen Raum zum Einfügen.",
+    sched_preset_sync_note: "Referenzwerte mit Standard-Voreinstellungen synchronisiert",
+    sched_plant_mode: "Anlagenmodus:",
+    sched_cool_mode_label: "❄️ Kühlen (Cool)",
+    sched_heat_mode_label: "🔥 Heizen (Heat)",
+    btn_cancel: "Abbrechen",
+    btn_save: "Speichern",
+    sched_no_change_baseline: "⏸️ Keine Änderung / Basis",
+    sched_save_slot: "💾 Zeitfenster speichern",
+    sched_permanent: "Dauerhaft (Kein Ablauf)",
+    sched_arrival_label: "Erwartete Rückkehrzeit:",
+    sched_plan_return: "Rückkehr planen"
   },
   es: {
     heat_source_gas: "Gas",
@@ -821,7 +1166,76 @@ sched_nav_title: "Programación",
     day_sun: "Domingo",
     prof_standard: "Estándar",
     prof_smart_working: "Teletrabajo",
-    prof_holiday: "Festivo"
+    prof_holiday: "Festivo",
+    pid_section_title: "PID y Autotuner",
+    pid_auto_badge: "Auto EMA",
+    pid_manual_badge: "Manual",
+    pid_reset_btn: "Reiniciar Autotuner",
+    pid_click_to_edit: "Clic para desbloquear",
+    pid_modal_title: "Aviso de Seguridad PID",
+    pid_modal_warn: "Los valores Kp, Ki y Kd se calibran automáticamente cada semana. Desbloquearlos pausa el ajuste automático y puede causar oscilaciones.",
+    pid_modal_value: "Nuevo valor",
+    pid_modal_save: "Desbloquear y Guardar",
+    pid_modal_restore: "Restaurar Automático",
+    pid_modal_cancel: "Cancelar",
+    pid_reset_title: "Confirmar Reinicio Autotuner",
+    pid_reset_confirm_msg: "¿Borrar los ciclos aprendidos y reiniciar la calibración inicial de 3 ciclos?",
+    pid_reset_confirm_btn: "Reiniciar",
+    pid_restore_backup_btn: "Restaurar PID",
+    pid_restore_backup_title: "Restaurar PID del Autotuner",
+    pid_restore_backup_confirm_msg: "¿Restaurar los parámetros PID calculados por el autotuner antes del último reinicio?",
+    pid_restore_backup_confirm_btn: "Restaurar PID",
+    pid_learning_status: "Aprendiendo",
+    sched_all_zones_row: "Todas las Zonas (General)",
+    sched_base_tag: "Base",
+    prio_hybrid: "Híbrido",
+    prio_hybrid_title: "Híbrido (Split solo con excedente solar)",
+    prio_combined: "Combinado",
+    prio_combined_title: "Combinado (Caldera + Split juntos)",
+    prio_electric: "Eléctrico",
+    prio_electric_title: "Solo Eléctrico (Bloquear Caldera)",
+    electric_cooling: "Refrigeración Eléctrica",
+    toggle_season_title: "Cambiar Calefacción / Refrigeración",
+    central_plant: "Planta Central",
+    heating_label: "Calefacción",
+    cooling_label: "Refrigeración",
+    boiler_label: "Caldera",
+    hp_label: "BC",
+    boiler_hp_label: "Caldera + BC",
+    boiler_or_hp_label: "Caldera / BC",
+    split_electric_label: "Split Eléctrico",
+    state_off_upper: "APAGADO",
+    state_standby_upper: "EN ESPERA (ACTIVO)",
+    sched_nav_title: "Programación",
+    diag_nav_title: "Diagnóstico",
+    system_ok: "Sistema OK",
+    sched_modal_title: "Programación Semanal",
+    diag_modal_title: "Diagnóstico y Planta",
+    close_btn: "Cerrar",
+    split_master_locked_title: "Gestionado por Planta Master (Control manual desactivado)",
+    split_cool_on_title: "Encender Split Refrigeración",
+    split_heat_on_title: "Encender Split Calefacción",
+    cooling_subtext: "Refrigeración",
+    heating_subtext: "Calefacción",
+    cooling_valve: "Refrigeración",
+    sched_cancel_expiry: "Cancelar caducidad",
+    sched_cancel_sr: "Cancelar Smart Return",
+    sched_return_at: "Regreso a las",
+    sched_no_zones: "No hay zonas configuradas.",
+    sched_copy_room_title: "Copiar/Pegar programación de habitación",
+    sched_confirm_clear_override: "¿Eliminar la anulación manual temporal de esta habitación?",
+    sched_copied_alert: "¡Programación copiada! Pulsa 📋 en otra habitación para pegar.",
+    sched_preset_sync_note: "Valores de referencia sincronizados con los preajustes de planta",
+    sched_plant_mode: "Modo de Planta:",
+    sched_cool_mode_label: "❄️ Refrigeración (Cool)",
+    sched_heat_mode_label: "🔥 Calefacción (Heat)",
+    btn_cancel: "Cancelar",
+    btn_save: "Guardar",
+    sched_no_change_baseline: "⏸️ Sin cambios / Base",
+    sched_save_slot: "💾 Guardar Franja",
+    sched_permanent: "Permanente (Sin caducidad)",
+    sched_arrival_label: "Hora prevista de llegada:",
+    sched_plan_return: "Planificar Regreso"
   }
 };
 
@@ -876,32 +1290,54 @@ function isZoneEntityMatch(id, slug) {
   return false;
 }
 
-// Helper function to auto-discover the bypass switch for a climate entity
+// Helper function to check whether an auxiliary switch/select should never be treated as zone mode
+function _isAuxiliaryZoneEntity(entityId, stateObj) {
+  if (!entityId) return false;
+  if (entityId.includes("pid_") || entityId.includes("split_")) return true;
+  const mType = stateObj && stateObj.attributes && stateObj.attributes.multizone_type;
+  return mType === "pid_manual_unlock" || mType === "pid_parameter" || mType === "master";
+}
+
+// Helper function to auto-discover the bypass switch / zone_mode select for a climate entity
 function autoDiscoverSwitch(hass, climateId) {
   if (!hass || !hass.states || !climateId) return "";
+  // Prefer select.* zone_mode entities before legacy switch.* entities
+  let legacySwitchFallback = "";
   for (const entityId of Object.keys(hass.states)) {
-    // Check both legacy switches and new select entities for the climate_entity attribute
-    if ((entityId.startsWith("select.") || entityId.startsWith("switch.")) && 
-        hass.states[entityId].attributes && 
-        hass.states[entityId].attributes.climate_entity === climateId) {
-      return entityId;
+    const stateObj = hass.states[entityId];
+    if (_isAuxiliaryZoneEntity(entityId, stateObj)) continue;
+    if ((entityId.startsWith("select.") || entityId.startsWith("switch.")) &&
+        stateObj && stateObj.attributes &&
+        stateObj.attributes.climate_entity === climateId) {
+      if (entityId.startsWith("select.")) return entityId;
+      if (!legacySwitchFallback) legacySwitchFallback = entityId;
     }
   }
-  
+  if (legacySwitchFallback) return legacySwitchFallback;
+
   // Fallback: check if the entityId contains the climate device name AND is a zone_mode entity
   const rawName = climateId.split('.')[1] || "";
   const slug = rawName.replace(/^multizone_thermostat_/, "");
   const cleanSlug = slug.replace(/^zona_/, "");
   const isSlugMatch = (id) => isZoneEntityMatch(id, cleanSlug);
 
+  let legacySlugSwitchFallback = "";
   for (const entityId of Object.keys(hass.states)) {
-    if ((entityId.startsWith("select.") || entityId.startsWith("switch.")) && 
-        isSlugMatch(entityId) &&
+    const stateObj = hass.states[entityId];
+    if (_isAuxiliaryZoneEntity(entityId, stateObj)) continue;
+    if (!isSlugMatch(entityId)) continue;
+    if (entityId.startsWith("select.") &&
         (entityId.includes("mode") || entityId.includes("zone") || entityId.includes("modalita"))) {
       return entityId;
     }
+    if (entityId.startsWith("switch.") &&
+        (entityId.includes("mode") || entityId.includes("modalita") || entityId.includes("bypass")) &&
+        !legacySlugSwitchFallback) {
+      legacySlugSwitchFallback = entityId;
+    }
   }
-  
+  if (legacySlugSwitchFallback) return legacySlugSwitchFallback;
+
   return "";
 }
 
@@ -2132,9 +2568,9 @@ class MultizoneThermostatDialCard extends HTMLElement {
         }
         .pills-row {
           display: flex;
-          flex-direction: column;
-          align-items: flex-start;
-          gap: 4px;
+          align-items: center;
+          gap: 6px;
+          flex-wrap: wrap;
         }
         .header-center {
           position: absolute;
@@ -3010,7 +3446,7 @@ class MultizoneThermostatDialCard extends HTMLElement {
           btnSplitToggle.style.pointerEvents = 'none';
           btnSplitToggle.style.opacity = '0.45';
           btnSplitToggle.style.cursor = 'not-allowed';
-          btnSplitToggle.setAttribute('title', 'Gestito da Impianto Master (Controllo manuale disabilitato)');
+          btnSplitToggle.setAttribute('title', getTranslation(this._hass, 'split_master_locked_title') || 'Managed by Master Plant (Manual control disabled)');
           btnSplitToggle.className = isSplitOn ? (isSummer ? 'split-pill-btn active cool disabled' : 'split-pill-btn active heat disabled') : 'split-pill-btn disabled';
         } else {
           btnSplitToggle.disabled = false;
@@ -3019,10 +3455,10 @@ class MultizoneThermostatDialCard extends HTMLElement {
           btnSplitToggle.style.cursor = 'pointer';
           if (isSplitOn) {
             btnSplitToggle.className = isSummer ? 'split-pill-btn active cool' : 'split-pill-btn active heat';
-            btnSplitToggle.setAttribute('title', isSummer ? 'Split Acceso (Clicca per spegnere)' : 'Split Acceso (Clicca per spegnere)');
+            btnSplitToggle.setAttribute('title', 'Split ON');
           } else {
             btnSplitToggle.className = 'split-pill-btn';
-            btnSplitToggle.setAttribute('title', isSummer ? 'Accendi Split Climatizzazione' : 'Accendi Split Riscaldamento');
+            btnSplitToggle.setAttribute('title', isSummer ? (getTranslation(this._hass, 'split_cool_on_title') || 'Turn ON Split Cooling') : (getTranslation(this._hass, 'split_heat_on_title') || 'Turn ON Split Heating'));
           }
         }
       }
@@ -3046,7 +3482,7 @@ class MultizoneThermostatDialCard extends HTMLElement {
           btnSplitClassic.style.pointerEvents = 'none';
           btnSplitClassic.style.opacity = '0.45';
           btnSplitClassic.style.cursor = 'not-allowed';
-          btnSplitClassic.setAttribute('title', 'Gestito da Impianto Master (Controllo manuale disabilitato)');
+          btnSplitClassic.setAttribute('title', getTranslation(this._hass, 'split_master_locked_title') || 'Managed by Master Plant (Manual control disabled)');
           btnSplitClassic.className = isSplitOn ? (isSummer ? 'split-pill-btn active cool disabled' : 'split-pill-btn active heat disabled') : 'split-pill-btn disabled';
         } else {
           btnSplitClassic.disabled = false;
@@ -3055,10 +3491,10 @@ class MultizoneThermostatDialCard extends HTMLElement {
           btnSplitClassic.style.cursor = 'pointer';
           if (isSplitOn) {
             btnSplitClassic.className = isSummer ? 'split-pill-btn active cool' : 'split-pill-btn active heat';
-            btnSplitClassic.setAttribute('title', isSummer ? 'Split Acceso (Clicca per spegnere)' : 'Split Acceso (Clicca per spegnere)');
+            btnSplitClassic.setAttribute('title', 'Split ON');
           } else {
             btnSplitClassic.className = 'split-pill-btn';
-            btnSplitClassic.setAttribute('title', isSummer ? 'Accendi Split Climatizzazione' : 'Accendi Split Riscaldamento');
+            btnSplitClassic.setAttribute('title', isSummer ? (getTranslation(this._hass, 'split_cool_on_title') || 'Turn ON Split Cooling') : (getTranslation(this._hass, 'split_heat_on_title') || 'Turn ON Split Heating'));
           }
         }
       }
@@ -3191,15 +3627,16 @@ class MultizoneThermostatDialCard extends HTMLElement {
         subText.textContent = getTranslation(this._hass, 'off') || "Spento";
       } else if (this._isCooling) {
         subText.className = "dial-sub-text cooling-text";
-        subText.textContent = "In Raffrescamento";
+        subText.textContent = getTranslation(this._hass, 'cooling_subtext') || "Cooling";
       } else if (this._isHeating) {
         subText.className = "dial-sub-text heating-text";
+        const tHeating = getTranslation(this._hass, 'heating_subtext') || "Heating";
         if (heatSource === "electric") {
-          subText.textContent = "Riscaldamento (" + (getTranslation(this._hass, 'heat_source_electric') || "Split") + ")";
+          subText.textContent = tHeating + " (" + (getTranslation(this._hass, 'heat_source_electric') || "Split") + ")";
         } else if (heatSource === "dual") {
-          subText.textContent = "Riscaldamento (" + (getTranslation(this._hass, 'heat_source_dual') || "Gas + Split") + ")";
+          subText.textContent = tHeating + " (" + (getTranslation(this._hass, 'heat_source_dual') || "Gas + Split") + ")";
         } else {
-          subText.textContent = "Riscaldamento (" + (getTranslation(this._hass, 'heat_source_gas') || "Gas") + ")";
+          subText.textContent = tHeating + " (" + (getTranslation(this._hass, 'heat_source_gas') || "Gas") + ")";
         }
       } else {
         subText.className = "dial-sub-text standby-text";
@@ -3219,21 +3656,21 @@ class MultizoneThermostatDialCard extends HTMLElement {
     const valveEl = this.shadowRoot.querySelector('#valve-val');
     if (valveEl) {
       if (typeof climateState.attributes.valve_position === 'number') {
-        valveEl.textContent = "Valvola " + Math.round(climateState.attributes.valve_position) + "%";
+        valveEl.textContent = (getTranslation(this._hass, 'valve_label') || "Valve") + " " + Math.round(climateState.attributes.valve_position) + "%";
         valveEl.style.color = "#38bdf8";
       } else if (this._isHeating) {
         if (heatSource === "electric") {
-          valveEl.textContent = "Attivo (Split/PDC)";
+          valveEl.textContent = "ON (Split/HP)";
           valveEl.style.color = "#38bdf8";
         } else if (heatSource === "dual") {
-          valveEl.textContent = "Attivo (Gas + Split)";
+          valveEl.textContent = "ON (Gas + Split)";
           valveEl.style.color = "#fcd34d";
         } else {
-          valveEl.textContent = "Attivo (Gas)";
+          valveEl.textContent = "ON (Gas)";
           valveEl.style.color = "#f97316";
         }
       } else if (this._isCooling) {
-        valveEl.textContent = "Raffrescamento";
+        valveEl.textContent = getTranslation(this._hass, 'cooling_valve') || "Cooling";
         valveEl.style.color = "#38bdf8";
       } else {
         valveEl.textContent = "Standby";
@@ -3748,14 +4185,14 @@ class MultizoneThermostatStatusCard extends HTMLElement {
           <ha-icon id="master-icon" icon="mdi:power"></ha-icon>
         </div>
         <div class="info-container">
-          <div class="sub-title">Impianto Centrale</div>
-          <div class="name" id="master-name">Riscaldamento</div>
+          <div class="sub-title" id="master-sub-title">${getTranslation(this._hass, 'central_plant') || 'Central Plant'}</div>
+          <div class="name" id="master-name">${getTranslation(this._hass, 'heating_label') || 'Heating'}</div>
           <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
             <div class="status-pill" id="master-pill">
               <span class="status-dot"></span>
-              <span id="master-state-text">Caricamento...</span>
+              <span id="master-state-text">...</span>
             </div>
-            <div class="telemetry" id="master-telemetry">Caldaia: OFF</div>
+            <div class="telemetry" id="master-telemetry">${getTranslation(this._hass, 'boiler_label') || 'Boiler'}: OFF</div>
           </div>
         </div>
       </div>
@@ -3886,40 +4323,52 @@ class MultizoneThermostatStatusCard extends HTMLElement {
     const stateText = this.shadowRoot.getElementById('master-state-text');
     const telemetry = this.shadowRoot.getElementById('master-telemetry');
 
+    const subTitleEl = this.shadowRoot.getElementById('master-sub-title');
+    if (subTitleEl) {
+      subTitleEl.textContent = getTranslation(this._hass, 'central_plant') || 'Central Plant';
+    }
+
     if (nameEl) {
       nameEl.textContent = isCoolMode
-        ? (getTranslation(this._hass, 'cooling_active') ? 'Raffrescamento' : 'Raffrescamento')
-        : 'Riscaldamento';
+        ? (getTranslation(this._hass, 'cooling_label') || 'Cooling')
+        : (getTranslation(this._hass, 'heating_label') || 'Heating');
     }
+
+    const tBoiler = getTranslation(this._hass, 'boiler_label') || 'Boiler';
+    const tHp = getTranslation(this._hass, 'hp_label') || 'HP';
+    const tBoilerHp = getTranslation(this._hass, 'boiler_hp_label') || 'Boiler + HP';
+    const tBoilerOrHp = getTranslation(this._hass, 'boiler_or_hp_label') || 'Boiler / HP';
+    const tSplitElec = getTranslation(this._hass, 'split_electric_label') || 'Electric Split';
+    const tActiveZones = getTranslation(this._hass, 'active_zones') || 'Active zones';
 
     if (telemetry) {
       if (isCoolMode) {
         telemetry.textContent = activeCoolingZones > 0
-          ? `Zone attive: ${activeCoolingZones}`
-          : `Split / PDC: Standby`;
+          ? `${tActiveZones}: ${activeCoolingZones}`
+          : `Split / ${tHp}: Standby`;
       } else if (activeSplits > 0 && !isBoilerActive && !isCentralHpActive) {
-        telemetry.textContent = `Split Elettrico: ON`;
+        telemetry.textContent = `${tSplitElec}: ON`;
       } else if (activeSplits > 0 && isBoilerActive && !isCentralHpActive) {
-        telemetry.textContent = `Caldaia: ON + Split`;
+        telemetry.textContent = `${tBoiler}: ON + Split`;
       } else if (activeSplits > 0 && isCentralHpActive && !isBoilerActive) {
-        telemetry.textContent = `PDC: ON + Split`;
+        telemetry.textContent = `${tHp}: ON + Split`;
       } else if (activeSplits > 0 && isCentralHpActive && isBoilerActive) {
-        telemetry.textContent = `Caldaia + PDC: ON + Split`;
+        telemetry.textContent = `${tBoilerHp}: ON + Split`;
       } else if (isCentralHpActive && isBoilerActive) {
-        telemetry.textContent = `Caldaia + PDC: ON`;
+        telemetry.textContent = `${tBoilerHp}: ON`;
       } else if (isCentralHpActive) {
-        telemetry.textContent = `PDC: ON`;
+        telemetry.textContent = `${tHp}: ON`;
       } else if (isBoilerActive) {
-        telemetry.textContent = `Caldaia: ${boilerText}`;
+        telemetry.textContent = `${tBoiler}: ${boilerText}`;
       } else if (hasCentralHp && hasBoiler) {
-        telemetry.textContent = `Caldaia / PDC: OFF`;
+        telemetry.textContent = `${tBoilerOrHp}: OFF`;
       } else if (hasCentralHp && !hasBoiler) {
-        telemetry.textContent = `PDC: OFF`;
+        telemetry.textContent = `${tHp}: OFF`;
       } else if (activeHeatingZones > 0 && !isBoilerActive) {
         // Heating is active across zones without boiler switch: PDC or integrated central heating
-        telemetry.textContent = hasCentralHp ? `PDC: ON` : `Caldaia / PDC: ON`;
+        telemetry.textContent = hasCentralHp ? `${tHp}: ON` : `${tBoilerOrHp}: ON`;
       } else {
-        telemetry.textContent = `Caldaia: ${boilerText}`;
+        telemetry.textContent = `${tBoiler}: ${boilerText}`;
       }
     }
 
@@ -3941,7 +4390,7 @@ class MultizoneThermostatStatusCard extends HTMLElement {
         pill.style.color = "var(--secondary-text-color, #94a3b8)";
         pill.style.borderColor = "var(--divider-color, rgba(148, 163, 184, 0.25))";
       }
-      if (stateText) stateText.textContent = "SPENTO";
+      if (stateText) stateText.textContent = getTranslation(this._hass, 'state_off_upper') || "OFF";
     } else if (isCoolMode) {
       if (isCoolingSystemActive) {
         if (card && !isClassic) card.className = "cooling-aura";
@@ -3959,7 +4408,7 @@ class MultizoneThermostatStatusCard extends HTMLElement {
           pill.style.color = "#38bdf8";
           pill.style.borderColor = "rgba(56, 189, 248, 0.45)";
         }
-        if (stateText) stateText.textContent = "RAFFRESCAMENTO ATTIVO";
+        if (stateText) stateText.textContent = getTranslation(this._hass, 'cooling_active') || "COOLING ACTIVE";
       } else {
         if (card && !isClassic) card.className = "cool-idle-aura";
         if (icon) {
@@ -3976,7 +4425,7 @@ class MultizoneThermostatStatusCard extends HTMLElement {
           pill.style.color = "#7dd3fc";
           pill.style.borderColor = "rgba(56, 189, 248, 0.3)";
         }
-        if (stateText) stateText.textContent = "STANDBY (FREDDO)";
+        if (stateText) stateText.textContent = `${getTranslation(this._hass, 'standby_idle') || 'STANDBY'} (${getTranslation(this._hass, 'cool_mode') || 'COOL'})`;
       }
     } else {
       if (isHeatingSystemActive) {
@@ -3995,7 +4444,7 @@ class MultizoneThermostatStatusCard extends HTMLElement {
           pill.style.color = "#f97316";
           pill.style.borderColor = "rgba(249, 115, 22, 0.45)";
         }
-        if (stateText) stateText.textContent = "RISCALDAMENTO ATTIVO";
+        if (stateText) stateText.textContent = getTranslation(this._hass, 'heating_active') || "HEATING ACTIVE";
       } else {
         if (card && !isClassic) card.className = "idle-aura";
         if (icon) {
@@ -4012,7 +4461,7 @@ class MultizoneThermostatStatusCard extends HTMLElement {
           pill.style.color = "#f59e0b";
           pill.style.borderColor = "rgba(245, 158, 11, 0.35)";
         }
-        if (stateText) stateText.textContent = "STANDBY (ACCESO)";
+        if (stateText) stateText.textContent = getTranslation(this._hass, 'state_standby_upper') || "STANDBY (ON)";
       }
     }
   }
@@ -4600,18 +5049,18 @@ class MultizoneThermostatPresetCard extends HTMLElement {
         <div class="header">
           <div class="header-left">
             <div class="priority-segmented" id="priority-segmented">
-              <button class="priority-btn" data-priority="auto" id="pbtn-auto" title="Automatica (Solare + Gas)">Auto</button>
-              <button class="priority-btn" data-priority="hybrid" id="pbtn-hybrid" title="Ibrido (Split solo se surplus solare)">Ibrido</button>
-              <button class="priority-btn" data-priority="combined" id="pbtn-combined" title="Combinato (Caldaia + Split insieme)">Combinato</button>
-              <button class="priority-btn" data-priority="electric_only" id="pbtn-electric" title="Solo Elettrico (Blocca Caldaia)">Elettrico</button>
-              <button class="priority-btn" data-priority="gas_only" id="pbtn-gas" title="Solo Gas (Split spenti in caldo)">Gas</button>
+              <button class="priority-btn" data-priority="auto" id="pbtn-auto" title="Auto">Auto</button>
+              <button class="priority-btn" data-priority="hybrid" id="pbtn-hybrid" title="${getTranslation(this._hass, 'prio_hybrid_title') || 'Ibrido'}">${getTranslation(this._hass, 'prio_hybrid') || 'Ibrido'}</button>
+              <button class="priority-btn" data-priority="combined" id="pbtn-combined" title="${getTranslation(this._hass, 'prio_combined_title') || 'Combinato'}">${getTranslation(this._hass, 'prio_combined') || 'Combinato'}</button>
+              <button class="priority-btn" data-priority="electric_only" id="pbtn-electric" title="${getTranslation(this._hass, 'prio_electric_title') || 'Elettrico'}">${getTranslation(this._hass, 'prio_electric') || 'Elettrico'}</button>
+              <button class="priority-btn" data-priority="gas_only" id="pbtn-gas" title="Gas">Gas</button>
             </div>
             <div class="summer-indicator" id="summer-indicator" style="display: none;">
               <ha-icon icon="mdi:snowflake" style="--mdc-icon-size: 15px; color: #38bdf8;"></ha-icon>
-              <span>Raffrescamento Elettrico</span>
+              <span id="summer-indicator-label">${getTranslation(this._hass, 'electric_cooling') || 'Raffrescamento Elettrico'}</span>
             </div>
           </div>
-          <div class="mode-switch-wrap heat" id="btn-mode-toggle" role="switch" aria-checked="false" title="Commuta Riscaldamento / Raffrescamento">
+          <div class="mode-switch-wrap heat" id="btn-mode-toggle" role="switch" aria-checked="false" title="${getTranslation(this._hass, 'toggle_season_title') || 'Commuta Riscaldamento / Raffrescamento'}">
             <span class="mode-switch-label" id="mode-toggle-label">${getTranslation(this._hass, 'master_mode_heat') || 'Caldo'}</span>
             <div class="mode-switch-track">
               <ha-icon class="track-icon fire" icon="mdi:fire"></ha-icon>
@@ -4727,6 +5176,26 @@ class MultizoneThermostatPresetCard extends HTMLElement {
     const modeBtn = this.shadowRoot.querySelector('#btn-mode-toggle');
     const modeIcon = this.shadowRoot.querySelector('#mode-toggle-icon');
     const modeLabel = this.shadowRoot.querySelector('#mode-toggle-label');
+
+    // Dynamic i18n refresh for header labels
+    const pHybrid = this.shadowRoot.querySelector('#pbtn-hybrid');
+    if (pHybrid) {
+      pHybrid.textContent = getTranslation(this._hass, 'prio_hybrid') || 'Hybrid';
+      pHybrid.title = getTranslation(this._hass, 'prio_hybrid_title') || 'Hybrid';
+    }
+    const pCombined = this.shadowRoot.querySelector('#pbtn-combined');
+    if (pCombined) {
+      pCombined.textContent = getTranslation(this._hass, 'prio_combined') || 'Combined';
+      pCombined.title = getTranslation(this._hass, 'prio_combined_title') || 'Combined';
+    }
+    const pElectric = this.shadowRoot.querySelector('#pbtn-electric');
+    if (pElectric) {
+      pElectric.textContent = getTranslation(this._hass, 'prio_electric') || 'Electric';
+      pElectric.title = getTranslation(this._hass, 'prio_electric_title') || 'Electric';
+    }
+    const summerLbl = this.shadowRoot.querySelector('#summer-indicator-label');
+    if (summerLbl) summerLbl.textContent = getTranslation(this._hass, 'electric_cooling') || 'Electric Cooling';
+    if (modeBtn) modeBtn.title = getTranslation(this._hass, 'toggle_season_title') || 'Switch Heating / Cooling';
 
     if (card) {
       if (isCool) {
@@ -5005,11 +5474,11 @@ function openMzStandaloneModal(type, hass) {
   const titleEl = document.createElement('div');
   titleEl.style.cssText = 'font-size: 1.2rem; font-weight: 700; color: #ffffff; display: flex; align-items: center; gap: 10px;';
   titleEl.innerHTML = type === 'scheduler'
-    ? '<ha-icon icon="mdi:calendar-clock" style="color:#38bdf8;"></ha-icon> <span>Programmazione Fasce Orarie</span>'
-    : '<ha-icon icon="mdi:chart-box-outline" style="color:#10b981;"></ha-icon> <span>Diagnostica & Impianto</span>';
+    ? `<ha-icon icon="mdi:calendar-clock" style="color:#38bdf8;"></ha-icon> <span>${getTranslation(hass, 'sched_modal_title') || 'Weekly Schedule'}</span>`
+    : `<ha-icon icon="mdi:chart-box-outline" style="color:#10b981;"></ha-icon> <span>${getTranslation(hass, 'diag_modal_title') || 'Plant & Diagnostics'}</span>`;
 
   const closeBtn = document.createElement('button');
-  closeBtn.innerHTML = '✕ Chiudi';
+  closeBtn.innerHTML = `✕ ${getTranslation(hass, 'close_btn') || 'Close'}`;
   closeBtn.style.cssText = [
     'background: rgba(255, 255, 255, 0.14)',
     'color: #ffffff',
@@ -5398,7 +5867,7 @@ class MultizoneThermostatScheduleSummaryCard extends HTMLElement {
           <div class="icon-box" id="icon-box">
             <ha-icon icon="mdi:calendar-clock"></ha-icon>
           </div>
-          <div class="badge-title">Programmazione</div>
+          <div class="badge-title" id="sched-badge-title">${getTranslation(this._hass, 'sched_nav_title') || 'Scheduling'}</div>
           <div class="badge-pill" id="pill">
             <span class="badge-dot" id="dot"></span>
             <span id="label">In Pausa</span>
@@ -5425,6 +5894,8 @@ class MultizoneThermostatScheduleSummaryCard extends HTMLElement {
 
   updateCard() {
     if (!this._hass || !this._rendered) return;
+    const titleEl = this.shadowRoot.getElementById('sched-badge-title');
+    if (titleEl) titleEl.textContent = getTranslation(this._hass, 'sched_nav_title') || 'Scheduling';
     const pill = this.shadowRoot.getElementById('pill');
     const label = this.shadowRoot.getElementById('label');
     const dot = this.shadowRoot.getElementById('dot');
@@ -5665,10 +6136,10 @@ class MultizoneThermostatHealthSummaryCard extends HTMLElement {
           <div class="icon-box" id="icon-box">
             <ha-icon icon="mdi:shield-check"></ha-icon>
           </div>
-          <div class="badge-title">Diagnostica</div>
+          <div class="badge-title" id="diag-badge-title">${getTranslation(this._hass, 'diag_nav_title') || 'Diagnostics'}</div>
           <div class="badge-pill" id="pill">
             <span class="badge-dot" id="dot"></span>
-            <span id="label">Sistema OK</span>
+            <span id="label">${getTranslation(this._hass, 'system_ok') || 'System OK'}</span>
           </div>
         </div>
       </ha-card>
@@ -5692,6 +6163,8 @@ class MultizoneThermostatHealthSummaryCard extends HTMLElement {
 
   updateCard() {
     if (!this._hass || !this._rendered) return;
+    const titleEl = this.shadowRoot.getElementById('diag-badge-title');
+    if (titleEl) titleEl.textContent = getTranslation(this._hass, 'diag_nav_title') || 'Diagnostics';
     const pill = this.shadowRoot.getElementById('pill');
     const label = this.shadowRoot.getElementById('label');
     const dot = this.shadowRoot.getElementById('dot');
@@ -5713,14 +6186,14 @@ class MultizoneThermostatHealthSummaryCard extends HTMLElement {
     }
 
     if (hasAnomaly) {
-      label.textContent = 'Allarme';
+      label.textContent = getTranslation(this._hass, 'fault_detected') || 'Alert';
       pill.style.background = 'rgba(239, 68, 68, 0.18)';
       pill.style.color = '#ef4444';
       pill.style.borderColor = 'rgba(239, 68, 68, 0.4)';
       if (dot) dot.style.background = '#ef4444';
       if (iconBox) iconBox.style.color = '#ef4444';
     } else {
-      label.textContent = 'Sistema Ok';
+      label.textContent = getTranslation(this._hass, 'system_ok') || 'System OK';
       pill.style.background = 'rgba(16, 185, 129, 0.15)';
       pill.style.color = '#10b981';
       pill.style.borderColor = 'rgba(16, 185, 129, 0.35)';
@@ -6663,6 +7136,209 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
       .pulse-green { background: #10b981; }
       .pulse-red { background: #ef4444; animation: blink 1s infinite; }
       @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+      .pid-panel {
+        margin-top: 10px;
+        margin-bottom: 10px;
+        background: rgba(15, 23, 42, 0.38);
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        border-radius: 12px;
+        padding: 10px 12px;
+      }
+      .pid-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+        gap: 8px;
+      }
+      .pid-title-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.78em;
+        font-weight: 600;
+        color: var(--secondary-text-color, #94a3b8);
+      }
+      .pid-state-pill {
+        font-size: 0.78em;
+        padding: 2px 7px;
+        border-radius: 999px;
+        background: rgba(148, 163, 184, 0.16);
+        color: #cbd5e1;
+      }
+      .pid-reset-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.75em;
+        font-weight: 600;
+        padding: 4px 8px;
+        border-radius: 8px;
+        border: 1px solid rgba(239, 68, 68, 0.35);
+        background: rgba(239, 68, 68, 0.12);
+        color: #fca5a5;
+        cursor: pointer;
+        transition: background 0.15s ease;
+      }
+      .pid-reset-btn:hover {
+        background: rgba(239, 68, 68, 0.24);
+      }
+      .pid-actions {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .pid-restore-backup-btn {
+        display: none;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.75em;
+        font-weight: 600;
+        padding: 4px 8px;
+        border-radius: 8px;
+        border: 1px solid rgba(59, 130, 246, 0.4);
+        background: rgba(59, 130, 246, 0.14);
+        color: #93c5fd;
+        cursor: pointer;
+        transition: background 0.15s ease;
+      }
+      .pid-restore-backup-btn:hover {
+        background: rgba(59, 130, 246, 0.28);
+      }
+      .pid-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+      }
+      .pid-box {
+        background: rgba(148, 163, 184, 0.14);
+        border: 1px solid rgba(148, 163, 184, 0.28);
+        border-radius: 10px;
+        padding: 8px 6px;
+        text-align: center;
+        cursor: pointer;
+        color: #94a3b8;
+        transition: border-color 0.15s ease, transform 0.12s ease;
+      }
+      .pid-box:hover {
+        border-color: rgba(148, 163, 184, 0.55);
+        transform: translateY(-1px);
+      }
+      .pid-box.manual-override {
+        background: rgba(245, 158, 11, 0.14);
+        border-color: rgba(245, 158, 11, 0.55);
+        color: #fde68a;
+      }
+      .pid-box-top {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        font-size: 0.72em;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        margin-bottom: 3px;
+      }
+      .pid-box-val {
+        font-size: 0.95em;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+      }
+      .pid-modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(2, 6, 23, 0.72);
+        backdrop-filter: blur(4px);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        padding: 16px;
+      }
+      .pid-modal-backdrop.open {
+        display: flex;
+      }
+      .pid-modal {
+        width: 100%;
+        max-width: 360px;
+        background: var(--card-background-color, #1e293b);
+        color: var(--primary-text-color, #f1f5f9);
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        border-radius: 16px;
+        padding: 18px;
+        box-shadow: 0 20px 45px rgba(0, 0, 0, 0.45);
+      }
+      .pid-modal-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 1.02em;
+        font-weight: 700;
+        margin-bottom: 10px;
+        color: #fbbf24;
+      }
+      .pid-modal-warn {
+        font-size: 0.84em;
+        line-height: 1.45;
+        color: var(--secondary-text-color, #cbd5e1);
+        background: rgba(245, 158, 11, 0.1);
+        border: 1px solid rgba(245, 158, 11, 0.28);
+        border-radius: 10px;
+        padding: 10px;
+        margin-bottom: 12px;
+      }
+      .pid-modal-input-wrap {
+        margin-bottom: 14px;
+      }
+      .pid-modal-input-wrap label {
+        display: block;
+        font-size: 0.8em;
+        color: var(--secondary-text-color, #94a3b8);
+        margin-bottom: 4px;
+      }
+      .pid-modal-input-wrap input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 8px 10px;
+        border-radius: 8px;
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        background: rgba(15, 23, 42, 0.55);
+        color: var(--primary-text-color, #f8fafc);
+        font-size: 1em;
+        font-weight: 600;
+      }
+      .pid-modal-actions {
+        display: flex;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .pid-btn {
+        border: none;
+        border-radius: 8px;
+        padding: 8px 12px;
+        font-size: 0.82em;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .pid-btn-cancel {
+        background: rgba(148, 163, 184, 0.18);
+        color: #cbd5e1;
+      }
+      .pid-btn-restore {
+        background: rgba(56, 189, 248, 0.18);
+        color: #7dd3fc;
+      }
+      .pid-btn-save {
+        background: #f59e0b;
+        color: #0f172a;
+      }
+      .pid-btn-danger {
+        background: #ef4444;
+        color: #ffffff;
+      }
     `;
 
     const t = (k) => getTranslation(this._hass, k);
@@ -6709,6 +7385,39 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
         </div>
       </div>
 
+      <div class="pid-panel">
+        <div class="pid-header">
+          <div class="pid-title-row">
+            <span id="pid-section-title">${t('pid_section_title')}</span>
+            <span class="pid-state-pill" id="pid-state-pill">--</span>
+          </div>
+          <div class="pid-actions">
+            <button type="button" class="pid-restore-backup-btn" id="pid-restore-backup-btn" title="${t('pid_restore_backup_btn')}">
+              <ha-icon icon="mdi:backup-restore" style="--mdc-icon-size: 14px;"></ha-icon>
+              <span id="pid-restore-backup-label">${t('pid_restore_backup_btn')}</span>
+            </button>
+            <button type="button" class="pid-reset-btn" id="pid-reset-btn" title="${t('pid_reset_btn')}">
+              <ha-icon icon="mdi:restart-alert" style="--mdc-icon-size: 14px;"></ha-icon>
+              <span id="pid-reset-label">${t('pid_reset_btn')}</span>
+            </button>
+          </div>
+        </div>
+        <div class="pid-grid">
+          <div class="pid-box" id="pid-box-kp" data-param="Kp" title="${t('pid_click_to_edit')}">
+            <div class="pid-box-top"><span id="pid-lock-kp">🔒</span><span>Kp</span></div>
+            <div class="pid-box-val" id="pid-val-kp">--</div>
+          </div>
+          <div class="pid-box" id="pid-box-ki" data-param="Ki" title="${t('pid_click_to_edit')}">
+            <div class="pid-box-top"><span id="pid-lock-ki">🔒</span><span>Ki</span></div>
+            <div class="pid-box-val" id="pid-val-ki">--</div>
+          </div>
+          <div class="pid-box" id="pid-box-kd" data-param="Kd" title="${t('pid_click_to_edit')}">
+            <div class="pid-box-top"><span id="pid-lock-kd">🔒</span><span>Kd</span></div>
+            <div class="pid-box-val" id="pid-val-kd">--</div>
+          </div>
+        </div>
+      </div>
+
       <div class="bottom-row">
         <span style="color: var(--secondary-text-color, #94a3b8);" id="valve-status-label">${t('valve_status')}</span>
         <div class="valve-status" id="valve-status" style="margin-right: auto; padding-left: 10px;">
@@ -6720,11 +7429,217 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
           <span id="battery-text">--%</span>
         </div>
       </div>
+
+      <div class="pid-modal-backdrop" id="pid-modal-backdrop">
+        <div class="pid-modal">
+          <div class="pid-modal-title" id="pid-modal-title"></div>
+          <div class="pid-modal-warn" id="pid-modal-warn"></div>
+          <div class="pid-modal-input-wrap" id="pid-modal-input-wrap">
+            <label for="pid-modal-input" id="pid-modal-input-label"></label>
+            <input type="number" id="pid-modal-input" />
+          </div>
+          <div class="pid-modal-actions">
+            <button type="button" class="pid-btn pid-btn-cancel" id="pid-modal-cancel">${t('pid_modal_cancel')}</button>
+            <button type="button" class="pid-btn pid-btn-restore" id="pid-modal-restore">${t('pid_modal_restore')}</button>
+            <button type="button" class="pid-btn pid-btn-save" id="pid-modal-confirm">${t('pid_modal_save')}</button>
+          </div>
+        </div>
+      </div>
     `;
 
     this.shadowRoot.appendChild(style);
     this.shadowRoot.appendChild(card);
+    this._bindPidEvents();
     this._rendered = true;
+  }
+
+  _bindPidEvents() {
+    this._activePidParam = null;
+    this._modalMode = null;
+
+    const closeModal = () => {
+      const backdrop = this.shadowRoot.getElementById('pid-modal-backdrop');
+      if (backdrop) backdrop.classList.remove('open');
+      this._activePidParam = null;
+      this._modalMode = null;
+    };
+
+    ['kp', 'ki', 'kd'].forEach((paramLower) => {
+      const box = this.shadowRoot.getElementById(`pid-box-${paramLower}`);
+      if (!box) return;
+      box.addEventListener('click', () => {
+        if (!this._hass || !this._config || !this._config.entity) return;
+        const param = box.dataset.param;
+        this._openPidEditModal(param);
+      });
+    });
+
+    const resetBtn = this.shadowRoot.getElementById('pid-reset-btn');
+    if (resetBtn) {
+      resetBtn.addEventListener('click', () => {
+        if (!this._hass || !this._config || !this._config.entity) return;
+        this._openResetModal();
+      });
+    }
+
+    const restoreBackupBtn = this.shadowRoot.getElementById('pid-restore-backup-btn');
+    if (restoreBackupBtn) {
+      restoreBackupBtn.addEventListener('click', () => {
+        if (!this._hass || !this._config || !this._config.entity) return;
+        this._openRestoreBackupModal();
+      });
+    }
+
+    const cancelBtn = this.shadowRoot.getElementById('pid-modal-cancel');
+    if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+
+    const backdrop = this.shadowRoot.getElementById('pid-modal-backdrop');
+    if (backdrop) {
+      backdrop.addEventListener('click', (e) => {
+        if (e.target === backdrop) closeModal();
+      });
+    }
+
+    const restoreBtn = this.shadowRoot.getElementById('pid-modal-restore');
+    if (restoreBtn) {
+      restoreBtn.addEventListener('click', async () => {
+        if (!this._hass || !this._config || !this._activePidParam) return;
+        await this._hass.callService('multizone_thermostat', 'set_pid_parameters', {
+          climate_entity: this._config.entity,
+          lock_parameter: this._activePidParam,
+          unlock: false,
+        });
+        closeModal();
+      });
+    }
+
+    const confirmBtn = this.shadowRoot.getElementById('pid-modal-confirm');
+    if (confirmBtn) {
+      confirmBtn.addEventListener('click', async () => {
+        if (!this._hass || !this._config || !this._config.entity) return;
+        if (this._modalMode === 'reset') {
+          await this._hass.callService('multizone_thermostat', 'reset_autotune', {
+            climate_entity: this._config.entity,
+          });
+          closeModal();
+          return;
+        }
+        if (this._modalMode === 'restore_backup') {
+          await this._hass.callService('multizone_thermostat', 'restore_autotune', {
+            climate_entity: this._config.entity,
+          });
+          closeModal();
+          return;
+        }
+        if (this._modalMode === 'edit' && this._activePidParam) {
+          const inputEl = this.shadowRoot.getElementById('pid-modal-input');
+          const parsed = inputEl ? parseFloat(inputEl.value) : NaN;
+          if (!isNaN(parsed)) {
+            await this._hass.callService('multizone_thermostat', 'set_pid_parameters', {
+              climate_entity: this._config.entity,
+              [this._activePidParam.toLowerCase()]: parsed,
+              unlock: true,
+            });
+          }
+          closeModal();
+        }
+      });
+    }
+  }
+
+  _openPidEditModal(param) {
+    const t = (k) => getTranslation(this._hass, k);
+    this._modalMode = 'edit';
+    this._activePidParam = param;
+
+    const specs = {
+      Kp: { min: 0.1, max: 500, step: 0.1 },
+      Ki: { min: 0, max: 1, step: 0.0001 },
+      Kd: { min: 0, max: 50000, step: 1 },
+    }[param];
+
+    const titleEl = this.shadowRoot.getElementById('pid-modal-title');
+    const warnEl = this.shadowRoot.getElementById('pid-modal-warn');
+    const inputWrap = this.shadowRoot.getElementById('pid-modal-input-wrap');
+    const labelEl = this.shadowRoot.getElementById('pid-modal-input-label');
+    const inputEl = this.shadowRoot.getElementById('pid-modal-input');
+    const restoreBtn = this.shadowRoot.getElementById('pid-modal-restore');
+    const confirmBtn = this.shadowRoot.getElementById('pid-modal-confirm');
+    const valEl = this.shadowRoot.getElementById(`pid-val-${param.toLowerCase()}`);
+    const backdrop = this.shadowRoot.getElementById('pid-modal-backdrop');
+
+    if (titleEl) titleEl.innerText = `⚠️ ${t('pid_modal_title')} (${param})`;
+    if (warnEl) warnEl.innerText = t('pid_modal_warn');
+    if (inputWrap) inputWrap.style.display = 'block';
+    if (labelEl) labelEl.innerText = `${t('pid_modal_value')} (${param})`;
+    if (inputEl && specs) {
+      inputEl.min = String(specs.min);
+      inputEl.max = String(specs.max);
+      inputEl.step = String(specs.step);
+      const curNum = valEl ? parseFloat(valEl.innerText) : NaN;
+      inputEl.value = isNaN(curNum) ? '0' : String(curNum);
+    }
+    if (restoreBtn) {
+      const overrides = (this._latestPidInfo && this._latestPidInfo.overrides) || [];
+      restoreBtn.style.display = overrides.includes(param) ? 'inline-block' : 'none';
+      restoreBtn.innerText = t('pid_modal_restore');
+    }
+    if (confirmBtn) {
+      confirmBtn.className = 'pid-btn pid-btn-save';
+      confirmBtn.innerText = t('pid_modal_save');
+    }
+    if (backdrop) backdrop.classList.add('open');
+  }
+
+  _openResetModal() {
+    const t = (k) => getTranslation(this._hass, k);
+    this._modalMode = 'reset';
+    this._activePidParam = null;
+
+    const titleEl = this.shadowRoot.getElementById('pid-modal-title');
+    const warnEl = this.shadowRoot.getElementById('pid-modal-warn');
+    const inputWrap = this.shadowRoot.getElementById('pid-modal-input-wrap');
+    const restoreBtn = this.shadowRoot.getElementById('pid-modal-restore');
+    const confirmBtn = this.shadowRoot.getElementById('pid-modal-confirm');
+    const backdrop = this.shadowRoot.getElementById('pid-modal-backdrop');
+
+    if (titleEl) titleEl.innerText = `🔄 ${t('pid_reset_title')}`;
+    if (warnEl) warnEl.innerText = t('pid_reset_confirm_msg');
+    if (inputWrap) inputWrap.style.display = 'none';
+    if (restoreBtn) restoreBtn.style.display = 'none';
+    if (confirmBtn) {
+      confirmBtn.className = 'pid-btn pid-btn-danger';
+      confirmBtn.innerText = t('pid_reset_confirm_btn');
+    }
+    if (backdrop) backdrop.classList.add('open');
+  }
+
+  _openRestoreBackupModal() {
+    const t = (k) => getTranslation(this._hass, k);
+    this._modalMode = 'restore_backup';
+    this._activePidParam = null;
+
+    const titleEl = this.shadowRoot.getElementById('pid-modal-title');
+    const warnEl = this.shadowRoot.getElementById('pid-modal-warn');
+    const inputWrap = this.shadowRoot.getElementById('pid-modal-input-wrap');
+    const restoreBtn = this.shadowRoot.getElementById('pid-modal-restore');
+    const confirmBtn = this.shadowRoot.getElementById('pid-modal-confirm');
+    const backdrop = this.shadowRoot.getElementById('pid-modal-backdrop');
+
+    const bp = this._latestBackupPid;
+    const bpText = (bp && bp.Kp !== undefined)
+      ? ` (Kp: ${bp.Kp}, Ki: ${bp.Ki}, Kd: ${bp.Kd})`
+      : '';
+
+    if (titleEl) titleEl.innerText = `↩️ ${t('pid_restore_backup_title')}`;
+    if (warnEl) warnEl.innerText = `${t('pid_restore_backup_confirm_msg')}${bpText}`;
+    if (inputWrap) inputWrap.style.display = 'none';
+    if (restoreBtn) restoreBtn.style.display = 'none';
+    if (confirmBtn) {
+      confirmBtn.className = 'pid-btn pid-btn-save';
+      confirmBtn.innerText = t('pid_restore_backup_confirm_btn');
+    }
+    if (backdrop) backdrop.classList.add('open');
   }
 
   updateCard() {
@@ -7056,6 +7971,82 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
           batteryIcon.style.color = "var(--secondary-text-color, #94a3b8)";
         }
       }
+
+      // PID & Autotuner Display
+      const attrs = climateState.attributes || {};
+      const autotuneSensorKey = this._hass && this._hass.states && Object.keys(this._hass.states).find(k =>
+        k.startsWith('sensor.') && k.includes('autotun') && (isSlugMatch(k) || k.includes(slug))
+      );
+      const autotuneStateObj = autotuneSensorKey ? this._hass.states[autotuneSensorKey] : null;
+      const autoAttrs = (autotuneStateObj && autotuneStateObj.attributes) || {};
+
+      const readNumFallback = (paramLower) => {
+        const numKey = Object.keys(this._hass.states).find(k =>
+          k.startsWith('number.') && k.includes(`pid_${paramLower}`) && (isSlugMatch(k) || k.includes(slug))
+        );
+        if (numKey && this._hass.states[numKey]) {
+          const parsed = parseFloat(this._hass.states[numKey].state);
+          if (!isNaN(parsed)) return parsed;
+        }
+        return null;
+      };
+
+      const kpVal = attrs.pid_kp !== undefined ? attrs.pid_kp : (autoAttrs.Kp !== undefined ? autoAttrs.Kp : readNumFallback('kp'));
+      const kiVal = attrs.pid_ki !== undefined ? attrs.pid_ki : (autoAttrs.Ki !== undefined ? autoAttrs.Ki : readNumFallback('ki'));
+      const kdVal = attrs.pid_kd !== undefined ? attrs.pid_kd : (autoAttrs.Kd !== undefined ? autoAttrs.Kd : readNumFallback('kd'));
+      const overrides = Array.isArray(attrs.pid_manual_overrides)
+        ? attrs.pid_manual_overrides
+        : (Array.isArray(autoAttrs.manual_overrides) ? autoAttrs.manual_overrides : []);
+      const autotuneState = attrs.autotune_state || (autotuneStateObj ? autotuneStateObj.state : null);
+
+      this._latestPidInfo = { kp: kpVal, ki: kiVal, kd: kdVal, overrides };
+      this._latestBackupPid = attrs.autotune_backup_pid || null;
+
+      const pidTitleEl = this.shadowRoot.getElementById('pid-section-title');
+      if (pidTitleEl) pidTitleEl.innerText = t('pid_section_title');
+      const resetLabelEl = this.shadowRoot.getElementById('pid-reset-label');
+      if (resetLabelEl) resetLabelEl.innerText = t('pid_reset_btn');
+      const restoreBackupBtn = this.shadowRoot.getElementById('pid-restore-backup-btn');
+      const restoreBackupLabel = this.shadowRoot.getElementById('pid-restore-backup-label');
+      if (restoreBackupLabel) restoreBackupLabel.innerText = t('pid_restore_backup_btn');
+      if (restoreBackupBtn) {
+        restoreBackupBtn.style.display = attrs.autotune_can_restore ? 'inline-flex' : 'none';
+      }
+
+      const pillEl = this.shadowRoot.getElementById('pid-state-pill');
+      if (pillEl) {
+        if (overrides.length > 0) {
+          pillEl.innerText = t('pid_manual_badge');
+        } else if (
+          autotuneState === 'completed'
+          || (typeof autotuneState === 'string' && (autotuneState.includes('Smart PID Attivo') || autotuneState.includes('Smart PID Active')))
+        ) {
+          pillEl.innerText = t('pid_auto_badge');
+        } else {
+          const cyc = attrs.autotune_cycles !== undefined ? attrs.autotune_cycles : 0;
+          const req = attrs.autotune_required_cycles !== undefined ? attrs.autotune_required_cycles : 3;
+          pillEl.innerText = `${t('pid_learning_status')} (${cyc}/${req})`;
+        }
+      }
+
+      const fmtMap = {
+        Kp: kpVal !== null && kpVal !== undefined ? Number(kpVal).toFixed(1) : '--',
+        Ki: kiVal !== null && kiVal !== undefined ? Number(kiVal).toFixed(4) : '--',
+        Kd: kdVal !== null && kdVal !== undefined ? Number(kdVal).toFixed(1) : '--',
+      };
+      ['Kp', 'Ki', 'Kd'].forEach((param) => {
+        const lower = param.toLowerCase();
+        const box = this.shadowRoot.getElementById(`pid-box-${lower}`);
+        const valEl = this.shadowRoot.getElementById(`pid-val-${lower}`);
+        const lockEl = this.shadowRoot.getElementById(`pid-lock-${lower}`);
+        const isOverride = overrides.includes(param);
+        if (valEl) valEl.innerText = fmtMap[param];
+        if (box) {
+          box.classList.toggle('manual-override', isOverride);
+          box.title = t('pid_click_to_edit');
+        }
+        if (lockEl) lockEl.innerText = isOverride ? '✏️' : '🔒';
+      });
     } catch (err) {
       console.error("Error updating MultizoneThermostatZoneEnergyCard:", err);
     }
@@ -7268,7 +8259,9 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
     };
 
     for (const eid of Object.keys(this._hass.states)) {
+      if (!eid.startsWith('select.') && !eid.startsWith('switch.')) continue;
       const s = this._hass.states[eid];
+      if (eid.includes('pid_') || eid.includes('split_') || s.attributes?.multizone_type === 'pid_manual_unlock') continue;
       const climateId = s.attributes ? s.attributes.climate_entity : null;
       if (climateId && this._hass.states[climateId] && !seenClimates.has(climateId)) {
         seenClimates.add(climateId);
@@ -7649,31 +8642,66 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
 
         .matrix-container {
           overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
           margin-bottom: 20px;
         }
         .time-ruler {
           display: flex;
-          margin-left: 180px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-          padding-bottom: 4px;
+          align-items: center;
+          gap: 10px;
           margin-bottom: 8px;
+          min-width: 680px;
+        }
+        .ruler-spacer {
+          width: 170px;
+          flex-shrink: 0;
+          box-sizing: border-box;
+          position: sticky;
+          left: 0;
+          background: #1e293b;
+          z-index: 20;
+          height: 20px;
+        }
+        .ruler-track {
+          flex: 1;
           position: relative;
+          height: 20px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+          border-left: 1px solid transparent;
+          border-right: 1px solid transparent;
+          box-sizing: border-box;
         }
         .ruler-hour {
-          flex: 1;
-          text-align: left;
+          position: absolute;
+          top: 0;
+          transform: translateX(-50%);
           font-size: 0.75rem;
           color: rgba(255, 255, 255, 0.6);
+          white-space: nowrap;
+          user-select: none;
+        }
+        .ruler-hour.ruler-start {
+          transform: translateX(0);
+        }
+        .ruler-hour.ruler-end {
+          transform: translateX(-100%);
         }
         .matrix-row {
           display: flex;
           align-items: center;
           margin-bottom: 8px;
           gap: 10px;
+          min-width: 680px;
         }
         .room-label-box {
           width: 170px;
           flex-shrink: 0;
+          box-sizing: border-box;
+          position: sticky;
+          left: 0;
+          background: #1e293b;
+          z-index: 20;
+          padding-right: 6px;
           display: flex;
           align-items: center;
           justify-content: space-between;
@@ -7704,6 +8732,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
           cursor: crosshair;
           overflow: hidden;
           border: 1px solid rgba(255, 255, 255, 0.08);
+          box-sizing: border-box;
         }
         .grid-line {
           position: absolute;
@@ -7746,6 +8775,34 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
           transform: scaleY(1.08);
           filter: brightness(1.15);
           z-index: 5;
+        }
+        .time-block.baseline-block {
+          opacity: 0.36;
+          border: 1px dashed rgba(255, 255, 255, 0.35);
+          box-shadow: none;
+          font-weight: 500;
+          font-size: 0.68rem;
+          z-index: 1;
+          pointer-events: none;
+        }
+        .time-block.manual-override-block {
+          background: linear-gradient(135deg, rgba(245, 158, 11, 0.92), rgba(217, 119, 6, 0.92));
+          border: 1px solid #fde68a;
+          z-index: 6;
+          box-shadow: 0 0 8px rgba(245, 158, 11, 0.45);
+        }
+        .matrix-row.general-master-row {
+          padding-bottom: 8px;
+          margin-bottom: 10px;
+          border-bottom: 1px dashed rgba(56, 189, 248, 0.35);
+        }
+        .matrix-row.general-master-row .room-title {
+          color: #38bdf8;
+          font-weight: 700;
+        }
+        .matrix-row.general-master-row .timeline-track {
+          border-color: rgba(56, 189, 248, 0.35);
+          background: rgba(56, 189, 248, 0.06);
         }
         .block-comfort { background: linear-gradient(135deg, #f97316, #ea580c); }
         .block-eco { background: linear-gradient(135deg, #22c55e, #16a34a); }
@@ -7916,12 +8973,9 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
           .time-ruler, .matrix-row {
             min-width: 680px;
           }
+          .ruler-spacer,
           .room-label-box {
-            position: sticky;
-            left: 0;
-            background: #1e293b;
-            z-index: 10;
-            padding-right: 6px;
+            width: 120px;
           }
           .matrix-table-container table {
             min-width: 520px;
@@ -8206,8 +9260,8 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
       const expDate = new Date(sched.profile_expires_at);
       const expStr = isNaN(expDate.getTime()) ? String(sched.profile_expires_at) : expDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       expiryHtml = `
-        <span class="badge badge-amber badge-btn" id="btn-cancel-expiry" title="Annulla scadenza">
-          ⏳ Fino a ${expStr} ✕
+        <span class="badge badge-amber badge-btn" id="btn-cancel-expiry" title="${getTranslation(this._hass, 'sched_cancel_expiry') || 'Cancel expiration'}">
+          ⏳ ${expStr} ✕
         </span>
       `;
     }
@@ -8217,8 +9271,8 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
     if (sr && sr.active) {
       const arr = sr.arrival_time ? sr.arrival_time.substring(0, 5) : '';
       srHtml = `
-        <span class="badge badge-orange badge-btn" id="btn-cancel-sr" title="Annulla Smart Return">
-          🚗 Rientro ore ${arr} ✕
+        <span class="badge badge-orange badge-btn" id="btn-cancel-sr" title="${getTranslation(this._hass, 'sched_cancel_sr') || 'Cancel Smart Return'}">
+          🚗 ${getTranslation(this._hass, 'sched_return_at') || 'Return at'} ${arr} ✕
         </span>
       `;
     }
@@ -8317,7 +9371,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
     const isCoolMode = (typeof getMasterHVACMode === 'function' && getMasterHVACMode(this._hass) === 'cool');
     const zones = this._getZones();
     if (zones.length === 0) {
-      container.innerHTML = `<div style="opacity:0.6; margin-bottom: 20px;">Nessuna zona termostato configurata.</div>`;
+      container.innerHTML = `<div style="opacity:0.6; margin-bottom: 20px;">${getTranslation(this._hass, 'sched_no_zones') || 'No thermostat zones configured.'}</div>`;
       return;
     }
 
@@ -8519,10 +9573,15 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
 
         <div class="matrix-container" id="matrix-scroll-area">
           <div class="time-ruler">
-            ${Array.from({ length: 13 }).map((_, i) => {
-              const h = String(i * 2).padStart(2, '0');
-              return `<div class="ruler-hour">${h}:00</div>`;
-            }).join('')}
+            <div class="ruler-spacer"></div>
+            <div class="ruler-track">
+              ${Array.from({ length: 13 }).map((_, i) => {
+                const h = String(i * 2).padStart(2, '0');
+                const leftPct = (i * 100) / 12;
+                const edgeCls = i === 0 ? 'ruler-start' : (i === 12 ? 'ruler-end' : '');
+                return `<div class="ruler-hour ${edgeCls}" style="left: ${leftPct}%;">${h}:00</div>`;
+              }).join('')}
+            </div>
           </div>
           <div id="matrix-rows-container"></div>
         </div>
@@ -8580,6 +9639,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
     sched.profiles[this._editorProfileId].baseline_preset = newPreset;
     this._localScheduleCache = sched;
     this._saveProfileToServer(this._editorProfileId, sched.profiles[this._editorProfileId]);
+    this.renderMatrixRows();
   }
 
   _copyDayToRange(targetDays) {
@@ -8598,6 +9658,108 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
     this.renderMatrixRows();
   }
 
+  _computeBaselineGaps(blocks, baselinePreset) {
+    const base = baselinePreset || 'eco';
+    const sorted = (blocks || [])
+      .map(b => {
+        const s = this._toMinutes(b.start);
+        const e = (b.end === '23:59' || b.end === '24:00') ? 1440 : this._toMinutes(b.end);
+        return { s, e };
+      })
+      .filter(b => b.e > b.s)
+      .sort((a, b) => a.s - b.s);
+
+    const gaps = [];
+    let cursor = 0;
+    for (const seg of sorted) {
+      if (seg.s > cursor) {
+        gaps.push({
+          startMin: cursor,
+          endMin: seg.s,
+          start: this._toTimeStr(cursor),
+          end: seg.s >= 1440 ? '24:00' : this._toTimeStr(seg.s),
+          preset: base,
+        });
+      }
+      cursor = Math.max(cursor, seg.e);
+    }
+    if (cursor < 1440) {
+      gaps.push({
+        startMin: cursor,
+        endMin: 1440,
+        start: this._toTimeStr(cursor),
+        end: '24:00',
+        preset: base,
+      });
+    }
+    return gaps;
+  }
+
+  _computeGeneralDayBlocks(zones, daySchedule) {
+    if (!zones || zones.length === 0) return [];
+    const points = new Set([0, 1440]);
+    const zoneIntervals = zones.map(z => {
+      const zBlocks = daySchedule[z.climate] || daySchedule[z.id] || [];
+      return zBlocks.map(b => {
+        const s = this._toMinutes(b.start);
+        const e = (b.end === '23:59' || b.end === '24:00') ? 1440 : this._toMinutes(b.end);
+        if (e > s) {
+          points.add(s);
+          points.add(e);
+        }
+        return { s, e, preset: b.preset || 'comfort' };
+      }).filter(b => b.e > b.s);
+    });
+
+    const sortedPoints = Array.from(points).sort((a, b) => a - b);
+    const priority = { comfort: 0, eco: 1, sleep: 2, away: 3 };
+    const slices = [];
+
+    for (let i = 0; i < sortedPoints.length - 1; i++) {
+      const t1 = sortedPoints[i];
+      const t2 = sortedPoints[i + 1];
+      if (t2 <= t1) continue;
+      const mid = (t1 + t2) / 2;
+      const counts = {};
+      let covered = 0;
+
+      for (const intervals of zoneIntervals) {
+        const hit = intervals.find(iv => iv.s <= mid && iv.e > mid);
+        if (hit) {
+          covered += 1;
+          counts[hit.preset] = (counts[hit.preset] || 0) + 1;
+        }
+      }
+      if (covered === 0) continue;
+
+      const topPreset = Object.keys(counts).sort((a, b) => {
+        if (counts[b] !== counts[a]) return counts[b] - counts[a];
+        return (priority[a] ?? 99) - (priority[b] ?? 99);
+      })[0];
+      const mixed = counts[topPreset] < zones.length;
+      slices.push({ startMin: t1, endMin: t2, preset: topPreset, mixed });
+    }
+
+    const merged = [];
+    for (const sl of slices) {
+      const prev = merged[merged.length - 1];
+      if (prev && prev.endMin === sl.startMin && prev.preset === sl.preset && prev.mixed === sl.mixed) {
+        prev.endMin = sl.endMin;
+      } else {
+        merged.push({ ...sl });
+      }
+    }
+
+    return merged.map(m => ({
+      start: this._toTimeStr(m.startMin),
+      end: m.endMin >= 1440 ? '24:00' : this._toTimeStr(m.endMin),
+      startMin: m.startMin,
+      endMin: m.endMin,
+      preset: m.preset,
+      mixed: m.mixed,
+    }));
+  }
+
   renderMatrixRows() {
     const rowsContainer = this.shadowRoot.querySelector('#matrix-rows-container');
     if (!rowsContainer) return;
@@ -8606,6 +9768,8 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
     const sched = this._getScheduleStatus();
     const prof = sched.profiles?.[this._editorProfileId] || {};
     const daySchedule = prof.days?.[this._selectedDay] || {};
+    const currentBaseline = prof.baseline_preset || 'eco';
+    const manualOverrides = sched.manual_overrides || {};
 
     const dayMap = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
     const isToday = dayMap[new Date().getDay()] === this._selectedDay;
@@ -8613,26 +9777,94 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
     const nowMinutes = now.getHours() * 60 + now.getMinutes();
     const nowPercent = (nowMinutes / 1440) * 100;
 
-    rowsContainer.innerHTML = zones.map(z => {
+    const gridAndLine = `
+      ${Array.from({ length: 12 }).map((_, i) => `
+        <div class="grid-line" style="left: ${(i + 1) * (100 / 12)}%;"></div>
+      `).join('')}
+      ${isToday ? `<div class="current-time-line" style="left: ${nowPercent}%;"></div>` : ''}
+    `;
+
+    const renderBaselineGapsHtml = (blocks) => {
+      const gaps = this._computeBaselineGaps(blocks, currentBaseline);
+      return gaps.map(g => {
+        const left = (g.startMin / 1440) * 100;
+        const width = ((g.endMin - g.startMin) / 1440) * 100;
+        if (width < 2) return '';
+        const presetClass = 'block-' + g.preset;
+        const baseWord = this._t('sched_base_tag');
+        return `
+          <div class="time-block baseline-block ${presetClass}" style="left: ${left}%; width: ${width}%;"
+               title="${g.preset.toUpperCase()} (${baseWord}): ${g.start} - ${g.end}">
+            ${g.preset.substring(0, 3).toUpperCase()} (${baseWord})
+          </div>
+        `;
+      }).join('');
+    };
+
+    const generalBlocks = this._computeGeneralDayBlocks(zones, daySchedule);
+    const generalRowHtml = zones.length > 0 ? `
+      <div class="matrix-row general-master-row" data-zone="__all__">
+        <div class="room-label-box">
+          <span class="room-title" title="${this._t('sched_all_zones_row')}">🏠 ${this._t('sched_all_zones_row')}</span>
+        </div>
+        <div class="timeline-track" data-zone="__all__">
+          ${gridAndLine}
+          ${renderBaselineGapsHtml(generalBlocks)}
+          ${generalBlocks.map(b => {
+            const left = (b.startMin / 1440) * 100;
+            const width = Math.max(1.5, ((b.endMin - b.startMin) / 1440) * 100);
+            const presetClass = 'block-' + b.preset;
+            const prefix = b.mixed ? '⚡ ' : '';
+            return `
+              <div class="time-block ${presetClass}" style="left: ${left}%; width: ${width}%;"
+                   data-zone="__all__" data-start="${b.start}" data-end="${b.end}" data-preset="${b.preset}"
+                   title="${b.preset.toUpperCase()}: ${b.start} - ${b.end}${b.mixed ? ' (Mixed)' : ''}">
+                ${prefix}${b.preset.substring(0, 3).toUpperCase()} ${b.start}-${b.end}
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    ` : '';
+
+    const zonesRowsHtml = zones.map(z => {
       const blocks = daySchedule[z.climate] || daySchedule[z.id] || [];
+      let overrideBlockHtml = '';
+      if (isToday && manualOverrides[z.climate]) {
+        const ov = manualOverrides[z.climate];
+        const untilDt = ov.until ? new Date(ov.until) : null;
+        if (untilDt && !isNaN(untilDt.getTime()) && untilDt > now && nowMinutes < 1440) {
+          const sameDay = untilDt.getDate() === now.getDate()
+            && untilDt.getMonth() === now.getMonth()
+            && untilDt.getFullYear() === now.getFullYear();
+          const untilMin = sameDay ? (untilDt.getHours() * 60 + untilDt.getMinutes()) : 1440;
+          const ovEnd = Math.min(1440, Math.max(nowMinutes + 15, untilMin));
+          const left = (nowMinutes / 1440) * 100;
+          const width = Math.max(2.0, ((ovEnd - nowMinutes) / 1440) * 100);
+          overrideBlockHtml = `
+            <div class="time-block manual-override-block" style="left: ${left}%; width: ${width}%;"
+                 data-zone="${z.climate}" data-override="1"
+                 title="Override manuale attivo: ${Number(ov.target_temp).toFixed(1)}°C">
+              ✋ ${Number(ov.target_temp).toFixed(1)}°C
+            </div>
+          `;
+        }
+      }
+
       return `
         <div class="matrix-row" data-zone="${z.climate}">
           <div class="room-label-box">
             <span class="room-title" title="${z.name}">${z.name}</span>
-            <button class="room-copy-btn btn-copy-room" data-zone="${z.climate}" title="Copia/Incolla programmazione stanza">
+            <button class="room-copy-btn btn-copy-room" data-zone="${z.climate}" title="${getTranslation(this._hass, 'sched_copy_room_title') || 'Copy/Paste room schedule'}">
               📋
             </button>
           </div>
           <div class="timeline-track" data-zone="${z.climate}">
-            ${Array.from({ length: 12 }).map((_, i) => `
-              <div class="grid-line" style="left: ${(i + 1) * (100 / 12)}%;"></div>
-            `).join('')}
-            ${isToday ? `
-              <div class="current-time-line" style="left: ${nowPercent}%;"></div>
-            ` : ''}
+            ${gridAndLine}
+            ${renderBaselineGapsHtml(blocks)}
             ${blocks.map((b, idx) => {
               const startMin = this._toMinutes(b.start);
-              const endMin = this._toMinutes(b.end);
+              const endMin = (b.end === '23:59' || b.end === '24:00') ? 1440 : this._toMinutes(b.end);
               const left = (startMin / 1440) * 100;
               const width = Math.max(1.5, ((endMin - startMin) / 1440) * 100);
               const presetClass = 'block-' + (b.preset || 'comfort');
@@ -8643,10 +9875,13 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
                 </div>
               `;
             }).join('')}
+            ${overrideBlockHtml}
           </div>
         </div>
       `;
     }).join('');
+
+    rowsContainer.innerHTML = generalRowHtml + zonesRowsHtml;
 
     rowsContainer.querySelectorAll('.btn-copy-room').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -8658,7 +9893,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
 
     rowsContainer.querySelectorAll('.timeline-track').forEach(track => {
       track.addEventListener('click', (e) => {
-        if (e.target.closest('.time-block')) return;
+        if (e.target.closest('.time-block:not(.baseline-block)')) return;
         const cid = track.getAttribute('data-zone');
         const rect = track.getBoundingClientRect();
         const clickX = e.clientX - rect.left;
@@ -8669,7 +9904,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
 
         this.openSlotModal({
           isEdit: false,
-          zoneId: cid,
+          zoneId: cid === '__all__' ? undefined : cid,
           day: this._selectedDay,
           start: this._toTimeStr(startMin),
           end: this._toTimeStr(endMin),
@@ -8678,10 +9913,29 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
       });
     });
 
-    rowsContainer.querySelectorAll('.time-block').forEach(block => {
+    rowsContainer.querySelectorAll('.time-block:not(.baseline-block)').forEach(block => {
       block.addEventListener('click', (e) => {
         e.stopPropagation();
         const cid = block.getAttribute('data-zone');
+        if (block.hasAttribute('data-override')) {
+          if (this._hass && confirm(getTranslation(this._hass, 'sched_confirm_clear_override') || "Remove temporary manual override for this room?")) {
+            this._hass.callService('multizone_thermostat', 'clear_zone_override', {
+              entity_id: cid
+            });
+          }
+          return;
+        }
+        if (cid === '__all__') {
+          this.openSlotModal({
+            isEdit: true,
+            day: this._selectedDay,
+            preset: block.getAttribute('data-preset') || 'comfort',
+            start: block.getAttribute('data-start'),
+            end: block.getAttribute('data-end'),
+            selectedDays: [this._selectedDay]
+          });
+          return;
+        }
         const idx = parseInt(block.getAttribute('data-index'), 10);
         const blocks = (sched.profiles?.[this._editorProfileId]?.days?.[this._selectedDay]?.[cid]) || [];
         const slot = blocks[idx];
@@ -8712,7 +9966,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
         sourceZone: zoneId,
         blocks: JSON.parse(JSON.stringify(blocks))
       };
-      alert("Programmazione stanza copiata! Clicca di nuovo 📋 su un'altra stanza per incollare.");
+      alert(getTranslation(this._hass, 'sched_copied_alert') || "Room schedule copied! Click 📋 again on another room to paste.");
     } else {
       if (!prof.days) prof.days = {};
       if (!prof.days[this._selectedDay]) prof.days[this._selectedDay] = {};
@@ -8933,19 +10187,19 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
           </div>
           <div class="modal-body">
             <div class="form-row">
-              <label class="form-label">Modalità Impianto:</label>
+              <label class="form-label">${getTranslation(this._hass, 'sched_plant_mode') || 'Plant Mode:'}</label>
               <div style="font-weight:600; color: ${isCoolMode ? '#38bdf8' : '#fb923c'}; margin-bottom: 8px;">
-                ${isCoolMode ? '❄️ Raffrescamento (Cool)' : '🔥 Riscaldamento (Heat)'}
+                ${isCoolMode ? (getTranslation(this._hass, 'sched_cool_mode_label') || '❄️ Cooling (Cool)') : (getTranslation(this._hass, 'sched_heat_mode_label') || '🔥 Heating (Heat)')}
               </div>
             </div>
             <div class="form-row">
-              <label class="form-label">Temperatura Obiettivo (°C):</label>
+              <label class="form-label">${getTranslation(this._hass, 'target_temp') || 'Target Temperature'} (°C):</label>
               <input type="number" id="input-preset-temp" class="form-control" step="0.5" min="10" max="35" value="${safeTemp.toFixed(1)}" style="font-size:1.2rem; font-weight:700; text-align:center; padding:8px;">
             </div>
           </div>
           <div class="modal-actions">
-            <button class="btn" id="btn-cancel-modal">Annulla</button>
-            <button class="btn btn-primary" id="btn-save-preset">Salva</button>
+            <button class="btn" id="btn-cancel-modal">${getTranslation(this._hass, 'btn_cancel') || 'Cancel'}</button>
+            <button class="btn btn-primary" id="btn-save-preset">${getTranslation(this._hass, 'btn_save') || 'Save'}</button>
           </div>
         </div>
       </div>
@@ -9203,7 +10457,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
                         <option value="eco" ${initialVal === 'eco' ? 'selected' : ''}>🌿 Eco (${eTemp.toFixed(1)}°C)</option>
                         <option value="sleep" ${initialVal === 'sleep' ? 'selected' : ''}>🌙 Notte (${sTemp.toFixed(1)}°C)</option>
                         <option value="away" ${initialVal === 'away' ? 'selected' : ''}>🚶 Away (${aTemp.toFixed(1)}°C)</option>
-                        <option value="none" ${initialVal === 'none' ? 'selected' : ''}>⏸️ Nessuna modifica / Baseline (${baseTemp.toFixed(1)}°C)</option>
+                        <option value="none" ${initialVal === 'none' ? 'selected' : ''}>${getTranslation(this._hass, 'sched_no_change_baseline') || '⏸️ No change / Baseline'} (${baseTemp.toFixed(1)}°C)</option>
                       </select>
                     </div>
                   </div>
@@ -9216,14 +10470,14 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
           <div class="modal-actions">
             ${isEdit ? `
               <button type="button" class="btn btn-danger" id="btn-delete-slot">
-                🗑️ Elimina Fascia
+                🗑️ ${getTranslation(this._hass, 'sched_delete') || 'Delete'}
               </button>
             ` : ''}
             <button type="button" class="btn" id="btn-cancel-modal">
-              Annulla
+              ${getTranslation(this._hass, 'btn_cancel') || 'Cancel'}
             </button>
             <button type="button" class="btn btn-primary" id="btn-save-slot">
-              💾 Salva Fascia
+              ${getTranslation(this._hass, 'sched_save_slot') || '💾 Save Slot'}
             </button>
           </div>
         </div>
@@ -9530,11 +10784,11 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
 
           <div style="display:flex; gap:12px;">
             <div class="form-group" style="flex:1;">
-              <label class="form-label">Orario di Rientro Previsto:</label>
+              <label class="form-label">${getTranslation(this._hass, 'sched_arrival_label') || 'Expected Arrival Time:'}</label>
               <input type="time" id="sr-arrival-time" value="${defArrStr}">
             </div>
             <div class="form-group" style="flex:1;">
-              <label class="form-label">Preset Obiettivo:</label>
+              <label class="form-label">${getTranslation(this._hass, 'preset') || 'Preset'}:</label>
               <select id="sr-preset-select">
                 <option value="comfort" selected>${isCoolMode ? '❄️' : '🔥'} Comfort</option>
                 <option value="eco">🌿 Eco</option>
@@ -9543,19 +10797,19 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
           </div>
 
           <div style="display:flex; gap:6px; margin-bottom:12px;">
-            <button class="btn" id="btn-sr-add-1h" style="padding:4px 8px; font-size:0.8rem;">+1 ora</button>
-            <button class="btn" id="btn-sr-add-2h" style="padding:4px 8px; font-size:0.8rem;">+2 ore</button>
-            <button class="btn" id="btn-sr-add-3h" style="padding:4px 8px; font-size:0.8rem;">+3 ore</button>
+            <button class="btn" id="btn-sr-add-1h" style="padding:4px 8px; font-size:0.8rem;">+1h</button>
+            <button class="btn" id="btn-sr-add-2h" style="padding:4px 8px; font-size:0.8rem;">+2h</button>
+            <button class="btn" id="btn-sr-add-3h" style="padding:4px 8px; font-size:0.8rem;">+3h</button>
           </div>
 
           <div class="form-group">
-            <label class="form-label">Radar Termico & Accensione Scaglionata (Anteprima Live):</label>
+            <label class="form-label">${getTranslation(this._hass, 'sched_smart_return') || 'Smart Return'}:</label>
             <div class="radar-list" id="sr-radar-preview"></div>
           </div>
 
           <div class="modal-actions">
-            <button class="btn" id="btn-cancel-modal">Annulla</button>
-            <button class="btn btn-amber" id="btn-confirm-sr">${isCoolMode ? '❄️' : '🔥'} Pianifica Rientro</button>
+            <button class="btn" id="btn-cancel-modal">${getTranslation(this._hass, 'btn_cancel') || 'Cancel'}</button>
+            <button class="btn btn-amber" id="btn-confirm-sr">${isCoolMode ? '❄️' : '🔥'} ${getTranslation(this._hass, 'sched_plan_return') || 'Plan Return'}</button>
           </div>
         </div>
       </div>
@@ -10347,6 +11601,7 @@ class MultizoneThermostatDashboardStrategy extends HTMLElement {
     for (const entityId of Object.keys(hass.states)) {
       if (entityId.startsWith("select.") || entityId.startsWith("switch.")) {
         const stateObj = hass.states[entityId];
+        if (entityId.includes("pid_") || entityId.includes("split_") || stateObj?.attributes?.multizone_type === "pid_manual_unlock") continue;
         const climateId = stateObj.attributes ? stateObj.attributes.climate_entity : null;
         if (climateId) {
           const climateState = hass.states[climateId];
@@ -10424,15 +11679,23 @@ class MultizoneThermostatDashboardStrategy extends HTMLElement {
     // Find preset entity
     const presetEntity = findPresetEntity(hass);
     
-    // Find all zones (by checking for climate_entity attribute)
+    // Find all zones (by checking for climate_entity attribute on zone_mode select/switch)
     const zones = [];
     for (const entityId of Object.keys(hass.states)) {
       if (entityId.startsWith("select.") || entityId.startsWith("switch.")) {
         const stateObj = hass.states[entityId];
+        if (entityId.includes("pid_") || entityId.includes("split_") || stateObj?.attributes?.multizone_type === "pid_manual_unlock") continue;
         const climateId = stateObj.attributes ? stateObj.attributes.climate_entity : null;
-        if (climateId && !zones.some(z => z.climate === climateId)) {
+        if (climateId) {
           const climateState = hass.states[climateId];
           if (climateState) {
+            const existing = zones.find(z => z.climate === climateId);
+            if (existing) {
+              if (entityId.startsWith("select.") && existing.switch && existing.switch.startsWith("switch.")) {
+                existing.switch = entityId;
+              }
+              continue;
+            }
             let title = climateState.attributes.friendly_name || climateId;
             title = title.replace(/^Virtual Thermostats VT /i, '').replace(/^Heating Zones(?: Zone)? /i, '');
             zones.push({

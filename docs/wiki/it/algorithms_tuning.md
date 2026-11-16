@@ -68,8 +68,15 @@ Dai valori $L$, $R$ e $D$, l'autotuner calcola i coefficienti di regolazione:
 * **Tempo Integrale**: $T_i = 2.0 \cdot L \quad \implies \quad K_i = \frac{K_p}{T_i}$
 * **Tempo Derivativo**: $T_d = 0.5 \cdot L \quad \implies \quad K_d = K_p \cdot T_d$
 
-* **Anti-Windup Integrale**: Il termine integrale $K_i$ è limitato matematicamente per impedire l'accumulo di errore quando la caldaia è spenta o durante assenze prolungate.
-* **Filtro Derivativo a Basso Passaggio**: Il termine $K_d$ è attenuato per ignorare rumori di lettura ad alta frequenza generati da sonde Zigbee o correnti d'aria passeggere.
+* **Anti-Windup Integrale**: Il termine integrale $K_i$ è limitato matematicamente (`max_dt = 600s`, `Ti >= 600s`) per impedire l'accumulo di errore quando la caldaia è spenta o durante assenze prolungate.
+* **Filtro Derivativo a Basso Passaggio**: Il termine $K_d$ (`Kd <= 500`, uscita passo limitata a `<= 15.0`) è attenuato per ignorare rumori di lettura ad alta frequenza generati da sonde Zigbee o correnti d'aria passeggere.
+* **Tempo Morto Esteso & Apprendimento Intermedio**: Supporta massetti radianti lenti con tempi morti fino a 4 ore (`L <= 14400s`), apprendimento dell'osservatore termico a carico intermedio (`demand >= 40%`) e normalizzazione duty (`>= 70%`).
+
+### EMA Settimanale & PID Manuale Dual-Season (v6.1.0-beta)
+* **EMA Settimanale con Filtro Mediano**: Dopo i primi 3 cicli di apprendimento, l'osservatore continua a rifinire i guadagni con una media mobile esponenziale settimanale (limitata a `±10%/settimana` e compresa tra `[0.5x, 2.0x]` rispetto alla baseline) per seguire le derive stagionali, con capacità di `rollback_to_baseline`.
+* **Controllo Manuale per Zona & Blocco di Sicurezza**: Il dispositivo di ogni singola zona (`Zona <Nome>`) espone nella sezione **Configurazione** le entità `PID Kp`, `PID Ki`, `PID Kd` (`number`), `PID Manual Unlock` (`switch`, bloccato di default) e `Reset Autotuner` (`button`).
+* **Isolamento Doppio Binario (`heat` / `cool`)**: I parametri PID di riscaldamento e raffrescamento sono separati; modifiche manuali o reset agiscono solo sulla stagione attiva (o sul parametro `mode` dei servizi `set_pid_parameters` / `reset_autotune`). I parametri modificati manualmente non vengono sovrascritti dall'EMA automatica.
+* **Seed Autotuner & Backup Pre-Reset (`v6.1.0-beta.10`)**: È possibile impostare `Kp/Ki/Kd` direttamente come baseline appresa dell'Auto EMA (`seed_autotuner: true`) per far proseguire l'ottimizzazione settimanale da quei valori. Prima di ogni reset dell'autotuner viene salvato un backup automatico dei parametri e dei cicli appresi, ripristinabile in qualsiasi momento tramite `multizone_thermostat.restore_autotune` (o dalla Zone Energy Card).
 
 ---
 
@@ -105,6 +112,6 @@ Quando più stanze richiedono calore contemporaneamente, come viene calcolato il
 1. **`max` (Massimo tra le zone)**:
    La richiesta della centrale termica coincide con il valore più alto registrato tra tutte le zone attive. Ideale per impianti a radiatori tradizionali ad alta temperatura.
 2. **`weighted_average` (Media Ponderata)**:
-   Ogni zona contribuisce alla richiesta proporzionalmente al proprio peso volumetrico (`weight` configurabile nella stanza, default 1.0). Evita accensioni spinte della caldaia per un piccolo disimpegno.
+   Ogni zona contribuisce alla richiesta proporzionalmente al proprio peso volumetrico (`weight` configurabile nella stanza, default 1.0) diviso per la somma dei pesi primari configurati, garantendo una domanda strettamente monotona con un pavimento minimo del 70% sul picco. Evita accensioni spinte della caldaia per un piccolo disimpegno.
 3. **`sum_capped` (Somma Saturata a 100%)**:
    I fabbisogni di tutte le stanze si sommano tra loro fino al massimo del 100%. Ideale per collettori con molteplici circuiti indipendenti.

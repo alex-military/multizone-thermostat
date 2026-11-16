@@ -2,7 +2,7 @@
 
 <span class="badge-beta">BETA</span>
 
-La **Fase 11** consente di associare a ogni singola zona termica il proprio condizionatore split (`climate.*`), integrandolo armoniosamente nell'orchestrazione con i termosifoni e le valvole idroniche.
+La versione **`v6.1.0-beta`** consente di associare a ogni singola zona termica il proprio condizionatore split (`climate.*`), integrandolo armoniosamente nell'orchestrazione con i termosifoni e le valvole idroniche.
 
 ---
 
@@ -35,7 +35,7 @@ $$T_{\text{split\_inviato}} = T_{\text{desiderato}} + \left(T_{\text{split\_lett
 * **Temperatura reale misurata ad altezza uomo**: 19.0 °C (la stanza è ancora fredda)
 * **Temperatura rilevata dalla sonda a soffitto dello split**: 22.0 °C (accumulo di calore vicino al soffitto)
 * **Calcolo**: $T_{\text{split\_inviato}} = 20.5 + (22.0 - 19.0) = 23.5\ ^\circ\text{C}$
-* **Risultato**: Multizone Thermostat ordina allo split di puntare a 23.5 °C. Lo split continuerà a erogare calore fino a quando la sonda a terra non raggiungerà effettivamente i 20.5 °C, eliminando completamente la sensazione di freddo ai piedi.
+* **Risultato**: Multizone Thermostat ordina allo split di puntare a 23.5 °C. Lo split continuerà a erogare calore fino a quando la sonda a terra non raggiungerà effettivamente i 20.5 °C, eliminando completamente la sensazione di freddo ai piedi. Quando la sonda a soffitto non è stratificata (valori vicini al sensore reale), l'iniezione viene scalata proporzionalmente per evitare sbalzi inutili.
 
 ---
 
@@ -71,8 +71,9 @@ Nella scheda Lovelace **Dial Card**, al centro esatto dell'header, è collocato 
   * La card visualizza immediatamente il badge **`⚡ ELETTRICO`** e l'arco luminescente ciano.
 * **Blocco di Sicurezza a Master Acceso**:
   * Quando l'impianto centrale della casa è acceso, il pulsante viene disabilitato per proteggere l'orchestrazione termica globale della famiglia da tocchi involontari.
-* **Riallineamento Automatico al Master**:
+* **Riallineamento Automatico al Master & Sicurezza Finestre**:
   * Se il Master generale viene successivamente acceso, l'accensione manuale locale si disattiva e la stanza si risincronizza con il preset globale dell'abitazione.
+  * L'apertura di una finestra nella stanza azzera immediatamente la richiesta di zona e annulla qualsiasi accensione manuale locale dello split.
 
 ---
 

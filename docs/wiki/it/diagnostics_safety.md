@@ -41,22 +41,30 @@ flowchart TD
 
 Quattro livelli di protezione hardware salvaguardano la caldaia e gli attuatori da usura o danneggiamenti:
 
-### 1. Protezione Anti-Short-Cycle (Anti-Pendolamento Bruciatore)
-Le continue accensioni e spegnimenti del bruciatore a gas nel giro di pochi minuti provocano una rapida usura delle candelette di accensione, dei relè e un crollo dell'efficienza energetica della condensazione:
-* `number.master_control_min_cycle_on`: Forza un tempo minimo di accensione continuativa della caldaia (default: **5 minuti**).
-* `number.master_control_min_cycle_off`: Impone un tempo minimo di riposo della caldaia prima di consentire una nuova riaccensione (default: **5 minuti**).
+### 1. Protezione Anti-Short-Cycle (Caldaia & Pompa di Calore)
+Le continue accensioni e spegnimenti riducono l'efficienza e usurano bruciatori o compressori:
+* **Caldaia a Gas**: `number.master_control_min_cycle_on` / `min_cycle_off` (default: **5 minuti**).
+* **Pompa di Calore Centrale**: Controlli indipendenti `number.master_control_hp_min_cycle_on` / `hp_min_cycle_off` dedicati al compressore.
+* **Diagnostica Impianto**: Il conteggio cicli/ora e le ore di funzionamento giornaliere supportano anche impianti in sola pompa di calore.
 
 ### 2. Ritardo Apertura Valvole Motorizzate (`number.master_control_valve_delay`)
 Le testine elettrotermiche dei collettori a pavimento o le valvole di zona motorizzate impiegano tipicamente tra 90 e 180 secondi per completare l'apertura meccanica dello spillo.
-Impostando un ritardo (es. **120 secondi**), la caldaia e la pompa di circolazione si avviano solo a valvole completamente aperte, evitando rumorosi colpi d'ariete o sovrapressioni nelle tubazioni.
+Impostando un ritardo (es. **120 secondi**), la caldaia/PDC e la pompa di circolazione si avviano solo a valvole completamente aperte, evitando rumorosi colpi d'ariete o sovrapressioni nelle tubazioni.
 
 ### 3. Esercizio Anti-Bloccaggio Estivo (Anti-Seize)
 Durante la stagione estiva le valvole dei termosifoni e le giranti delle pompe rimangono ferme per mesi, rischiando di bloccarsi a causa dei depositi di calcare:
-* Se l'impianto rimane inattivo per più di 15 giorni (`number.master_control_anti_seize_idle_days`), l'integrazione esegue automaticamente un ciclo di apertura completa di tutte le valvole per una durata di 2 minuti (`number.master_control_anti_seize_duration`), richiudendole subito dopo.
+* Se l'impianto rimane inattivo per più di 15 giorni (`number.master_control_anti_seize_idle_days`), l'integrazione esegue automaticamente un ciclo di apertura completa di tutte le valvole per una durata di 2 minuti (`number.master_control_anti_seize_duration`), richiudendole subito dopo (protetto da guardia anti-duplicazione e compatibile sia con caldaia che con pompa di calore tramite `anti_seize_boiler`).
 
-### 4. Protezione Antigelo di Emergenza (Anti-Frost)
+### 4. Protezione Antigelo di Emergenza (Anti-Frost) & Ripristino Persistente
 Se la temperatura di qualsiasi stanza dell'abitazione scende al di sotto della soglia di sicurezza impostata su `number.master_control_anti_frost_temperature` (default: **7.0°C**):
-* Il sistema attiva immediatamente il riscaldamento forzato al 100%, scavalcando qualsiasi blocco (finestra aperta, riscaldamento Master disattivato o preset Fuori Casa attivo), per scongiurare il congelamento e l'esplosione delle tubature.
+* Il sistema attiva immediatamente il riscaldamento forzato al 100% con temperatura di mandata configurabile (`number.master_control_frost_flow_temp`), scavalcando qualsiasi blocco (finestra aperta, Master spento o preset Fuori Casa), per scongiurare il congelamento delle tubature.
+* **Ripristino Persistente**: I target precedenti (`pre_frost_targets`) vengono salvati tra i riavvii di Home Assistant.
+* **Fallback Emergenza L5**: Se sia la sonda ambiente sia le TRV diventano non disponibili con temperatura esterna (meteo o `sensor.*` numerico) inferiore a **2.0 °C**, entra in funzione una protezione antigelo conservativa.
+
+### 5. Tetto Pavimento 40.0 °C, Punto di Rugiada & Sicurezza Finestre
+* **Tetto Termico Pavimento Radiante**: Impone un limite massimo rigoroso di **40.0 °C** sull'acqua di mandata nei sistemi a pavimento non miscelati (anche in impianti misti con radiatori).
+* **Anti-Condensa da Punto di Rugiada**: Mantiene l'acqua refrigerata almeno **+2.0 °C** sopra il punto di rugiada peggiore delle sole zone attive in raffrescamento.
+* **Blocco Finestra Aperta**: L'apertura di una finestra azzera immediatamente la richiesta di zona e cancella eventuali override manuali dello split locale.
 
 ---
 
@@ -68,4 +76,4 @@ Se la caldaia è collegata tramite un'interfaccia OpenTherm, Multizone Thermosta
 * **Temperatura Mandata & Ritorno Impianto (°C)**: Calcolo in tempo reale del salto termico $\Delta T = (T_{\text{mandata}} - T_{\text{ritorno}})$ per verificare la condensazione ottimale.
 * **Modulazione Fiamma (%)**: Visualizzazione istantanea della potenza percentuale erogata dal bruciatore.
 * **Codici Errore OEM della Caldaia**: Cattura e decodifica istantanea dei codici guasto inviati dalla centralina della caldaia (es. blocco fiamma, mancanza tiraggio fumi, sovratemperatura).
-* **Priorità Acqua Calda Sanitaria (DHW Freeze)**: Quando un rubinetto apre l'acqua calda sanitaria, la caldaia devia la valvola a tre vie sul boiler o sullo scambiatore a piastre. Multizone Thermostat **congela istantaneamente il calcolo integrale del PID del riscaldamento**, impedendo l'accumulo di errore fasullo mentre il bruciatore è dedicato al sanitario.
+* **Priorità Acqua Calda Sanitaria (DHW Freeze)**: Quando un rubinetto apre l'acqua calda sanitaria (incluso rilevamento multi-dispositivo EMS-ESP ed entità ACS personalizzate), la caldaia devia la valvola a tre vie sul boiler o sullo scambiatore a piastre. Multizone Thermostat **congela istantaneamente il calcolo integrale del PID del riscaldamento**, impedendo l'accumulo di errore fasullo mentre il bruciatore è dedicato al sanitario.

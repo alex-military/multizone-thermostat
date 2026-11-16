@@ -579,18 +579,18 @@ class MultizoneThermostatPresetCard extends HTMLElement {
         <div class="header">
           <div class="header-left">
             <div class="priority-segmented" id="priority-segmented">
-              <button class="priority-btn" data-priority="auto" id="pbtn-auto" title="Automatica (Solare + Gas)">Auto</button>
-              <button class="priority-btn" data-priority="hybrid" id="pbtn-hybrid" title="Ibrido (Split solo se surplus solare)">Ibrido</button>
-              <button class="priority-btn" data-priority="combined" id="pbtn-combined" title="Combinato (Caldaia + Split insieme)">Combinato</button>
-              <button class="priority-btn" data-priority="electric_only" id="pbtn-electric" title="Solo Elettrico (Blocca Caldaia)">Elettrico</button>
-              <button class="priority-btn" data-priority="gas_only" id="pbtn-gas" title="Solo Gas (Split spenti in caldo)">Gas</button>
+              <button class="priority-btn" data-priority="auto" id="pbtn-auto" title="Auto">Auto</button>
+              <button class="priority-btn" data-priority="hybrid" id="pbtn-hybrid" title="${getTranslation(this._hass, 'prio_hybrid_title') || 'Ibrido'}">${getTranslation(this._hass, 'prio_hybrid') || 'Ibrido'}</button>
+              <button class="priority-btn" data-priority="combined" id="pbtn-combined" title="${getTranslation(this._hass, 'prio_combined_title') || 'Combinato'}">${getTranslation(this._hass, 'prio_combined') || 'Combinato'}</button>
+              <button class="priority-btn" data-priority="electric_only" id="pbtn-electric" title="${getTranslation(this._hass, 'prio_electric_title') || 'Elettrico'}">${getTranslation(this._hass, 'prio_electric') || 'Elettrico'}</button>
+              <button class="priority-btn" data-priority="gas_only" id="pbtn-gas" title="Gas">Gas</button>
             </div>
             <div class="summer-indicator" id="summer-indicator" style="display: none;">
               <ha-icon icon="mdi:snowflake" style="--mdc-icon-size: 15px; color: #38bdf8;"></ha-icon>
-              <span>Raffrescamento Elettrico</span>
+              <span id="summer-indicator-label">${getTranslation(this._hass, 'electric_cooling') || 'Raffrescamento Elettrico'}</span>
             </div>
           </div>
-          <div class="mode-switch-wrap heat" id="btn-mode-toggle" role="switch" aria-checked="false" title="Commuta Riscaldamento / Raffrescamento">
+          <div class="mode-switch-wrap heat" id="btn-mode-toggle" role="switch" aria-checked="false" title="${getTranslation(this._hass, 'toggle_season_title') || 'Commuta Riscaldamento / Raffrescamento'}">
             <span class="mode-switch-label" id="mode-toggle-label">${getTranslation(this._hass, 'master_mode_heat') || 'Caldo'}</span>
             <div class="mode-switch-track">
               <ha-icon class="track-icon fire" icon="mdi:fire"></ha-icon>
@@ -706,6 +706,26 @@ class MultizoneThermostatPresetCard extends HTMLElement {
     const modeBtn = this.shadowRoot.querySelector('#btn-mode-toggle');
     const modeIcon = this.shadowRoot.querySelector('#mode-toggle-icon');
     const modeLabel = this.shadowRoot.querySelector('#mode-toggle-label');
+
+    // Dynamic i18n refresh for header labels
+    const pHybrid = this.shadowRoot.querySelector('#pbtn-hybrid');
+    if (pHybrid) {
+      pHybrid.textContent = getTranslation(this._hass, 'prio_hybrid') || 'Hybrid';
+      pHybrid.title = getTranslation(this._hass, 'prio_hybrid_title') || 'Hybrid';
+    }
+    const pCombined = this.shadowRoot.querySelector('#pbtn-combined');
+    if (pCombined) {
+      pCombined.textContent = getTranslation(this._hass, 'prio_combined') || 'Combined';
+      pCombined.title = getTranslation(this._hass, 'prio_combined_title') || 'Combined';
+    }
+    const pElectric = this.shadowRoot.querySelector('#pbtn-electric');
+    if (pElectric) {
+      pElectric.textContent = getTranslation(this._hass, 'prio_electric') || 'Electric';
+      pElectric.title = getTranslation(this._hass, 'prio_electric_title') || 'Electric';
+    }
+    const summerLbl = this.shadowRoot.querySelector('#summer-indicator-label');
+    if (summerLbl) summerLbl.textContent = getTranslation(this._hass, 'electric_cooling') || 'Electric Cooling';
+    if (modeBtn) modeBtn.title = getTranslation(this._hass, 'toggle_season_title') || 'Switch Heating / Cooling';
 
     if (card) {
       if (isCool) {

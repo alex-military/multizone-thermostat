@@ -8,8 +8,9 @@ Multizone Thermostat integrates a native weekly schedule engine with a visual 24
 
 ## 1. The Scheduler Card (`custom:multizone-thermostat-scheduler-card`)
 
-* **24-Hour Timeline Matrix**: Visual timeline with color-coded preset blocks (Comfort, Eco, Sleep, Away) across all rooms throughout the day.
+* **24-Hour Timeline Matrix**: Visual timeline with color-coded preset blocks (Comfort, Eco, Sleep, Away) across all rooms throughout the day, including the **"🏠 All Zones (General)"** master summary row, dashed baseline gap blocks, and amber manual override indicators.
 * **Touch-Friendly Block Editing**: Tap any time block to adjust start time, end time, and assigned preset mode.
+* **Global Preset Sync without Pollution**: Synchronizes the `Global Preset` selector with the active weekly schedule while respecting geofencing `away` and preventing manual slot overrides from overwriting scheduled base presets.
 * **Quick Multi-Day Copy**: Copy configurations across weekdays (Monday–Friday) or weekends with a single tap.
 
 ---
@@ -49,7 +50,7 @@ Using the learned warm-up rate $R$ (°C/hour):
 
 $$\Delta t_{\text{lead\_time}} = \frac{T_{\text{comfort}} - T_{\text{current}}}{R}$$
 
-* Rooms warm up at their natural rates without wasted early heating.
+* Rooms warm up at their natural rates without wasted early heating (and in `cool` mode, non-cooling zones are automatically skipped on Smart Return completion).
 * **Result**: At 18:30 sharp, every room reaches comfort simultaneously.
 
 ---

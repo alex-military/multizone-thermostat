@@ -10,8 +10,9 @@ Multizone Thermostat integra un motore di programmazione oraria settimanale comp
 
 La scheda di programmazione visuale permette di gestire con la massima semplicità gli orari di comfort di tutta la famiglia:
 
-* **Visualizzazione a Matrice 24 Ore**: Una vista orizzontale a fasce colorate che mostra l'alternanza dei preset (Comfort, Eco, Notte, Fuori Casa) per tutte le zone dell'abitazione lungo l'arco della giornata.
+* **Visualizzazione a Matrice 24 Ore**: Una vista orizzontale a fasce colorate che mostra l'alternanza dei preset (Comfort, Eco, Notte, Fuori Casa) per tutte le zone dell'abitazione, inclusa la riga riepilogativa **"🏠 Tutte le Zone (Generale)"**, i blocchi tratteggiati di baseline e gli indicatori ambra di override manuale.
 * **Modifica Intuitiva dei Blocchi Orari**: Toccando qualsiasi fascia oraria è possibile regolare con estrema facilità ora di inizio, ora di fine e il preset termico associato.
+* **Sincronizzazione Global Preset senza Inquinamento**: Allinea il selettore `Global Preset` alla programmazione attiva rispettando il geofencing `away`, evitando che gli override manuali di temperatura sovrascrivano i preset base.
 * **Copia Veloce Multi-Giorno**: Pulsante dedicato per replicare la configurazione dal Lunedì al Venerdì (giorni lavorativi) o sull'intero fine settimana con un solo tocco.
 
 ---
@@ -53,7 +54,7 @@ Grazie all'autotuner passivo, il sistema conosce la pendenza di riscaldamento $R
 
 $$\Delta t_{\text{anticipo}} = \frac{T_{\text{comfort}} - T_{\text{corrente}}}{R}$$
 
-* L'impianto non accende tutte le stanze contemporaneamente, ma scagliona l'avvio: le stanze a riscaldamento più lento partiranno per prime, mentre quelle veloci partiranno più tardi.
+* L'impianto non accende tutte le stanze contemporaneamente, ma scagliona l'avvio: le stanze a riscaldamento più lento partiranno per prime, mentre quelle veloci partiranno più tardi (in modalità `cool`, le zone non raffrescabili vengono saltate al completamento dello Smart Return).
 * **Risultato**: Alle 18:30 precise tutte le stanze raggiungono la temperatura desiderata nello stesso istante, evitando sprechi dovuti ad accensioni troppo anticipate.
 
 ---

@@ -98,7 +98,7 @@ title: Master Bedroom
 
 Visual weekly matrix scheduling interface:
 
-* **24-Hour Color Matrix**: Displays schedule blocks for all rooms across the day.
+* **24-Hour Color Matrix**: Displays schedule blocks for all rooms across the day, including the **"🏠 All Zones (General)"** master summary row, dashed baseline gaps, amber manual override blocks, and responsive sticky-label layout on narrow/mobile screens.
 * **Interactive Editing**: Tap blocks to adjust start/end times and presets.
 * **Smart Return Planner**: Schedule arrival times with automated preheating advance per room.
 
@@ -131,6 +131,7 @@ Displays physical building performance metrics for each room:
 * **Thermal Retention Time**: Hours required to drop by 1.0 °C.
 * **Radiator Sizing**: Evaluates emitter sizing (Undersized, Optimal, Oversized).
 * **Universal TRV Battery Gauge**: Battery monitoring for wireless Zigbee/Z-Wave valves.
+* **Live Seasonal PID Panel**: Displays active season (`heat`/`cool`) `Kp`, `Ki`, `Kd` gains in 3 read-only boxes with protected safety unlock, `seed_autotuner` baseline seeding, and pre-reset backup/restore modals.
 * **Interactive Toggles**: Cycle zone mode or toggle passive heat directly from the card.
 
 ```yaml

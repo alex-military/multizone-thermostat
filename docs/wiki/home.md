@@ -3,8 +3,8 @@
 Welcome to the official documentation and wiki for **Multizone Thermostat**, the most advanced, modular, and comprehensive custom climate integration designed for Home Assistant.
 
 <div class="callout-beta">
-  <strong>What's New in Phase 11 (v6.1.0-beta.1 — Beta Branch)</strong><br>
-  Phase 11 introduces comprehensive support for <strong>bivalent central plants (Gas Boiler + Central Hydronic Heat Pump)</strong>, individual <strong>Room Split AC units</strong> with dynamic ceiling sensor bypass, <strong>off-grid & zero-export solar self-consumption</strong> with battery discharge protection, seasonal <strong>Heat 🔥 / Cool ❄️ dual-track preset memory</strong>, and <strong>1-to-1 visual twin Lovelace cards</strong> matching Home Assistant native styling.
+  <strong>What's New in v6.1.0-beta.10 (Beta Branch)</strong><br>
+  The v6.1.0-beta release introduces comprehensive support for <strong>bivalent central plants (Gas Boiler + Central Hydronic Heat Pump)</strong>, <strong>centralized condo / district heating</strong> (no boiler switch), individual <strong>Room Split AC units</strong> with dynamic ceiling sensor bypass, <strong>off-grid & zero-export solar self-consumption</strong> with battery discharge protection, seasonal <strong>Heat 🔥 / Cool ❄️ dual-track preset & PID memory</strong> (with per-zone manual PID controls and weekly smoothed EMA), <strong>indoor dew-point & 40 °C underfloor safeguards</strong>, and <strong>1-to-1 visual twin Lovelace cards</strong> matching Home Assistant native styling.
 </div>
 
 ---
@@ -108,7 +108,8 @@ Custom cards matching native Home Assistant styling 1-to-1:
 
 ### Bivalent Plant & Hybrid Climate (v6.1.0-beta)
 * 🔄 **Multi-Generator Staging (`PlantOrchestrator`)**: Arbitrates between Gas Boiler and Central Heat Pump based on 5 configurable priority modes: `auto`, `hybrid`, `combined`, `electric_only`, and `gas_only`.
-* ❄️ **Reversible Hydronic Cooling (`heat_pump_cooling`)**: Supports radiant floor or fancoil cooling in summer, strictly locking gas combustion to 0%.
+* 🏢 **Centralized Condo / District Heating (`CentralizedBoilerBackend`)**: Native support for centralized plants without a local boiler switch (`boiler_mode: central`), driving TRVs and zone actuators directly.
+* ❄️ **Reversible Hydronic Cooling (`heat_pump_cooling`)**: Supports radiant floor or fancoil cooling in summer, strictly locking gas combustion to 0%, with **indoor dew-point anti-condensation** (+2.0 °C margin) and a strict **40.0 °C underfloor ceiling** in unmixed systems.
 * ⚡ **Full Electric Mode**: Fully functional with central heat pumps or room splits alone without any gas boiler configured.
 
 ### Room Split AC Integration (v6.1.0-beta)
@@ -217,7 +218,7 @@ flowchart TD
 * **Installation & Setup**:
   * [📥 Installation & Requirements](installation.md)
   * [⚙️ Setup Wizard (Config Flow & Options)](setup_wizard.md)
-* **Phase 11 (Beta Features)**:
+* **Beta Features (v6.1.0-beta)**:
   * [🔥 Bivalent Central Plant & Energy Management](hybrid_energy.md)
   * [❄️ Room Split Air Conditioners](split_climate.md)
   * [🔄 Summer Cooling & Dual-Track Regulation](cooling_season.md)

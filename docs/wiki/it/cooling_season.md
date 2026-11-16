@@ -2,7 +2,7 @@
 
 <span class="badge-beta">BETA</span>
 
-Con la **Fase 11**, Multizone Thermostat diventa una piattaforma climatica integrale per tutte e quattro le stagioni, gestendo con estrema precisione sia il riscaldamento invernale sia il raffrescamento estivo (tramite split ad espansione diretta o pompa di calore idronica reversibile).
+Con la versione **`v6.1.0-beta`**, Multizone Thermostat diventa una piattaforma climatica integrale per tutte e quattro le stagioni, gestendo con estrema precisione sia il riscaldamento invernale sia il raffrescamento estivo (tramite split ad espansione diretta o pompa di calore idronica reversibile).
 
 ---
 
@@ -63,8 +63,11 @@ In base alla configurazione della tua abitazione, Multizone Thermostat gestisce 
 | Tipologia Raffrescamento | Attuatori Coinvolti | Comportamento Sistema |
 |---|---|---|
 | **Climatizzatori Split d'Ambiente** | Entità `climate.*` split | Lo split risponde direttamente alla richiesta di raffrescamento della stanza. La valvola idronica della stanza rimane chiusa a 0%. |
-| **Pavimento Radiante + PDC Reversibile** | Valvole proporzionali / relè + PDC centrale | La PDC genera acqua fredda (es. $18^\circ\text{C}$), le valvole modulano il flusso in base al PID estivo. Richiede deumidificatori dedicati per prevenire condensa. |
+| **Pavimento Radiante + PDC Reversibile** | Valvole proporzionali / relè + PDC centrale | La PDC genera acqua fredda (es. $18^\circ\text{C}$), le valvole modulano il flusso in base al PID estivo. Include la **Protezione Anti-Condensa da Punto di Rugiada Interno** (+2.0 °C sopra il punto di rugiada peggiore calcolato dai `humidity_sensor` delle sole zone attive in raffrescamento). |
 | **Fancoil Idronici Centralizzati** | Valvole 0-10V + Ventilconvettori | La mandata scende a $7-12^\circ\text{C}$, con modulazione continua del ventilatore e della valvola di mandata. |
+
+> [!NOTE]
+> In modalità `cool`, il sensore `Master Demand` riflette correttamente la richiesta aggregata di raffrescamento e lo Smart Return salta automaticamente le zone non raffrescabili.
 
 ---
 

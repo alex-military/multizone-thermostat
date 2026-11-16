@@ -1198,8 +1198,8 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
       const expDate = new Date(sched.profile_expires_at);
       const expStr = isNaN(expDate.getTime()) ? String(sched.profile_expires_at) : expDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       expiryHtml = `
-        <span class="badge badge-amber badge-btn" id="btn-cancel-expiry" title="Annulla scadenza">
-          ⏳ Fino a ${expStr} ✕
+        <span class="badge badge-amber badge-btn" id="btn-cancel-expiry" title="${getTranslation(this._hass, 'sched_cancel_expiry') || 'Cancel expiration'}">
+          ⏳ ${expStr} ✕
         </span>
       `;
     }
@@ -1209,8 +1209,8 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
     if (sr && sr.active) {
       const arr = sr.arrival_time ? sr.arrival_time.substring(0, 5) : '';
       srHtml = `
-        <span class="badge badge-orange badge-btn" id="btn-cancel-sr" title="Annulla Smart Return">
-          🚗 Rientro ore ${arr} ✕
+        <span class="badge badge-orange badge-btn" id="btn-cancel-sr" title="${getTranslation(this._hass, 'sched_cancel_sr') || 'Cancel Smart Return'}">
+          🚗 ${getTranslation(this._hass, 'sched_return_at') || 'Return at'} ${arr} ✕
         </span>
       `;
     }
@@ -1309,7 +1309,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
     const isCoolMode = (typeof getMasterHVACMode === 'function' && getMasterHVACMode(this._hass) === 'cool');
     const zones = this._getZones();
     if (zones.length === 0) {
-      container.innerHTML = `<div style="opacity:0.6; margin-bottom: 20px;">Nessuna zona termostato configurata.</div>`;
+      container.innerHTML = `<div style="opacity:0.6; margin-bottom: 20px;">${getTranslation(this._hass, 'sched_no_zones') || 'No thermostat zones configured.'}</div>`;
       return;
     }
 
@@ -1793,7 +1793,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
         <div class="matrix-row" data-zone="${z.climate}">
           <div class="room-label-box">
             <span class="room-title" title="${z.name}">${z.name}</span>
-            <button class="room-copy-btn btn-copy-room" data-zone="${z.climate}" title="Copia/Incolla programmazione stanza">
+            <button class="room-copy-btn btn-copy-room" data-zone="${z.climate}" title="${getTranslation(this._hass, 'sched_copy_room_title') || 'Copy/Paste room schedule'}">
               📋
             </button>
           </div>
@@ -1856,7 +1856,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
         e.stopPropagation();
         const cid = block.getAttribute('data-zone');
         if (block.hasAttribute('data-override')) {
-          if (this._hass && confirm("Rimuovere l'override manuale temporaneo per questa stanza?")) {
+          if (this._hass && confirm(getTranslation(this._hass, 'sched_confirm_clear_override') || "Remove temporary manual override for this room?")) {
             this._hass.callService('multizone_thermostat', 'clear_zone_override', {
               entity_id: cid
             });
@@ -1904,7 +1904,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
         sourceZone: zoneId,
         blocks: JSON.parse(JSON.stringify(blocks))
       };
-      alert("Programmazione stanza copiata! Clicca di nuovo 📋 su un'altra stanza per incollare.");
+      alert(getTranslation(this._hass, 'sched_copied_alert') || "Room schedule copied! Click 📋 again on another room to paste.");
     } else {
       if (!prof.days) prof.days = {};
       if (!prof.days[this._selectedDay]) prof.days[this._selectedDay] = {};
@@ -2125,19 +2125,19 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
           </div>
           <div class="modal-body">
             <div class="form-row">
-              <label class="form-label">Modalità Impianto:</label>
+              <label class="form-label">${getTranslation(this._hass, 'sched_plant_mode') || 'Plant Mode:'}</label>
               <div style="font-weight:600; color: ${isCoolMode ? '#38bdf8' : '#fb923c'}; margin-bottom: 8px;">
-                ${isCoolMode ? '❄️ Raffrescamento (Cool)' : '🔥 Riscaldamento (Heat)'}
+                ${isCoolMode ? (getTranslation(this._hass, 'sched_cool_mode_label') || '❄️ Cooling (Cool)') : (getTranslation(this._hass, 'sched_heat_mode_label') || '🔥 Heating (Heat)')}
               </div>
             </div>
             <div class="form-row">
-              <label class="form-label">Temperatura Obiettivo (°C):</label>
+              <label class="form-label">${getTranslation(this._hass, 'target_temp') || 'Target Temperature'} (°C):</label>
               <input type="number" id="input-preset-temp" class="form-control" step="0.5" min="10" max="35" value="${safeTemp.toFixed(1)}" style="font-size:1.2rem; font-weight:700; text-align:center; padding:8px;">
             </div>
           </div>
           <div class="modal-actions">
-            <button class="btn" id="btn-cancel-modal">Annulla</button>
-            <button class="btn btn-primary" id="btn-save-preset">Salva</button>
+            <button class="btn" id="btn-cancel-modal">${getTranslation(this._hass, 'btn_cancel') || 'Cancel'}</button>
+            <button class="btn btn-primary" id="btn-save-preset">${getTranslation(this._hass, 'btn_save') || 'Save'}</button>
           </div>
         </div>
       </div>
@@ -2395,7 +2395,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
                         <option value="eco" ${initialVal === 'eco' ? 'selected' : ''}>🌿 Eco (${eTemp.toFixed(1)}°C)</option>
                         <option value="sleep" ${initialVal === 'sleep' ? 'selected' : ''}>🌙 Notte (${sTemp.toFixed(1)}°C)</option>
                         <option value="away" ${initialVal === 'away' ? 'selected' : ''}>🚶 Away (${aTemp.toFixed(1)}°C)</option>
-                        <option value="none" ${initialVal === 'none' ? 'selected' : ''}>⏸️ Nessuna modifica / Baseline (${baseTemp.toFixed(1)}°C)</option>
+                        <option value="none" ${initialVal === 'none' ? 'selected' : ''}>${getTranslation(this._hass, 'sched_no_change_baseline') || '⏸️ No change / Baseline'} (${baseTemp.toFixed(1)}°C)</option>
                       </select>
                     </div>
                   </div>
@@ -2408,14 +2408,14 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
           <div class="modal-actions">
             ${isEdit ? `
               <button type="button" class="btn btn-danger" id="btn-delete-slot">
-                🗑️ Elimina Fascia
+                🗑️ ${getTranslation(this._hass, 'sched_delete') || 'Delete'}
               </button>
             ` : ''}
             <button type="button" class="btn" id="btn-cancel-modal">
-              Annulla
+              ${getTranslation(this._hass, 'btn_cancel') || 'Cancel'}
             </button>
             <button type="button" class="btn btn-primary" id="btn-save-slot">
-              💾 Salva Fascia
+              ${getTranslation(this._hass, 'sched_save_slot') || '💾 Save Slot'}
             </button>
           </div>
         </div>
@@ -2722,11 +2722,11 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
 
           <div style="display:flex; gap:12px;">
             <div class="form-group" style="flex:1;">
-              <label class="form-label">Orario di Rientro Previsto:</label>
+              <label class="form-label">${getTranslation(this._hass, 'sched_arrival_label') || 'Expected Arrival Time:'}</label>
               <input type="time" id="sr-arrival-time" value="${defArrStr}">
             </div>
             <div class="form-group" style="flex:1;">
-              <label class="form-label">Preset Obiettivo:</label>
+              <label class="form-label">${getTranslation(this._hass, 'preset') || 'Preset'}:</label>
               <select id="sr-preset-select">
                 <option value="comfort" selected>${isCoolMode ? '❄️' : '🔥'} Comfort</option>
                 <option value="eco">🌿 Eco</option>
@@ -2735,19 +2735,19 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
           </div>
 
           <div style="display:flex; gap:6px; margin-bottom:12px;">
-            <button class="btn" id="btn-sr-add-1h" style="padding:4px 8px; font-size:0.8rem;">+1 ora</button>
-            <button class="btn" id="btn-sr-add-2h" style="padding:4px 8px; font-size:0.8rem;">+2 ore</button>
-            <button class="btn" id="btn-sr-add-3h" style="padding:4px 8px; font-size:0.8rem;">+3 ore</button>
+            <button class="btn" id="btn-sr-add-1h" style="padding:4px 8px; font-size:0.8rem;">+1h</button>
+            <button class="btn" id="btn-sr-add-2h" style="padding:4px 8px; font-size:0.8rem;">+2h</button>
+            <button class="btn" id="btn-sr-add-3h" style="padding:4px 8px; font-size:0.8rem;">+3h</button>
           </div>
 
           <div class="form-group">
-            <label class="form-label">Radar Termico & Accensione Scaglionata (Anteprima Live):</label>
+            <label class="form-label">${getTranslation(this._hass, 'sched_smart_return') || 'Smart Return'}:</label>
             <div class="radar-list" id="sr-radar-preview"></div>
           </div>
 
           <div class="modal-actions">
-            <button class="btn" id="btn-cancel-modal">Annulla</button>
-            <button class="btn btn-amber" id="btn-confirm-sr">${isCoolMode ? '❄️' : '🔥'} Pianifica Rientro</button>
+            <button class="btn" id="btn-cancel-modal">${getTranslation(this._hass, 'btn_cancel') || 'Cancel'}</button>
+            <button class="btn btn-amber" id="btn-confirm-sr">${isCoolMode ? '❄️' : '🔥'} ${getTranslation(this._hass, 'sched_plan_return') || 'Plan Return'}</button>
           </div>
         </div>
       </div>
