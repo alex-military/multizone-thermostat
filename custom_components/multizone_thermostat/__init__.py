@@ -517,8 +517,9 @@ async def _async_register_services(hass: HomeAssistant) -> None:
                     "ki": ki,
                     "kd": kd,
                     "lock_param": lock_param,
-                    "seed_autotuner": seed_autotuner,
                 }
+                if seed_autotuner:
+                    kwargs["seed_autotuner"] = True
                 if mode_arg is not None:
                     kwargs["mode"] = mode_arg
                 updated = await zc.async_set_zone_pid(climate_entity, **kwargs)
