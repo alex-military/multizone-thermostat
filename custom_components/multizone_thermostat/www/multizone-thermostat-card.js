@@ -8214,6 +8214,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
 
         .matrix-container {
           overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
           margin-bottom: 20px;
         }
         .time-ruler {
@@ -8221,10 +8222,17 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
           align-items: center;
           gap: 10px;
           margin-bottom: 8px;
+          min-width: 680px;
         }
         .ruler-spacer {
           width: 170px;
           flex-shrink: 0;
+          box-sizing: border-box;
+          position: sticky;
+          left: 0;
+          background: #1e293b;
+          z-index: 20;
+          height: 20px;
         }
         .ruler-track {
           flex: 1;
@@ -8255,10 +8263,17 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
           align-items: center;
           margin-bottom: 8px;
           gap: 10px;
+          min-width: 680px;
         }
         .room-label-box {
           width: 170px;
           flex-shrink: 0;
+          box-sizing: border-box;
+          position: sticky;
+          left: 0;
+          background: #1e293b;
+          z-index: 20;
+          padding-right: 6px;
           display: flex;
           align-items: center;
           justify-content: space-between;
@@ -8289,6 +8304,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
           cursor: crosshair;
           overflow: hidden;
           border: 1px solid rgba(255, 255, 255, 0.08);
+          box-sizing: border-box;
         }
         .grid-line {
           position: absolute;
@@ -8529,12 +8545,9 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
           .time-ruler, .matrix-row {
             min-width: 680px;
           }
+          .ruler-spacer,
           .room-label-box {
-            position: sticky;
-            left: 0;
-            background: #1e293b;
-            z-index: 10;
-            padding-right: 6px;
+            width: 120px;
           }
           .matrix-table-container table {
             min-width: 520px;
