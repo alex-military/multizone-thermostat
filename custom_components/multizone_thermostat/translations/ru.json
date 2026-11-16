@@ -178,7 +178,8 @@
           "solar_forecast_sensor": "Solar Forecast Sensor (W or kWh, optional)",
           "solar_irradiance_sensor": "Solar Irradiance Sensor (W/m² or lux, optional)",
           "battery_max_discharge_time": "Max Allowed Battery Discharge Time (minutes)",
-          "battery_power_inverted": "Invert Battery Power Sign (if positive = discharge)"
+          "battery_power_inverted": "Invert Battery Power Sign (if positive = discharge)",
+          "grid_export_inverted": "Invert Grid Export Sign (if negative = exporting)"
         }
       }
     },
@@ -438,7 +439,8 @@
           "solar_forecast_sensor": "Solar Forecast Sensor (W or kWh, optional)",
           "solar_irradiance_sensor": "Solar Irradiance Sensor (W/m² or lux, optional)",
           "battery_max_discharge_time": "Max Allowed Battery Discharge Time (minutes)",
-          "battery_power_inverted": "Invert Battery Power Sign (if positive = discharge)"
+          "battery_power_inverted": "Invert Battery Power Sign (if positive = discharge)",
+          "grid_export_inverted": "Invert Grid Export Sign (if negative = exporting)"
         }
       },
       "edit_heat_pump": {

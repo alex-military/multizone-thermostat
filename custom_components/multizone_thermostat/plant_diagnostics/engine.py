@@ -104,14 +104,33 @@ class PlantDiagnosticsEngine:
         """Return True if at least one generator is actively running."""
         return any(v is not None for v in self._current_generator_start.values()) or (self._current_boiler_start is not None)
 
+    def _resolve_default_generator_id(self, generator_id: str | None) -> str:
+        """Resolve which generator track to inspect when generator_id is omitted."""
+        if generator_id:
+            return generator_id
+        gas_enabled = getattr(self.coordinator, "enable_gas_heater", True) is not False
+        hp_enabled = getattr(self.coordinator, "enable_heat_pump", False) is True
+        if not gas_enabled and hp_enabled:
+            return "heat_pump"
+        if (
+            "gas" not in self._generator_on_events
+            and "heat_pump" in self._generator_on_events
+            and not self._boiler_on_events
+        ):
+            return "heat_pump"
+        return "gas"
+
     def get_boiler_cycles_per_hour(self, generator_id: str | None = None) -> int:
         """Calculate generator ignition cycles in the past 60 minutes."""
         now = time.monotonic()
         one_hour_ago = now - 3600.0
-        if generator_id and generator_id in self._generator_on_events:
-            return sum(1 for t in self._generator_on_events[generator_id] if t >= one_hour_ago)
-        if "gas" in self._generator_on_events:
+        eff_gen = self._resolve_default_generator_id(generator_id)
+        if eff_gen in self._generator_on_events:
+            return sum(1 for t in self._generator_on_events[eff_gen] if t >= one_hour_ago)
+        if generator_id is None and "gas" in self._generator_on_events:
             return sum(1 for t in self._generator_on_events["gas"] if t >= one_hour_ago)
+        if generator_id is not None:
+            return 0
         return sum(1 for t in self._boiler_on_events if t >= one_hour_ago)
 
     def get_boiler_daily_runtime_hours(self, generator_id: str | None = None) -> float:
@@ -119,13 +138,16 @@ class PlantDiagnosticsEngine:
         now = time.monotonic()
         twenty_four_hours_ago = now - 86400.0
         total_seconds = 0.0
+        eff_gen = self._resolve_default_generator_id(generator_id)
 
-        if generator_id and generator_id in self._generator_run_intervals:
-            target_intervals = list(self._generator_run_intervals[generator_id])
-            cur_start = self._current_generator_start.get(generator_id)
-        elif "gas" in self._generator_run_intervals:
+        if eff_gen in self._generator_run_intervals:
+            target_intervals = list(self._generator_run_intervals[eff_gen])
+            cur_start = self._current_generator_start.get(eff_gen)
+        elif generator_id is None and "gas" in self._generator_run_intervals:
             target_intervals = list(self._generator_run_intervals["gas"])
             cur_start = self._current_generator_start.get("gas")
+        elif generator_id is not None:
+            return 0.0
         else:
             target_intervals = list(self._boiler_run_intervals)
             cur_start = self._current_boiler_start

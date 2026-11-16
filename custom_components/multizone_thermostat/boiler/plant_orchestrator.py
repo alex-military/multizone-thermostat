@@ -3,6 +3,7 @@ from .plant_decision import (
     decide_heating,
     AUTO,
 )
+from ..demand_aggregator import AggregatedDemand
 from collections.abc import Mapping
 from datetime import datetime
 from types import SimpleNamespace
@@ -348,9 +349,25 @@ class PlantOrchestrator:
                 if (solar_surplus or solar_boost) and cool_demand > 0.0:
                     cool_demand = max(cool_demand, 100.0)
 
+                self.last_aggregate = AggregatedDemand(
+                    demand=cool_demand,
+                    peak_zone=cool_peak,
+                    strategy="cooling",
+                )
                 await hp_backend.async_update(cool_demand, cool_peak, False, hvac_mode=HVAC_MODE_COOL)
             elif hp_backend is not None:
+                self.last_aggregate = AggregatedDemand(
+                    demand=0.0,
+                    peak_zone=None,
+                    strategy="cooling",
+                )
                 await hp_backend.async_update(0.0, None, False, hvac_mode=HVAC_MODE_COOL)
+            else:
+                self.last_aggregate = AggregatedDemand(
+                    demand=0.0,
+                    peak_zone=None,
+                    strategy="cooling",
+                )
             return
 
         plant_diag = getattr(self.coordinator, "plant_diagnostics", None)
@@ -419,10 +436,21 @@ class PlantOrchestrator:
             if st and st.state in ("unavailable", "unknown"):
                 hp_available = False
 
-        # Calculate max zone delta (for COMBINED boost mode)
+        # Calculate max zone delta (for COMBINED boost mode) across active heating zones only
         max_delta = 0.0
         if isinstance(climate_entities, dict):
-            for ent in climate_entities.values():
+            mode_fn = getattr(self.coordinator, "get_zone_mode", None)
+            for cid, ent in climate_entities.items():
+                try:
+                    if callable(mode_fn) and mode_fn(cid) == ZONE_MODE_BYPASS:
+                        continue
+                except AttributeError:
+                    pass
+                raw_hvac = getattr(ent, "hvac_mode", None)
+                if hasattr(raw_hvac, "value"):
+                    raw_hvac = raw_hvac.value
+                if isinstance(raw_hvac, str) and raw_hvac.lower() in ("off", "cool"):
+                    continue
                 c_t = getattr(ent, "current_temperature", None)
                 t_t = getattr(ent, "target_temperature", None)
                 if isinstance(c_t, (int, float)) and isinstance(t_t, (int, float)):

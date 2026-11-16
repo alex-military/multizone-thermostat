@@ -351,6 +351,28 @@ class MultizonePersistentNumber(NumberEntity):
         """Return the current value."""
         return self._coordinator.get_persistent_data(self._key, self._default_val)
 
+    async def async_added_to_hass(self) -> None:
+        """Sync persisted heat-pump cycle overrides to coordinator on startup."""
+        await super().async_added_to_hass()
+        persisted = self._coordinator.get_persistent_data(self._key, None)
+        if (
+            persisted is not None
+            and not isinstance(persisted, bool)
+            and isinstance(persisted, (int, float, str))
+        ):
+            try:
+                val = float(persisted)
+            except (ValueError, TypeError):
+                return
+            if self._key in (KEY_HP_MIN_CYCLE_ON, "hp_min_cycle_on") and hasattr(
+                self._coordinator, "set_hp_min_cycle_on"
+            ):
+                self._coordinator.set_hp_min_cycle_on(val)
+            elif self._key in (KEY_HP_MIN_CYCLE_OFF, "hp_min_cycle_off") and hasattr(
+                self._coordinator, "set_hp_min_cycle_off"
+            ):
+                self._coordinator.set_hp_min_cycle_off(val)
+
     async def async_set_native_value(self, value: float) -> None:
         """Update the value."""
         await self._coordinator.async_set_persistent_data(self._key, value)

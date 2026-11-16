@@ -69,6 +69,8 @@ from ..const import (
     DEFAULT_BATTERY_MAX_DISCHARGE_TIME,
     CONF_BATTERY_POWER_INVERTED,
     DEFAULT_BATTERY_POWER_INVERTED,
+    CONF_GRID_EXPORT_INVERTED,
+    DEFAULT_GRID_EXPORT_INVERTED,
 )
 import logging
 from homeassistant.helpers import entity_registry as er
@@ -116,6 +118,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
         self._solar_irradiance_sensor: str | None = None
         self._battery_max_discharge_time: float = float(DEFAULT_BATTERY_MAX_DISCHARGE_TIME)
         self._battery_power_inverted: bool = DEFAULT_BATTERY_POWER_INVERTED
+        self._grid_export_inverted: bool = DEFAULT_GRID_EXPORT_INVERTED
         # Extras
         self._geofencing_enabled: bool = False
         self._presence_sensor: str | None = None
@@ -165,6 +168,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             self._solar_irradiance_sensor = cfg.get(CONF_SOLAR_IRRADIANCE_SENSOR)
             self._battery_max_discharge_time = float(cfg.get(CONF_BATTERY_MAX_DISCHARGE_TIME, DEFAULT_BATTERY_MAX_DISCHARGE_TIME))
             self._battery_power_inverted = bool(cfg.get(CONF_BATTERY_POWER_INVERTED, DEFAULT_BATTERY_POWER_INVERTED))
+            self._grid_export_inverted = bool(cfg.get(CONF_GRID_EXPORT_INVERTED, DEFAULT_GRID_EXPORT_INVERTED))
             # Extras
             self._geofencing_enabled = cfg.get(CONF_GEOFENCING_ENABLED, False)
             self._presence_sensor = cfg.get(CONF_PRESENCE_SENSOR)
@@ -364,6 +368,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                 self._solar_irradiance_sensor = user_input.get(CONF_SOLAR_IRRADIANCE_SENSOR)
                 self._battery_max_discharge_time = float(user_input.get(CONF_BATTERY_MAX_DISCHARGE_TIME, DEFAULT_BATTERY_MAX_DISCHARGE_TIME))
                 self._battery_power_inverted = bool(user_input.get(CONF_BATTERY_POWER_INVERTED, DEFAULT_BATTERY_POWER_INVERTED))
+                self._grid_export_inverted = bool(user_input.get(CONF_GRID_EXPORT_INVERTED, DEFAULT_GRID_EXPORT_INVERTED))
             return self._save_options()
 
         schema = get_energy_management_schema(
@@ -381,6 +386,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             solar_irradiance_sensor=self._solar_irradiance_sensor,
             battery_max_discharge_time=self._battery_max_discharge_time,
             battery_power_inverted=self._battery_power_inverted,
+            grid_export_inverted=self._grid_export_inverted,
         )
         return self.async_show_form(
             step_id="edit_energy_management",
@@ -738,6 +744,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                 data[CONF_SOLAR_IRRADIANCE_SENSOR] = self._solar_irradiance_sensor
             data[CONF_BATTERY_MAX_DISCHARGE_TIME] = self._battery_max_discharge_time
             data[CONF_BATTERY_POWER_INVERTED] = self._battery_power_inverted
+            data[CONF_GRID_EXPORT_INVERTED] = self._grid_export_inverted
 
         self.hass.config_entries.async_update_entry(
             self.config_entry, data=data, options=self.config_entry.options

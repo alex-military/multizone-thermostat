@@ -1,5 +1,31 @@
 # Changelog
 
+## [6.1.0-beta.9] - 2026-11-16
+### Bug Fixes & Full Pre-Release Hardening
+- **Anti-Seize (`safety/anti_seize.py`):** Fixed `AttributeError` when `anti_seize_boiler=True` by invoking `boiler_backend` / `heat_pump_backend` directly instead of non-existent `PlantOrchestrator.async_update()` / `async_emergency_off()`.
+- **Energy Config & Options Flow (`config_flow/`):** Exposed and persisted `CONF_GRID_EXPORT_INVERTED` in Config Flow, Options Flow, and all UI translations (`strings.json` + `en`/`it`/`de`/`es`/`fr`/`ru`).
+- **Cooling Diagnostics & Master Demand (`boiler/plant_orchestrator.py`, `plant_diagnostics/engine.py`):**
+  - Updated `last_aggregate` in `HVAC_MODE_COOL` so `Master Demand` accurately reflects cooling demand.
+  - Added heat-pump-only plant support in `get_boiler_cycles_per_hour()` and `get_boiler_daily_runtime_hours()`.
+- **Combined Boost, Frost, Split & Window Safety:**
+  - Excluded `OFF` and `BYPASS` zones from `max_zone_delta` in `COMBINED` heating boost.
+  - Added numeric `sensor.*` outdoor temperature support to L5 Frost Emergency fallback (`safety/frost.py`).
+  - Scaled split sensor injection proportionally when ceiling probe is not stratified (`split/split_controller.py`).
+  - Skipped non-cooling zones on Smart Return completion in `cool` mode (`schedule/manager.py`).
+  - Cleared zone demand and local split manual override on window open (`zone_manager.py`).
+  - Synced persisted `KEY_HP_MIN_CYCLE_ON/OFF` to coordinator on startup (`number.py`) and guarded `MasterController.async_apply_master_off()` against missing backends.
+
+## [6.1.0-beta.8] - 2026-11-16
+### Heat Pump Cycle Wiring, Exact Cooling Candidate Match & Architectural Cleanup
+- **Heat Pump Min Cycle Wiring (`coordinator.py`):** `set_min_cycle_on/off` no longer overwrites dedicated `hp_min_cycle_on/off` values once explicitly configured.
+- **Dew Point Candidate Filtering (`boiler/heat_pump_backend.py`):** Replaced substring matching (`z_name in c_key`) with exact zone ID resolution and unified `_compute_dew_point()`.
+- **Centralized Underfloor Flow Cap (`boiler/flow_curve.py`, `boiler/opentherm_backend.py`):** Shared `UNDERFLOOR_MAX_FLOW_TEMP = 40.0`.
+- **Architectural Cleanup:** Added `protocols.py`, public coordinator/subsystem APIs, `ZoneConfig(Mapping)` in `plant_config.py`, and targeted exception handling.
+
+## [6.1.0-beta.7] - 2026-11-16
+### Scheduler Card Layout Fix
+- **Scheduler Card (`frontend/src/components/scheduler_card.js`):** Fixed narrow desktop column squishing (`min-width: 680px`), sticky `z-index`, `box-sizing: border-box` alignment, and mobile label width (`120px`).
+
 ## [6.1.0-beta.6] - 2026-11-15
 ### Safety, PID/Autotune, Plant Coordination & Energy Hardening
 - **Plant & Heat Pump Backend Safety**:

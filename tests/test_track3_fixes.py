@@ -395,3 +395,309 @@ async def test_service_handlers_with_list_of_entities():
     assert zc.async_reset_zone_autotuner.call_count == 2
     zc.async_reset_zone_autotuner.assert_any_call("climate.living", keep_manual_overrides=False)
     zc.async_reset_zone_autotuner.assert_any_call("climate.bed", keep_manual_overrides=False)
+
+
+# ==============================================================================
+# 5. Beta.9 Regression Tests (6 Logic Bugs)
+# ==============================================================================
+
+@pytest.mark.asyncio
+async def test_anti_seize_turn_boiler_on_off_uses_backends_not_orchestrator():
+    """Bug 1: AntiSeizeManager must call boiler/hp backends, never non-existent orchestrator.async_update."""
+    from custom_components.multizone_thermostat.safety.anti_seize import AntiSeizeManager
+
+    hass = MagicMock()
+    coord = MagicMock()
+    coord.enable_gas_heater = True
+    coord.enable_heat_pump = True
+    coord.plant_orchestrator = PlantOrchestrator(hass, MagicMock(), MagicMock(), coord)
+    coord.boiler_backend = MagicMock()
+    coord.boiler_backend.async_update = AsyncMock()
+    coord.boiler_backend.async_emergency_off = AsyncMock()
+    coord.boiler_backend.status_reason = "OFF - No Demand"
+    coord.boiler_backend._status_reason = "OFF - No Demand"
+    coord.heat_pump_backend = MagicMock()
+    coord.heat_pump_backend.async_update = AsyncMock()
+    coord.heat_pump_backend.async_emergency_off = AsyncMock()
+
+    mgr = AntiSeizeManager(hass, coord)
+    await mgr._turn_boiler_on()
+    coord.boiler_backend.async_update.assert_awaited_once_with(100.0, "Anti-Seize", False)
+
+    await mgr._turn_boiler_off()
+    coord.boiler_backend.async_update.assert_awaited_with(0.0, None, False)
+    coord.heat_pump_backend.async_emergency_off.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_options_flow_preserves_grid_export_inverted():
+    """Bug 2: OptionsFlow must load, expose in schema, and save CONF_GRID_EXPORT_INVERTED."""
+    from custom_components.multizone_thermostat.config_flow.options_flow import MultizoneOptionsFlow
+    from custom_components.multizone_thermostat.const import CONF_GRID_EXPORT_INVERTED, CONF_ENERGY_MANAGEMENT_ENABLED
+
+    entry = SimpleNamespace(
+        entry_id="e1",
+        data={
+            CONF_ENERGY_MANAGEMENT_ENABLED: True,
+            CONF_GRID_EXPORT_INVERTED: True,
+            "zones": [{"name": "Living"}],
+        },
+        options={},
+    )
+    flow = MultizoneOptionsFlow()
+    flow.hass = MagicMock()
+    flow.hass.config_entries = MagicMock()
+    flow.config_entry = entry
+
+    await flow.async_step_init(None)
+    assert flow._grid_export_inverted is True
+
+    await flow.async_step_edit_energy_management(
+        {
+            CONF_ENERGY_MANAGEMENT_ENABLED: True,
+            CONF_GRID_EXPORT_INVERTED: True,
+        }
+    )
+    saved_data = flow.hass.config_entries.async_update_entry.call_args.kwargs["data"]
+    assert saved_data[CONF_GRID_EXPORT_INVERTED] is True
+
+
+@pytest.mark.asyncio
+async def test_plant_orchestrator_max_zone_delta_ignores_off_and_bypass_zones():
+    """Bug 3: max_zone_delta for COMBINED boost must exclude OFF and BYPASS zones."""
+    from custom_components.multizone_thermostat.const import ZONE_MODE_BYPASS, ZONE_MODE_PRIMARY
+
+    hass = MagicMock()
+    hass.states = MagicMock()
+    hass.states.get.return_value = None
+
+    demand_agg = MagicMock()
+    demand_agg._zone_demands = {"climate.active": 30.0, "climate.off_zone": 0.0, "climate.bypass_zone": 0.0}
+    demand_agg.calculate.return_value = SimpleNamespace(demand=30.0, peak_zone="climate.active")
+
+    boiler = MagicMock()
+    boiler.async_update = AsyncMock()
+    hp = MagicMock()
+    hp.hp_entity = None
+    hp.async_update = AsyncMock()
+
+    coord = MagicMock()
+    coord.get_master_state.return_value = True
+    coord.master_hvac_mode = HVAC_MODE_HEAT
+    coord.enable_gas_heater = True
+    coord.enable_heat_pump = True
+    coord.is_dhw_active = False
+    coord.zones = []
+    coord.zone_controller = None
+    coord.frost_manager = None
+    coord.plant_diagnostics = None
+    coord.energy_manager = SimpleNamespace(
+        get_heat_source_priority=lambda: "combined",
+        is_solar_surplus=lambda: False,
+    )
+    coord.get_zone_mode.side_effect = lambda cid: ZONE_MODE_BYPASS if cid == "climate.bypass_zone" else ZONE_MODE_PRIMARY
+    coord._climate_entities = {
+        "climate.active": SimpleNamespace(hvac_mode="heat", current_temperature=19.8, target_temperature=20.0),
+        "climate.off_zone": SimpleNamespace(hvac_mode="off", current_temperature=14.0, target_temperature=21.0),
+        "climate.bypass_zone": SimpleNamespace(hvac_mode="heat", current_temperature=15.0, target_temperature=22.0),
+    }
+
+    orch = PlantOrchestrator(hass, demand_agg, boiler, coord, heat_pump_backend=hp)
+    await orch._async_update_boiler()
+
+    # Only climate.active (delta 0.2°C) should be considered, NOT 7.0°C from off/bypass zones
+    assert orch.last_plant_command is not None
+    assert orch.last_plant_command.reason == "COMBINED_BASE"
+    assert orch.last_plant_command.hp_demand == 0.0
+
+
+def test_frost_l5_supports_numeric_sensor_entity():
+    """Bug 4: Frost L5 outdoor fallback must read numeric state from sensor.* entities."""
+    from custom_components.multizone_thermostat.safety.frost import FrostManager
+    from custom_components.multizone_thermostat.const import KEY_ANTI_FROST_ENABLED
+
+    hass = MagicMock()
+    sensor_state = SimpleNamespace(state="0.5", domain="sensor", attributes={})
+    hass.states.get.side_effect = lambda eid: sensor_state if eid == "sensor.outdoor_temp" else None
+
+    coord = MagicMock()
+    coord.weather_sensor_id = "sensor.outdoor_temp"
+    coord.plant_diagnostics.has_critical_sensor_fault.return_value = True
+    coord.zone_manager.get_zone.return_value = None
+    coord.get_persistent_data.side_effect = lambda k, d=None: True if k == KEY_ANTI_FROST_ENABLED else d
+
+    fm = FrostManager(hass, coord)
+    assert fm.is_zone_in_frost_emergency("climate.multizone_thermostat_living") is True
+
+
+def test_split_sensor_injection_proportional_when_ceiling_not_stratified():
+    """Bug 5: When ceiling probe <= room sensor, push must scale proportionally instead of flat +1.5°C."""
+    from custom_components.multizone_thermostat.split.split_controller import SplitZoneManager
+
+    hass = MagicMock()
+    hass.states.get.return_value = SimpleNamespace(attributes={"current_temperature": 19.8})
+    coord = MagicMock()
+    coord.zones = [{"name": "Salotto", "split_climate_entity": "climate.split_salotto", "split_sensor_injection": True}]
+
+    mgr = SplitZoneManager(hass, coord)
+    # 0.2°C deficit with aligned ceiling probe -> 20.0 + 0.2 = 20.2°C (not 21.5°C)
+    injected = mgr.calculate_injected_target("climate.multizone_thermostat_salotto", 19.8, 20.0)
+    assert injected == 20.2
+
+
+@pytest.mark.asyncio
+async def test_smart_return_completion_skips_non_cooling_zones_in_cool_mode():
+    """Bug 6: Smart Return completion in COOL mode must not wake zones that cannot cool."""
+    from custom_components.multizone_thermostat.schedule.manager import ScheduleProfileManager
+
+    hass = MagicMock()
+    coord = MagicMock()
+    coord.hass = hass
+    coord.master_hvac_mode = "cool"
+    coord.zones = [{"name": "Radiatori"}, {"name": "SplitRoom"}]
+    coord.can_zone_cool.side_effect = lambda cid: cid == "climate.multizone_thermostat_splitroom"
+    coord.get_zone_mode.return_value = "primary"
+    coord.get_master_state.return_value = True
+
+    mgr = ScheduleProfileManager(coord)
+    mgr.scheduler_enabled = False
+    mgr.smart_return = {"arrival_time": "2026-01-01T10:00:00+00:00", "preset": "comfort", "zones": None}
+    mgr._async_wake_zone = AsyncMock()
+    mgr.async_save_to_storage = AsyncMock()
+    mgr.coordinator.zone_manager = MagicMock()
+    mgr.coordinator.zone_manager.async_set_global_preset = AsyncMock()
+
+    from datetime import datetime, timezone
+    await mgr.async_evaluate_schedule(now=datetime(2026, 1, 1, 10, 5, tzinfo=timezone.utc))
+
+    mgr._async_wake_zone.assert_awaited_once_with("climate.multizone_thermostat_splitroom")
+
+
+# ==============================================================================
+# 6. Second-Pass Audit Regression Tests (Bugs 7–11)
+# ==============================================================================
+
+@pytest.mark.asyncio
+async def test_plant_orchestrator_updates_last_aggregate_in_cooling_mode():
+    """Bug 7: Master Demand Sensor depends on last_aggregate being updated during HVAC_MODE_COOL."""
+    hass = MagicMock()
+    hass.states = MagicMock()
+    hass.states.get.return_value = None
+
+    demand_agg = MagicMock()
+    demand_agg._zone_demands = {"climate.salotto": 75.0}
+
+    boiler = MagicMock()
+    boiler.async_update = AsyncMock()
+    hp = MagicMock()
+    hp.async_update = AsyncMock()
+
+    coord = MagicMock()
+    coord.get_master_state.return_value = True
+    coord.master_hvac_mode = HVAC_MODE_COOL
+    coord.enable_heat_pump = True
+    coord.heat_pump_cooling = True
+    coord.zones = []
+    coord.zone_controller = None
+    coord.frost_manager = None
+    coord.plant_diagnostics = None
+    coord.energy_manager = None
+    coord.split_manager = None
+    coord.get_zone_mode.return_value = "primary"
+    coord._climate_entities = {
+        "climate.salotto": SimpleNamespace(hvac_mode=HVAC_MODE_COOL, current_temperature=26.5, target_temperature=24.0)
+    }
+    demand_agg.get_zone_demand.return_value = 75.0
+
+    orch = PlantOrchestrator(hass, demand_agg, boiler, coord, heat_pump_backend=hp)
+    await orch._async_update_boiler()
+
+    assert orch.last_aggregate is not None
+    assert orch.last_aggregate.demand == 75.0
+    assert orch.last_aggregate.peak_zone == "climate.salotto"
+    assert orch.last_aggregate.strategy == "cooling"
+
+
+def test_diagnostics_cycles_and_runtime_support_heat_pump_only_plants():
+    """Bug 8: Heat-pump-only plants must report non-zero cycles/h and runtime without generator_id."""
+    from custom_components.multizone_thermostat.plant_diagnostics.engine import PlantDiagnosticsEngine
+
+    coord = MagicMock()
+    coord.zones = []
+    coord.enable_gas_heater = False
+    coord.enable_heat_pump = True
+
+    diag = PlantDiagnosticsEngine(coord)
+    diag.record_generator_state("heat_pump", True)
+    assert diag.get_boiler_cycles_per_hour() == 1
+    assert diag.get_boiler_daily_runtime_hours() >= 0.0
+    diag.record_generator_state("heat_pump", False)
+    assert diag.get_boiler_cycles_per_hour() == 1
+
+
+@pytest.mark.asyncio
+async def test_persistent_number_syncs_hp_cycle_on_startup():
+    """Bug 9: MultizonePersistentNumber syncs persisted HP min cycle ON/OFF to coordinator on boot."""
+    from custom_components.multizone_thermostat.number import MultizonePersistentNumber
+    from custom_components.multizone_thermostat.const import KEY_HP_MIN_CYCLE_ON, KEY_HP_MIN_CYCLE_OFF
+
+    coord = MagicMock()
+    coord.get_persistent_data.side_effect = lambda k, d=None: 14.0 if k == KEY_HP_MIN_CYCLE_ON else (9.0 if k == KEY_HP_MIN_CYCLE_OFF else d)
+    coord.set_hp_min_cycle_on = MagicMock()
+    coord.set_hp_min_cycle_off = MagicMock()
+
+    dev_info = MagicMock()
+    num_on = MultizonePersistentNumber(coord, "e1", KEY_HP_MIN_CYCLE_ON, "HP On", 0, 30, 1, "min", "mdi:timer", 5, dev_info)
+    num_on.hass = MagicMock()
+    await num_on.async_added_to_hass()
+    coord.set_hp_min_cycle_on.assert_called_once_with(14.0)
+
+    num_off = MultizonePersistentNumber(coord, "e1", KEY_HP_MIN_CYCLE_OFF, "HP Off", 0, 30, 1, "min", "mdi:timer", 5, dev_info)
+    num_off.hass = MagicMock()
+    await num_off.async_added_to_hass()
+    coord.set_hp_min_cycle_off.assert_called_once_with(9.0)
+
+
+def test_window_open_clears_split_manual_and_zeroes_demand():
+    """Bug 10: Opening a window zeroes demand, clears local split manual override, and turns off zone if no select."""
+    from custom_components.multizone_thermostat.zone_manager import ZoneManager
+
+    hass = MagicMock()
+    hass.async_create_task = MagicMock(side_effect=lambda coro: coro.close() if hasattr(coro, "close") else None)
+    coord = MagicMock()
+    coord.zones = [{"name": "Salotto", "window_sensor": "binary_sensor.win_salotto"}]
+    coord._select_entities = {}
+    coord._climate_entities = {}
+    coord._climate_callbacks = {}
+    coord._settings = {}
+    coord.is_zone_in_frost_emergency.return_value = False
+    coord.demand_aggregator = MagicMock()
+    coord.split_manager = MagicMock()
+    coord._async_set_hvac_mode = AsyncMock()
+    coord.async_save_storage = AsyncMock()
+    coord.async_set_persistent_data = AsyncMock()
+
+    zm = ZoneManager(hass, coord)
+    event = SimpleNamespace(data={"entity_id": "binary_sensor.win_salotto", "new_state": SimpleNamespace(state="on")})
+    zm.async_on_window_state_changed(event)
+
+    coord.demand_aggregator.set_zone_demand.assert_called_with("climate.multizone_thermostat_salotto", 0.0)
+    coord.split_manager.set_local_manual_on.assert_called_with("climate.multizone_thermostat_salotto", False)
+
+
+@pytest.mark.asyncio
+async def test_master_controller_apply_master_off_guards_missing_boiler_backend():
+    """Bug 11: MasterController.async_apply_master_off handles missing plant_orchestrator/boiler_backend safely."""
+    from custom_components.multizone_thermostat.master_controller import MasterController
+
+    coord = MagicMock()
+    coord.hass = MagicMock()
+    coord.hass.states = MagicMock()
+    coord.hass.states.get.return_value = None
+    coord.zones = []
+    coord.plant_orchestrator = None
+    coord.boiler_backend = None
+    coord.heat_pump_backend = None
+
+    mc = MasterController(coord)
+    await mc.async_apply_master_off()

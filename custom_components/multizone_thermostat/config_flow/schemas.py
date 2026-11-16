@@ -108,6 +108,8 @@ from ..const import (
     DEFAULT_BATTERY_MAX_DISCHARGE_TIME,
     CONF_BATTERY_POWER_INVERTED,
     DEFAULT_BATTERY_POWER_INVERTED,
+    CONF_GRID_EXPORT_INVERTED,
+    DEFAULT_GRID_EXPORT_INVERTED,
 )
 
 
@@ -248,6 +250,7 @@ def get_energy_management_schema(
     solar_overheat_offset: float = DEFAULT_SOLAR_OVERHEAT_OFFSET,
     battery_max_discharge_time: float = DEFAULT_BATTERY_MAX_DISCHARGE_TIME,
     battery_power_inverted: bool = DEFAULT_BATTERY_POWER_INVERTED,
+    grid_export_inverted: bool = DEFAULT_GRID_EXPORT_INVERTED,
 ) -> vol.Schema:
     schema_dict: dict[Any, Any] = {
         vol.Required(CONF_ENERGY_MANAGEMENT_ENABLED, default=enabled): bool,
@@ -318,6 +321,7 @@ def get_energy_management_schema(
         selector.NumberSelectorConfig(min=1, max=30, step=1, mode=selector.NumberSelectorMode.BOX)
     )
     schema_dict[vol.Optional(CONF_BATTERY_POWER_INVERTED, default=battery_power_inverted)] = bool
+    schema_dict[vol.Optional(CONF_GRID_EXPORT_INVERTED, default=grid_export_inverted)] = bool
     return vol.Schema(schema_dict)
 
 

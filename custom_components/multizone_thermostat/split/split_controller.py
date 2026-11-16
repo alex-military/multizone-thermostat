@@ -267,8 +267,12 @@ class SplitZoneManager:
                 injected,
             )
         elif current_temp < target_temp:
-            # Room is still cold: give a +1.5°C push to ensure machine modulates actively
-            injected = target_temp + 1.5
+            if ceiling_temp is not None:
+                # Ceiling probe is reading equal/cooler than room sensor: scale push proportionally to deficit
+                injected = target_temp + min(1.5, max(0.0, target_temp - current_temp))
+            else:
+                # No split ceiling reading available: give a +1.5°C push to ensure active modulation
+                injected = target_temp + 1.5
         else:
             injected = target_temp
 

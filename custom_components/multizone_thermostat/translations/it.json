@@ -178,7 +178,8 @@
           "solar_forecast_sensor": "Sensore Previsione Solare (W o kWh, opzionale)",
           "solar_irradiance_sensor": "Sensore Irraggiamento Solare (W/m² o lux, opzionale)",
           "battery_max_discharge_time": "Tempo Max Scarica Batteria Tollerata (minuti)",
-          "battery_power_inverted": "Inverti Segno Potenza Batteria (se positivo = scarica)"
+          "battery_power_inverted": "Inverti Segno Potenza Batteria (se positivo = scarica)",
+          "grid_export_inverted": "Inverti Segno Immissione in Rete (se negativo = esportazione)"
         }
       }
     },
@@ -438,7 +439,8 @@
           "solar_forecast_sensor": "Sensore Previsione Solare (W o kWh, opzionale)",
           "solar_irradiance_sensor": "Sensore Irraggiamento Solare (W/m² o lux, opzionale)",
           "battery_max_discharge_time": "Tempo Max Scarica Batteria Tollerata (minuti)",
-          "battery_power_inverted": "Inverti Segno Potenza Batteria (se positivo = scarica)"
+          "battery_power_inverted": "Inverti Segno Potenza Batteria (se positivo = scarica)",
+          "grid_export_inverted": "Inverti Segno Immissione in Rete (se negativo = esportazione)"
         }
       },
       "edit_heat_pump": {

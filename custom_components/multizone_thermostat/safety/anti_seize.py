@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime
+import inspect
 import logging
 import time
 from typing import TYPE_CHECKING
@@ -73,12 +74,15 @@ class AntiSeizeManager:
 
     async def _turn_boiler_on(self) -> None:
         """Turn on central plant generator(s) for anti-seize."""
-        from ..boiler.plant_orchestrator import PlantOrchestrator
-        orch = getattr(self.coordinator, "plant_orchestrator", None)
-        if isinstance(orch, PlantOrchestrator):
-            await orch.async_update(100.0, "Anti-Seize", False)
-        elif hasattr(self.coordinator, "boiler_backend") and self.coordinator.boiler_backend:
-            await self.coordinator.boiler_backend.async_update(100.0, "Anti-Seize", False)
+        gas_enabled = getattr(self.coordinator, "enable_gas_heater", True) is not False
+        hp_enabled = getattr(self.coordinator, "enable_heat_pump", False) is True
+        boiler_backend = getattr(self.coordinator, "boiler_backend", None)
+        hp_backend = getattr(self.coordinator, "heat_pump_backend", None)
+
+        if gas_enabled and boiler_backend is not None:
+            await boiler_backend.async_update(100.0, "Anti-Seize", False)
+        elif not gas_enabled and hp_enabled and hp_backend is not None:
+            await hp_backend.async_update(100.0, "Anti-Seize", False)
         elif getattr(self.coordinator, "boiler_switch", None):
             await self.hass.services.async_call(
                 "switch",
@@ -89,18 +93,18 @@ class AntiSeizeManager:
 
     async def _turn_boiler_off(self) -> None:
         """Turn off central plant generator(s) after anti-seize."""
-        from ..boiler.plant_orchestrator import PlantOrchestrator
-        orch = getattr(self.coordinator, "plant_orchestrator", None)
-        if isinstance(orch, PlantOrchestrator):
-            await orch.async_emergency_off()
-        elif hasattr(self.coordinator, "boiler_backend") and self.coordinator.boiler_backend:
-            await self.coordinator.boiler_backend.async_update(0.0, None, False)
-            status_reason = getattr(self.coordinator.boiler_backend, "_status_reason", None) or getattr(
-                self.coordinator.boiler_backend, "status_reason", ""
+        boiler_backend = getattr(self.coordinator, "boiler_backend", None)
+        hp_backend = getattr(self.coordinator, "heat_pump_backend", None)
+        hp_enabled = getattr(self.coordinator, "enable_heat_pump", False) is True
+
+        if boiler_backend is not None:
+            await boiler_backend.async_update(0.0, None, False)
+            status_reason = getattr(boiler_backend, "_status_reason", None) or getattr(
+                boiler_backend, "status_reason", ""
             )
             if isinstance(status_reason, str) and status_reason.startswith("HOLD_ON"):
-                if hasattr(self.coordinator.boiler_backend, "async_emergency_off"):
-                    await self.coordinator.boiler_backend.async_emergency_off()
+                if hasattr(boiler_backend, "async_emergency_off"):
+                    await boiler_backend.async_emergency_off()
         elif getattr(self.coordinator, "boiler_switch", None):
             await self.hass.services.async_call(
                 "switch",
@@ -108,6 +112,9 @@ class AntiSeizeManager:
                 {ATTR_ENTITY_ID: self.coordinator.boiler_switch},
                 blocking=False,
             )
+
+        if hp_enabled and hp_backend is not None and inspect.iscoroutinefunction(getattr(hp_backend, "async_emergency_off", None)):
+            await hp_backend.async_emergency_off()
 
     async def async_execute(self) -> None:
         """Execute the anti-seize routine."""

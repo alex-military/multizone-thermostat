@@ -505,11 +505,14 @@ class ScheduleProfileManager:
                     # Wake up master if disabled
                     await self._async_wake_master()
 
-                    # Ensure plan zones are in HVACMode.HEAT
+                    # Ensure plan zones are in target HVACMode (skip non-cooling zones in cool mode)
+                    master_mode = str(getattr(self.coordinator, "master_hvac_mode", "heat")).lower()
                     all_zones_list = getattr(self.coordinator, "zones", [])
                     for z in all_zones_list:
                         cid = z.get("climate_id") or make_zone_entity_id(z.get(CONF_ZONE_NAME, ""))
                         if sr_zones is None or cid in sr_zones:
+                            if master_mode == "cool" and hasattr(self.coordinator, "can_zone_cool") and not self.coordinator.can_zone_cool(cid):
+                                continue
                             z_mode = None
                             if hasattr(self.coordinator, "get_zone_mode"):
                                 z_mode = self.coordinator.get_zone_mode(cid)

@@ -101,6 +101,8 @@ from ..const import (
     DEFAULT_BATTERY_MAX_DISCHARGE_TIME,
     CONF_BATTERY_POWER_INVERTED,
     DEFAULT_BATTERY_POWER_INVERTED,
+    CONF_GRID_EXPORT_INVERTED,
+    DEFAULT_GRID_EXPORT_INVERTED,
     CONF_SOLAR_MIN_RUN_TIME,
     DEFAULT_SOLAR_MIN_RUN_TIME,
     CONF_SOLAR_OVERHEAT_OFFSET,
@@ -168,6 +170,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._solar_irradiance_sensor: str | None = None
         self._battery_max_discharge_time: float = DEFAULT_BATTERY_MAX_DISCHARGE_TIME
         self._battery_power_inverted: bool = DEFAULT_BATTERY_POWER_INVERTED
+        self._grid_export_inverted: bool = DEFAULT_GRID_EXPORT_INVERTED
         self._solar_min_run_time: float = DEFAULT_SOLAR_MIN_RUN_TIME
         self._solar_overheat_offset: float = DEFAULT_SOLAR_OVERHEAT_OFFSET
         # Zones & extras
@@ -517,6 +520,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 self._solar_irradiance_sensor = user_input.get(CONF_SOLAR_IRRADIANCE_SENSOR)
                 self._battery_max_discharge_time = float(user_input.get(CONF_BATTERY_MAX_DISCHARGE_TIME, DEFAULT_BATTERY_MAX_DISCHARGE_TIME))
                 self._battery_power_inverted = bool(user_input.get(CONF_BATTERY_POWER_INVERTED, DEFAULT_BATTERY_POWER_INVERTED))
+                self._grid_export_inverted = bool(user_input.get(CONF_GRID_EXPORT_INVERTED, DEFAULT_GRID_EXPORT_INVERTED))
                 self._solar_min_run_time = float(user_input.get(CONF_SOLAR_MIN_RUN_TIME, DEFAULT_SOLAR_MIN_RUN_TIME))
                 self._solar_overheat_offset = float(user_input.get(CONF_SOLAR_OVERHEAT_OFFSET, DEFAULT_SOLAR_OVERHEAT_OFFSET))
             return await self.async_step_confirm()
@@ -536,6 +540,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             solar_overheat_offset=self._solar_overheat_offset,
             battery_max_discharge_time=self._battery_max_discharge_time,
             battery_power_inverted=self._battery_power_inverted,
+            grid_export_inverted=self._grid_export_inverted,
         )
         return self.async_show_form(
             step_id="energy_management",
@@ -607,6 +612,7 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 data[CONF_BATTERY_MIN_RESERVE_SOC] = self._battery_min_reserve_soc
                 data[CONF_BATTERY_MAX_DISCHARGE_TIME] = self._battery_max_discharge_time
                 data[CONF_BATTERY_POWER_INVERTED] = self._battery_power_inverted
+                data[CONF_GRID_EXPORT_INVERTED] = self._grid_export_inverted
                 data[CONF_SOLAR_MIN_RUN_TIME] = self._solar_min_run_time
                 data[CONF_SOLAR_OVERHEAT_OFFSET] = self._solar_overheat_offset
 

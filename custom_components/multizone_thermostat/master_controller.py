@@ -169,7 +169,13 @@ class MasterController:
 
         # Boiler will auto-turn off via state change listener,
         # but we also force it off here for safety ignoring locks
-        await self.coordinator.plant_orchestrator.boiler_backend.async_emergency_off()
+        boiler_backend = getattr(
+            getattr(self.coordinator, "plant_orchestrator", None), "boiler_backend", None
+        ) or getattr(self.coordinator, "boiler_backend", None)
+        if boiler_backend is not None and hasattr(boiler_backend, "async_emergency_off"):
+            res_b = boiler_backend.async_emergency_off()
+            if inspect.isawaitable(res_b):
+                await res_b
         hp_backend = getattr(self.coordinator, "heat_pump_backend", None) or getattr(
             self.coordinator.plant_orchestrator, "heat_pump_backend", None
         )

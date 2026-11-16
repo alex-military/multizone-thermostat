@@ -1,3 +1,4 @@
+import inspect
 import logging
 from typing import Any
 
@@ -437,12 +438,25 @@ class ZoneManager:
                     self._pre_window_state[climate_id] = PreWindowState({"mode": current_mode, "was_off": is_off})
                     self.hass.async_create_task(self.coordinator.async_save_storage())
                 
+                if hasattr(self.coordinator, "demand_aggregator") and self.coordinator.demand_aggregator:
+                    self.coordinator.demand_aggregator.set_zone_demand(climate_id, 0.0)
+                if (
+                    hasattr(self.coordinator, "split_manager")
+                    and self.coordinator.split_manager
+                    and hasattr(self.coordinator.split_manager, "set_local_manual_on")
+                ):
+                    self.coordinator.split_manager.set_local_manual_on(climate_id, False)
+
                 if self._zone_modes.get(climate_id) != ZONE_MODE_BYPASS:
                     self.coordinator.record_diagnostic_event("WINDOW_OPENED_BYPASS", {"sensor": sensor_id, "zone": climate_id})
                     if zone_select:
                         self.hass.async_create_task(zone_select.async_select_option(ZONE_MODE_BYPASS))
                     else:
                         self.set_zone_mode(climate_id, ZONE_MODE_BYPASS, save_to_preset=False)
+                        if inspect.iscoroutinefunction(getattr(self.coordinator, "_async_set_hvac_mode", None)):
+                            self.hass.async_create_task(
+                                self.coordinator._async_set_hvac_mode(climate_id, HVACMode.OFF)
+                            )
                     
             elif new_state.state in ("off", "unavailable", "unknown"):
                 _LOGGER.debug("Window closed or sensor lost (%s), restoring zone %s", sensor_id, climate_id)

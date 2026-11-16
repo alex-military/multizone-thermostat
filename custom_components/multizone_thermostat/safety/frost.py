@@ -121,7 +121,18 @@ class FrostManager:
             if weather_id and hasattr(self.hass, "states") and self.hass.states:
                 w_st = self.hass.states.get(weather_id)
                 if w_st and w_st.state not in ("unavailable", "unknown", None):
-                    out_t = w_st.attributes.get("temperature") if getattr(w_st, "attributes", None) else None
+                    is_weather = (
+                        str(weather_id).startswith("weather.")
+                        or getattr(w_st, "domain", None) == "weather"
+                    )
+                    attrs = getattr(w_st, "attributes", None)
+                    out_t = attrs.get("temperature") if is_weather and isinstance(attrs, dict) else None
+                    if not is_weather:
+                        out_t = w_st.state
+                        try:
+                            float(out_t)
+                        except (ValueError, TypeError):
+                            out_t = attrs.get("temperature") if isinstance(attrs, dict) else None
                     if out_t is not None:
                         try:
                             if float(out_t) <= 2.0:
