@@ -343,13 +343,16 @@ async def _async_register_services(hass: HomeAssistant) -> None:
         kd = float(call.data["kd"]) if call.data.get("kd") is not None else None
         lock_param = call.data.get("lock_parameter")
         unlock_arg = call.data.get("unlock")
+        seed_autotuner = bool(call.data.get("seed_autotuner", False))
 
         for coord in _get_active_coordinators(hass):
             zc = getattr(coord, "zone_controller", None)
             if not zc or not hasattr(zc, "async_set_zone_pid"):
                 continue
             zname = _find_zone_name_for_entity(coord, climate_entity)
-            if unlock_arg is not None and zname and hasattr(coord, "async_set_pid_manual_unlock"):
+            if seed_autotuner and zname and hasattr(coord, "async_set_pid_manual_unlock"):
+                await coord.async_set_pid_manual_unlock(zname, False)
+            elif unlock_arg is not None and zname and hasattr(coord, "async_set_pid_manual_unlock"):
                 await coord.async_set_pid_manual_unlock(zname, bool(unlock_arg))
             updated = await zc.async_set_zone_pid(
                 climate_entity,
@@ -357,6 +360,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
                 ki=ki,
                 kd=kd,
                 lock_param=lock_param,
+                seed_autotuner=seed_autotuner,
             )
             if updated:
                 if hasattr(coord, "async_notify_pid_entities"):
@@ -388,6 +392,29 @@ async def _async_register_services(hass: HomeAssistant) -> None:
                 if orch and inspect.iscoroutinefunction(getattr(orch, "_async_update_boiler", None)):
                     await orch._async_update_boiler()
 
+    async def handle_restore_autotune(call: ServiceCall) -> None:
+        climate_entity = call.data.get("climate_entity") or call.data.get("entity_id")
+        if not climate_entity:
+            return
+        keep_manual = bool(call.data.get("keep_manual_overrides", False))
+        for coord in _get_active_coordinators(hass):
+            zc = getattr(coord, "zone_controller", None)
+            if not zc or not hasattr(zc, "async_restore_zone_autotuner"):
+                continue
+            ok = await zc.async_restore_zone_autotuner(
+                climate_entity,
+                keep_manual_overrides=keep_manual,
+            )
+            if ok:
+                zname = _find_zone_name_for_entity(coord, climate_entity)
+                if not keep_manual and zname and hasattr(coord, "async_set_pid_manual_unlock"):
+                    await coord.async_set_pid_manual_unlock(zname, False)
+                if hasattr(coord, "async_notify_pid_entities"):
+                    coord.async_notify_pid_entities()
+                orch = getattr(coord, "plant_orchestrator", None)
+                if orch and inspect.iscoroutinefunction(getattr(orch, "_async_update_boiler", None)):
+                    await orch._async_update_boiler()
+
     services = {
         "save_schedule_profile": handle_save_schedule_profile,
         "activate_schedule_profile": handle_activate_schedule_profile,
@@ -398,6 +425,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
         "set_preset_temperature": handle_set_preset_temperature,
         "set_pid_parameters": handle_set_pid_parameters,
         "reset_autotune": handle_reset_autotune,
+        "restore_autotune": handle_restore_autotune,
     }
 
     if hasattr(hass, "services") and hasattr(hass.services, "async_register"):

@@ -187,6 +187,10 @@ sched_nav_title: "Programmazione",
     pid_reset_title: "Conferma Reset Autotuner",
     pid_reset_confirm_msg: "Azzerare i cicli appresi e riavviare la calibrazione iniziale (3 cicli) per questa zona?",
     pid_reset_confirm_btn: "Resetta Autotuner",
+    pid_restore_backup_btn: "Ripristina PID",
+    pid_restore_backup_title: "Ripristina PID Autotuner",
+    pid_restore_backup_confirm_msg: "Ripristinare i parametri PID calcolati dall'autotuner prima dell'ultimo reset?",
+    pid_restore_backup_confirm_btn: "Ripristina PID",
     pid_learning_status: "Apprendimento",
     sched_all_zones_row: "Tutte le Zone (Generale)",
     sched_base_tag: "Base"
@@ -320,6 +324,10 @@ sched_nav_title: "Schedule",
     pid_reset_title: "Confirm Autotuner Reset",
     pid_reset_confirm_msg: "Clear learned cycles and restart the 3-cycle initial calibration for this zone?",
     pid_reset_confirm_btn: "Reset Autotuner",
+    pid_restore_backup_btn: "Restore PID",
+    pid_restore_backup_title: "Restore Autotuner PID",
+    pid_restore_backup_confirm_msg: "Restore the PID parameters learned by the autotuner before the last reset?",
+    pid_restore_backup_confirm_btn: "Restore PID",
     pid_learning_status: "Learning",
     sched_all_zones_row: "All Zones (General)",
     sched_base_tag: "Base"
@@ -453,6 +461,10 @@ sched_nav_title: "Расписание",
     pid_reset_title: "Сброс автонастройки зоны",
     pid_reset_confirm_msg: "Сбросить обученные циклы и перезапустить начальную калибровку (3 цикла)?",
     pid_reset_confirm_btn: "Сбросить",
+    pid_restore_backup_btn: "Восстановить PID",
+    pid_restore_backup_title: "Восстановить PID автонастройки",
+    pid_restore_backup_confirm_msg: "Восстановить параметры PID, вычисленные автонастройкой до последнего сброса?",
+    pid_restore_backup_confirm_btn: "Восстановить PID",
     pid_learning_status: "Обучение",
     sched_all_zones_row: "Все зоны (Общее)",
     sched_base_tag: "База"
@@ -585,6 +597,10 @@ sched_nav_title: "Programmation",
     pid_reset_title: "Réinitialiser l'Autotuner",
     pid_reset_confirm_msg: "Effacer les cycles appris et relancer la calibration initiale (3 cycles) ?",
     pid_reset_confirm_btn: "Réinitialiser",
+    pid_restore_backup_btn: "Restaurer PID",
+    pid_restore_backup_title: "Restaurer le PID Autotuner",
+    pid_restore_backup_confirm_msg: "Restaurer les paramètres PID calculés par l'autotuner avant la dernière réinitialisation ?",
+    pid_restore_backup_confirm_btn: "Restaurer PID",
     pid_learning_status: "Apprentissage",
     sched_all_zones_row: "Toutes les Zones (Général)",
     sched_base_tag: "Base"
@@ -716,6 +732,10 @@ sched_nav_title: "Zeitplan",
     pid_reset_title: "Autotuner Zurücksetzen",
     pid_reset_confirm_msg: "Gelernte Zyklen löschen und 3-Zyklus-Kalibrierung neu starten?",
     pid_reset_confirm_btn: "Zurücksetzen",
+    pid_restore_backup_btn: "PID Wiederherstellen",
+    pid_restore_backup_title: "Autotuner-PID wiederherstellen",
+    pid_restore_backup_confirm_msg: "Die vor dem letzten Zurücksetzen vom Autotuner gelernten PID-Parameter wiederherstellen?",
+    pid_restore_backup_confirm_btn: "PID Wiederherstellen",
     pid_learning_status: "Lernen",
     sched_all_zones_row: "Alle Zonen (Allgemein)",
     sched_base_tag: "Basis"
@@ -848,6 +868,10 @@ sched_nav_title: "Programación",
     pid_reset_title: "Confirmar Reinicio Autotuner",
     pid_reset_confirm_msg: "¿Borrar los ciclos aprendidos y reiniciar la calibración inicial de 3 ciclos?",
     pid_reset_confirm_btn: "Reiniciar",
+    pid_restore_backup_btn: "Restaurar PID",
+    pid_restore_backup_title: "Restaurar PID del Autotuner",
+    pid_restore_backup_confirm_msg: "¿Restaurar los parámetros PID calculados por el autotuner antes del último reinicio?",
+    pid_restore_backup_confirm_btn: "Restaurar PID",
     pid_learning_status: "Aprendiendo",
     sched_all_zones_row: "Todas las Zonas (General)",
     sched_base_tag: "Base"
@@ -5263,6 +5287,29 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
       .pid-reset-btn:hover {
         background: rgba(239, 68, 68, 0.24);
       }
+      .pid-actions {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .pid-restore-backup-btn {
+        display: none;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.75em;
+        font-weight: 600;
+        padding: 4px 8px;
+        border-radius: 8px;
+        border: 1px solid rgba(59, 130, 246, 0.4);
+        background: rgba(59, 130, 246, 0.14);
+        color: #93c5fd;
+        cursor: pointer;
+        transition: background 0.15s ease;
+      }
+      .pid-restore-backup-btn:hover {
+        background: rgba(59, 130, 246, 0.28);
+      }
       .pid-grid {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
@@ -5448,10 +5495,16 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
             <span id="pid-section-title">${t('pid_section_title')}</span>
             <span class="pid-state-pill" id="pid-state-pill">--</span>
           </div>
-          <button type="button" class="pid-reset-btn" id="pid-reset-btn" title="${t('pid_reset_btn')}">
-            <ha-icon icon="mdi:restart-alert" style="--mdc-icon-size: 14px;"></ha-icon>
-            <span id="pid-reset-label">${t('pid_reset_btn')}</span>
-          </button>
+          <div class="pid-actions">
+            <button type="button" class="pid-restore-backup-btn" id="pid-restore-backup-btn" title="${t('pid_restore_backup_btn')}">
+              <ha-icon icon="mdi:backup-restore" style="--mdc-icon-size: 14px;"></ha-icon>
+              <span id="pid-restore-backup-label">${t('pid_restore_backup_btn')}</span>
+            </button>
+            <button type="button" class="pid-reset-btn" id="pid-reset-btn" title="${t('pid_reset_btn')}">
+              <ha-icon icon="mdi:restart-alert" style="--mdc-icon-size: 14px;"></ha-icon>
+              <span id="pid-reset-label">${t('pid_reset_btn')}</span>
+            </button>
+          </div>
         </div>
         <div class="pid-grid">
           <div class="pid-box" id="pid-box-kp" data-param="Kp" title="${t('pid_click_to_edit')}">
@@ -5533,6 +5586,14 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
       });
     }
 
+    const restoreBackupBtn = this.shadowRoot.getElementById('pid-restore-backup-btn');
+    if (restoreBackupBtn) {
+      restoreBackupBtn.addEventListener('click', () => {
+        if (!this._hass || !this._config || !this._config.entity) return;
+        this._openRestoreBackupModal();
+      });
+    }
+
     const cancelBtn = this.shadowRoot.getElementById('pid-modal-cancel');
     if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
 
@@ -5562,6 +5623,13 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
         if (!this._hass || !this._config || !this._config.entity) return;
         if (this._modalMode === 'reset') {
           await this._hass.callService('multizone_thermostat', 'reset_autotune', {
+            climate_entity: this._config.entity,
+          });
+          closeModal();
+          return;
+        }
+        if (this._modalMode === 'restore_backup') {
+          await this._hass.callService('multizone_thermostat', 'restore_autotune', {
             climate_entity: this._config.entity,
           });
           closeModal();
@@ -5646,6 +5714,34 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
     if (confirmBtn) {
       confirmBtn.className = 'pid-btn pid-btn-danger';
       confirmBtn.innerText = t('pid_reset_confirm_btn');
+    }
+    if (backdrop) backdrop.classList.add('open');
+  }
+
+  _openRestoreBackupModal() {
+    const t = (k) => getTranslation(this._hass, k);
+    this._modalMode = 'restore_backup';
+    this._activePidParam = null;
+
+    const titleEl = this.shadowRoot.getElementById('pid-modal-title');
+    const warnEl = this.shadowRoot.getElementById('pid-modal-warn');
+    const inputWrap = this.shadowRoot.getElementById('pid-modal-input-wrap');
+    const restoreBtn = this.shadowRoot.getElementById('pid-modal-restore');
+    const confirmBtn = this.shadowRoot.getElementById('pid-modal-confirm');
+    const backdrop = this.shadowRoot.getElementById('pid-modal-backdrop');
+
+    const bp = this._latestBackupPid;
+    const bpText = (bp && bp.Kp !== undefined)
+      ? ` (Kp: ${bp.Kp}, Ki: ${bp.Ki}, Kd: ${bp.Kd})`
+      : '';
+
+    if (titleEl) titleEl.innerText = `↩️ ${t('pid_restore_backup_title')}`;
+    if (warnEl) warnEl.innerText = `${t('pid_restore_backup_confirm_msg')}${bpText}`;
+    if (inputWrap) inputWrap.style.display = 'none';
+    if (restoreBtn) restoreBtn.style.display = 'none';
+    if (confirmBtn) {
+      confirmBtn.className = 'pid-btn pid-btn-save';
+      confirmBtn.innerText = t('pid_restore_backup_confirm_btn');
     }
     if (backdrop) backdrop.classList.add('open');
   }
@@ -5982,11 +6078,18 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
       const autotuneState = attrs.autotune_state || (autotuneStateObj ? autotuneStateObj.state : null);
 
       this._latestPidInfo = { kp: kpVal, ki: kiVal, kd: kdVal, overrides };
+      this._latestBackupPid = attrs.autotune_backup_pid || null;
 
       const pidTitleEl = this.shadowRoot.getElementById('pid-section-title');
       if (pidTitleEl) pidTitleEl.innerText = t('pid_section_title');
       const resetLabelEl = this.shadowRoot.getElementById('pid-reset-label');
       if (resetLabelEl) resetLabelEl.innerText = t('pid_reset_btn');
+      const restoreBackupBtn = this.shadowRoot.getElementById('pid-restore-backup-btn');
+      const restoreBackupLabel = this.shadowRoot.getElementById('pid-restore-backup-label');
+      if (restoreBackupLabel) restoreBackupLabel.innerText = t('pid_restore_backup_btn');
+      if (restoreBackupBtn) {
+        restoreBackupBtn.style.display = attrs.autotune_can_restore ? 'inline-flex' : 'none';
+      }
 
       const pillEl = this.shadowRoot.getElementById('pid-state-pill');
       if (pillEl) {

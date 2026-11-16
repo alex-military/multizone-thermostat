@@ -111,15 +111,22 @@ class ZoneController:
         ki: float | None = None,
         kd: float | None = None,
         lock_param: str | None = None,
+        seed_autotuner: bool = False,
     ) -> bool:
-        """Update manual PID overrides or restore parameters to autotuner control."""
+        """Update manual PID overrides, seed learned baseline, or restore autotuner control."""
         resolved_id = self._resolve_zone_id(climate_id)
         tuner = self._autotuners.get(resolved_id)
         if not tuner:
             return False
-        if lock_param is not None:
-            tuner.lock_param(None if str(lock_param).lower() == "all" else str(lock_param))
-        tuner.set_manual_pid(kp=kp, ki=ki, kd=kd)
+        if seed_autotuner:
+            eff_kp = kp if kp is not None else tuner.kp
+            eff_ki = ki if ki is not None else tuner.ki
+            eff_kd = kd if kd is not None else tuner.kd
+            tuner.seed_learned_pid(kp=float(eff_kp), ki=float(eff_ki), kd=float(eff_kd))
+        else:
+            if lock_param is not None:
+                tuner.lock_param(None if str(lock_param).lower() == "all" else str(lock_param))
+            tuner.set_manual_pid(kp=kp, ki=ki, kd=kd)
         self._apply_tuner_pid_to_controller(resolved_id)
         await self.async_save_autotuner_states()
         return True
@@ -139,6 +146,22 @@ class ZoneController:
         self._apply_tuner_pid_to_controller(resolved_id)
         if pid:
             pid.clear_samples()
+        await self.async_save_autotuner_states()
+        return True
+
+    async def async_restore_zone_autotuner(
+        self,
+        climate_id: str,
+        keep_manual_overrides: bool = False,
+    ) -> bool:
+        """Restore the pre-reset autotuner state and PID parameters for a zone."""
+        resolved_id = self._resolve_zone_id(climate_id)
+        tuner = self._autotuners.get(resolved_id)
+        if not tuner:
+            return False
+        if not tuner.restore_pre_reset(keep_manual_overrides=keep_manual_overrides):
+            return False
+        self._apply_tuner_pid_to_controller(resolved_id)
         await self.async_save_autotuner_states()
         return True
 
