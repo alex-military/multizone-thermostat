@@ -80,7 +80,7 @@ class RoutineManager:
         self._unsub_listeners.clear()
 
     @staticmethod
-    def _is_state_away(val: str) -> bool:
+    def is_state_away(val: str) -> bool:
         """Determine if a presence sensor state string represents Away."""
         val_lower = str(val).strip().lower()
         if val_lower in ("home", "on", "true"):
@@ -91,6 +91,11 @@ class RoutineManager:
             return float(val_lower) <= 0
         except (ValueError, TypeError):
             return val_lower != "home"
+
+    @staticmethod
+    def _is_state_away(val: str) -> bool:
+        """Backward-compatible alias for is_state_away."""
+        return RoutineManager.is_state_away(val)
 
     @callback
     def _async_on_presence_changed(self, event: Event) -> None:

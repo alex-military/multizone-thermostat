@@ -46,6 +46,16 @@ class MultizonePID:
     @property
     def mode(self):
         return self._pid.mode
+
+    @property
+    def last_input_time(self) -> float | None:
+        """Return monotonic timestamp of the last PID evaluation."""
+        return self._last_input_time
+
+    @property
+    def has_evaluated(self) -> bool:
+        """Return True if the PID has evaluated at least one sample."""
+        return self._last_input_time is not None
         
     @mode.setter
     def mode(self, mode):

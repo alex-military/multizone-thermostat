@@ -65,8 +65,8 @@ def check_is_dhw_active(coordinator: Any, hass: Any = None) -> bool:
                 diag = diag_fn()
                 if isinstance(diag, dict) and diag.get("dhw_active", False):
                     return True
-            except Exception:
-                pass
+            except (KeyError, AttributeError, ValueError, TypeError) as err:
+                _LOGGER.debug("DHW OpenTherm diagnostics check skipped: %s", err)
 
     if hass and hasattr(hass, "states") and hass.states:
         for std_id in ("binary_sensor.boiler_dhw_charging", "binary_sensor.dhw_charging"):
@@ -74,8 +74,8 @@ def check_is_dhw_active(coordinator: Any, hass: Any = None) -> bool:
                 st = hass.states.get(std_id)
                 if st and hasattr(st, "state") and str(st.state).lower() in ("on", "true", "1", "charging", "heat", "heating"):
                     return True
-            except Exception:
-                pass
+            except (KeyError, AttributeError, ValueError, TypeError) as err:
+                _LOGGER.debug("DHW sensor %s check skipped: %s", std_id, err)
 
     return False
 
@@ -144,8 +144,15 @@ class PlantOrchestrator:
                     except Exception:
                         pid_cool = None
                     if (
-                        getattr(pid_heat, "_last_input_time", None) is not None
-                        or getattr(pid_cool, "_last_input_time", None) is not None
+                        isinstance(getattr(pid_heat, "has_evaluated", None), bool) and pid_heat.has_evaluated
+                    ) or (
+                        isinstance(getattr(pid_cool, "has_evaluated", None), bool) and pid_cool.has_evaluated
+                    ) or (
+                        not isinstance(getattr(pid_heat, "has_evaluated", None), bool)
+                        and getattr(pid_heat, "_last_input_time", None) is not None
+                    ) or (
+                        not isinstance(getattr(pid_cool, "has_evaluated", None), bool)
+                        and getattr(pid_cool, "_last_input_time", None) is not None
                     ):
                         pid_evaluated = True
 

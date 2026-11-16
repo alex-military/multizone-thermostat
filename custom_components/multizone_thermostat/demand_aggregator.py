@@ -203,6 +203,11 @@ class DemandAggregator:
         """Return a copy of all current zone demands."""
         return dict(self._zone_demands)
 
+    @property
+    def zone_demands(self) -> dict[str, float]:
+        """Return a copy of all current zone demands."""
+        return self.get_all_demands()
+
     def reset_zone_demand(self, climate_id: str) -> None:
         """Reset demand of a single zone to 0.0%."""
         self.set_zone_demand(climate_id, 0.0)

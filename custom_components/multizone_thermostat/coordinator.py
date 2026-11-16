@@ -17,6 +17,8 @@ from .const import (
     KEY_ALLOW_SPLIT_COOLING,
     KEY_HEAT_SOURCE_PRIORITY,
     DEFAULT_HEAT_SOURCE_PRIORITY,
+    KEY_HP_MIN_CYCLE_ON,
+    KEY_HP_MIN_CYCLE_OFF,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -181,8 +183,32 @@ class MultizoneCoordinator:
         return self.zone_manager._zone_modes
 
     @property
+    def climate_entities(self) -> dict[str, Any]:
+        """Return registered climate entities keyed by canonical zone id."""
+        return self._climate_entities
+
+    def get_climate_entity(self, climate_id: str) -> Any | None:
+        """Return registered climate entity for a zone id or alias."""
+        canon = self.resolve_zone_id(climate_id) if hasattr(self, "resolve_zone_id") else climate_id
+        return self._climate_entities.get(canon) or self._climate_entities.get(climate_id)
+
+    @property
+    def select_entities(self) -> dict[str, Any]:
+        """Return registered select entities."""
+        return self._select_entities
+
+    def get_select_entity(self, key: str) -> Any | None:
+        """Return registered select entity by key."""
+        return self._select_entities.get(key)
+
+    @property
+    def zone_demands(self) -> dict[str, float]:
+        """Return current zone demands from DemandAggregator."""
+        return self.demand_aggregator.zone_demands
+
+    @property
     def _zone_demands(self) -> dict[str, float]:
-        """Alias to zone demands owned by DemandAggregator."""
+        """Backward-compatible alias to zone demands owned by DemandAggregator."""
         return self.demand_aggregator._zone_demands
 
     @property
@@ -330,9 +356,13 @@ class MultizoneCoordinator:
         """Save thermal model learning progress to storage via StorageManager."""
         await self.storage.async_save_thermal_states(self._thermal_models)
 
-    async def _async_save_presets_storage(self) -> None:
+    async def async_save_presets_storage(self) -> None:
         """Save presets to storage via StorageManager."""
         await self.storage.async_save_presets(self.zone_manager._presets_heat, self.zone_manager._presets_cool)
+
+    async def _async_save_presets_storage(self) -> None:
+        """Backward-compatible alias for async_save_presets_storage."""
+        await self.async_save_presets_storage()
 
     def register_select(self, key: str, select_entity: Any) -> None:
         """Register a select entity."""
@@ -343,13 +373,29 @@ class MultizoneCoordinator:
         """Return minimum cycle on time in minutes."""
         return self._min_cycle_on
 
+    def _has_dedicated_hp_cycle_setting(self, flag_attr: str, persist_key: str) -> bool:
+        """Return True if a dedicated heat-pump min cycle time was explicitly configured."""
+        if getattr(self, flag_attr, False) is True:
+            return True
+        if hasattr(self, "get_persistent_data"):
+            persisted = self.get_persistent_data(persist_key, None)
+            if persisted is not None and not isinstance(persisted, bool) and isinstance(persisted, (int, float, str)):
+                try:
+                    float(persisted)
+                    return True
+                except (ValueError, TypeError):
+                    return False
+        return False
+
     def set_min_cycle_on(self, value: float) -> None:
         self._min_cycle_on = float(value)
         bb = getattr(self, "boiler_backend", None)
         if bb is not None and hasattr(bb, "set_min_cycle_on"):
             bb.set_min_cycle_on(int(value))
         hp = getattr(self, "heat_pump_backend", None)
-        if hp is not None and hasattr(hp, "set_min_cycle_on"):
+        if hp is not None and hasattr(hp, "set_min_cycle_on") and not self._has_dedicated_hp_cycle_setting(
+            "_hp_min_cycle_on_explicit", KEY_HP_MIN_CYCLE_ON
+        ):
             hp.set_min_cycle_on(float(value))
 
     @property
@@ -363,7 +409,9 @@ class MultizoneCoordinator:
         if bb is not None and hasattr(bb, "set_min_cycle_off"):
             bb.set_min_cycle_off(int(value))
         hp = getattr(self, "heat_pump_backend", None)
-        if hp is not None and hasattr(hp, "set_min_cycle_off"):
+        if hp is not None and hasattr(hp, "set_min_cycle_off") and not self._has_dedicated_hp_cycle_setting(
+            "_hp_min_cycle_off_explicit", KEY_HP_MIN_CYCLE_OFF
+        ):
             hp.set_min_cycle_off(float(value))
 
     @property
@@ -373,6 +421,7 @@ class MultizoneCoordinator:
 
     def set_hp_min_cycle_on(self, value: float) -> None:
         self._hp_min_cycle_on = float(value)
+        self._hp_min_cycle_on_explicit = True
         hp = getattr(self, "heat_pump_backend", None)
         if hp is not None and hasattr(hp, "set_min_cycle_on"):
             hp.set_min_cycle_on(float(value))
@@ -384,6 +433,7 @@ class MultizoneCoordinator:
 
     def set_hp_min_cycle_off(self, value: float) -> None:
         self._hp_min_cycle_off = float(value)
+        self._hp_min_cycle_off_explicit = True
         hp = getattr(self, "heat_pump_backend", None)
         if hp is not None and hasattr(hp, "set_min_cycle_off"):
             hp.set_min_cycle_off(float(value))
@@ -537,7 +587,7 @@ class MultizoneCoordinator:
         else:
             await MasterController(self).async_apply_master_off()
 
-    async def _async_set_hvac_mode(self, climate_entity: str, mode: str) -> None:
+    async def async_set_hvac_mode(self, climate_entity: str, mode: str) -> None:
         """Set HVAC mode on a climate entity."""
         from .master_controller import MasterController
         ctrl = getattr(self, "master_controller", None)
@@ -545,6 +595,22 @@ class MultizoneCoordinator:
             await ctrl.async_set_hvac_mode(climate_entity, mode)
         else:
             await MasterController(self).async_set_hvac_mode(climate_entity, mode)
+
+    async def _async_set_hvac_mode(self, climate_entity: str, mode: str) -> None:
+        """Backward-compatible alias for async_set_hvac_mode."""
+        await self.async_set_hvac_mode(climate_entity, mode)
+
+    def notify_climate(self, climate_id: str) -> None:
+        """Trigger state update callback for a single climate entity."""
+        canon = self.resolve_zone_id(climate_id) if hasattr(self, "resolve_zone_id") else climate_id
+        cb = self._climate_callbacks.get(canon) or self._climate_callbacks.get(climate_id)
+        if cb:
+            cb()
+
+    def notify_all_climates(self) -> None:
+        """Trigger state update callbacks for all registered climate entities."""
+        for cb in list(self._climate_callbacks.values()):
+            cb()
 
     async def async_update_all_climates(self) -> None:
         """Trigger zone controller re-evaluation and state write on all registered zones."""

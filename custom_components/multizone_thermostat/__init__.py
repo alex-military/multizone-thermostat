@@ -38,6 +38,19 @@ _LOGGER = logging.getLogger(__name__)
 PLATFORMS = ["climate", "switch", "number", "select", "time", "sensor", "binary_sensor", "button"]
 
 
+async def _async_refresh_orchestrator(orch: Any) -> None:
+    """Refresh plant orchestrator using public async_refresh (with mock fallback)."""
+    if orch is None:
+        return
+    refresh_fn = getattr(orch, "async_refresh", None)
+    if inspect.iscoroutinefunction(refresh_fn):
+        await refresh_fn()
+        return
+    legacy_fn = getattr(orch, "_async_update_boiler", None)
+    if inspect.iscoroutinefunction(legacy_fn):
+        await legacy_fn()
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Multizone Thermostat from a config entry."""
     hass.data.setdefault(DOMAIN, {})
@@ -200,9 +213,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Proactively evaluate zone PID demands and aggregate immediately after setup
     # so Master Demand does not remain at 0% until the first manual change or periodic tick.
     orch = getattr(coordinator, "plant_orchestrator", None)
-    if orch and inspect.iscoroutinefunction(getattr(orch, "_async_update_boiler", None)):
+    if orch is not None:
         try:
-            await orch._async_update_boiler()
+            await _async_refresh_orchestrator(orch)
         except Exception as init_err:
             _LOGGER.debug("Initial boiler demand sync skipped: %s", init_err)
 
@@ -503,9 +516,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
                 if updated:
                     if hasattr(coord, "async_notify_pid_entities"):
                         coord.async_notify_pid_entities()
-                    orch = getattr(coord, "plant_orchestrator", None)
-                    if orch and inspect.iscoroutinefunction(getattr(orch, "_async_update_boiler", None)):
-                        await orch._async_update_boiler()
+                    await _async_refresh_orchestrator(getattr(coord, "plant_orchestrator", None))
 
     async def handle_reset_autotune(call: ServiceCall) -> None:
         data = dict(call.data) if hasattr(call, "data") and isinstance(call.data, Mapping) else {}
@@ -534,9 +545,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
                         await coord.async_set_pid_manual_unlock(zname, False)
                     if hasattr(coord, "async_notify_pid_entities"):
                         coord.async_notify_pid_entities()
-                    orch = getattr(coord, "plant_orchestrator", None)
-                    if orch and inspect.iscoroutinefunction(getattr(orch, "_async_update_boiler", None)):
-                        await orch._async_update_boiler()
+                    await _async_refresh_orchestrator(getattr(coord, "plant_orchestrator", None))
 
     services = {
         "save_schedule_profile": (handle_save_schedule_profile, None),

@@ -1,6 +1,7 @@
 """Typed configuration for Multizone Thermostat heating plant."""
 from __future__ import annotations
 
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -9,6 +10,18 @@ from .const import (
     CONF_ZONE_CLIMATES,
     CONF_ZONE_SWITCHES,
     CONF_ZONE_VALVES,
+    CONF_ZONE_TEMP_SENSOR,
+    CONF_ZONE_HUMIDITY_SENSOR,
+    CONF_ZONE_WINDOW_SENSOR,
+    CONF_ZONE_EMITTER_TYPE,
+    CONF_ZONE_SPLIT_CLIMATE,
+    CONF_ZONE_SPLIT_ROLE,
+    EMITTER_TYPE_RADIATOR,
+    EMITTER_TYPE_UNDERFLOOR,
+    EMITTER_TYPE_FANCOIL,
+    SPLIT_ROLE_COOLING_ONLY,
+    DEFAULT_SPLIT_ROLE,
+    make_zone_entity_id,
     CONF_BOILER_MODE,
     CONF_BOILER_SWITCH,
     CONF_OPENTHERM_ENTITY,
@@ -99,6 +112,11 @@ class PlantConfig:
     min_cycle_off: float = float(DEFAULT_MIN_CYCLE_OFF)
     valve_delay: float = float(DEFAULT_VALVE_DELAY)
 
+    @property
+    def zone_configs(self) -> list[ZoneConfig]:
+        """Return normalized ZoneConfig objects for all configured zones."""
+        return [ZoneConfig.from_dict(z) for z in self.zones]
+
     @classmethod
     def from_entry(cls, entry: Any) -> PlantConfig:
         """Construct PlantConfig from Home Assistant ConfigEntry data and options."""
@@ -143,32 +161,116 @@ class PlantConfig:
         )
 
 
-def get_zone_name(zone: dict[str, Any] | None) -> str:
+@dataclass
+class ZoneConfig(Mapping[str, Any]):
+    """Typed zone configuration with backward-compatible Mapping interface."""
+
+    name: str
+    climate_id: str
+    emitter_type: str = EMITTER_TYPE_RADIATOR
+    temp_sensor: str | None = None
+    humidity_sensor: str | None = None
+    window_sensor: str | None = None
+    climates: list[str] = field(default_factory=list)
+    switches: list[str] = field(default_factory=list)
+    valves: list[str] = field(default_factory=list)
+    split_climate_entity: str | None = None
+    split_role: str = DEFAULT_SPLIT_ROLE
+    raw_config: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def is_underfloor(self) -> bool:
+        return self.emitter_type == EMITTER_TYPE_UNDERFLOOR
+
+    @property
+    def is_fancoil(self) -> bool:
+        return self.emitter_type == EMITTER_TYPE_FANCOIL
+
+    @property
+    def is_radiator(self) -> bool:
+        return self.emitter_type == EMITTER_TYPE_RADIATOR
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any] | ZoneConfig) -> ZoneConfig:
+        """Normalize legacy/alias zone configuration dicts into a ZoneConfig."""
+        if isinstance(data, cls):
+            return data
+        name = str(data.get(CONF_ZONE_NAME) or data.get("zone_name") or "")
+        climate_id = str(data.get("climate_id") or (make_zone_entity_id(name) if name else ""))
+        raw_emitter = data.get(CONF_ZONE_EMITTER_TYPE) or data.get("emitter_type")
+        if data.get("is_fancoil") or data.get("fancoil"):
+            emitter = EMITTER_TYPE_FANCOIL
+        elif raw_emitter in (EMITTER_TYPE_RADIATOR, EMITTER_TYPE_UNDERFLOOR, EMITTER_TYPE_FANCOIL):
+            emitter = str(raw_emitter)
+        else:
+            emitter = EMITTER_TYPE_RADIATOR
+
+        split_role = str(data.get(CONF_ZONE_SPLIT_ROLE) or data.get("split_role") or DEFAULT_SPLIT_ROLE)
+        if data.get("cooling_only"):
+            split_role = SPLIT_ROLE_COOLING_ONLY
+
+        return cls(
+            name=name,
+            climate_id=climate_id,
+            emitter_type=emitter,
+            temp_sensor=data.get(CONF_ZONE_TEMP_SENSOR) or data.get("temp_sensor"),
+            humidity_sensor=data.get(CONF_ZONE_HUMIDITY_SENSOR) or data.get("humidity_sensor"),
+            window_sensor=data.get(CONF_ZONE_WINDOW_SENSOR) or data.get("window_sensor"),
+            climates=get_zone_climates(data),
+            switches=get_zone_switches(data),
+            valves=get_zone_valves(data),
+            split_climate_entity=data.get(CONF_ZONE_SPLIT_CLIMATE) or data.get("split_climate_entity"),
+            split_role=split_role,
+            raw_config=dict(data),
+        )
+
+    def __getitem__(self, key: str) -> Any:
+        if key in self.raw_config:
+            return self.raw_config[key]
+        if hasattr(self, key):
+            return getattr(self, key)
+        raise KeyError(key)
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self.raw_config)
+
+    def __len__(self) -> int:
+        return len(self.raw_config)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        if key in self.raw_config:
+            return self.raw_config[key]
+        if hasattr(self, key):
+            return getattr(self, key)
+        return default
+
+
+def get_zone_name(zone: Mapping[str, Any] | None) -> str:
     """Extract zone name, supporting both 'name' and 'zone_name'."""
-    if not isinstance(zone, dict):
+    if not isinstance(zone, Mapping):
         return ""
     return str(zone.get(CONF_ZONE_NAME) or zone.get("zone_name") or "")
 
 
-def get_zone_climates(zone: dict[str, Any] | None) -> list[str]:
+def get_zone_climates(zone: Mapping[str, Any] | None) -> list[str]:
     """Extract list of climate entities (TRVs), supporting aliases."""
-    if not isinstance(zone, dict):
+    if not isinstance(zone, Mapping):
         return []
     res = zone.get(CONF_ZONE_CLIMATES) or zone.get("zone_climates") or zone.get("climates") or []
     return list(res) if isinstance(res, (list, tuple, set)) else []
 
 
-def get_zone_switches(zone: dict[str, Any] | None) -> list[str]:
+def get_zone_switches(zone: Mapping[str, Any] | None) -> list[str]:
     """Extract list of switch entities (relays), supporting aliases."""
-    if not isinstance(zone, dict):
+    if not isinstance(zone, Mapping):
         return []
     res = zone.get(CONF_ZONE_SWITCHES) or zone.get("zone_switches") or zone.get("switches") or []
     return list(res) if isinstance(res, (list, tuple, set)) else []
 
 
-def get_zone_valves(zone: dict[str, Any] | None) -> list[str]:
+def get_zone_valves(zone: Mapping[str, Any] | None) -> list[str]:
     """Extract list of proportional/analog valve entities, supporting aliases."""
-    if not isinstance(zone, dict):
+    if not isinstance(zone, Mapping):
         return []
     res = zone.get(CONF_ZONE_VALVES) or zone.get("zone_valves") or zone.get("valves") or []
     return list(res) if isinstance(res, (list, tuple, set)) else []

@@ -338,6 +338,14 @@ class CentralHeatPumpBackend(BoilerBackend):
             return False
 
         cid = z.get("climate_id") or make_zone_entity_id(z.get("name") or z.get("zone_name") or "")
+        resolve_fn = getattr(self.coordinator, "resolve_zone_id", None)
+        if callable(resolve_fn) and cid:
+            try:
+                resolved = resolve_fn(cid)
+                if isinstance(resolved, str) and resolved:
+                    cid = resolved
+            except (KeyError, TypeError, ValueError, AttributeError) as err:
+                _LOGGER.debug("Failed to resolve zone id %s: %s", cid, err)
 
         get_zone_mode_fn = getattr(self.coordinator, "get_zone_mode", None)
         if callable(get_zone_mode_fn):
@@ -345,12 +353,16 @@ class CentralHeatPumpBackend(BoilerBackend):
                 z_mode = get_zone_mode_fn(cid)
                 if isinstance(z_mode, str) and z_mode == "bypass":
                     return False
-            except Exception:
-                pass
+            except (KeyError, TypeError, ValueError, AttributeError) as err:
+                _LOGGER.debug("Failed to read zone mode for %s: %s", cid, err)
 
-        climates = getattr(self.coordinator, "_climate_entities", None)
+        climates = getattr(self.coordinator, "climate_entities", None)
+        if not isinstance(climates, dict):
+            climates = getattr(self.coordinator, "_climate_entities", None)
         if isinstance(climates, dict) and climates:
             c_obj = climates.get(cid)
+            if c_obj is None and z.get("name"):
+                c_obj = climates.get(make_zone_entity_id(str(z["name"])))
             if c_obj is not None:
                 raw_hvac = getattr(c_obj, "hvac_mode", None)
                 if hasattr(raw_hvac, "value"):
@@ -359,19 +371,6 @@ class CentralHeatPumpBackend(BoilerBackend):
                     raw_hvac = raw_hvac.lower()
                 if raw_hvac in ("off", "heat"):
                     return False
-            else:
-                z_name = z.get("name")
-                if z_name:
-                    for c_key, c_val in climates.items():
-                        if z_name in c_key:
-                            raw_hvac = getattr(c_val, "hvac_mode", None)
-                            if hasattr(raw_hvac, "value"):
-                                raw_hvac = raw_hvac.value
-                            if isinstance(raw_hvac, str):
-                                raw_hvac = raw_hvac.lower()
-                            if raw_hvac in ("off", "heat"):
-                                return False
-                            break
 
         split_mgr = getattr(self.coordinator, "split_manager", None)
         if split_mgr is not None and hasattr(split_mgr, "has_split") and hasattr(split_mgr, "is_split_active"):
@@ -382,10 +381,21 @@ class CentralHeatPumpBackend(BoilerBackend):
                     and z.get("emitter_type") != EMITTER_UNDERFLOOR
                 ):
                     return False
-            except Exception:
-                pass
+            except (KeyError, TypeError, ValueError, AttributeError) as err:
+                _LOGGER.debug("Failed to evaluate split status for %s: %s", cid, err)
 
         return True
+
+    @staticmethod
+    def _compute_dew_point(temp_c: float, rh_pct: float) -> float | None:
+        """Compute Magnus-formula dew point in °C safely."""
+        try:
+            a, b = 17.27, 237.7
+            alpha = ((a * temp_c) / (b + temp_c)) + math.log(max(1.0, min(100.0, rh_pct)) / 100.0)
+            return (b * alpha) / (a - alpha)
+        except (ValueError, TypeError, ZeroDivisionError) as err:
+            _LOGGER.debug("Dew point calculation failed (T=%s, RH=%s): %s", temp_c, rh_pct, err)
+            return None
 
     def _calculate_safe_cooling_min_temp(self) -> float:
         """Calculate safe minimum cooling water temperature to prevent internal condensation (L4).
@@ -447,14 +457,9 @@ class CentralHeatPumpBackend(BoilerBackend):
                         break
 
             if t_val is not None and h_val is not None and 5.0 <= h_val <= 100.0:
-                try:
-                    a, b = 17.27, 237.7
-                    alpha = ((a * t_val) / (b + t_val)) + math.log(max(1.0, min(100.0, h_val)) / 100.0)
-                    dp = (b * alpha) / (a - alpha)
-                    if dp > highest_dew_point:
-                        highest_dew_point = dp
-                except Exception:
-                    pass
+                dp = self._compute_dew_point(t_val, h_val)
+                if dp is not None and dp > highest_dew_point:
+                    highest_dew_point = dp
 
         if highest_dew_point > -900.0:
             # Water temperature must remain at least 2.0°C above worst-case indoor dew point
@@ -468,13 +473,9 @@ class CentralHeatPumpBackend(BoilerBackend):
                     rh = w_st.attributes.get("humidity")
                     temp = w_st.attributes.get("temperature")
                     if isinstance(rh, (int, float)) and isinstance(temp, (int, float)) and float(rh) > 10.0:
-                        try:
-                            a, b = 17.27, 237.7
-                            alpha = ((a * float(temp)) / (b + float(temp))) + math.log(max(1.0, min(100.0, float(rh))) / 100.0)
-                            dew_point = (b * alpha) / (a - alpha)
+                        dew_point = self._compute_dew_point(float(temp), float(rh))
+                        if dew_point is not None:
                             safe_floor = max(safe_floor, round(dew_point + 2.0, 1))
-                        except Exception:
-                            pass
 
         return safe_floor
 

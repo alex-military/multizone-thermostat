@@ -15,6 +15,7 @@ from typing import Any
 EMITTER_RADIATOR = "radiator"
 EMITTER_UNDERFLOOR = "underfloor"
 EMITTER_FANCOIL = "fancoil"
+UNDERFLOOR_MAX_FLOW_TEMP = 40.0
 
 EMITTER_PRESETS: dict[str, dict[str, float]] = {
     EMITTER_RADIATOR: {
@@ -108,7 +109,7 @@ def create_flow_curve_for_emitter(
     # Se l'impianto è misto con pavimento e senza valvola miscelatrice,
     # la mandata centrale non può mai superare i 40°C del pavimento!
     if is_mixed_underfloor and not has_mixing_valve:
-        eff_max = min(eff_max, 40.0)
+        eff_max = min(eff_max, UNDERFLOOR_MAX_FLOW_TEMP)
 
     # Assicura validità dei limiti
     if eff_min >= eff_max:

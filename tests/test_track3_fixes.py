@@ -103,6 +103,38 @@ def test_coordinator_min_cycle_and_valve_delay_delegation():
     assert coord.hp_min_cycle_off == 7.0
     hp.set_min_cycle_off.assert_called_with(7.0)
 
+    # Once dedicated HP min cycle values are set, changing boiler min cycle must NOT overwrite HP
+    hp.set_min_cycle_on.reset_mock()
+    hp.set_min_cycle_off.reset_mock()
+    coord.set_min_cycle_on(3.0)
+    coord.set_min_cycle_off(2.0)
+    assert coord.min_cycle_on == 3.0
+    assert coord.min_cycle_off == 2.0
+    boiler.set_min_cycle_on.assert_called_with(3)
+    boiler.set_min_cycle_off.assert_called_with(2)
+    hp.set_min_cycle_on.assert_not_called()
+    hp.set_min_cycle_off.assert_not_called()
+
+
+def test_hp_cooling_candidate_no_substring_collision():
+    """Verify _is_zone_cooling_candidate uses exact zone id matching, not substring matching."""
+    from custom_components.multizone_thermostat.boiler.heat_pump_backend import CentralHeatPumpBackend
+
+    coord = MagicMock()
+    coord.get_zone_mode.return_value = "primary"
+    coord.resolve_zone_id.side_effect = lambda x: x
+    coord._climate_entities = {
+        "climate.multizone_thermostat_bagno_2": SimpleNamespace(hvac_mode="off"),
+        "climate.multizone_thermostat_bagno": SimpleNamespace(hvac_mode="cool"),
+    }
+    coord.split_manager = None
+
+    hp = CentralHeatPumpBackend.__new__(CentralHeatPumpBackend)
+    hp.coordinator = coord
+
+    assert hp._is_zone_cooling_candidate({"name": "Bagno"}) is True
+    assert hp._is_zone_cooling_candidate({"name": "Bagno 2"}) is False
+
 
 def test_coordinator_notify_pid_entities_exception_handling():
     """Verify exceptions in PID and climate callbacks are logged at debug level and do not abort."""

@@ -137,11 +137,6 @@ class ListenerManager:
         if hasattr(coord, "boiler_backend") and coord.boiler_backend:
             if hasattr(coord.boiler_backend, "cancel_pending_tasks"):
                 coord.boiler_backend.cancel_pending_tasks()
-            else:
-                backend_task = getattr(coord.boiler_backend, "_pending_boiler_task", None)
-                if backend_task and not backend_task.done():
-                    backend_task.cancel()
-                    coord.boiler_backend._pending_boiler_task = None
 
         if hasattr(coord, "energy_manager") and coord.energy_manager:
             coord.energy_manager.async_stop()

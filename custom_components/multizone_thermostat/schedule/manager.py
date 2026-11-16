@@ -248,14 +248,23 @@ class ScheduleProfileManager:
         """Get current temperature for zone from climate entity or HA state."""
         return self._smart_return_planner.get_zone_current_temp(climate_id)
 
-    def _get_zone_heating_rate(self, climate_id: str) -> float:
+    def get_zone_heating_rate(self, climate_id: str) -> float:
         """Get zone heating rate from thermal model or default fallback."""
         return self._smart_return_planner.get_zone_heating_rate(climate_id)
 
-    def _get_zone_cooling_rate(self, climate_id: str) -> float:
+    def _get_zone_heating_rate(self, climate_id: str) -> float:
+        """Backward-compatible alias for get_zone_heating_rate."""
+        return self.get_zone_heating_rate(climate_id)
+
+    def get_zone_cooling_rate(self, climate_id: str) -> float:
         """Get zone cooling rate from thermal model or default fallback."""
         if hasattr(self._smart_return_planner, "get_zone_cooling_rate"):
             return self._smart_return_planner.get_zone_cooling_rate(climate_id)
+        return 0.5
+
+    def _get_zone_cooling_rate(self, climate_id: str) -> float:
+        """Backward-compatible alias for get_zone_cooling_rate."""
+        return self.get_zone_cooling_rate(climate_id)
         return self._smart_return_planner.get_zone_heating_rate(climate_id)
 
     def _parse_arrival_time(self, arrival_time: str | datetime, now: datetime) -> datetime:

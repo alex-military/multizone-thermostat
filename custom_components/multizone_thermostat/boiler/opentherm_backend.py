@@ -4,6 +4,7 @@ from .flow_curve import (
     EMITTER_RADIATOR,
     EMITTER_UNDERFLOOR,
     EMITTER_FANCOIL,
+    UNDERFLOOR_MAX_FLOW_TEMP,
 )
 """OpenTherm boiler backend."""
 import logging
@@ -146,7 +147,7 @@ class OpenThermBoilerBackend(BoilerBackend):
             target_temp = curve.flow_for_demand(demand, outdoor_temp)
 
         if (emitter == EMITTER_UNDERFLOOR or self._has_mixed_underfloor()) and not has_mixing:
-            target_temp = min(target_temp, 40.0)
+            target_temp = min(target_temp, UNDERFLOOR_MAX_FLOW_TEMP)
 
         target_temp = round(target_temp, 1)
 
