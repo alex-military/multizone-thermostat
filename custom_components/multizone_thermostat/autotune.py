@@ -72,6 +72,7 @@ class PassiveAutotuneObserver:
         self._learned_ki = 0.0
         self._learned_kd = 0.0
         self.manual_overrides: dict[str, float] = {}
+        self._pre_reset_snapshot: dict[str, Any] | None = None
         self.weekly_updated_last_tick = False
         self.needs_save = False
 
@@ -79,6 +80,8 @@ class PassiveAutotuneObserver:
         """Restore state from storage."""
         if not data:
             return
+        raw_snap = data.get("pre_reset_snapshot")
+        self._pre_reset_snapshot = dict(raw_snap) if isinstance(raw_snap, dict) else None
         self.completed_cycles = list(data.get("completed_cycles", []))
         if "mode" in data:
             self.mode = str(data["mode"]).lower()
@@ -117,7 +120,7 @@ class PassiveAutotuneObserver:
     def dump_state(self) -> dict:
         """Dump state for storage."""
         return {
-            "completed_cycles": self.completed_cycles,
+            "completed_cycles": [dict(c) if isinstance(c, dict) else c for c in self.completed_cycles],
             "mode": self.mode,
             "manual_overrides": dict(self.manual_overrides),
             "weekly_candidates": list(self.weekly_candidates),
@@ -132,6 +135,7 @@ class PassiveAutotuneObserver:
                 "Ki": self._learned_ki,
                 "Kd": self._learned_kd,
             },
+            "pre_reset_snapshot": dict(self._pre_reset_snapshot) if self._pre_reset_snapshot else None,
         }
 
     def _sync_effective_pid(self) -> None:
@@ -188,6 +192,30 @@ class PassiveAutotuneObserver:
             self.manual_overrides["Kd"] = float(kd)
         self._sync_effective_pid()
 
+    def seed_learned_pid(self, kp: float, ki: float, kd: float) -> None:
+        """Seed learned/baseline PID values and switch tuner to completed Auto EMA mode."""
+        self._learned_kp = float(kp)
+        self._learned_ki = float(ki)
+        self._learned_kd = float(kd)
+        self._baseline_kp = float(kp)
+        self._baseline_ki = float(ki)
+        self._baseline_kd = float(kd)
+        self.state = self.STATE_COMPLETED
+        while len(self.completed_cycles) < self.required_cycles:
+            self.completed_cycles.append(
+                {
+                    "kp": float(kp),
+                    "ki": float(ki),
+                    "kd": float(kd),
+                    "seeded": True,
+                }
+            )
+        if self.last_weekly_update <= 0.0:
+            self.last_weekly_update = time.time()
+        self.manual_overrides.clear()
+        self._sync_effective_pid()
+        self.needs_save = True
+
     def lock_param(self, param: str | None = None) -> None:
         """Clear manual override(s) and return parameter(s) to autotuned baseline."""
         if param is None:
@@ -208,8 +236,47 @@ class PassiveAutotuneObserver:
         self._last_ramp_hist_time = None
         self._last_ramp_hist_temp = None
 
+    @property
+    def can_restore_pre_reset(self) -> bool:
+        """Return True if a pre-reset autotuner snapshot is available to restore."""
+        return isinstance(self._pre_reset_snapshot, dict) and bool(self._pre_reset_snapshot)
+
+    def _has_restorable_state(self) -> bool:
+        """Return True when the tuner has learned or completed state worth backing up."""
+        return bool(
+            self._learned_kp > 0.0
+            or self._baseline_kp > 0.0
+            or self.state == self.STATE_COMPLETED
+            or len(self.completed_cycles) >= self.required_cycles
+        )
+
+    def restore_pre_reset(self, keep_manual_overrides: bool = False) -> bool:
+        """Restore the autotuner state saved right before the last reset."""
+        if not self.can_restore_pre_reset:
+            return False
+        snap = dict(self._pre_reset_snapshot)  # type: ignore[arg-type]
+        preserved_overrides = dict(self.manual_overrides) if keep_manual_overrides else {}
+        self.load_state(snap)
+        if keep_manual_overrides:
+            self.manual_overrides = preserved_overrides
+        else:
+            self.manual_overrides.clear()
+        self._pre_reset_snapshot = None
+        self._reset_ramp()
+        self.cycle_start_time = None
+        self.cycle_start_temp = None
+        self._last_hist_time = None
+        self._last_hist_temp = None
+        self._sync_effective_pid()
+        self.needs_save = True
+        return True
+
     def reset(self, keep_manual_overrides: bool = False) -> None:
-        """Reset autotuner learning state cleanly."""
+        """Reset autotuner learning state cleanly, preserving a pre-reset backup."""
+        if self._has_restorable_state():
+            snap = self.dump_state()
+            snap.pop("pre_reset_snapshot", None)
+            self._pre_reset_snapshot = snap
         self.state = self.STATE_IDLE
         self.history.clear()
         self.completed_cycles.clear()

@@ -248,6 +248,29 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
       .pid-reset-btn:hover {
         background: rgba(239, 68, 68, 0.24);
       }
+      .pid-actions {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .pid-restore-backup-btn {
+        display: none;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.75em;
+        font-weight: 600;
+        padding: 4px 8px;
+        border-radius: 8px;
+        border: 1px solid rgba(59, 130, 246, 0.4);
+        background: rgba(59, 130, 246, 0.14);
+        color: #93c5fd;
+        cursor: pointer;
+        transition: background 0.15s ease;
+      }
+      .pid-restore-backup-btn:hover {
+        background: rgba(59, 130, 246, 0.28);
+      }
       .pid-grid {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
@@ -433,10 +456,16 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
             <span id="pid-section-title">${t('pid_section_title')}</span>
             <span class="pid-state-pill" id="pid-state-pill">--</span>
           </div>
-          <button type="button" class="pid-reset-btn" id="pid-reset-btn" title="${t('pid_reset_btn')}">
-            <ha-icon icon="mdi:restart-alert" style="--mdc-icon-size: 14px;"></ha-icon>
-            <span id="pid-reset-label">${t('pid_reset_btn')}</span>
-          </button>
+          <div class="pid-actions">
+            <button type="button" class="pid-restore-backup-btn" id="pid-restore-backup-btn" title="${t('pid_restore_backup_btn')}">
+              <ha-icon icon="mdi:backup-restore" style="--mdc-icon-size: 14px;"></ha-icon>
+              <span id="pid-restore-backup-label">${t('pid_restore_backup_btn')}</span>
+            </button>
+            <button type="button" class="pid-reset-btn" id="pid-reset-btn" title="${t('pid_reset_btn')}">
+              <ha-icon icon="mdi:restart-alert" style="--mdc-icon-size: 14px;"></ha-icon>
+              <span id="pid-reset-label">${t('pid_reset_btn')}</span>
+            </button>
+          </div>
         </div>
         <div class="pid-grid">
           <div class="pid-box" id="pid-box-kp" data-param="Kp" title="${t('pid_click_to_edit')}">
@@ -518,6 +547,14 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
       });
     }
 
+    const restoreBackupBtn = this.shadowRoot.getElementById('pid-restore-backup-btn');
+    if (restoreBackupBtn) {
+      restoreBackupBtn.addEventListener('click', () => {
+        if (!this._hass || !this._config || !this._config.entity) return;
+        this._openRestoreBackupModal();
+      });
+    }
+
     const cancelBtn = this.shadowRoot.getElementById('pid-modal-cancel');
     if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
 
@@ -547,6 +584,13 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
         if (!this._hass || !this._config || !this._config.entity) return;
         if (this._modalMode === 'reset') {
           await this._hass.callService('multizone_thermostat', 'reset_autotune', {
+            climate_entity: this._config.entity,
+          });
+          closeModal();
+          return;
+        }
+        if (this._modalMode === 'restore_backup') {
+          await this._hass.callService('multizone_thermostat', 'restore_autotune', {
             climate_entity: this._config.entity,
           });
           closeModal();
@@ -631,6 +675,34 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
     if (confirmBtn) {
       confirmBtn.className = 'pid-btn pid-btn-danger';
       confirmBtn.innerText = t('pid_reset_confirm_btn');
+    }
+    if (backdrop) backdrop.classList.add('open');
+  }
+
+  _openRestoreBackupModal() {
+    const t = (k) => getTranslation(this._hass, k);
+    this._modalMode = 'restore_backup';
+    this._activePidParam = null;
+
+    const titleEl = this.shadowRoot.getElementById('pid-modal-title');
+    const warnEl = this.shadowRoot.getElementById('pid-modal-warn');
+    const inputWrap = this.shadowRoot.getElementById('pid-modal-input-wrap');
+    const restoreBtn = this.shadowRoot.getElementById('pid-modal-restore');
+    const confirmBtn = this.shadowRoot.getElementById('pid-modal-confirm');
+    const backdrop = this.shadowRoot.getElementById('pid-modal-backdrop');
+
+    const bp = this._latestBackupPid;
+    const bpText = (bp && bp.Kp !== undefined)
+      ? ` (Kp: ${bp.Kp}, Ki: ${bp.Ki}, Kd: ${bp.Kd})`
+      : '';
+
+    if (titleEl) titleEl.innerText = `↩️ ${t('pid_restore_backup_title')}`;
+    if (warnEl) warnEl.innerText = `${t('pid_restore_backup_confirm_msg')}${bpText}`;
+    if (inputWrap) inputWrap.style.display = 'none';
+    if (restoreBtn) restoreBtn.style.display = 'none';
+    if (confirmBtn) {
+      confirmBtn.className = 'pid-btn pid-btn-save';
+      confirmBtn.innerText = t('pid_restore_backup_confirm_btn');
     }
     if (backdrop) backdrop.classList.add('open');
   }
@@ -993,11 +1065,18 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
       const autotuneState = attrs.autotune_state || (autotuneStateObj ? autotuneStateObj.state : null);
 
       this._latestPidInfo = { kp: kpVal, ki: kiVal, kd: kdVal, overrides };
+      this._latestBackupPid = attrs.autotune_backup_pid || null;
 
       const pidTitleEl = this.shadowRoot.getElementById('pid-section-title');
       if (pidTitleEl) pidTitleEl.innerText = t('pid_section_title');
       const resetLabelEl = this.shadowRoot.getElementById('pid-reset-label');
       if (resetLabelEl) resetLabelEl.innerText = t('pid_reset_btn');
+      const restoreBackupBtn = this.shadowRoot.getElementById('pid-restore-backup-btn');
+      const restoreBackupLabel = this.shadowRoot.getElementById('pid-restore-backup-label');
+      if (restoreBackupLabel) restoreBackupLabel.innerText = t('pid_restore_backup_btn');
+      if (restoreBackupBtn) {
+        restoreBackupBtn.style.display = attrs.autotune_can_restore ? 'inline-flex' : 'none';
+      }
 
       const pillEl = this.shadowRoot.getElementById('pid-state-pill');
       if (pillEl) {

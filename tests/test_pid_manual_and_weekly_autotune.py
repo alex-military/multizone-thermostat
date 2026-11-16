@@ -666,3 +666,88 @@ async def test_zone_entities_device_info_and_category_mapping():
     anomaly_sensor = MultizoneZoneAnomalyBinarySensor(coord, entry.entry_id, "Soggiorno", canon_id)
     assert anomaly_sensor._attr_device_info["identifiers"] == expected_zone_device_id
     assert anomaly_sensor.entity_category == EntityCategory.DIAGNOSTIC
+
+
+async def test_autotuner_pre_reset_backup_and_restore():
+    """Verify resetting an autotuner preserves a restorable snapshot across persistence."""
+    tuner = PassiveAutotuneObserver("Salone", required_cycles=3)
+    tuner.load_state(
+        {
+            "completed_cycles": [
+                {"ku": 500.0, "tu": 1800.0, "kp": 412.3, "ki": 2.8644, "kd": 28000.2},
+                {"ku": 500.0, "tu": 1800.0, "kp": 412.3, "ki": 2.8644, "kd": 28000.2},
+                {"ku": 500.0, "tu": 1800.0, "kp": 412.3, "ki": 2.8644, "kd": 28000.2},
+            ],
+            "baseline_pid": {"Kp": 412.3, "Ki": 2.8644, "Kd": 28000.2},
+            "learned_pid": {"Kp": 412.3, "Ki": 2.8644, "Kd": 28000.2},
+        }
+    )
+    assert tuner.state == PassiveAutotuneObserver.STATE_COMPLETED
+    assert tuner.can_restore_pre_reset is False
+
+    # First reset saves backup
+    tuner.reset()
+    assert tuner.state == PassiveAutotuneObserver.STATE_IDLE
+    assert tuner.kp == 0.0
+    assert tuner.can_restore_pre_reset is True
+
+    # A second accidental reset while idle must NOT clobber the valid backup
+    tuner.reset()
+    assert tuner.can_restore_pre_reset is True
+
+    # Backup survives dump_state -> load_state persistence
+    dumped = tuner.dump_state()
+    tuner_reloaded = PassiveAutotuneObserver("Salone", required_cycles=3)
+    tuner_reloaded.load_state(dumped)
+    assert tuner_reloaded.can_restore_pre_reset is True
+
+    # Restore brings back exact learned PID and completed state
+    assert tuner_reloaded.restore_pre_reset() is True
+    assert tuner_reloaded.can_restore_pre_reset is False
+    assert tuner_reloaded.state == PassiveAutotuneObserver.STATE_COMPLETED
+    assert tuner_reloaded.kp == pytest.approx(412.3)
+    assert tuner_reloaded.ki == pytest.approx(2.8644)
+    assert tuner_reloaded.kd == pytest.approx(28000.2)
+    assert len(tuner_reloaded.completed_cycles) == 3
+
+    # Restoring again when no backup exists returns False
+    assert tuner_reloaded.restore_pre_reset() is False
+
+    # Test via ZoneController async_restore_zone_autotuner
+    hass = _make_fake_hass()
+    entry = _make_entry()
+    coord = MultizoneCoordinator(hass, entry)
+    canon_id = make_zone_entity_id("Soggiorno")
+    zc = coord.zone_controller
+    zc_tuner = zc._autotuners_heat[canon_id]
+    zc_tuner.load_state(
+        {
+            "completed_cycles": [
+                {"ku": 500.0, "tu": 1800.0, "kp": 412.3, "ki": 2.8644, "kd": 28000.2},
+                {"ku": 500.0, "tu": 1800.0, "kp": 412.3, "ki": 2.8644, "kd": 28000.2},
+                {"ku": 500.0, "tu": 1800.0, "kp": 412.3, "ki": 2.8644, "kd": 28000.2},
+            ],
+            "baseline_pid": {"Kp": 412.3, "Ki": 2.8644, "Kd": 28000.2},
+            "learned_pid": {"Kp": 412.3, "Ki": 2.8644, "Kd": 28000.2},
+        }
+    )
+    assert await zc.async_reset_zone_autotuner(canon_id) is True
+    assert zc_tuner.can_restore_pre_reset is True
+    assert await zc.async_restore_zone_autotuner(canon_id) is True
+    assert zc_tuner.can_restore_pre_reset is False
+    assert zc_tuner.kp == pytest.approx(412.3)
+    assert zc_tuner.ki == pytest.approx(2.8644)
+    assert zc_tuner.kd == pytest.approx(28000.2)
+
+    # Seed autotuner directly from a reset state so Auto EMA continues from these values
+    assert await zc.async_reset_zone_autotuner(canon_id) is True
+    assert zc_tuner.state == PassiveAutotuneObserver.STATE_IDLE
+    assert await zc.async_set_zone_pid(
+        canon_id, kp=412.3, ki=2.8644, kd=28000.2, seed_autotuner=True
+    ) is True
+    assert zc_tuner.state == PassiveAutotuneObserver.STATE_COMPLETED
+    assert zc_tuner.manual_overrides == {}
+    assert zc_tuner._learned_kp == pytest.approx(412.3)
+    assert zc_tuner._learned_ki == pytest.approx(2.8644)
+    assert zc_tuner._learned_kd == pytest.approx(28000.2)
+    assert zc_tuner.kp == pytest.approx(412.3)

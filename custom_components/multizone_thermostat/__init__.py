@@ -345,6 +345,7 @@ SERVICE_SET_PID_SCHEMA = vol.All(
             vol.Optional("kd"): vol.All(_finite_float, vol.Range(min=0.0, max=50000.0)),
             vol.Optional("lock_parameter"): vol.In(["Kp", "Ki", "Kd", "kp", "ki", "kd"]),
             vol.Optional("unlock"): bool,
+            vol.Optional("seed_autotuner"): bool,
             vol.Optional("mode"): vol.In(["heat", "cool"]),
         }
     ),
@@ -492,6 +493,11 @@ async def _async_register_services(hass: HomeAssistant) -> None:
         if unlock_arg is not None and not isinstance(unlock_arg, bool):
             raise vol.Invalid(f"Parameter 'unlock' must be a boolean, got {unlock_arg!r}")
 
+        raw_seed = data.get("seed_autotuner")
+        if raw_seed is not None and not isinstance(raw_seed, bool):
+            raise vol.Invalid(f"Parameter 'seed_autotuner' must be a boolean, got {raw_seed!r}")
+        seed_autotuner = bool(raw_seed) if raw_seed is not None else False
+
         mode_arg = data.get("mode")
         if mode_arg is not None and mode_arg not in ("heat", "cool"):
             raise vol.Invalid(f"Invalid mode: {mode_arg}")
@@ -502,13 +508,16 @@ async def _async_register_services(hass: HomeAssistant) -> None:
                 continue
             for climate_entity in entity_ids:
                 zname = _find_zone_name_for_entity(coord, climate_entity)
-                if unlock_arg is not None and zname and hasattr(coord, "async_set_pid_manual_unlock"):
+                if seed_autotuner and zname and hasattr(coord, "async_set_pid_manual_unlock"):
+                    await coord.async_set_pid_manual_unlock(zname, False)
+                elif unlock_arg is not None and zname and hasattr(coord, "async_set_pid_manual_unlock"):
                     await coord.async_set_pid_manual_unlock(zname, bool(unlock_arg))
                 kwargs: dict[str, object] = {
                     "kp": kp,
                     "ki": ki,
                     "kd": kd,
                     "lock_param": lock_param,
+                    "seed_autotuner": seed_autotuner,
                 }
                 if mode_arg is not None:
                     kwargs["mode"] = mode_arg
@@ -547,6 +556,35 @@ async def _async_register_services(hass: HomeAssistant) -> None:
                         coord.async_notify_pid_entities()
                     await _async_refresh_orchestrator(getattr(coord, "plant_orchestrator", None))
 
+    async def handle_restore_autotune(call: ServiceCall) -> None:
+        data = dict(call.data) if hasattr(call, "data") and isinstance(call.data, Mapping) else {}
+        entity_ids = _extract_entity_ids(data)
+        raw_keep = data.get("keep_manual_overrides")
+        if raw_keep is not None and not isinstance(raw_keep, bool):
+            raise vol.Invalid(f"Parameter 'keep_manual_overrides' must be a boolean, got {raw_keep!r}")
+        keep_manual = bool(raw_keep) if raw_keep is not None else False
+
+        mode_arg = data.get("mode")
+        if mode_arg is not None and mode_arg not in ("heat", "cool"):
+            raise vol.Invalid(f"Invalid mode: {mode_arg}")
+
+        for coord in _get_active_coordinators(hass):
+            zc = getattr(coord, "zone_controller", None)
+            if not zc or not hasattr(zc, "async_restore_zone_autotuner"):
+                continue
+            for climate_entity in entity_ids:
+                kwargs: dict[str, object] = {"keep_manual_overrides": keep_manual}
+                if mode_arg is not None:
+                    kwargs["mode"] = mode_arg
+                ok = await zc.async_restore_zone_autotuner(climate_entity, **kwargs)
+                if ok:
+                    zname = _find_zone_name_for_entity(coord, climate_entity)
+                    if not keep_manual and zname and hasattr(coord, "async_set_pid_manual_unlock"):
+                        await coord.async_set_pid_manual_unlock(zname, False)
+                    if hasattr(coord, "async_notify_pid_entities"):
+                        coord.async_notify_pid_entities()
+                    await _async_refresh_orchestrator(getattr(coord, "plant_orchestrator", None))
+
     services = {
         "save_schedule_profile": (handle_save_schedule_profile, None),
         "activate_schedule_profile": (handle_activate_schedule_profile, None),
@@ -558,6 +596,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
         "set_master_operation_mode": (handle_set_master_operation_mode, None),
         "set_pid_parameters": (handle_set_pid_parameters, SERVICE_SET_PID_SCHEMA),
         "reset_autotune": (handle_reset_autotune, SERVICE_RESET_AUTOTUNE_SCHEMA),
+        "restore_autotune": (handle_restore_autotune, SERVICE_RESET_AUTOTUNE_SCHEMA),
     }
 
     if hasattr(hass, "services") and hasattr(hass.services, "async_register"):

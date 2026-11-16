@@ -256,6 +256,13 @@ set_pid_parameters:
       required: false
       selector:
         boolean:
+    seed_autotuner:
+      name: Seed Autotuner Baseline (Auto EMA)
+      description: Apply Kp/Ki/Kd directly as the learned Auto EMA baseline and mark autotuning completed so continuous optimization continues from these values.
+      required: false
+      default: false
+      selector:
+        boolean:
     mode:
       name: Seasonal PID Track
       description: Optional seasonal PID track (heat or cool). Defaults to active/heat track.
@@ -282,6 +289,36 @@ reset_autotune:
     keep_manual_overrides:
       name: Keep Manual Overrides
       description: Retain existing manual PID parameter overrides after resetting learned cycles.
+      required: false
+      default: false
+      selector:
+        boolean:
+    mode:
+      name: Seasonal Autotuner Track
+      description: Optional seasonal autotuner track (heat or cool). Defaults to active/heat track.
+      required: false
+      example: heat
+      selector:
+        select:
+          options:
+            - heat
+            - cool
+
+restore_autotune:
+  name: Restore Autotuner Backup
+  description: Restore the learned Smart PID parameters and cycles saved before the last autotuner reset.
+  fields:
+    climate_entity:
+      name: Zone Climate Entity
+      description: Target multizone virtual thermostat climate entity.
+      required: true
+      example: climate.multizone_thermostat_soggiorno
+      selector:
+        entity:
+          domain: climate
+    keep_manual_overrides:
+      name: Keep Manual Overrides
+      description: Retain existing manual PID parameter overrides after restoring the autotuner backup.
       required: false
       default: false
       selector:

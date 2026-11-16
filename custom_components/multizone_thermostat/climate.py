@@ -339,6 +339,17 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             weekly = getattr(tuner, "weekly_candidates", None)
             if isinstance(weekly, list):
                 attrs["weekly_candidates_count"] = len(weekly)
+            can_restore = getattr(tuner, "can_restore_pre_reset", False)
+            attrs["autotune_can_restore"] = bool(can_restore)
+            snap = getattr(tuner, "_pre_reset_snapshot", None)
+            if isinstance(snap, dict):
+                learned = snap.get("learned_pid") or {}
+                if learned.get("Kp"):
+                    attrs["autotune_backup_pid"] = {
+                        "Kp": round(float(learned.get("Kp", 0.0)), 1),
+                        "Ki": round(float(learned.get("Ki", 0.0)), 4),
+                        "Kd": round(float(learned.get("Kd", 0.0)), 1),
+                    }
         unlock_getter = getattr(self._coordinator, "get_pid_manual_unlock", None)
         if callable(unlock_getter):
             unlock_val = unlock_getter(self._name)
