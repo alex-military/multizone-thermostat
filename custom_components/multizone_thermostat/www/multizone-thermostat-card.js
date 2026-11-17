@@ -1,4 +1,3 @@
-function getTempUnit(hass) { return (hass && hass.config && hass.config.unit_system && hass.config.unit_system.temperature) || '°C'; }
 // window.customCards definition to register the cards in Lovelace UI card picker
 window.customCards = window.customCards || [];
 window.customCards.push({
@@ -885,6 +884,7 @@ function getTranslation(hass, key) {
   return translations[key] || TRANSLATIONS['en'][key] || key;
 }
 
+function getTempUnit(hass) { return (hass && hass.config && hass.config.unit_system && hass.config.unit_system.temperature) || '°C'; }
 // Helper function to check whether an auxiliary switch/select should never be treated as zone mode
 function _isAuxiliaryZoneEntity(entityId, stateObj) {
   if (!entityId) return false;
@@ -1120,7 +1120,7 @@ class MultizoneThermostatButtonCard extends HTMLElement {
     // Update temperatures
     const tempCurrentEl = this.shadowRoot.querySelector('.temp-current');
     if (tempCurrentEl) {
-      const curStr = currentTemp !== undefined ? `${currentTemp}°C` : '--°C';
+      const curStr = currentTemp !== undefined ? `${currentTemp}${getTempUnit(this._hass)}` : '--' + getTempUnit(this._hass);
       tempCurrentEl.innerHTML = `<span class="temp-current-val">${curStr}</span>`;
     }
     const step = this.getStep(climateState);
@@ -1130,7 +1130,7 @@ class MultizoneThermostatButtonCard extends HTMLElement {
       const num = parseFloat(targetTemp);
       targetDisplay = !isNaN(num) ? (decimals > 0 && !Number.isInteger(num) ? num.toFixed(decimals) : num) : targetTemp;
     }
-    this.shadowRoot.querySelector('.temp-target-val').textContent = `${targetDisplay}°C`;
+    this.shadowRoot.querySelector('.temp-target-val').textContent = `${targetDisplay}${getTempUnit(this._hass)}`;
     
     const tempTargetEl = this.shadowRoot.querySelector('.temp-target');
     if (tempTargetEl) {

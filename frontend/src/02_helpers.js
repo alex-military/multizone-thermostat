@@ -1,3 +1,4 @@
+function getTempUnit(hass) { return (hass && hass.config && hass.config.unit_system && hass.config.unit_system.temperature) || '°C'; }
 // Helper function to check whether an auxiliary switch/select should never be treated as zone mode
 function _isAuxiliaryZoneEntity(entityId, stateObj) {
   if (!entityId) return false;
