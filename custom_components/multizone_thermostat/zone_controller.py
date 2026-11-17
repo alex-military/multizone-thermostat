@@ -277,16 +277,18 @@ class ZoneController:
     async def async_update_zone(self, entity_id: str, new_state: Any) -> float:
         """Calculate and update PID demand, autotuner and thermal model for a zone in HEAT or COOL mode."""
         entity_id = self._resolve_zone_id(entity_id)
-        current_temp = new_state.attributes.get("current_temperature")
-        target_temp = new_state.attributes.get("temperature")
+        attrs = getattr(new_state, "attributes", None) or {}
+        current_temp = attrs.get("current_temperature") if hasattr(attrs, "get") else None
+        target_temp = attrs.get("temperature") if hasattr(attrs, "get") else None
+        st_unit = (attrs.get("temperature_unit") or attrs.get("unit_of_measurement")) if hasattr(attrs, "get") else None
 
         if current_temp is None or target_temp is None:
             self.coordinator.demand_aggregator.set_zone_demand(entity_id, 0.0)
             return 0.0
 
         try:
-            current_temp = float(current_temp)
-            target_temp = float(target_temp)
+            current_temp = to_celsius(float(current_temp), st_unit, self.hass)
+            target_temp = to_celsius(float(target_temp), st_unit, self.hass)
         except (ValueError, TypeError):
             self.coordinator.demand_aggregator.set_zone_demand(entity_id, 0.0)
             return 0.0

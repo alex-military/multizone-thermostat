@@ -8,6 +8,7 @@ from homeassistant.components.climate import HVACMode
 from homeassistant.const import ATTR_TEMPERATURE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.restore_state import RestoreEntity
+from .const import to_celsius
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -33,7 +34,8 @@ class ZoneStateRestorer:
                 hvac_mode = HVACMode(last_state.state)
             if last_state.attributes.get(ATTR_TEMPERATURE) is not None:
                 try:
-                    target_temp = float(last_state.attributes[ATTR_TEMPERATURE])
+                    st_unit = last_state.attributes.get("temperature_unit") or last_state.attributes.get("unit_of_measurement")
+                    target_temp = to_celsius(float(last_state.attributes[ATTR_TEMPERATURE]), st_unit, getattr(entity, "hass", None))
                 except (ValueError, TypeError):
                     _LOGGER.warning(
                         "Could not restore target temperature %s, falling back to %s",
