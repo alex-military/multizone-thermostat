@@ -28,6 +28,7 @@ from ..const import (
     HVAC_MODE_COOL,
     HVAC_MODE_OFF,
     KEY_FROST_FLOW_TEMP,
+    to_celsius,
     KEY_HP_MIN_CYCLE_ON,
     KEY_HP_MIN_CYCLE_OFF,
     DEFAULT_HP_MIN_CYCLE_ON,
@@ -434,7 +435,9 @@ class CentralHeatPumpBackend(BoilerBackend):
                 st = self.hass.states.get(t_sensor)
                 if st and st.state not in ("unavailable", "unknown", None):
                     try:
-                        t_val = float(st.state)
+                        attrs = getattr(st, "attributes", None) or {}
+                        t_unit = attrs.get("unit_of_measurement") if hasattr(attrs, "get") else None
+                        t_val = to_celsius(float(st.state), t_unit, self.hass)
                     except (ValueError, TypeError):
                         pass
                 # Also check state attributes if humidity was reported directly on the temp sensor entity

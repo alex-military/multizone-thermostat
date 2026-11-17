@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 from homeassistant.core import HomeAssistant
+from ..const import to_celsius
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -18,7 +19,8 @@ def get_zone_energy_class(coordinator: Any, hass: HomeAssistant, climate_id: str
 
         st = hass.states.get(climate_id)
         raw_cur = st.attributes.get("current_temperature") if st else None
-        current_temp = float(raw_cur) if raw_cur is not None else 20.0
+        cur_unit = st.attributes.get("temperature_unit") or st.attributes.get("unit_of_measurement") if (st and getattr(st, "attributes", None)) else None
+        current_temp = to_celsius(float(raw_cur), cur_unit, hass) if raw_cur is not None else 20.0
 
         # Outdoor temperature lookup
         outdoor_temp = None
@@ -26,8 +28,10 @@ def get_zone_energy_class(coordinator: Any, hass: HomeAssistant, climate_id: str
             w_st = hass.states.get(coordinator.weather_sensor_id)
             if w_st and w_st.state not in ("unavailable", "unknown"):
                 try:
-                    raw_out = w_st.attributes.get("temperature")
-                    outdoor_temp = float(raw_out if raw_out is not None else w_st.state)
+                    w_attrs = getattr(w_st, "attributes", None) or {}
+                    raw_out = w_attrs.get("temperature") if hasattr(w_attrs, "get") else None
+                    w_unit = (w_attrs.get("temperature_unit") or w_attrs.get("unit_of_measurement")) if hasattr(w_attrs, "get") else None
+                    outdoor_temp = to_celsius(float(raw_out if raw_out is not None else w_st.state), w_unit, hass)
                 except (ValueError, TypeError):
                     pass
 
