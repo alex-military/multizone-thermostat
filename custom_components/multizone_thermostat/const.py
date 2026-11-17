@@ -181,3 +181,20 @@ def make_via_device_kwargs(entry_id: str, master_device_id: str | None = None) -
     except Exception:
         pass
     return {"via_device": (DOMAIN, entry_id)}
+
+
+def to_celsius(value: float, unit: str | None = None, hass: Any = None) -> float:
+    """Convert a temperature reading to Celsius when its unit (or HA unit system) is Fahrenheit or Kelvin."""
+    raw_unit = unit
+    if not raw_unit and hass is not None:
+        cfg = getattr(hass, "config", None)
+        units = getattr(cfg, "units", None) if cfg is not None else None
+        raw_unit = getattr(units, "temperature_unit", None) if units is not None else None
+
+    if raw_unit is not None:
+        u = str(raw_unit).strip().lower()
+        if u in ("°f", "f", "fahrenheit"):
+            return (value - 32.0) * 5.0 / 9.0
+        if u in ("k", "kelvin"):
+            return value - 273.15
+    return value

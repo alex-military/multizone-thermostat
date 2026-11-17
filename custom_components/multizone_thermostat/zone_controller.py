@@ -16,6 +16,7 @@ from .const import (
     HVAC_MODE_HEAT,
     ZONE_MODE_BYPASS,
     KEY_WEATHER_CURVE,
+    to_celsius,
 )
 from .pid_wrapper import MultizonePID
 from .autotune import PassiveAutotuneObserver
@@ -313,15 +314,21 @@ class ZoneController:
                 # Hysteresis Fallback Mode (Learning phase)
                 tolerance = 0.3
                 current_demand = self.coordinator.demand_aggregator.get_zone_demand(entity_id)
-                if current_temp <= effective_target - tolerance:
+                if current_temp <= target_temp - tolerance:
                     demand = 100.0
-                elif current_temp >= effective_target + tolerance:
+                elif current_temp >= max(target_temp - tolerance + 0.05, effective_target + tolerance):
                     demand = 0.0
                 else:
                     demand = current_demand  # Keep previous demand inside the hysteresis band
             else:
                 # Smart PID Mode
-                demand = self._pids[entity_id].calc(current_temp, effective_target)
+                pid_ctrl = self._pids[entity_id]
+                pid_target = effective_target
+                # Avoid Smart Stop deadlock when starting/resuming (e.g. post-DHW) with zero integral
+                # while room temperature is still below the actual target setpoint.
+                if current_temp < target_temp and pid_target <= current_temp and pid_ctrl._pid.integral <= 0.0:
+                    pid_target = target_temp
+                demand = pid_ctrl.calc(current_temp, pid_target)
 
                 # Apply Weather Compensation (Feed Forward)
                 try:
@@ -340,9 +347,11 @@ class ZoneController:
                             if is_weather_domain:
                                 temp_attr = weather_state.attributes.get("temperature") if getattr(weather_state, "attributes", None) else None
                                 if temp_attr is not None:
-                                    outdoor_temp = float(temp_attr)
+                                    w_unit = weather_state.attributes.get("temperature_unit") or weather_state.attributes.get("unit_of_measurement")
+                                    outdoor_temp = to_celsius(float(temp_attr), w_unit, self.hass)
                             else:
-                                outdoor_temp = float(weather_state.state)
+                                w_unit = weather_state.attributes.get("unit_of_measurement") if getattr(weather_state, "attributes", None) else None
+                                outdoor_temp = to_celsius(float(weather_state.state), w_unit, self.hass)
 
                             if outdoor_temp is not None:
                                 # Adaptive Curve Calculation (SAT Math)
