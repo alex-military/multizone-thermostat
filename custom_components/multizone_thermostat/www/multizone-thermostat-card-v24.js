@@ -1,3 +1,4 @@
+function getTempUnit(hass) { return (hass && hass.config && hass.config.unit_system && hass.config.unit_system.temperature) || '°C'; }
 // window.customCards definition to register the cards in Lovelace UI card picker
 window.customCards = window.customCards || [];
 window.customCards.push({
@@ -4980,15 +4981,15 @@ class MultizoneThermostatPlantCard extends HTMLElement {
           if (flowVal !== null && flowVal !== undefined && flowVal !== "") {
             const num = parseFloat(flowVal);
             const displayVal = !isNaN(num) ? (Number.isInteger(num) ? num : num.toFixed(1)) : flowVal;
-            otFlow.innerText = `${displayVal}°C`;
+            otFlow.innerText = `${displayVal}${getTempUnit(this._hass)}`;
           } else {
-            otFlow.innerText = '--°C';
+            otFlow.innerText = '--' + getTempUnit(this._hass);
           }
         }
 
         if (otReturn) {
           if (ot.return_temperature !== null && ot.return_temperature !== undefined) {
-            otReturn.innerText = `${ot.return_temperature}°C`;
+            otReturn.innerText = `${ot.return_temperature}${getTempUnit(this._hass)}`;
             if (otCondense) {
               if (ot.condensing_optimal) {
                 otCondense.innerText = t('ot_condensing_ok');
@@ -4999,7 +5000,7 @@ class MultizoneThermostatPlantCard extends HTMLElement {
               }
             }
           } else {
-            otReturn.innerText = '--°C';
+            otReturn.innerText = '--' + getTempUnit(this._hass);
             if (otCondense) otCondense.innerText = '';
           }
         }
@@ -5814,9 +5815,9 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
         const cur = climateState.attributes.current_temperature;
         const tgt = climateState.attributes.temperature;
         if (zoneMode === "bypass") {
-          tempSubEl.innerText = `${cur !== undefined ? cur : '--'}°C / (${t('bypassed_tag')})`;
+          tempSubEl.innerText = `${cur !== undefined ? cur : '--'}${getTempUnit(this._hass)} / (${t('bypassed_tag')})`;
         } else {
-          tempSubEl.innerText = `${cur !== undefined ? cur : '--'}°C / ${t('target')} ${tgt !== undefined ? tgt : '--'}°C`;
+          tempSubEl.innerText = `${cur !== undefined ? cur : '--'}${getTempUnit(this._hass)} / ${t('target')} ${tgt !== undefined ? tgt : '--'}${getTempUnit(this._hass)}`;
         }
       }
 
@@ -7380,13 +7381,13 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
             }
             badgeHtml = `
               <span class="badge badge-amber badge-btn btn-clear-zone-override" data-zone="${z.climate}" title="${this._t('sched_restore')}">
-                ✋ ${z.target_temp.toFixed(1)}°C ${untilStr ? this._t('sched_override_until') + ' ' + untilStr : ''} ✕
+                ✋ ${z.target_temp.toFixed(1)}${getTempUnit(this._hass)} ${untilStr ? this._t('sched_override_until') + ' ' + untilStr : ''} ✕
               </span>
             `;
           } else if (z.smart_start) {
             badgeHtml = `<span class="badge badge-orange">🔥 Smart Start ${z.smart_start_detail || ''}</span>`;
           } else {
-            badgeHtml = `<span class="badge badge-green">🌿 ${z.target_temp.toFixed(1)}°C</span>`;
+            badgeHtml = `<span class="badge badge-green">🌿 ${z.target_temp.toFixed(1)}${getTempUnit(this._hass)}</span>`;
           }
 
           const isOff = z.hvac_mode === 'off';
@@ -7398,9 +7399,9 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
               </div>
               <div class="zone-card-mid">
                 <div class="temp-display">
-                  <span class="current-temp">${z.current_temp.toFixed(1)}°C</span>
+                  <span class="current-temp">${z.current_temp.toFixed(1)}${getTempUnit(this._hass)}</span>
                   <span style="opacity:0.6;">➔</span>
-                  <span class="target-temp">${z.target_temp.toFixed(1)}°C</span>
+                  <span class="target-temp">${z.target_temp.toFixed(1)}${getTempUnit(this._hass)}</span>
                 </div>
                 <div class="temp-controls">
                   <button class="btn-circle btn-temp-down" data-zone="${z.climate}" data-target="${z.target_temp}">-</button>
@@ -7411,7 +7412,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
                 </div>
               </div>
               <div class="zone-card-bottom">
-                <span>⚡ Inerzia: ${z.heating_rate.toFixed(1)} °C/h</span>
+                <span>⚡ Inerzia: ${z.heating_rate.toFixed(1)} ${getTempUnit(this._hass)}/h</span>
                 <span title="${z.climate}">${z.climate.replace('climate.', '')}</span>
               </div>
             </div>
@@ -7834,7 +7835,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
             <div class="time-block manual-override-block" style="left: ${left}%; width: ${width}%;"
                  data-zone="${z.climate}" data-override="1"
                  title="Override manuale attivo: ${Number(ov.target_temp).toFixed(1)}°C">
-              ✋ ${Number(ov.target_temp).toFixed(1)}°C
+              ✋ ${Number(ov.target_temp).toFixed(1)}${getTempUnit(this._hass)}
             </div>
           `;
         }
@@ -8361,11 +8362,11 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
                     <div class="zone-exception-control">
                       <select class="zone-override-select" data-zone="${z.climate}">
                         <option value="inherit" ${initialVal === 'inherit' ? 'selected' : ''}>🔗 Segui Preset Generale</option>
-                        <option value="comfort" ${initialVal === 'comfort' ? 'selected' : ''}>🔥 Comfort (${cTemp.toFixed(1)}°C)</option>
-                        <option value="eco" ${initialVal === 'eco' ? 'selected' : ''}>🌿 Eco (${eTemp.toFixed(1)}°C)</option>
-                        <option value="sleep" ${initialVal === 'sleep' ? 'selected' : ''}>🌙 Notte (${sTemp.toFixed(1)}°C)</option>
-                        <option value="away" ${initialVal === 'away' ? 'selected' : ''}>🚶 Away (${aTemp.toFixed(1)}°C)</option>
-                        <option value="none" ${initialVal === 'none' ? 'selected' : ''}>⏸️ Nessuna modifica / Baseline (${baseTemp.toFixed(1)}°C)</option>
+                        <option value="comfort" ${initialVal === 'comfort' ? 'selected' : ''}>🔥 Comfort (${cTemp.toFixed(1)}${getTempUnit(this._hass)})</option>
+                        <option value="eco" ${initialVal === 'eco' ? 'selected' : ''}>🌿 Eco (${eTemp.toFixed(1)}${getTempUnit(this._hass)})</option>
+                        <option value="sleep" ${initialVal === 'sleep' ? 'selected' : ''}>🌙 Notte (${sTemp.toFixed(1)}${getTempUnit(this._hass)})</option>
+                        <option value="away" ${initialVal === 'away' ? 'selected' : ''}>🚶 Away (${aTemp.toFixed(1)}${getTempUnit(this._hass)})</option>
+                        <option value="none" ${initialVal === 'none' ? 'selected' : ''}>⏸️ Nessuna modifica / Baseline (${baseTemp.toFixed(1)}${getTempUnit(this._hass)})</option>
                       </select>
                     </div>
                   </div>
@@ -8406,7 +8407,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
         const temp = this._resolvePresetTemp(zid, genPreset);
         const inheritOpt = sel.querySelector('option[value="inherit"]');
         if (inheritOpt) {
-          inheritOpt.textContent = `🔗 Segui Preset Generale (${pInfo.icon} ${pInfo.label} · ${temp.toFixed(1)}°C)`;
+          inheritOpt.textContent = `🔗 Segui Preset Generale (${pInfo.icon} ${pInfo.label} · ${temp.toFixed(1)}${getTempUnit(this._hass)})`;
         }
       });
     };
@@ -8770,7 +8771,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
             <div class="radar-item-left">
               <strong>${item.zone.name}</strong>
               <span style="font-size:0.8rem; opacity:0.8;">
-                Attuale: ${item.curTemp.toFixed(1)}°C ➔ Target: ${item.targetTemp.toFixed(1)}°C (Δ ${item.delta.toFixed(1)}°C, ${item.rate.toFixed(1)}°C/h)
+                Attuale: ${item.curTemp.toFixed(1)}${getTempUnit(this._hass)} ➔ Target: ${item.targetTemp.toFixed(1)}${getTempUnit(this._hass)} (Δ ${item.delta.toFixed(1)}${getTempUnit(this._hass)}, ${item.rate.toFixed(1)}${getTempUnit(this._hass)}/h)
               </span>
             </div>
             <div class="radar-item-right">
