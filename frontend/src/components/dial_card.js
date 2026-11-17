@@ -1041,7 +1041,7 @@ class MultizoneThermostatDialCard extends HTMLElement {
   }
 
   renderMinimizedView(title, currentTemp) {
-    const curStr = (typeof currentTemp === 'number') ? `${this.formatTemperature(currentTemp)} °C` : '--°C';
+    const curStr = (typeof currentTemp === 'number') ? `${this.formatTemperature(currentTemp)} ${getTempUnit(this._hass)}` : '--' + getTempUnit(this._hass);
     this.shadowRoot.innerHTML = `
       <style>
         ha-card {
@@ -1362,7 +1362,7 @@ class MultizoneThermostatDialCard extends HTMLElement {
     }
 
     const currentEl = this.shadowRoot.querySelector('#current-temp');
-    if (currentEl) currentEl.textContent = this.formatTemperature(currentTemp) + " °C";
+    if (currentEl) currentEl.textContent = this.formatTemperature(currentTemp) + " " + getTempUnit(this._hass);
 
     this.renderCurrentTempMarker(currentTemp);
 

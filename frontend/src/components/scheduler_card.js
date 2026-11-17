@@ -1327,13 +1327,13 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
             }
             badgeHtml = `
               <span class="badge badge-amber badge-btn btn-clear-zone-override" data-zone="${z.climate}" title="${this._t('sched_restore')}">
-                ✋ ${z.target_temp.toFixed(1)}°C ${untilStr ? this._t('sched_override_until') + ' ' + untilStr : ''} ✕
+                ✋ ${z.target_temp.toFixed(1)}${getTempUnit(this._hass)} ${untilStr ? this._t('sched_override_until') + ' ' + untilStr : ''} ✕
               </span>
             `;
           } else if (z.smart_start) {
             badgeHtml = `<span class="badge badge-orange">${isCoolMode ? '❄️' : '🔥'} Smart Start ${z.smart_start_detail || ''}</span>`;
           } else {
-            badgeHtml = `<span class="badge badge-green">🌿 ${z.target_temp.toFixed(1)}°C</span>`;
+            badgeHtml = `<span class="badge badge-green">🌿 ${z.target_temp.toFixed(1)}${getTempUnit(this._hass)}</span>`;
           }
 
           const isOff = z.hvac_mode === 'off';
@@ -1346,9 +1346,9 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
               </div>
               <div class="zone-card-mid">
                 <div class="temp-display">
-                  <span class="current-temp">${z.current_temp.toFixed(1)}°C</span>
+                  <span class="current-temp">${z.current_temp.toFixed(1)}${getTempUnit(this._hass)}</span>
                   <span style="opacity:0.6;">➔</span>
-                  <span class="target-temp">${z.target_temp.toFixed(1)}°C</span>
+                  <span class="target-temp">${z.target_temp.toFixed(1)}${getTempUnit(this._hass)}</span>
                 </div>
                 <div class="temp-controls">
                   <button class="btn-circle btn-temp-down" data-zone="${z.climate}" data-target="${z.target_temp}">-</button>
@@ -1359,7 +1359,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
                 </div>
               </div>
               <div class="zone-card-bottom">
-                <span>⚡ Inerzia: ${(typeof zoneRate === 'number' && !isNaN(zoneRate)) ? zoneRate.toFixed(1) : '--'} °C/h</span>
+                <span>⚡ Inerzia: ${(typeof zoneRate === 'number' && !isNaN(zoneRate)) ? zoneRate.toFixed(1) : '--'} ${getTempUnit(this._hass)}/h</span>
                 <span title="${z.climate}">${z.climate.replace('climate.', '')}</span>
               </div>
             </div>
@@ -1783,7 +1783,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
             <div class="time-block manual-override-block" style="left: ${left}%; width: ${width}%;"
                  data-zone="${z.climate}" data-override="1"
                  title="Override manuale attivo: ${Number(ov.target_temp).toFixed(1)}°C">
-              ✋ ${Number(ov.target_temp).toFixed(1)}°C
+              ✋ ${Number(ov.target_temp).toFixed(1)}${getTempUnit(this._hass)}
             </div>
           `;
         }
@@ -2391,11 +2391,11 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
                     <div class="zone-exception-control">
                       <select class="zone-override-select" data-zone="${z.climate}">
                         <option value="inherit" ${initialVal === 'inherit' ? 'selected' : ''}>🔗 Segui Preset Generale</option>
-                        <option value="comfort" ${initialVal === 'comfort' ? 'selected' : ''}>${isCoolMode ? '❄️' : '🔥'} Comfort (${cTemp.toFixed(1)}°C)</option>
-                        <option value="eco" ${initialVal === 'eco' ? 'selected' : ''}>🌿 Eco (${eTemp.toFixed(1)}°C)</option>
-                        <option value="sleep" ${initialVal === 'sleep' ? 'selected' : ''}>🌙 Notte (${sTemp.toFixed(1)}°C)</option>
-                        <option value="away" ${initialVal === 'away' ? 'selected' : ''}>🚶 Away (${aTemp.toFixed(1)}°C)</option>
-                        <option value="none" ${initialVal === 'none' ? 'selected' : ''}>${getTranslation(this._hass, 'sched_no_change_baseline') || '⏸️ No change / Baseline'} (${baseTemp.toFixed(1)}°C)</option>
+                        <option value="comfort" ${initialVal === 'comfort' ? 'selected' : ''}>${isCoolMode ? '❄️' : '🔥'} Comfort (${cTemp.toFixed(1)}${getTempUnit(this._hass)})</option>
+                        <option value="eco" ${initialVal === 'eco' ? 'selected' : ''}>🌿 Eco (${eTemp.toFixed(1)}${getTempUnit(this._hass)})</option>
+                        <option value="sleep" ${initialVal === 'sleep' ? 'selected' : ''}>🌙 Notte (${sTemp.toFixed(1)}${getTempUnit(this._hass)})</option>
+                        <option value="away" ${initialVal === 'away' ? 'selected' : ''}>🚶 Away (${aTemp.toFixed(1)}${getTempUnit(this._hass)})</option>
+                        <option value="none" ${initialVal === 'none' ? 'selected' : ''}>${getTranslation(this._hass, 'sched_no_change_baseline') || '⏸️ No change / Baseline'} (${baseTemp.toFixed(1)}${getTempUnit(this._hass)})</option>
                       </select>
                     </div>
                   </div>
@@ -2436,7 +2436,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
         const temp = this._resolvePresetTemp(zid, genPreset);
         const inheritOpt = sel.querySelector('option[value="inherit"]');
         if (inheritOpt) {
-          inheritOpt.textContent = `🔗 Segui Preset Generale (${pInfo.icon} ${pInfo.label} · ${temp.toFixed(1)}°C)`;
+          inheritOpt.textContent = `🔗 Segui Preset Generale (${pInfo.icon} ${pInfo.label} · ${temp.toFixed(1)}${getTempUnit(this._hass)})`;
         }
       });
     };
@@ -2806,7 +2806,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
             <div class="radar-item-left">
               <strong>${item.zone.name}</strong>
               <span style="font-size:0.8rem; opacity:0.8;">
-                Attuale: ${item.curTemp.toFixed(1)}°C ➔ Target: ${item.targetTemp.toFixed(1)}°C (Δ ${item.delta.toFixed(1)}°C, ${item.rate.toFixed(1)}°C/h)
+                Attuale: ${item.curTemp.toFixed(1)}${getTempUnit(this._hass)} ➔ Target: ${item.targetTemp.toFixed(1)}${getTempUnit(this._hass)} (Δ ${item.delta.toFixed(1)}${getTempUnit(this._hass)}, ${item.rate.toFixed(1)}${getTempUnit(this._hass)}/h)
               </span>
             </div>
             <div class="radar-item-right">

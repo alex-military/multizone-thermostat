@@ -788,9 +788,9 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
         const cur = climateState.attributes.current_temperature;
         const tgt = climateState.attributes.temperature;
         if (zoneMode === "bypass") {
-          tempSubEl.innerText = `${cur !== undefined ? cur : '--'}°C / (${t('bypassed_tag')})`;
+          tempSubEl.innerText = `${cur !== undefined ? cur : '--'}${getTempUnit(this._hass)} / (${t('bypassed_tag')})`;
         } else {
-          tempSubEl.innerText = `${cur !== undefined ? cur : '--'}°C / ${t('target')} ${tgt !== undefined ? tgt : '--'}°C`;
+          tempSubEl.innerText = `${cur !== undefined ? cur : '--'}${getTempUnit(this._hass)} / ${t('target')} ${tgt !== undefined ? tgt : '--'}${getTempUnit(this._hass)}`;
         }
       }
 

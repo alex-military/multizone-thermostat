@@ -447,15 +447,15 @@ class MultizoneThermostatPlantCard extends HTMLElement {
           if (flowVal !== null && flowVal !== undefined && flowVal !== "") {
             const num = parseFloat(flowVal);
             const displayVal = !isNaN(num) ? (Number.isInteger(num) ? num : num.toFixed(1)) : flowVal;
-            otFlow.innerText = `${displayVal}°C`;
+            otFlow.innerText = `${displayVal}${getTempUnit(this._hass)}`;
           } else {
-            otFlow.innerText = '--°C';
+            otFlow.innerText = '--' + getTempUnit(this._hass);
           }
         }
 
         if (otReturn) {
           if (ot.return_temperature !== null && ot.return_temperature !== undefined) {
-            otReturn.innerText = `${ot.return_temperature}°C`;
+            otReturn.innerText = `${ot.return_temperature}${getTempUnit(this._hass)}`;
             if (otCondense) {
               if (ot.condensing_optimal) {
                 otCondense.innerText = t('ot_condensing_ok');
@@ -466,7 +466,7 @@ class MultizoneThermostatPlantCard extends HTMLElement {
               }
             }
           } else {
-            otReturn.innerText = '--°C';
+            otReturn.innerText = '--' + getTempUnit(this._hass);
             if (otCondense) otCondense.innerText = '';
           }
         }

@@ -1,3 +1,4 @@
+function getTempUnit(hass) { return (hass && hass.config && hass.config.unit_system && hass.config.unit_system.temperature) || '°C'; }
 // Helper function to match entity_id to zone slug accurately without false positives
 function isZoneEntityMatch(id, slug) {
   if (!id || !slug) return false;

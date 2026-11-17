@@ -1,4 +1,3 @@
-function getTempUnit(hass) { return (hass && hass.config && hass.config.unit_system && hass.config.unit_system.temperature) || '°C'; }
 // window.customCards definition to register the cards in Lovelace UI card picker
 window.customCards = window.customCards || [];
 window.customCards.push({
@@ -1246,6 +1245,7 @@ function getTranslation(hass, key) {
   return translations[key] || TRANSLATIONS['en'][key] || key;
 }
 
+function getTempUnit(hass) { return (hass && hass.config && hass.config.unit_system && hass.config.unit_system.temperature) || '°C'; }
 // Helper function to match entity_id to zone slug accurately without false positives
 function isZoneEntityMatch(id, slug) {
   if (!id || !slug) return false;
