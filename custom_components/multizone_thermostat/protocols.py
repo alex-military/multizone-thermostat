@@ -52,7 +52,7 @@ class PlantOrchestratorProtocol(Protocol):
         """Periodic plant tick."""
         ...
 
-    async def async_refresh(self, force: bool = False) -> None:
+    async def async_refresh(self, force_refresh_zones: bool = False) -> None:
         """Immediately refresh plant demand and generator state."""
         ...
 

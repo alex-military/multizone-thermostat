@@ -201,6 +201,28 @@ class SplitZoneManager:
         if not self.has_split(climate_id):
             return False
 
+        # Never suppress hydronic heating during a frost emergency on this zone
+        frost_mgr = getattr(self.coordinator, "frost_protection", None) or getattr(self.coordinator, "anti_frost", None)
+        if frost_mgr is not None and callable(getattr(frost_mgr, "is_zone_in_frost_emergency", None)):
+            if frost_mgr.is_zone_in_frost_emergency(climate_id) is True:
+                return False
+
+        # Fail-safe: verify actual split entity state when available
+        split_conf = self._splits.get(climate_id)
+        if split_conf and hasattr(self.hass, "states") and self.hass.states:
+            split_st = self.hass.states.get(split_conf["split_entity_id"])
+            raw_state = getattr(split_st, "state", None) if split_st is not None else None
+            if isinstance(raw_state, str):
+                if raw_state in ("unavailable", "unknown"):
+                    return False
+                if (
+                    raw_state == HVAC_MODE_OFF
+                    and not self.is_local_manual_on(climate_id)
+                    and (time.monotonic() - self._last_command_timestamps.get(climate_id, 0.0)) > 30.0
+                ):
+                    self._last_split_commands.pop(climate_id, None)
+                    return False
+
         # If master switch is OFF or local manual override is active, strictly decouple hydronics
         master_on = (
             self.coordinator.get_master_state()
@@ -520,12 +542,6 @@ class SplitZoneManager:
             )
             return
 
-        self._last_split_commands[climate_id] = {
-            "mode": desired_mode,
-            "target": desired_target,
-        }
-        self._last_command_timestamps[climate_id] = now
-
         try:
             if desired_mode == HVAC_MODE_OFF:
                 _LOGGER.info("[%s] Setting split %s to OFF", climate_id, split_entity)
@@ -556,6 +572,11 @@ class SplitZoneManager:
                         {ATTR_ENTITY_ID: split_entity, ATTR_TEMPERATURE: desired_target},
                         blocking=False,
                     )
+            self._last_split_commands[climate_id] = {
+                "mode": desired_mode,
+                "target": desired_target,
+            }
+            self._last_command_timestamps[climate_id] = now
         except Exception as err:
             _LOGGER.warning("[%s] Failed to send command to split %s: %s", climate_id, split_entity, err)
 
