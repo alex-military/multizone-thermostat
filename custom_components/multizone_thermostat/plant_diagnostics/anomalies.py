@@ -18,6 +18,7 @@ from .const import (
     ANOMALY_SENSOR_TIMEOUT,
     ANOMALY_LABELS,
 )
+from ..const import to_celsius
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -364,14 +365,21 @@ def evaluate_zone_anomalies(
         if not st:
             return ANOMALY_NONE, "Zone not ready"
 
-        current_temp = st.attributes.get("current_temperature")
-        target_temp = st.attributes.get("temperature")
+        attrs = getattr(st, "attributes", None) or {}
+        current_temp = attrs.get("current_temperature") if hasattr(attrs, "get") else None
+        target_temp = attrs.get("temperature") if hasattr(attrs, "get") else None
+        st_unit = (attrs.get("temperature_unit") or attrs.get("unit_of_measurement")) if hasattr(attrs, "get") else None
         demand = coordinator.get_zone_demand(climate_id)
 
         if current_temp is None:
             return ANOMALY_NONE, "Waiting for temperature reading"
 
-        current_temp = float(current_temp)
+        current_temp = to_celsius(float(current_temp), st_unit, hass)
+        if target_temp is not None:
+            try:
+                target_temp = to_celsius(float(target_temp), st_unit, hass)
+            except (ValueError, TypeError):
+                target_temp = None
 
         # 0.a Battery Check (Main Sensor)
         zone = coordinator.zone_manager.get_zone(climate_id)

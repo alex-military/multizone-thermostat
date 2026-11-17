@@ -16,6 +16,7 @@ from ..const import (
     KEY_ANTI_FROST_ENABLED,
     KEY_FROST_PROTECTION_TEMP,
     make_zone_entity_id,
+    to_celsius,
 )
 
 SERVICE_SET_TEMPERATURE = "set_temperature"
@@ -48,7 +49,13 @@ class FrostManager:
             else False
         )
         if st and not is_faulty:
-            current_temp = st.attributes.get("current_temperature")
+            raw_ct = st.attributes.get("current_temperature")
+            if raw_ct is not None:
+                try:
+                    st_unit = st.attributes.get("temperature_unit") or st.attributes.get("unit_of_measurement")
+                    current_temp = to_celsius(float(raw_ct), st_unit, self.hass)
+                except (ValueError, TypeError):
+                    current_temp = None
 
         # WARN-02: Fallback — average TRV sensor readings if virtual thermostat has no temperature yet
         # (e.g., right after boot before TRVs have reported back)

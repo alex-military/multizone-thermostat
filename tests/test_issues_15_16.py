@@ -82,9 +82,10 @@ def test_issue_15_fahrenheit_sensor_converted_and_no_fault():
     assert climate.current_temperature == pytest.approx(22.0)
 
     # Sanity check in PlantDiagnostics must see 22.0 °C, not 71.6 °C
+    # Simulate HA's ClimateEntity state serialization in Fahrenheit (71.6 °F, target 69.0 °F)
     states[climate.entity_id] = SimpleNamespace(
         state="heat",
-        attributes={"current_temperature": climate.current_temperature, "temperature": 21.0},
+        attributes={"current_temperature": 71.6, "temperature": 69.0},
     )
     coordinator.zone_manager = MagicMock()
     coordinator.zone_manager.get_zone = MagicMock(
@@ -94,6 +95,45 @@ def test_issue_15_fahrenheit_sensor_converted_and_no_fault():
     anomaly, _ = diag.evaluate_zone_anomalies(climate.entity_id)
     assert anomaly == ANOMALY_NONE
     assert diag.has_critical_sensor_fault(climate.entity_id) is False
+
+
+@pytest.mark.asyncio
+async def test_issue_15_climate_state_attributes_in_fahrenheit():
+    """Issue #15 follow-up: HA serializes climate attributes in °F; ZoneController & Restorer must convert to °C."""
+    from unittest.mock import AsyncMock
+    from custom_components.multizone_thermostat.state_restorer import ZoneStateRestorer
+
+    hass = MagicMock()
+    hass.config = SimpleNamespace(units=SimpleNamespace(temperature_unit="°F"))
+    coord = MagicMock()
+    coord.zones = [{"name": "Living Room"}]
+    demands = {}
+    coord.demand_aggregator = MagicMock()
+    coord.demand_aggregator.get_zone_demand = MagicMock(side_effect=lambda cid: demands.get(cid, 0.0))
+    coord.demand_aggregator.set_zone_demand = MagicMock(side_effect=lambda cid, d: demands.update({cid: d}))
+    coord.get_zone_demand = coord.demand_aggregator.get_zone_demand
+    coord.get_zone_mode = MagicMock(return_value="primary")
+    coord.plant_diagnostics = MagicMock()
+    coord.plant_diagnostics.has_critical_sensor_fault = MagicMock(return_value=False)
+    coord.weather_sensor_id = None
+    coord.is_dhw_active = False
+
+    zc = ZoneController(hass, coord)
+    cid = make_zone_entity_id("Living Room")
+    # 68.0 °F (20.0 °C) vs target 69.8 °F (21.0 °C) -> delta 1.0 °C -> hysteresis demands 100%
+    st = SimpleNamespace(state="heat", attributes={"current_temperature": 68.0, "temperature": 69.8})
+    dem = await zc.async_update_zone(cid, st)
+    assert dem == 100.0
+
+    # StateRestorer: 69.8 °F -> 21.0 °C
+    ent = MagicMock()
+    ent.hass = hass
+    ent.async_get_last_state = AsyncMock(
+        return_value=SimpleNamespace(state="heat", attributes={"temperature": 69.8})
+    )
+    mode, restored_t = await ZoneStateRestorer.async_restore_state(ent)
+    assert mode == "heat"
+    assert restored_t == pytest.approx(21.0)
 
 
 def test_issue_15_trv_fallback_fahrenheit():
