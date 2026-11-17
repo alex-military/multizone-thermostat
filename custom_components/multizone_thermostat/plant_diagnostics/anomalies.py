@@ -391,7 +391,9 @@ def evaluate_zone_anomalies(
         if current_temp < -30.0 or current_temp > 60.0:
             is_insane = True
         elif state.get("last_temp_seen") is not None and state.get("last_temp_time") is not None:
-            if abs(state["last_temp_seen"] - current_temp) > 4.0 and (now_mono - state["last_temp_time"]) < 600:
+            delta_seen = abs(state["last_temp_seen"] - current_temp)
+            dt_seen = now_mono - state["last_temp_time"]
+            if (delta_seen > 4.0 and dt_seen < 1800) or (delta_seen > 6.0 and dt_seen < 3600):
                 # Spike sanity check: if the new reading is sustained across consecutive readings,
                 # accept it rather than locking the zone to 0% for 10 full minutes.
                 spike_cand = state.get("spike_cand")
