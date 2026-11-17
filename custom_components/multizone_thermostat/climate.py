@@ -60,6 +60,7 @@ from .const import (
     make_zone_entity_id,
     make_via_device_kwargs,
     make_zone_device_info,
+    to_celsius,
 )
 from .sync_manager import ZoneSyncManager
 from .state_restorer import ZoneStateRestorer
@@ -542,7 +543,9 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             return
 
         try:
-            self._current_temperature = float(new_state.state)
+            attrs = getattr(new_state, "attributes", None) or {}
+            unit = attrs.get("unit_of_measurement") if hasattr(attrs, "get") else None
+            self._current_temperature = to_celsius(float(new_state.state), unit, self.hass)
             if self._safety_fallback_active:
                 _LOGGER.info("Zone %s: External temp sensor recovered. Exiting safety fallback.", self._name)
                 self._safety_fallback_active = False
@@ -576,7 +579,9 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
                     elapsed = (now - ts) if isinstance(ts, (int, float)) else 0.0
                     
                     if self._sensor_timeout_min == 0 or elapsed <= (self._sensor_timeout_min * 60):
-                        self._current_temperature = float(state.state)
+                        attrs = getattr(state, "attributes", None) or {}
+                        unit = attrs.get("unit_of_measurement") if hasattr(attrs, "get") else None
+                        self._current_temperature = to_celsius(float(state.state), unit, self.hass)
                         ext_temp_valid = True
                         if self._safety_fallback_active:
                             _LOGGER.info("Zone %s: External temp sensor recovered. Exiting safety fallback.", self._name)

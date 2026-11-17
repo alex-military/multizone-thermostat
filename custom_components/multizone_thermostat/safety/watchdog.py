@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from homeassistant.util import dt as dt_util
-from ..const import CONF_ZONE_CLIMATES
+from ..const import CONF_ZONE_CLIMATES, to_celsius
 from ..plant_config import get_zone_climates
 
 if TYPE_CHECKING:
@@ -51,10 +51,12 @@ class SensorWatchdog:
         for trv in trv_entities:
             st = ha.states.get(trv)
             if st and getattr(st, "state", None) not in ("unavailable", "unknown"):
-                t = getattr(st, "attributes", {}).get("current_temperature")
+                attrs = getattr(st, "attributes", {}) or {}
+                t = attrs.get("current_temperature")
                 if t is not None:
                     try:
-                        temps.append(float(t))
+                        unit = attrs.get("unit_of_measurement") or attrs.get("temperature_unit")
+                        temps.append(to_celsius(float(t), unit, ha))
                     except (ValueError, TypeError):
                         pass
 
