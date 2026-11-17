@@ -309,7 +309,8 @@ class PlantOrchestrator:
                 _LOGGER.info("Master switch is OFF (no frost emergency): stopping plant")
                 self._master_off_logged = True
             self.last_aggregate = None
-            await self.boiler_backend.async_emergency_off()
+            if self.boiler_backend is not None:
+                await self.boiler_backend.async_emergency_off()
             if hp_backend is not None and hasattr(hp_backend, "async_emergency_off"):
                 await hp_backend.async_emergency_off()
             return
@@ -320,7 +321,8 @@ class PlantOrchestrator:
         master_mode = getattr(self.coordinator, "master_hvac_mode", HVAC_MODE_HEAT)
         if master_mode == HVAC_MODE_COOL and not frost_emergency:
             # In cooling mode, gas boiler is strictly OFF (0.0% demand)
-            await self.boiler_backend.async_update(0.0, None, False)
+            if self.boiler_backend is not None:
+                await self.boiler_backend.async_update(0.0, None, False)
             if (
                 hp_backend is not None
                 and getattr(self.coordinator, "enable_heat_pump", False) is True
@@ -479,9 +481,10 @@ class PlantOrchestrator:
             cmd.reason,
         )
 
-        res_gas = self.boiler_backend.async_update(cmd.gas_demand, agg.peak_zone, frost_emergency)
-        if inspect.isawaitable(res_gas):
-            await res_gas
+        if self.boiler_backend is not None:
+            res_gas = self.boiler_backend.async_update(cmd.gas_demand, agg.peak_zone, frost_emergency)
+            if inspect.isawaitable(res_gas):
+                await res_gas
 
         if hp_backend is not None and hp_enabled:
             res_hp = hp_backend.async_update(cmd.hp_demand, agg.peak_zone, frost_emergency, hvac_mode=HVAC_MODE_HEAT)
