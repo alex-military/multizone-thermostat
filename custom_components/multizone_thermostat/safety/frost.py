@@ -17,6 +17,7 @@ from ..const import (
     KEY_FROST_PROTECTION_TEMP,
     make_zone_entity_id,
     to_celsius,
+    from_celsius,
 )
 
 SERVICE_SET_TEMPERATURE = "set_temperature"
@@ -69,7 +70,8 @@ class FrostManager:
                         t = trv_st.attributes.get("current_temperature")
                         if t is not None:
                             try:
-                                trv_temps.append(float(t))
+                                trv_unit = trv_st.attributes.get("temperature_unit") or trv_st.attributes.get("unit_of_measurement")
+                                trv_temps.append(to_celsius(float(t), trv_unit, self.hass))
                             except (ValueError, TypeError):
                                 pass
                 if trv_temps:
@@ -124,12 +126,13 @@ class FrostManager:
                     )
                     + 3.0
                 )
+                out_frost_target = round(from_celsius(frost_target, self.hass), 1)
                 st = self.hass.states.get(climate_id)
-                if not st or st.attributes.get(ATTR_TEMPERATURE) != frost_target:
+                if not st or st.attributes.get(ATTR_TEMPERATURE) != out_frost_target:
                     await self.hass.services.async_call(
                         CLIMATE_DOMAIN,
                         SERVICE_SET_TEMPERATURE,
-                        {ATTR_ENTITY_ID: climate_id, ATTR_TEMPERATURE: frost_target},
+                        {ATTR_ENTITY_ID: climate_id, ATTR_TEMPERATURE: out_frost_target},
                         blocking=False,
                     )
 

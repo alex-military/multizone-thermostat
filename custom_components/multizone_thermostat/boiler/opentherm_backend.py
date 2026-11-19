@@ -4,6 +4,7 @@ import time
 
 from homeassistant.core import HomeAssistant
 from .base import BoilerBackend
+from ..const import to_celsius, from_celsius
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -70,7 +71,9 @@ class OpenThermBoilerBackend(BoilerBackend):
                             raw_t = w_state.state
                         if isinstance(raw_t, (int, float, str)):
                             try:
-                                outdoor_temp = float(raw_t)
+                                attrs = getattr(w_state, "attributes", None) or {}
+                                w_unit = (attrs.get("temperature_unit") or attrs.get("unit_of_measurement")) if hasattr(attrs, "get") else None
+                                outdoor_temp = to_celsius(float(raw_t), w_unit, self.hass)
                             except (ValueError, TypeError):
                                 outdoor_temp = None
                     if outdoor_temp is not None and outdoor_temp < 15.0:
@@ -158,12 +161,13 @@ class OpenThermBoilerBackend(BoilerBackend):
         try:
             st = self.hass.states.get(self.opentherm_entity)
             if domain in ["climate", "water_heater"]:
+                out_target = round(from_celsius(target_temp, self.hass), 1)
                 current_target = st.attributes.get("temperature") if st else None
-                if current_target != target_temp:
+                if current_target != out_target:
                     await self.hass.services.async_call(
                         domain,
                         "set_temperature",
-                        {"entity_id": self.opentherm_entity, "temperature": target_temp},
+                        {"entity_id": self.opentherm_entity, "temperature": out_target},
                         blocking=False,
                     )
 
@@ -199,7 +203,10 @@ class OpenThermBoilerBackend(BoilerBackend):
                         )
             elif domain == "number":
                 heat_enabled = norm_demand > 0.0
+                num_unit = st.attributes.get("unit_of_measurement") if (st and getattr(st, "attributes", None)) else None
                 value = target_temp
+                if num_unit is not None and str(num_unit).strip().lower() in ("°f", "f", "fahrenheit"):
+                    value = round(from_celsius(target_temp, unit=num_unit), 1)
                 if not heat_enabled and not self.ch_switch:
                     # A bare number entity has no OFF command: write the lowest value the
                     # entity accepts (normally 0 = CH disabled) instead of the min flow temp.

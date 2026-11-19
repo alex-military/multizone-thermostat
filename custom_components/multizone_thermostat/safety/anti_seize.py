@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
+ANTI_SEIZE_MODULATING_DEMAND = 5.0
 
 
 class AntiSeizeManager:
@@ -72,7 +73,12 @@ class AntiSeizeManager:
     async def _turn_boiler_on(self) -> None:
         """Turn on boiler for anti-seize."""
         if hasattr(self.coordinator, "boiler_backend") and self.coordinator.boiler_backend:
-            await self.coordinator.boiler_backend.async_update(100.0, "Anti-Seize", False)
+            demand = (
+                ANTI_SEIZE_MODULATING_DEMAND
+                if getattr(self.coordinator.boiler_backend, "is_modulating", False) is True
+                else 100.0
+            )
+            await self.coordinator.boiler_backend.async_update(demand, "Anti-Seize", False)
         elif getattr(self.coordinator, "boiler_switch", None):
             await self.hass.services.async_call(
                 "switch",

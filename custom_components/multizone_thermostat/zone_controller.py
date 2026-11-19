@@ -319,7 +319,7 @@ class ZoneController:
                 current_demand = self.coordinator.demand_aggregator.get_zone_demand(entity_id)
                 if current_temp <= target_temp - tolerance:
                     demand = 100.0
-                elif current_temp >= max(target_temp - tolerance + 0.05, effective_target + tolerance):
+                elif current_temp >= max(target_temp, effective_target + tolerance):
                     demand = 0.0
                 else:
                     demand = current_demand  # Keep previous demand inside the hysteresis band

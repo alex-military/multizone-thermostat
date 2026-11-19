@@ -198,3 +198,20 @@ def to_celsius(value: float, unit: str | None = None, hass: Any = None) -> float
         if u in ("k", "kelvin"):
             return value - 273.15
     return value
+
+
+def from_celsius(value: float, hass: Any = None, unit: str | None = None) -> float:
+    """Convert an internal Celsius temperature to the target unit (or HA system unit)."""
+    raw_unit = unit
+    if not raw_unit and hass is not None:
+        cfg = getattr(hass, "config", None)
+        units = getattr(cfg, "units", None) if cfg is not None else None
+        raw_unit = getattr(units, "temperature_unit", None) if units is not None else None
+
+    if raw_unit is not None:
+        u = str(raw_unit).strip().lower()
+        if u in ("°f", "f", "fahrenheit"):
+            return value * 9.0 / 5.0 + 32.0
+        if u in ("k", "kelvin"):
+            return value + 273.15
+    return value

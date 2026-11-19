@@ -12,7 +12,15 @@ from homeassistant.const import ATTR_ENTITY_ID, ATTR_TEMPERATURE, SERVICE_TURN_O
 from homeassistant.core import HomeAssistant, Context, State, Event
 
 from .pwm_engine import PWMEngine
-from .const import KEY_PHYSICAL_SYNC_PREFIX, VALVE_SCALE_VOLT, DEFAULT_VALVE_SCALE, DEFAULT_MIN_CYCLE_ON, DEFAULT_MIN_CYCLE_OFF
+from .const import (
+    KEY_PHYSICAL_SYNC_PREFIX,
+    VALVE_SCALE_VOLT,
+    DEFAULT_VALVE_SCALE,
+    DEFAULT_MIN_CYCLE_ON,
+    DEFAULT_MIN_CYCLE_OFF,
+    to_celsius,
+    from_celsius,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -100,7 +108,9 @@ class ZoneSyncManager:
             st = self.hass.states.get(trv)
             if st and st.attributes.get(ATTR_TEMPERATURE) is not None:
                 try:
-                    self._last_known_trv_targets[trv] = float(st.attributes[ATTR_TEMPERATURE])
+                    self._last_known_trv_targets[trv] = to_celsius(
+                        float(st.attributes[ATTR_TEMPERATURE]), None, self.hass
+                    )
                 except (ValueError, TypeError):
                     pass
 
@@ -143,7 +153,7 @@ class ZoneSyncManager:
                         device_target = st.attributes.get(ATTR_TEMPERATURE)
                         if device_target is not None:
                             try:
-                                dt_val = float(device_target)
+                                dt_val = to_celsius(float(device_target), None, self.hass)
                                 if dt_val > 7.0 and not self._authoritative_sync:
                                     self._last_known_trv_targets[trv] = dt_val
                             except (ValueError, TypeError):
@@ -159,7 +169,7 @@ class ZoneSyncManager:
                         if has_external_sensor and not safety_fallback_active and master_current_temp is not None and trv_current is not None:
                             try:
                                 master_curr_f = float(master_current_temp)
-                                trv_curr_f = float(trv_current)
+                                trv_curr_f = to_celsius(float(trv_current), None, self.hass)
                             except (ValueError, TypeError):
                                 master_curr_f = None
                                 trv_curr_f = None
@@ -183,7 +193,17 @@ class ZoneSyncManager:
                                             else:
                                                 self._pending_calib.pop(trv, None)
 
-                                        offset = round(effective_base_calib + (master_curr_f - trv_curr_f), 1)
+                                        delta_c = master_curr_f - trv_curr_f
+                                        c_unit = (
+                                            calib_state.attributes.get("unit_of_measurement")
+                                            if (calib_state and getattr(calib_state, "attributes", None))
+                                            else None
+                                        )
+                                        if c_unit is not None and str(c_unit).strip().lower() in ("°f", "f", "fahrenheit"):
+                                            delta_out = delta_c * 9.0 / 5.0
+                                        else:
+                                            delta_out = delta_c
+                                        offset = round(effective_base_calib + delta_out, 1)
                                         if calib_state:
                                             c_min = calib_state.attributes.get("min")
                                             c_max = calib_state.attributes.get("max")
@@ -214,25 +234,27 @@ class ZoneSyncManager:
                                     trv_target = master_target_temp + (trv_curr_f - master_curr_f)
                                     trv_target = max(5.0, min(35.0, trv_target))
                         
+                        out_target = from_celsius(trv_target, self.hass)
                         step = st.attributes.get("target_temp_step")
                         try:
                             step_val = float(step) if step is not None else 0.5
                         except (ValueError, TypeError):
                             step_val = 0.5
                         if step_val > 0:
-                            trv_target = round(trv_target / step_val) * step_val
+                            out_target = round(out_target / step_val) * step_val
 
                         trv_min = st.attributes.get("min_temp")
                         trv_max = st.attributes.get("max_temp")
                         try:
-                            min_val = float(trv_min) if trv_min is not None else 5.0
+                            min_val = float(trv_min) if trv_min is not None else from_celsius(5.0, self.hass)
                         except (ValueError, TypeError):
-                            min_val = 5.0
+                            min_val = from_celsius(5.0, self.hass)
                         try:
-                            max_val = float(trv_max) if trv_max is not None else 35.0
+                            max_val = float(trv_max) if trv_max is not None else from_celsius(35.0, self.hass)
                         except (ValueError, TypeError):
-                            max_val = 35.0
-                        trv_target = max(min_val, min(max_val, trv_target))
+                            max_val = from_celsius(35.0, self.hass)
+                        out_target = round(max(min_val, min(max_val, out_target)), 2)
+                        sent_c = round(to_celsius(out_target, None, self.hass), 2)
 
                         current_device_target = st.attributes.get(ATTR_TEMPERATURE)
                         try:
@@ -240,28 +262,28 @@ class ZoneSyncManager:
                         except (ValueError, TypeError):
                             curr_dev_target_f = None
 
-                        if mode_changed or curr_dev_target_f != trv_target:
+                        if mode_changed or curr_dev_target_f != out_target:
                             health = self.trv_health.setdefault(trv, {})
                             try:
                                 await self.hass.services.async_call(
                                     "climate",
                                     "set_temperature",
-                                    {"entity_id": trv, "temperature": trv_target},
+                                    {"entity_id": trv, "temperature": out_target},
                                     blocking=True,
                                     context=self._internal_context,
                                 )
-                                health["last_command_target"] = trv_target
+                                health["last_command_target"] = sent_c
                                 health["last_command_mode"] = str(target_hvac_mode)
                                 health["last_command_time"] = dt_util.now().isoformat()
                                 health["last_command_time_monotonic"] = time.monotonic()
                                 health["sync_status"] = "PENDING_CONFIRMATION"
 
-                                self._pending_trv_targets[trv] = trv_target
-                                self._last_known_trv_targets[trv] = trv_target
+                                self._pending_trv_targets[trv] = sent_c
+                                self._last_known_trv_targets[trv] = sent_c
                                 self._coordinator.record_diagnostic_event("TRV_COMMAND_SENT", {
                                     "zone": self._zone_name,
                                     "trv": trv,
-                                    "target": trv_target,
+                                    "target": sent_c,
                                     "mode": str(target_hvac_mode),
                                 })
                             except Exception as err:
@@ -276,7 +298,7 @@ class ZoneSyncManager:
                                 })
                                 self._pending_trv_targets.pop(trv, None)
                         else:
-                            self._last_known_trv_targets[trv] = trv_target
+                            self._last_known_trv_targets[trv] = sent_c
                 except Exception as err:
                     _LOGGER.error("Error syncing TRV %s in zone %s: %s", trv, self._zone_name, err)
 
@@ -402,13 +424,13 @@ class ZoneSyncManager:
 
             raw_new_temp = new_state.attributes.get(ATTR_TEMPERATURE)
             try:
-                new_temp = float(raw_new_temp) if raw_new_temp is not None else None
+                new_temp = to_celsius(float(raw_new_temp), None, self.hass) if raw_new_temp is not None else None
             except (ValueError, TypeError):
                 new_temp = None
 
             raw_old_state_temp = old_state.attributes.get(ATTR_TEMPERATURE)
             try:
-                old_state_temp = float(raw_old_state_temp) if raw_old_state_temp is not None else None
+                old_state_temp = to_celsius(float(raw_old_state_temp), None, self.hass) if raw_old_state_temp is not None else None
             except (ValueError, TypeError):
                 old_state_temp = None
 

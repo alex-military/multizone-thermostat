@@ -1,8 +1,10 @@
 """Multizone Thermostat integration setup."""
 from __future__ import annotations
 
+from collections.abc import Mapping
 import inspect
 import logging
+from typing import Any
 
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
@@ -21,6 +23,7 @@ from .const import (
     MODE_RELAY,
     MODE_OPENTHERM,
     CONF_ZONES,
+    CONF_ZONE_ANTI_SEIZE,
     DOMAIN,
     make_zone_entity_id,
 )
@@ -29,6 +32,78 @@ from .coordinator import MultizoneCoordinator
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = ["climate", "switch", "number", "select", "time", "sensor", "binary_sensor", "button"]
+
+
+def _migrate_config_data(
+    data: Mapping[str, Any], options: Mapping[str, Any]
+) -> tuple[dict[str, Any], dict[str, Any], bool]:
+    """Normalize legacy config entry schemas and populate new release defaults."""
+    migrated = False
+    new_data = dict(data)
+    new_options = dict(options) if options else {}
+    config = {**new_data, **new_options}
+    zones = [dict(z) for z in list(config.get(CONF_ZONES, []))]
+
+    # 1. Migrate old virtual thermostats to new zones
+    old_vts = new_data.pop("virtual_thermostats", [])
+    if not old_vts and "virtual_thermostats" in new_options:
+        old_vts = new_options.pop("virtual_thermostats", [])
+    if old_vts:
+        migrated = True
+        for vt in old_vts:
+            vt_zone = {
+                "name": vt.get("name", "Unknown VT"),
+                "climate_entities": [],
+                "switch_entities": [vt.get("heater_switch")] if vt.get("heater_switch") else [],
+                "temp_sensor": vt.get("temperature_sensor"),
+                "target_temperature": vt.get("target_temperature", 20.0),
+                "trv_preset_sync": False,
+                CONF_ZONE_ANTI_SEIZE: True,
+            }
+            zones.append(vt_zone)
+
+    # 2. Migrate old zones and populate per-zone defaults
+    for zone in zones:
+        if "climate_entity" in zone:
+            migrated = True
+            climate = zone.pop("climate_entity")
+            zone["climate_entities"] = [climate] if isinstance(climate, str) and climate else []
+            zone["switch_entities"] = []
+            zone["target_temperature"] = 20.0
+        if CONF_ZONE_ANTI_SEIZE not in zone:
+            zone[CONF_ZONE_ANTI_SEIZE] = True
+            migrated = True
+
+    # 3. Migrate boiler mode for pre-OpenTherm installations
+    if CONF_BOILER_MODE not in new_data and CONF_BOILER_MODE not in new_options:
+        new_data[CONF_BOILER_MODE] = MODE_RELAY
+        migrated = True
+
+    if migrated:
+        new_data[CONF_ZONES] = zones
+        if CONF_ZONES in new_options:
+            new_options[CONF_ZONES] = zones
+
+    return new_data, new_options, migrated
+
+
+async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
+    """Migrate old config entries to version 2."""
+    version = getattr(config_entry, "version", 1)
+    if isinstance(version, int) and version >= 2:
+        return True
+    _LOGGER.info("Migrating Multizone Thermostat config entry from version %s to 2", version)
+    new_data, new_options, _ = _migrate_config_data(config_entry.data, config_entry.options or {})
+    try:
+        hass.config_entries.async_update_entry(
+            config_entry, data=new_data, options=new_options, version=2
+        )
+    except TypeError:
+        config_entry.version = 2
+        hass.config_entries.async_update_entry(
+            config_entry, data=new_data, options=new_options
+        )
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -92,47 +167,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, _check_ot_started)
 
     # Migrate old config format to new Hybrid Zones format
-    migrated = False
-    new_data = dict(entry.data)
-    new_options = dict(entry.options) if entry.options else {}
-    
-    # 1. Migrate old virtual thermostats to new zones
-    old_vts = new_data.pop("virtual_thermostats", [])
-    if not old_vts and "virtual_thermostats" in new_options:
-        old_vts = new_options.pop("virtual_thermostats", [])
-    if old_vts:
-        migrated = True
-        for vt in old_vts:
-            vt_zone = {
-                "name": vt.get("name", "Unknown VT"),
-                "climate_entities": [],
-                "switch_entities": [vt.get("heater_switch")] if vt.get("heater_switch") else [],
-                "temp_sensor": vt.get("temperature_sensor"),
-                "target_temperature": vt.get("target_temperature", 20.0),
-                "trv_preset_sync": False,
-                "anti_seize_zone_enable": True,
-            }
-            zones.append(vt_zone)
-            
-    # 2. Migrate old zones
-    for zone in zones:
-        if "climate_entity" in zone:
-            migrated = True
-            climate = zone.pop("climate_entity")
-            zone["climate_entities"] = [climate] if isinstance(climate, str) and climate else []
-            zone["switch_entities"] = []
-            zone["target_temperature"] = 20.0
-            
-    # Migrate boiler mode for pre-OpenTherm installations
-    if CONF_BOILER_MODE not in new_data and CONF_BOILER_MODE not in new_options:
-        new_data[CONF_BOILER_MODE] = MODE_RELAY
-        migrated = True
-
+    new_data, new_options, migrated = _migrate_config_data(entry.data, entry.options or {})
     if migrated:
         _LOGGER.info("Migrating Multizone Thermostat config to new Hybrid Zones format.")
-        new_data[CONF_ZONES] = zones
         if CONF_ZONES in new_options:
-            new_options[CONF_ZONES] = zones
             hass.config_entries.async_update_entry(entry, data=new_data, options=new_options)
         else:
             hass.config_entries.async_update_entry(entry, data=new_data)
