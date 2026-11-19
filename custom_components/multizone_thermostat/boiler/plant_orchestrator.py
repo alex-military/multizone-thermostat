@@ -23,6 +23,7 @@ from ..const import (
     SOURCE_PRIORITY_ELECTRIC,
     SOURCE_PRIORITY_COMBINED,
 )
+from ..protocols import BoilerBackendProtocol, CoordinatorProtocol
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -93,11 +94,18 @@ def check_boiler_status_reason(coordinator: Any, boiler_backend: Any = None, hea
 class PlantOrchestrator:
     """Orchestrates the boiler and central heat pump PWM ticks and demand logic."""
 
-    def __init__(self, hass, demand_aggregator, boiler_backend, coordinator, heat_pump_backend=None) -> None:
+    def __init__(
+        self,
+        hass: Any,
+        demand_aggregator: Any,
+        boiler_backend: BoilerBackendProtocol | None,
+        coordinator: CoordinatorProtocol,
+        heat_pump_backend: Any = None,
+    ) -> None:
         self.hass = hass
         self.demand_aggregator = demand_aggregator
-        self.boiler_backend = boiler_backend
-        self.coordinator = coordinator
+        self.boiler_backend: BoilerBackendProtocol | None = boiler_backend
+        self.coordinator: CoordinatorProtocol = coordinator
         self.heat_pump_backend = heat_pump_backend
         self._last_plant_command = None
         self._master_off_logged = False

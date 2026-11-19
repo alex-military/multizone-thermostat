@@ -19,6 +19,7 @@ from ..const import (
     KEY_FROST_PROTECTION_TEMP,
     make_zone_entity_id,
     to_celsius,
+    from_celsius,
 )
 from ..plant_config import get_zone_climates
 from .watchdog import SensorWatchdog
@@ -27,6 +28,7 @@ SERVICE_SET_TEMPERATURE = "set_temperature"
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
+from ..protocols import CoordinatorProtocol
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -34,7 +36,7 @@ _LOGGER = logging.getLogger(__name__)
 class FrostManager:
     """Manages anti-frost protection checks and emergency actions."""
 
-    def __init__(self, hass: HomeAssistant, coordinator) -> None:
+    def __init__(self, hass: HomeAssistant, coordinator: CoordinatorProtocol) -> None:
         """Initialize frost manager."""
         self.hass = hass
         self.coordinator = coordinator
@@ -208,17 +210,28 @@ class FrostManager:
                 )
                 st = self.hass.states.get(climate_id)
                 if st:
-                    # Save user target prior to frost override
+                    # Save user target prior to frost override (always stored in internal °C)
                     curr_user_target = st.attributes.get(ATTR_TEMPERATURE)
-                    if curr_user_target and curr_user_target > frost_target and climate_id not in self._pre_frost_targets:
-                        self._pre_frost_targets[climate_id] = float(curr_user_target)
+                    curr_user_target_c: float | None = None
+                    if curr_user_target is not None:
+                        try:
+                            curr_user_target_c = to_celsius(float(curr_user_target), None, self.hass)
+                        except (ValueError, TypeError):
+                            curr_user_target_c = None
+                    if (
+                        curr_user_target_c is not None
+                        and curr_user_target_c > frost_target
+                        and climate_id not in self._pre_frost_targets
+                    ):
+                        self._pre_frost_targets[climate_id] = curr_user_target_c
                         await self._async_persist_pre_frost_targets()
 
-                    if st.attributes.get(ATTR_TEMPERATURE) != frost_target:
+                    out_frost_target = round(from_celsius(frost_target, self.hass), 1)
+                    if st.attributes.get(ATTR_TEMPERATURE) != out_frost_target:
                         await self.hass.services.async_call(
                             CLIMATE_DOMAIN,
                             SERVICE_SET_TEMPERATURE,
-                            {ATTR_ENTITY_ID: climate_id, ATTR_TEMPERATURE: frost_target},
+                            {ATTR_ENTITY_ID: climate_id, ATTR_TEMPERATURE: out_frost_target},
                             blocking=False,
                         )
             else:
@@ -226,6 +239,7 @@ class FrostManager:
                 if climate_id in self._pre_frost_targets:
                     restored_target = self._pre_frost_targets.pop(climate_id)
                     await self._async_persist_pre_frost_targets()
+                    out_restored = round(from_celsius(restored_target, self.hass), 1)
                     _LOGGER.info(
                         "Anti-Frost emergency ended for %s: restoring user target to %.1f°C",
                         climate_id,
@@ -234,7 +248,7 @@ class FrostManager:
                     await self.hass.services.async_call(
                         CLIMATE_DOMAIN,
                         SERVICE_SET_TEMPERATURE,
-                        {ATTR_ENTITY_ID: climate_id, ATTR_TEMPERATURE: restored_target},
+                        {ATTR_ENTITY_ID: climate_id, ATTR_TEMPERATURE: out_restored},
                         blocking=False,
                     )
 

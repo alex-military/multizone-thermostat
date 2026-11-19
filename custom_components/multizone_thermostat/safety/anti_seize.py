@@ -24,14 +24,16 @@ from ..const import (
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
+from ..protocols import CoordinatorProtocol
 
 _LOGGER = logging.getLogger(__name__)
+ANTI_SEIZE_MODULATING_DEMAND = 5.0
 
 
 class AntiSeizeManager:
     """Manages periodic cycling of valves and boiler to prevent mechanical seizing."""
 
-    def __init__(self, hass: HomeAssistant, coordinator) -> None:
+    def __init__(self, hass: HomeAssistant, coordinator: CoordinatorProtocol) -> None:
         """Initialize anti-seize manager."""
         self.hass = hass
         self.coordinator = coordinator
@@ -80,9 +82,11 @@ class AntiSeizeManager:
         hp_backend = getattr(self.coordinator, "heat_pump_backend", None)
 
         if gas_enabled and boiler_backend is not None:
-            await boiler_backend.async_update(100.0, "Anti-Seize", False)
+            demand = ANTI_SEIZE_MODULATING_DEMAND if getattr(boiler_backend, "is_modulating", False) is True else 100.0
+            await boiler_backend.async_update(demand, "Anti-Seize", False)
         elif not gas_enabled and hp_enabled and hp_backend is not None:
-            await hp_backend.async_update(100.0, "Anti-Seize", False)
+            demand = ANTI_SEIZE_MODULATING_DEMAND if getattr(hp_backend, "is_modulating", False) is True else 100.0
+            await hp_backend.async_update(demand, "Anti-Seize", False)
         elif getattr(self.coordinator, "boiler_switch", None):
             await self.hass.services.async_call(
                 "switch",

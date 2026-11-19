@@ -23,6 +23,7 @@ from .const import (
 from .pid_wrapper import MultizonePID
 from .autotune import PassiveAutotuneObserver
 from .thermal_model import ThermalObserver
+from .protocols import CoordinatorProtocol
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ _LOGGER = logging.getLogger(__name__)
 class ZoneController:
     """Orchestrates PID controllers, autotuning, and thermal models for all zones in heating and cooling modes."""
 
-    def __init__(self, hass: HomeAssistant, coordinator: Any) -> None:
+    def __init__(self, hass: HomeAssistant, coordinator: CoordinatorProtocol) -> None:
         """Initialize the Zone Controller."""
         self.hass = hass
         self.coordinator = coordinator
@@ -425,7 +426,7 @@ class ZoneController:
                 current_demand = self.coordinator.demand_aggregator.get_zone_demand(entity_id)
                 if current_temp <= target - tolerance:
                     demand = 100.0
-                elif current_temp >= max(target - tolerance + 0.05, effective_target + tolerance):
+                elif current_temp >= max(target, effective_target + tolerance):
                     demand = 0.0
                 else:
                     demand = current_demand

@@ -20,12 +20,21 @@ from .const import (
     KEY_HP_MIN_CYCLE_ON,
     KEY_HP_MIN_CYCLE_OFF,
 )
+from .protocols import (
+    BoilerBackendProtocol,
+    PlantOrchestratorProtocol,
+    ZoneControllerProtocol,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
 
 class MultizoneCoordinator:
     """Central coordinator that acts as composition root and manages heating plant lifecycle."""
+
+    boiler_backend: BoilerBackendProtocol | None
+    plant_orchestrator: PlantOrchestratorProtocol | None
+    zone_controller: ZoneControllerProtocol | None
 
     def __init__(
         self,

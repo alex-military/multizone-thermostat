@@ -16,6 +16,8 @@ from homeassistant.const import ATTR_ENTITY_ID, ATTR_TEMPERATURE
 from ..const import (
     CONF_ZONE_NAME,
     make_zone_entity_id,
+    to_celsius,
+    from_celsius,
     HVAC_MODE_HEAT,
     HVAC_MODE_OFF,
     HVAC_MODE_COOL,
@@ -215,8 +217,13 @@ class SplitZoneManager:
             if isinstance(raw_state, str):
                 if raw_state in ("unavailable", "unknown"):
                     return False
+                cmd_mode = self._last_split_commands.get(climate_id, {}).get("mode")
+                wrong_mode = (
+                    (cmd_mode == HVAC_MODE_HEAT and raw_state == HVAC_MODE_COOL)
+                    or (cmd_mode == HVAC_MODE_COOL and raw_state == HVAC_MODE_HEAT)
+                )
                 if (
-                    raw_state == HVAC_MODE_OFF
+                    (raw_state in (HVAC_MODE_OFF, "off", "fan_only", "dry") or wrong_mode)
                     and not self.is_local_manual_on(climate_id)
                     and (time.monotonic() - self._last_command_timestamps.get(climate_id, 0.0)) > 30.0
                 ):
@@ -272,7 +279,7 @@ class SplitZoneManager:
                 c_temp = s_state.attributes.get("current_temperature")
                 if c_temp is not None:
                     try:
-                        ceiling_temp = float(c_temp)
+                        ceiling_temp = to_celsius(float(c_temp), None, self.hass)
                     except (ValueError, TypeError):
                         pass
 
@@ -566,10 +573,11 @@ class SplitZoneManager:
                     blocking=False,
                 )
                 if desired_target is not None:
+                    out_target = round(from_celsius(desired_target, self.hass), 1)
                     await self.hass.services.async_call(
                         "climate",
                         "set_temperature",
-                        {ATTR_ENTITY_ID: split_entity, ATTR_TEMPERATURE: desired_target},
+                        {ATTR_ENTITY_ID: split_entity, ATTR_TEMPERATURE: out_target},
                         blocking=False,
                     )
             self._last_split_commands[climate_id] = {

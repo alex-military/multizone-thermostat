@@ -29,6 +29,7 @@ from ..const import (
     HVAC_MODE_OFF,
     KEY_FROST_FLOW_TEMP,
     to_celsius,
+    from_celsius,
     KEY_HP_MIN_CYCLE_ON,
     KEY_HP_MIN_CYCLE_OFF,
     DEFAULT_HP_MIN_CYCLE_ON,
@@ -165,7 +166,11 @@ class CentralHeatPumpBackend(BoilerBackend):
         domain = self.hp_entity.split(".")[0] if "." in (self.hp_entity or "") else "number"
         target_domain = domain if domain in ("number", "input_number") else "number"
         if wanted_on:
-            val = target_temp
+            num_unit = st.attributes.get("unit_of_measurement") if (st and getattr(st, "attributes", None)) else None
+            if num_unit is not None and str(num_unit).strip().lower() in ("°f", "f", "fahrenheit"):
+                val = round(from_celsius(target_temp, unit=num_unit), 1)
+            else:
+                val = target_temp
         else:
             val = 0.0
             if st and getattr(st, "attributes", None):
@@ -202,12 +207,13 @@ class CentralHeatPumpBackend(BoilerBackend):
 
         if is_water_heater:
             if wanted_on:
+                out_target = round(from_celsius(target_temp, self.hass), 1)
                 current_target = st.attributes.get("temperature") if (st and getattr(st, "attributes", None)) else None
-                if current_target != target_temp:
+                if current_target != out_target:
                     await self.hass.services.async_call(
                         "water_heater",
                         "set_temperature",
-                        {"entity_id": self.hp_entity, "temperature": target_temp},
+                        {"entity_id": self.hp_entity, "temperature": out_target},
                         blocking=False,
                     )
                 operation_modes = st.attributes.get("operation_list", []) if (st and getattr(st, "attributes", None)) else []
@@ -243,7 +249,7 @@ class CentralHeatPumpBackend(BoilerBackend):
                             blocking=False,
                         )
                 else:
-                    min_t = self.min_temp
+                    min_t = round(from_celsius(self.min_temp, self.hass), 1)
                     if st and getattr(st, "attributes", None) and st.attributes.get("min_temp") is not None:
                         try:
                             min_t = float(st.attributes["min_temp"])
@@ -261,12 +267,13 @@ class CentralHeatPumpBackend(BoilerBackend):
 
         # Climate domain
         if wanted_on:
+            out_target = round(from_celsius(target_temp, self.hass), 1)
             current_target = st.attributes.get("temperature") if (st and getattr(st, "attributes", None)) else None
-            if current_target != target_temp:
+            if current_target != out_target:
                 await self.hass.services.async_call(
                     "climate",
                     "set_temperature",
-                    {"entity_id": self.hp_entity, "temperature": target_temp},
+                    {"entity_id": self.hp_entity, "temperature": out_target},
                     blocking=False,
                 )
         desired_hvac = (
@@ -297,7 +304,9 @@ class CentralHeatPumpBackend(BoilerBackend):
             raw_t = w_state.state
         if isinstance(raw_t, (int, float, str)):
             try:
-                return float(raw_t)
+                attrs = getattr(w_state, "attributes", None) or {}
+                w_unit = (attrs.get("temperature_unit") or attrs.get("unit_of_measurement")) if hasattr(attrs, "get") else None
+                return to_celsius(float(raw_t), w_unit, self.hass)
             except (ValueError, TypeError):
                 return None
         return None
@@ -476,7 +485,9 @@ class CentralHeatPumpBackend(BoilerBackend):
                     rh = w_st.attributes.get("humidity")
                     temp = w_st.attributes.get("temperature")
                     if isinstance(rh, (int, float)) and isinstance(temp, (int, float)) and float(rh) > 10.0:
-                        dew_point = self._compute_dew_point(float(temp), float(rh))
+                        w_unit = w_st.attributes.get("temperature_unit") or w_st.attributes.get("unit_of_measurement")
+                        temp_c = to_celsius(float(temp), w_unit, self.hass)
+                        dew_point = self._compute_dew_point(temp_c, float(rh))
                         if dew_point is not None:
                             safe_floor = max(safe_floor, round(dew_point + 2.0, 1))
 
