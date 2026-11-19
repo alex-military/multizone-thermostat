@@ -53,6 +53,7 @@ class ZoneController:
             self._thermal_models[climate_id] = ThermalObserver(climate_id)
 
         self._was_dhw_active: bool = False
+        self._smart_stop_bypass: set[str] = set()
 
     @property
     def pids(self) -> dict[str, MultizonePID]:
@@ -325,11 +326,13 @@ class ZoneController:
             else:
                 # Smart PID Mode
                 pid_ctrl = self._pids[entity_id]
-                pid_target = effective_target
-                # Avoid Smart Stop deadlock when starting/resuming (e.g. post-DHW) with zero integral
-                # while room temperature is still below the actual target setpoint.
-                if current_temp < target_temp and pid_target <= current_temp and pid_ctrl._pid.integral <= 0.0:
-                    pid_target = target_temp
+                if current_temp >= target_temp or effective_target > current_temp:
+                    self._smart_stop_bypass.discard(entity_id)
+                elif pid_ctrl._pid.integral <= 0.0:
+                    # Latch Smart Stop bypass when starting/resuming (e.g. post-DHW) with zero integral
+                    # while still below target, preventing 10s chattering as integral turns positive.
+                    self._smart_stop_bypass.add(entity_id)
+                pid_target = target_temp if entity_id in self._smart_stop_bypass else effective_target
                 demand = pid_ctrl.calc(current_temp, pid_target)
 
                 # Apply Weather Compensation (Feed Forward)
@@ -387,6 +390,7 @@ class ZoneController:
                         except (ValueError, TypeError):
                             pass
         else:
+            self._smart_stop_bypass.discard(entity_id)
             demand = 0.0
 
         self.coordinator.demand_aggregator.set_zone_demand(entity_id, demand)
