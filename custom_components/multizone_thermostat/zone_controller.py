@@ -69,6 +69,7 @@ class ZoneController:
         self._pids = self._pids_heat
         self._autotuners = self._autotuners_heat
         self._was_dhw_active: bool = False
+        self._smart_stop_bypass: set[str] = set()
 
     @property
     def pids(self) -> dict[str, MultizonePID]:
@@ -347,6 +348,7 @@ class ZoneController:
         demand = 0.0
 
         if zone_mode == ZONE_MODE_BYPASS or hvac_mode not in (HVAC_MODE_HEAT, HVAC_MODE_COOL):
+            self._smart_stop_bypass.discard(entity_id)
             demand = 0.0
         elif hvac_mode == HVAC_MODE_HEAT:
             is_faulty = (
@@ -430,11 +432,13 @@ class ZoneController:
             else:
                 # Smart PID Mode
                 pid_ctrl = self._pids_heat[entity_id]
-                pid_target = effective_target
-                # Avoid Smart Stop deadlock when starting/resuming (e.g. post-DHW) with zero integral
-                # while room temperature is still below the actual target setpoint.
-                if current_temp < target and pid_target <= current_temp and pid_ctrl._pid.integral <= 0.0:
-                    pid_target = target
+                if current_temp >= target or effective_target > current_temp:
+                    self._smart_stop_bypass.discard(entity_id)
+                elif pid_ctrl._pid.integral <= 0.0:
+                    # Latch Smart Stop bypass when starting/resuming (e.g. post-DHW) with zero integral
+                    # while still below target, preventing 10s chattering as integral turns positive.
+                    self._smart_stop_bypass.add(entity_id)
+                pid_target = target if entity_id in self._smart_stop_bypass else effective_target
                 demand = pid_ctrl.calc(current_temp, pid_target)
 
                 # Apply Weather Compensation (Feed Forward) ONLY for non-modulating plants (Relays)

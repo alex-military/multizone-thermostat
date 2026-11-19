@@ -9441,11 +9441,32 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
       });
     });
 
+    const stepZoneTemp = (cid, direction, fallbackCur) => {
+      const cState = this._hass && this._hass.states ? this._hass.states[cid] : null;
+      const attrs = cState && cState.attributes ? cState.attributes : {};
+      const isF = getTempUnit(this._hass) === '°F';
+      const step = typeof attrs.target_temp_step === 'number' && !isNaN(attrs.target_temp_step)
+        ? attrs.target_temp_step
+        : (isF ? 1.0 : 0.5);
+      const minTemp = typeof attrs.min_temp === 'number' && !isNaN(attrs.min_temp)
+        ? attrs.min_temp
+        : (isF ? 41.0 : 5.0);
+      const maxTemp = typeof attrs.max_temp === 'number' && !isNaN(attrs.max_temp)
+        ? attrs.max_temp
+        : (isF ? 95.0 : 35.0);
+      const cur = typeof attrs.temperature === 'number' && !isNaN(attrs.temperature)
+        ? attrs.temperature
+        : fallbackCur;
+      const decimals = (step.toString().split('.')[1] || '').length;
+      const next = parseFloat((Math.round((cur + direction * step) / step) * step).toFixed(decimals));
+      this._setZoneTemp(cid, Math.min(maxTemp, Math.max(minTemp, next)));
+    };
+
     container.querySelectorAll('.btn-temp-down').forEach(btn => {
       btn.addEventListener('click', () => {
         const cid = btn.getAttribute('data-zone');
         const cur = parseFloat(btn.getAttribute('data-target')) || 20.0;
-        this._setZoneTemp(cid, Math.max(5.0, cur - 0.5));
+        stepZoneTemp(cid, -1, cur);
       });
     });
 
@@ -9453,7 +9474,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
       btn.addEventListener('click', () => {
         const cid = btn.getAttribute('data-zone');
         const cur = parseFloat(btn.getAttribute('data-target')) || 20.0;
-        this._setZoneTemp(cid, Math.min(35.0, cur + 0.5));
+        stepZoneTemp(cid, 1, cur);
       });
     });
 

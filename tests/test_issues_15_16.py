@@ -215,3 +215,45 @@ async def test_issue_16_hysteresis_resumes_at_target_minus_tolerance_despite_ine
     st = SimpleNamespace(state="heat", attributes={"current_temperature": 19.2, "temperature": 19.5})
     demand = await zc.async_update_zone(cid, st)
     assert demand == 100.0
+
+
+@pytest.mark.asyncio
+async def test_issue_14_smart_stop_bypass_no_chattering():
+    """Issue #14: Smart Stop bypass latches until target is reached, preventing 10s chattering."""
+    hass = MagicMock()
+    coord = MagicMock()
+    coord.zones = [{"name": "Cucina"}]
+    coord.demand_aggregator = MagicMock()
+    coord.demand_aggregator.set_zone_demand = MagicMock()
+    coord.get_zone_mode = MagicMock(return_value="primary")
+    coord.plant_diagnostics = MagicMock()
+    coord.plant_diagnostics.has_critical_sensor_fault = MagicMock(return_value=False)
+    coord.weather_sensor_id = None
+    coord.is_dhw_active = False
+
+    zc = ZoneController(hass, coord)
+    cid = make_zone_entity_id("Cucina")
+    tuner = zc.get_autotuner(cid)
+    tuner.state = tuner.STATE_COMPLETED
+    pid = zc.get_pid(cid)
+    pid.set_pid_param(kp=100.0, ki=0.05, kd=0.0)
+    zc.get_thermal_model(cid).thermal_inertia = 0.3  # effective_target = 21.0 - 0.3 = 20.7
+
+    # Room at 20.8 (< 21.0 target, > 20.7 effective_target) with integral = 0.0
+    st_20_8 = SimpleNamespace(state="heat", attributes={"current_temperature": 20.8, "temperature": 21.0})
+    st_21_2 = SimpleNamespace(state="heat", attributes={"current_temperature": 21.2, "temperature": 21.0})
+
+    demands = []
+    for i in range(6):
+        with patch("time.monotonic", return_value=2000.0 + i * 10.0):
+            demands.append(await zc.async_update_zone(cid, st_20_8))
+
+    # Demand must stay positive and monotonic (no 0% <-> ~20-38% chattering)
+    assert all(d > 0.0 for d in demands)
+    assert cid in zc._smart_stop_bypass
+
+    # Reaching/exceeding target clears the latch
+    with patch("time.monotonic", return_value=2060.0):
+        d_over = await zc.async_update_zone(cid, st_21_2)
+    assert d_over == 0.0
+    assert cid not in zc._smart_stop_bypass
