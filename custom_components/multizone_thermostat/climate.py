@@ -1,6 +1,7 @@
 """Climate platform for Multizone Thermostat: Hybrid Master Virtual Thermostats."""
 from __future__ import annotations
 
+from collections.abc import Mapping
 import inspect
 
 import asyncio
@@ -92,6 +93,61 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
+def _collect_tuner_attrs(tuner: Any) -> dict[str, Any]:
+    """Extract autotuner/PID diagnostic attributes safely from a tuner instance."""
+    out: dict[str, Any] = {}
+    if tuner is None:
+        return out
+    try:
+        kp = tuner.kp
+    except AttributeError:
+        return out
+    if not isinstance(kp, (int, float)):
+        return out
+
+    out["pid_kp"] = round(float(kp), 2)
+    out["pid_ki"] = round(float(tuner.ki), 4)
+    out["pid_kd"] = round(float(tuner.kd), 2)
+    try:
+        l_kp, l_ki, l_kd = tuner._learned_kp, tuner._learned_ki, tuner._learned_kd
+    except AttributeError:
+        l_kp, l_ki, l_kd = kp, tuner.ki, tuner.kd
+    if isinstance(l_kp, (int, float)):
+        out["learned_kp"] = round(float(l_kp), 2)
+        out["learned_ki"] = round(float(l_ki), 4)
+        out["learned_kd"] = round(float(l_kd), 2)
+    try:
+        if isinstance(tuner.state, str):
+            out["autotune_state"] = tuner.state
+        if isinstance(tuner.completed_cycles, list):
+            out["autotune_cycles"] = len(tuner.completed_cycles)
+        if isinstance(tuner.required_cycles, int):
+            out["autotune_required_cycles"] = tuner.required_cycles
+        if isinstance(tuner.manual_overrides, dict):
+            out["pid_manual_overrides"] = sorted(tuner.manual_overrides.keys())
+        if isinstance(tuner.weekly_candidates, list):
+            out["weekly_candidates_count"] = len(tuner.weekly_candidates)
+    except AttributeError:
+        pass
+    try:
+        out["autotune_can_restore"] = bool(tuner.can_restore_pre_reset)
+    except AttributeError:
+        out["autotune_can_restore"] = False
+    try:
+        snap = tuner._pre_reset_snapshot
+    except AttributeError:
+        snap = None
+    if isinstance(snap, dict):
+        learned = snap.get("learned_pid") or {}
+        if learned.get("Kp"):
+            out["autotune_backup_pid"] = {
+                "Kp": round(float(learned.get("Kp", 0.0)), 1),
+                "Ki": round(float(learned.get("Ki", 0.0)), 4),
+                "Kd": round(float(learned.get("Kd", 0.0)), 1),
+            }
+    return out
+
+
 class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
     """A Hybrid Master Virtual Thermostat that controls sub-slave TRVs and Switches."""
 
@@ -99,22 +155,23 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
     @property
     def can_cool(self) -> bool:
         """Return True if this zone has cooling capabilities."""
-        if hasattr(self, "_coordinator") and hasattr(self._coordinator, "can_zone_cool"):
+        try:
             return bool(self._coordinator.can_zone_cool(self.entity_id))
-        return False
+        except AttributeError:
+            return False
 
     @property
     def hvac_modes(self) -> list[HVACMode]:
         """Return supported HVAC modes based on zone split configuration and central plant."""
-        zone_conf = getattr(self, "_zone_conf", None) or getattr(self, "_zone_data", {})
+        zone_conf = self._zone_conf or self._zone_data
         if zone_conf:
             split_entity = zone_conf.get(CONF_ZONE_SPLIT_CLIMATE)
             if split_entity and str(split_entity).lower() != "none":
                 role = zone_conf.get(CONF_ZONE_SPLIT_ROLE, DEFAULT_SPLIT_ROLE)
                 if role == SPLIT_ROLE_COOLING_ONLY:
-                    climates = zone_conf.get("climates") or zone_conf.get(CONF_ZONE_CLIMATES) or getattr(self, "_climates", None)
-                    switches = zone_conf.get("switches") or zone_conf.get(CONF_ZONE_SWITCHES) or getattr(self, "_switches", None)
-                    valves = zone_conf.get("valves") or zone_conf.get(CONF_ZONE_VALVES) or getattr(self, "_valves", None)
+                    climates = zone_conf.get("climates") or zone_conf.get(CONF_ZONE_CLIMATES) or self._climates
+                    switches = zone_conf.get("switches") or zone_conf.get(CONF_ZONE_SWITCHES) or self._switches
+                    valves = zone_conf.get("valves") or zone_conf.get(CONF_ZONE_VALVES) or self._valves
                     has_hydronic = bool(climates or switches or valves)
                     central_heat_enabled = (
                         bool(getattr(self._coordinator, "enable_gas_heater", True))
@@ -203,12 +260,17 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
     def hvac_action(self) -> HVACAction:
         if self._hvac_mode == HVACMode.OFF:
             return HVACAction.OFF
-            
+
+        coord = self._coordinator
+        split_mgr = getattr(coord, "split_manager", None)
+        try:
+            master_on = coord.get_master_state()
+        except AttributeError:
+            master_on = True
+
         if self._hvac_mode == HVACMode.COOL:
-            master_on = self._coordinator.get_master_state() if hasattr(self._coordinator, "get_master_state") else True
             if not master_on or not self.can_cool:
                 return HVACAction.IDLE
-            split_mgr = getattr(self._coordinator, "split_manager", None)
             if split_mgr and (split_mgr.is_split_active(self.entity_id) or split_mgr.is_local_manual_on(self.entity_id)):
                 return HVACAction.COOLING
             if self._current_temperature is not None and self.target_temperature is not None:
@@ -217,20 +279,15 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             return HVACAction.IDLE
 
         # Heating mode
-        split_mgr = getattr(self._coordinator, "split_manager", None)
-        split_is_active = (
-            (split_mgr.is_split_active(self.entity_id) or split_mgr.is_local_manual_on(self.entity_id))
-            if (split_mgr and hasattr(split_mgr, "is_split_active"))
-            else False
-        )
-        if split_is_active:
-            return HVACAction.HEATING
+        if split_mgr is not None:
+            try:
+                if split_mgr.is_split_active(self.entity_id) or split_mgr.is_local_manual_on(self.entity_id):
+                    return HVACAction.HEATING
+            except AttributeError:
+                pass
 
-        master_on = self._coordinator.get_master_state() if hasattr(self._coordinator, "get_master_state") else True
-        if master_on:
-            demand = self._coordinator.get_zone_demand(self.entity_id)
-            if demand > 0:
-                return HVACAction.HEATING
+        if master_on and coord.get_zone_demand(self.entity_id) > 0:
+            return HVACAction.HEATING
 
         return HVACAction.IDLE
 
@@ -240,12 +297,14 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
 
     @property
     def target_temperature(self) -> float | None:
-        if hasattr(self._coordinator, "calendar_manager"):
-            override_temp = self._coordinator.calendar_manager.temp_overrides.get(self.entity_id)
+        coord = self._coordinator
+        cal_mgr = getattr(coord, "calendar_manager", None)
+        if cal_mgr is not None:
+            override_temp = cal_mgr.temp_overrides.get(self.entity_id)
             if override_temp is not None and isinstance(override_temp, (int, float)):
                 return float(override_temp)
-        sched_manager = getattr(self._coordinator, "schedule_manager", None)
-        if sched_manager:
+        sched_manager = getattr(coord, "schedule_manager", None)
+        if sched_manager is not None:
             is_enabled = getattr(sched_manager, "scheduler_enabled", False) is True
             has_smart_return = isinstance(getattr(sched_manager, "smart_return", None), dict)
             if is_enabled or has_smart_return:
@@ -256,6 +315,7 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
+        coord = self._coordinator
         attrs = {
             "temperature_sensor": self._temp_sensor,
             "climates": self._climates,
@@ -265,93 +325,68 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             "calibrations": self._calibrations,
             "hybrid_zone": True,
             "local_pwm_active": self._sync_manager.local_pwm_state,
-            "boiler_entity_id": self._coordinator.boiler_switch,
-            "zone_mode": self._coordinator.get_zone_mode(self.entity_id),
-            "zone_weight": self._coordinator.demand_aggregator.get_zone_weight(self.entity_id),
+            "boiler_entity_id": coord.boiler_switch,
+            "zone_mode": coord.get_zone_mode(self.entity_id),
+            "zone_weight": coord.demand_aggregator.get_zone_weight(self.entity_id),
             "authoritative_climate_sync": self._authoritative_sync,
-            "allow_passive_heat": self._coordinator.zone_manager.is_passive_heat_allowed(self.entity_id),
+            "allow_passive_heat": coord.zone_manager.is_passive_heat_allowed(self.entity_id),
             "safety_fallback_active": self._safety_fallback_active,
             "sensor_timeout_min": self._sensor_timeout_min,
             "can_cool": self.can_cool,
             "emitter_type": self._emitter_type,
-            "master_hvac_mode": getattr(self._coordinator, "master_hvac_mode", "heat"),
+            "master_hvac_mode": getattr(coord, "master_hvac_mode", "heat"),
         }
-        if hasattr(self._coordinator, "plant_diagnostics"):
-            bat = self._coordinator.plant_diagnostics.get_zone_battery_level(self.entity_id)
+        diag = getattr(coord, "plant_diagnostics", None)
+        if diag is not None:
+            bat = diag.get_zone_battery_level(self.entity_id)
             if bat is not None:
                 attrs["battery_level"] = bat
-        sched_manager = getattr(self._coordinator, "schedule_manager", None)
-        if sched_manager and hasattr(sched_manager, "manual_overrides") and isinstance(getattr(sched_manager, "manual_overrides", None), dict):
-            manual_ovs = sched_manager.manual_overrides
-            attrs["schedule_manual_override"] = self.entity_id in manual_ovs
-            attrs["schedule_override_until"] = manual_ovs.get(self.entity_id, {}).get("until")
-            smart_info = getattr(sched_manager, "smart_start_info", None)
-            if isinstance(smart_info, dict):
-                attrs["smart_start_active"] = self.entity_id in smart_info
-                attrs["smart_start_detail"] = smart_info.get(self.entity_id)
-            if hasattr(sched_manager, "_get_zone_heating_rate"):
-                hr = sched_manager._get_zone_heating_rate(self.entity_id)
-                if isinstance(hr, (int, float)):
-                    attrs["heating_rate"] = hr
+        sched_manager = getattr(coord, "schedule_manager", None)
+        if sched_manager is not None:
+            manual_ovs = getattr(sched_manager, "manual_overrides", None)
+            if isinstance(manual_ovs, dict):
+                attrs["schedule_manual_override"] = self.entity_id in manual_ovs
+                attrs["schedule_override_until"] = manual_ovs.get(self.entity_id, {}).get("until")
+                smart_info = getattr(sched_manager, "smart_start_info", None)
+                if isinstance(smart_info, dict):
+                    attrs["smart_start_active"] = self.entity_id in smart_info
+                    attrs["smart_start_detail"] = smart_info.get(self.entity_id)
+                try:
+                    hr = sched_manager._get_zone_heating_rate(self.entity_id)
+                    if isinstance(hr, (int, float)):
+                        attrs["heating_rate"] = hr
+                except AttributeError:
+                    pass
 
-        if hasattr(self._coordinator, "get_zone_cooling_rate"):
-            attrs["cooling_rate"] = self._coordinator.get_zone_cooling_rate(self.entity_id)
-        elif sched_manager and hasattr(sched_manager, "_get_zone_cooling_rate"):
-            cr = sched_manager._get_zone_cooling_rate(self.entity_id)
-            if isinstance(cr, (int, float)):
-                attrs["cooling_rate"] = cr
+        try:
+            attrs["cooling_rate"] = coord.get_zone_cooling_rate(self.entity_id)
+        except AttributeError:
+            if sched_manager is not None:
+                try:
+                    cr = sched_manager._get_zone_cooling_rate(self.entity_id)
+                    if isinstance(cr, (int, float)):
+                        attrs["cooling_rate"] = cr
+                except AttributeError:
+                    pass
 
         if self._hvac_mode == HVACMode.COOL:
             active_mode = "cool"
         elif self._hvac_mode == HVACMode.HEAT:
             active_mode = "heat"
         else:
-            season = getattr(self._coordinator, "master_hvac_mode", "heat") or "heat"
+            season = attrs["master_hvac_mode"] or "heat"
             active_mode = "cool" if str(season).lower() == "cool" else "heat"
         attrs["pid_active_mode"] = active_mode
-        tuner_getter = getattr(self._coordinator, "get_autotuner", None)
-        cid_lookup = getattr(self, "_canonical_id", None) or self.entity_id
+        tuner_getter = getattr(coord, "get_autotuner", None)
+        cid_lookup = self._canonical_id or self.entity_id
         tuner = None
         if callable(tuner_getter):
             try:
                 tuner = tuner_getter(cid_lookup, mode=active_mode)
             except TypeError:
                 tuner = tuner_getter(cid_lookup)
-        if tuner and isinstance(getattr(tuner, "kp", None), (int, float)):
-            attrs["pid_kp"] = round(float(tuner.kp), 2)
-            attrs["pid_ki"] = round(float(tuner.ki), 4)
-            attrs["pid_kd"] = round(float(tuner.kd), 2)
-            learned_kp = getattr(tuner, "_learned_kp", tuner.kp)
-            learned_ki = getattr(tuner, "_learned_ki", tuner.ki)
-            learned_kd = getattr(tuner, "_learned_kd", tuner.kd)
-            if isinstance(learned_kp, (int, float)):
-                attrs["learned_kp"] = round(float(learned_kp), 2)
-                attrs["learned_ki"] = round(float(learned_ki), 4)
-                attrs["learned_kd"] = round(float(learned_kd), 2)
-            if isinstance(getattr(tuner, "state", None), str):
-                attrs["autotune_state"] = tuner.state
-            if isinstance(getattr(tuner, "completed_cycles", None), list):
-                attrs["autotune_cycles"] = len(tuner.completed_cycles)
-            if isinstance(getattr(tuner, "required_cycles", None), int):
-                attrs["autotune_required_cycles"] = tuner.required_cycles
-            overrides = getattr(tuner, "manual_overrides", None)
-            if isinstance(overrides, dict):
-                attrs["pid_manual_overrides"] = sorted(overrides.keys())
-            weekly = getattr(tuner, "weekly_candidates", None)
-            if isinstance(weekly, list):
-                attrs["weekly_candidates_count"] = len(weekly)
-            can_restore = getattr(tuner, "can_restore_pre_reset", False)
-            attrs["autotune_can_restore"] = bool(can_restore)
-            snap = getattr(tuner, "_pre_reset_snapshot", None)
-            if isinstance(snap, dict):
-                learned = snap.get("learned_pid") or {}
-                if learned.get("Kp"):
-                    attrs["autotune_backup_pid"] = {
-                        "Kp": round(float(learned.get("Kp", 0.0)), 1),
-                        "Ki": round(float(learned.get("Ki", 0.0)), 4),
-                        "Kd": round(float(learned.get("Kd", 0.0)), 1),
-                    }
-        unlock_getter = getattr(self._coordinator, "get_pid_manual_unlock", None)
+        attrs.update(_collect_tuner_attrs(tuner))
+        unlock_getter = getattr(coord, "get_pid_manual_unlock", None)
         if callable(unlock_getter):
             unlock_val = unlock_getter(self._name)
             if isinstance(unlock_val, bool):
@@ -359,30 +394,32 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
 
         split_is_heating = False
         hydronic_suppressed = False
-        if hasattr(self._coordinator, "split_manager") and self._coordinator.split_manager.has_split(self.entity_id):
-            split_info = self._coordinator.split_manager.get_split_info(self.entity_id) or {}
+        split_mgr = getattr(coord, "split_manager", None)
+        if split_mgr is not None and split_mgr.has_split(self.entity_id):
+            split_info = split_mgr.get_split_info(self.entity_id) or {}
             attrs["split_climate_entity"] = split_info.get("split_entity_id")
-            split_is_active = bool(self._coordinator.split_manager.is_split_active(self.entity_id))
+            split_is_active = bool(split_mgr.is_split_active(self.entity_id))
             attrs["split_active"] = split_is_active
-            attrs["split_manual_on"] = bool(self._coordinator.split_manager.is_local_manual_on(self.entity_id))
+            attrs["split_manual_on"] = bool(split_mgr.is_local_manual_on(self.entity_id))
             split_is_heating = (self._hvac_mode == HVACMode.HEAT and split_is_active)
-            split_is_cooling = (self._hvac_mode == HVACMode.COOL and split_is_active)
-            attrs["split_cooling"] = split_is_cooling
-            attrs["split_quick_boost_active"] = bool(self._coordinator.split_manager.is_quick_boost_active(self.entity_id))
-            hydronic_suppressed = bool(self._coordinator.split_manager.should_suppress_hydronic_demand(self.entity_id))
+            attrs["split_cooling"] = (self._hvac_mode == HVACMode.COOL and split_is_active)
+            attrs["split_quick_boost_active"] = bool(split_mgr.is_quick_boost_active(self.entity_id))
+            hydronic_suppressed = bool(split_mgr.should_suppress_hydronic_demand(self.entity_id))
             attrs["split_hydronic_suppressed"] = hydronic_suppressed
 
         # Determine real-time active heating source: gas, electric, dual, or none
-        master_on = bool(self._coordinator.get_master_state()) if hasattr(self._coordinator, "get_master_state") else True
-        split_mgr = getattr(self._coordinator, "split_manager", None)
+        try:
+            master_on = bool(coord.get_master_state())
+        except AttributeError:
+            master_on = True
         is_local_manual = bool(split_mgr.is_local_manual_on(self.entity_id)) if split_mgr else False
 
         is_heating = (self._hvac_mode == HVACMode.HEAT) and (self.hvac_action == HVACAction.HEATING or split_is_heating or is_local_manual)
         if not is_heating:
             attrs["active_heating_source"] = "none"
         else:
-            gas_enabled = getattr(self._coordinator, "enable_gas_heater", True)
-            hp_enabled = getattr(self._coordinator, "enable_heat_pump", False)
+            gas_enabled = getattr(coord, "enable_gas_heater", True)
+            hp_enabled = getattr(coord, "enable_heat_pump", False)
             hydronic_is_heating = master_on and (self.hvac_action == HVACAction.HEATING and not hydronic_suppressed)
             central_is_electric = hp_enabled and not gas_enabled
 
@@ -400,26 +437,38 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         """Set HVAC mode."""
         self._hvac_mode = hvac_mode
-        master_on = self._coordinator.get_master_state() if hasattr(self._coordinator, "get_master_state") else True
-        split_mgr = getattr(self._coordinator, "split_manager", None)
+        coord = self._coordinator
+        try:
+            master_on = coord.get_master_state()
+        except AttributeError:
+            master_on = True
+        split_mgr = getattr(coord, "split_manager", None)
 
         if hvac_mode == HVACMode.OFF:
             self._sync_manager._local_pwm_state = False
-            self._coordinator.set_zone_demand(self.entity_id, 0.0)
-            if split_mgr and hasattr(split_mgr, "set_local_manual_on"):
-                split_mgr.set_local_manual_on(self.entity_id, False)
+            coord.set_zone_demand(self.entity_id, 0.0)
+            if split_mgr is not None:
+                try:
+                    split_mgr.set_local_manual_on(self.entity_id, False)
+                except AttributeError:
+                    pass
         else:
-            if not master_on and split_mgr and hasattr(split_mgr, "has_split") and split_mgr.has_split(self.entity_id):
-                split_mgr.set_local_manual_on(self.entity_id, True)
+            if not master_on and split_mgr is not None:
+                try:
+                    if split_mgr.has_split(self.entity_id):
+                        split_mgr.set_local_manual_on(self.entity_id, True)
+                except AttributeError:
+                    pass
 
         self.async_write_ha_state()
         await self._trigger_trv_sync()
         await self._sync_manager.async_sync_switches()
         await self._sync_manager.async_sync_proportional_valves(self._hvac_mode)
-        if hasattr(self._coordinator, "zone_controller") and self._coordinator.zone_controller:
-            st = self.hass.states.get(self.entity_id) if hasattr(self, "hass") and self.hass and hasattr(self.hass, "states") else None
+        zc = getattr(coord, "zone_controller", None)
+        if zc is not None and self.hass and self.hass.states:
+            st = self.hass.states.get(self.entity_id)
             if st is not None:
-                coro = self._coordinator.zone_controller.async_update_zone(self.entity_id, st)
+                coro = zc.async_update_zone(self.entity_id, st)
                 if inspect.iscoroutine(coro):
                     await coro
 
@@ -429,44 +478,46 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         if temperature is None:
             return
 
+        coord = self._coordinator
         self._target_temperature = temperature
-        if (
-            hasattr(self._coordinator, "calendar_manager")
-            and self.entity_id in self._coordinator.calendar_manager.temp_overrides
-        ):
-            self._coordinator.calendar_manager.temp_overrides[self.entity_id] = temperature
+        cal_mgr = getattr(coord, "calendar_manager", None)
+        if cal_mgr is not None and self.entity_id in cal_mgr.temp_overrides:
+            cal_mgr.temp_overrides[self.entity_id] = temperature
 
-        sched_manager = getattr(self._coordinator, "schedule_manager", None)
+        sched_manager = getattr(coord, "schedule_manager", None)
         sched_enabled = bool(sched_manager and getattr(sched_manager, "scheduler_enabled", False) is True)
         if sched_enabled:
             sched_manager.record_manual_override(self.entity_id, temperature)
-            if hasattr(self.hass, "async_create_task"):
+            try:
                 self.hass.async_create_task(sched_manager.async_save_to_storage())
+            except AttributeError:
+                pass
 
         has_temp_slot_override = (
             sched_enabled
             and isinstance(getattr(sched_manager, "manual_overrides", None), dict)
             and self.entity_id in sched_manager.manual_overrides
         )
-        current_preset = self._coordinator.get_global_preset()
+        current_preset = coord.get_global_preset()
         if current_preset and current_preset != "none":
             target_preset = "manual" if has_temp_slot_override else current_preset
-            mode_val = str(self._hvac_mode.value if hasattr(self._hvac_mode, "value") else self._hvac_mode)
+            mode_val = str(self._hvac_mode.value if isinstance(self._hvac_mode, HVACMode) else self._hvac_mode)
             if mode_val == "cool":
-                self._coordinator.zone_manager.update_preset_temperature(
+                coord.zone_manager.update_preset_temperature(
                     target_preset, self.entity_id, temperature, hvac_mode="cool"
                 )
             else:
-                self._coordinator.zone_manager.update_preset_temperature(
+                coord.zone_manager.update_preset_temperature(
                     target_preset, self.entity_id, temperature
                 )
 
         self.async_write_ha_state()
         await self._trigger_trv_sync()
-        if hasattr(self._coordinator, "zone_controller") and self._coordinator.zone_controller:
-            st = self.hass.states.get(self.entity_id) if hasattr(self, "hass") and self.hass and hasattr(self.hass, "states") else None
+        zc = getattr(coord, "zone_controller", None)
+        if zc is not None and self.hass and self.hass.states:
+            st = self.hass.states.get(self.entity_id)
             if st is not None:
-                coro = self._coordinator.zone_controller.async_update_zone(self.entity_id, st)
+                coro = zc.async_update_zone(self.entity_id, st)
                 if inspect.iscoroutine(coro):
                     await coro
 
@@ -478,7 +529,7 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             self.entity_id,
             self.async_write_ha_state,
             self,
-            canonical_id=getattr(self, "_canonical_id", None) or self.entity_id,
+            canonical_id=self._canonical_id or self.entity_id,
         )
 
         self._hvac_mode, self._target_temperature = await ZoneStateRestorer.async_restore_state(
@@ -543,8 +594,8 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             return
 
         try:
-            attrs = getattr(new_state, "attributes", None) or {}
-            unit = attrs.get("unit_of_measurement") if hasattr(attrs, "get") else None
+            attrs = new_state.attributes or {}
+            unit = attrs.get("unit_of_measurement") if isinstance(attrs, Mapping) else None
             self._current_temperature = to_celsius(float(new_state.state), unit, self.hass)
             if self._safety_fallback_active:
                 _LOGGER.info("Zone %s: External temp sensor recovered. Exiting safety fallback.", self._name)
@@ -574,13 +625,16 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             if state and state.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN):
                 try:
                     now = time.time()
-                    reported = state.last_reported if hasattr(state, "last_reported") else getattr(state, "last_updated", None)
-                    ts = reported.timestamp() if (reported and hasattr(reported, "timestamp")) else None
+                    reported = getattr(state, "last_reported", None) or getattr(state, "last_updated", None)
+                    try:
+                        ts = reported.timestamp() if reported is not None else None
+                    except AttributeError:
+                        ts = None
                     elapsed = (now - ts) if isinstance(ts, (int, float)) else 0.0
                     
                     if self._sensor_timeout_min == 0 or elapsed <= (self._sensor_timeout_min * 60):
-                        attrs = getattr(state, "attributes", None) or {}
-                        unit = attrs.get("unit_of_measurement") if hasattr(attrs, "get") else None
+                        attrs = state.attributes or {}
+                        unit = attrs.get("unit_of_measurement") if isinstance(attrs, Mapping) else None
                         self._current_temperature = to_celsius(float(state.state), unit, self.hass)
                         ext_temp_valid = True
                         if self._safety_fallback_active:
@@ -642,36 +696,34 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             needs_sync = True
             
         if delta_temp is not None and self._target_temperature is not None and self._hvac_mode != HVACMode.OFF:
-            sched_manager = getattr(self._coordinator, "schedule_manager", None)
+            coord = self._coordinator
+            cal_mgr = getattr(coord, "calendar_manager", None)
+            sched_manager = getattr(coord, "schedule_manager", None)
             sched_enabled = bool(sched_manager and getattr(sched_manager, "scheduler_enabled", False) is True)
             if sched_enabled:
                 base_temp = self.target_temperature if self.target_temperature is not None else self._target_temperature
                 new_temp = max(self._attr_min_temp, min(self._attr_max_temp, base_temp + delta_temp))
                 self._target_temperature = new_temp
-                if (
-                    hasattr(self._coordinator, "calendar_manager")
-                    and self.entity_id in self._coordinator.calendar_manager.temp_overrides
-                ):
-                    self._coordinator.calendar_manager.temp_overrides[self.entity_id] = self._target_temperature
+                if cal_mgr is not None and self.entity_id in cal_mgr.temp_overrides:
+                    cal_mgr.temp_overrides[self.entity_id] = self._target_temperature
                 sched_manager.record_manual_override(self.entity_id, new_temp)
-                if hasattr(self.hass, "async_create_task"):
+                try:
                     self.hass.async_create_task(sched_manager.async_save_to_storage())
+                except AttributeError:
+                    pass
             else:
                 self._target_temperature = max(self._attr_min_temp, min(self._attr_max_temp, self._target_temperature + delta_temp))
-                if (
-                    hasattr(self._coordinator, "calendar_manager")
-                    and self.entity_id in self._coordinator.calendar_manager.temp_overrides
-                ):
-                    self._coordinator.calendar_manager.temp_overrides[self.entity_id] = self._target_temperature
-            current_preset = self._coordinator.get_global_preset()
+                if cal_mgr is not None and self.entity_id in cal_mgr.temp_overrides:
+                    cal_mgr.temp_overrides[self.entity_id] = self._target_temperature
+            current_preset = coord.get_global_preset()
             if current_preset and current_preset != "none":
-                mode_val = str(self._hvac_mode.value if hasattr(self._hvac_mode, "value") else self._hvac_mode)
+                mode_val = str(self._hvac_mode.value if isinstance(self._hvac_mode, HVACMode) else self._hvac_mode)
                 if mode_val == "cool":
-                    self._coordinator.zone_manager.update_preset_temperature(
+                    coord.zone_manager.update_preset_temperature(
                         current_preset, self.entity_id, self._target_temperature, hvac_mode="cool"
                     )
                 else:
-                    self._coordinator.zone_manager.update_preset_temperature(
+                    coord.zone_manager.update_preset_temperature(
                         current_preset, self.entity_id, self._target_temperature
                     )
             needs_sync = True

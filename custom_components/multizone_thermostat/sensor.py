@@ -149,25 +149,25 @@ class AutotuneSensor(SensorEntity):
         tuner_cool = self._coordinator.zone_controller.get_autotuner(self._climate_entity_id, mode="cool")
 
         active_tuner = tuner_cool if season_mode == "cool" else tuner_heat
-        overrides = getattr(active_tuner, "manual_overrides", {}) or {} if active_tuner else {}
+        overrides = (active_tuner.manual_overrides or {}) if active_tuner else {}
         completed = bool(active_tuner and active_tuner.state == active_tuner.STATE_COMPLETED)
         kp_active = round(active_tuner.kp, 2) if active_tuner and (completed or "Kp" in overrides) else 0.0
         ki_active = round(active_tuner.ki, 4) if active_tuner and (completed or "Ki" in overrides) else 0.0
         kd_active = round(active_tuner.kd, 2) if active_tuner and (completed or "Kd" in overrides) else 0.0
 
-        heat_overrides = getattr(tuner_heat, "manual_overrides", {}) or {} if tuner_heat else {}
-        cool_overrides = getattr(tuner_cool, "manual_overrides", {}) or {} if tuner_cool else {}
+        heat_overrides = (tuner_heat.manual_overrides or {}) if tuner_heat else {}
+        cool_overrides = (tuner_cool.manual_overrides or {}) if tuner_cool else {}
 
         attrs = {
             "active_season": season_mode,
             "Kp": kp_active,
             "Ki": ki_active,
             "Kd": kd_active,
-            "learned_kp": round(getattr(active_tuner, "_learned_kp", 0.0), 2) if active_tuner else 0.0,
-            "learned_ki": round(getattr(active_tuner, "_learned_ki", 0.0), 4) if active_tuner else 0.0,
-            "learned_kd": round(getattr(active_tuner, "_learned_kd", 0.0), 2) if active_tuner else 0.0,
+            "learned_kp": round(active_tuner._learned_kp, 2) if active_tuner else 0.0,
+            "learned_ki": round(active_tuner._learned_ki, 4) if active_tuner else 0.0,
+            "learned_kd": round(active_tuner._learned_kd, 2) if active_tuner else 0.0,
             "manual_overrides": sorted(overrides.keys()),
-            "weekly_candidates_count": len(getattr(active_tuner, "weekly_candidates", [])) if active_tuner else 0,
+            "weekly_candidates_count": len(active_tuner.weekly_candidates) if active_tuner else 0,
             "heat_status": tuner_heat.state if tuner_heat else "unknown",
             "heat_cycles": f"{len(tuner_heat.completed_cycles)}/{tuner_heat.required_cycles}" if tuner_heat else "0/3",
             "heat_kp": round(tuner_heat.kp, 2) if tuner_heat and (tuner_heat.state == tuner_heat.STATE_COMPLETED or "Kp" in heat_overrides) else 0.0,
@@ -379,17 +379,22 @@ class MultizoneMasterDemandSensor(SensorEntity):
         if agg is not None:
             return agg
         master_on = bool(self._coordinator.get_master_state())
-        frost_emergency = any(
-            self._coordinator.is_zone_in_frost_emergency(cid)
-            for cid in list(getattr(self._coordinator, "_climate_callbacks", {}).keys())
-        ) if hasattr(self._coordinator, "is_zone_in_frost_emergency") else False
-        if (master_on or frost_emergency) and hasattr(self._coordinator, "demand_aggregator"):
-            calc = getattr(self._coordinator.demand_aggregator, "calculate", None)
-            if callable(calc):
-                return calc(
+        try:
+            frost_emergency = any(
+                self._coordinator.is_zone_in_frost_emergency(cid)
+                for cid in list(getattr(self._coordinator, "_climate_callbacks", {}).keys())
+            )
+        except AttributeError:
+            frost_emergency = False
+        dem_agg = getattr(self._coordinator, "demand_aggregator", None)
+        if (master_on or frost_emergency) and dem_agg is not None:
+            try:
+                return dem_agg.calculate(
                     is_dhw_active=bool(getattr(self._coordinator, "is_dhw_active", False)),
                     frost_emergency=frost_emergency,
                 )
+            except AttributeError:
+                pass
         return None
 
     @property
@@ -433,12 +438,14 @@ class MultizoneMasterDemandSensor(SensorEntity):
             async_track_time_interval(self.hass, self._update_state, timedelta(seconds=15))
         )
         agg = getattr(self._coordinator, "demand_aggregator", None)
-        if agg and hasattr(agg, "register_on_demand_changed"):
-            agg.register_on_demand_changed(self._on_demand_changed)
-            if hasattr(agg, "unregister_on_demand_changed"):
+        if agg is not None:
+            try:
+                agg.register_on_demand_changed(self._on_demand_changed)
                 self.async_on_remove(
                     lambda: agg.unregister_on_demand_changed(self._on_demand_changed)
                 )
+            except AttributeError:
+                pass
 
 
 class MultizoneBoilerCyclesSensor(SensorEntity):

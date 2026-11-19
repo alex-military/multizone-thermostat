@@ -71,7 +71,7 @@ class CalendarManager:
                         coro = ent._trigger_trv_sync()
                         if hasattr(coro, "__await__"):
                             self.hass.async_create_task(coro)
-                    except Exception:
+                    except (ValueError, TypeError, AttributeError, RuntimeError):
                         pass
         
     async def async_check_global_calendar(self, now: datetime) -> None:

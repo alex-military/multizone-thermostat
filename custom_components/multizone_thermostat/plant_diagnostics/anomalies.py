@@ -148,7 +148,7 @@ def find_suggested_dhw_sensor(hass: HomeAssistant, ot_entity: str | None = None)
                         for c_ent in er.async_entries_for_config_entry(ent_reg, entry.config_entry_id):
                             if c_ent not in candidates:
                                 candidates.append(c_ent)
-                    except Exception:
+                    except (ValueError, TypeError, KeyError, AttributeError):
                         pass
 
                 for ent in candidates:
@@ -280,7 +280,7 @@ def get_opentherm_diagnostics(coordinator: Any, hass: HomeAssistant) -> dict[str
                         for c_ent in er.async_entries_for_config_entry(ent_reg, entry.config_entry_id):
                             if c_ent not in candidates:
                                 candidates.append(c_ent)
-                    except Exception:
+                    except (ValueError, TypeError, KeyError, AttributeError):
                         pass
 
                 for ent in candidates:

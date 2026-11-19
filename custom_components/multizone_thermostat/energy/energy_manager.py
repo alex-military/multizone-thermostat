@@ -484,7 +484,7 @@ class EnergyManager:
         for unsub in self._unsub_listeners:
             try:
                 unsub()
-            except Exception:
+            except (ValueError, TypeError, AttributeError, RuntimeError):
                 pass
         self._unsub_listeners.clear()
 

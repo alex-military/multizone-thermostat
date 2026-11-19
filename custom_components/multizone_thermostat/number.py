@@ -535,7 +535,7 @@ class MultizoneZonePIDNumber(NumberEntity):
                     )
                     if inspect.isawaitable(res):
                         await res
-                except Exception:
+                except (ValueError, TypeError, AttributeError, RuntimeError):
                     pass
             self.async_write_ha_state()
             return

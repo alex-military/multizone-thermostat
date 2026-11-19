@@ -1,6 +1,7 @@
 """Zone Controller for Multizone Thermostat: orchestrates PID, autotuning, thermal model, and weather compensation."""
 from __future__ import annotations
 
+from collections.abc import Mapping
 import logging
 import inspect
 from typing import Any
@@ -134,7 +135,7 @@ class ZoneController:
         if not tuner or not pid:
             return
         completed = tuner.state == tuner.STATE_COMPLETED
-        overrides = getattr(tuner, "manual_overrides", {}) or {}
+        overrides = tuner.manual_overrides or {}
         default_kp = 100.0
         kp = tuner.kp if (completed or "Kp" in overrides) else default_kp
         ki = tuner.ki if (completed or "Ki" in overrides) else 0.0
@@ -236,8 +237,7 @@ class ZoneController:
                 for climate_id, tuner in self._autotuners_heat.items():
                     if climate_id in heat_data:
                         tuner.load_state(heat_data[climate_id])
-                        overrides = getattr(tuner, "manual_overrides", {}) or {}
-                        if tuner.state == tuner.STATE_COMPLETED or overrides:
+                        if tuner.state == tuner.STATE_COMPLETED or tuner.manual_overrides:
                             self._apply_tuner_pid_to_controller(climate_id, mode="heat")
                             _LOGGER.info(
                                 "Restored Smart Heating PID for %s: Kp=%.1f, Ki=%.4f, Kd=%.1f",
@@ -249,8 +249,7 @@ class ZoneController:
                 for climate_id, tuner in self._autotuners_cool.items():
                     if climate_id in cool_data:
                         tuner.load_state(cool_data[climate_id])
-                        overrides = getattr(tuner, "manual_overrides", {}) or {}
-                        if tuner.state == tuner.STATE_COMPLETED or overrides:
+                        if tuner.state == tuner.STATE_COMPLETED or tuner.manual_overrides:
                             self._apply_tuner_pid_to_controller(climate_id, mode="cool")
                             _LOGGER.info(
                                 "Restored Smart Cooling PID for %s: Kp=%.1f, Ki=%.4f, Kd=%.1f",
@@ -268,21 +267,45 @@ class ZoneController:
 
     async def async_save_autotuner_states(self) -> None:
         """Save autotuner learning progress to storage."""
-        if hasattr(self.coordinator, "storage"):
-            await self.coordinator.storage.async_save_autotuner_states(self._autotuners_heat, self._autotuners_cool)
+        storage = getattr(self.coordinator, "storage", None)
+        if storage is not None:
+            await storage.async_save_autotuner_states(self._autotuners_heat, self._autotuners_cool)
 
     async def async_save_thermal_states(self) -> None:
         """Save thermal model learning progress to storage."""
-        if hasattr(self.coordinator, "storage"):
-            await self.coordinator.storage.async_save_thermal_states(self._thermal_models)
+        storage = getattr(self.coordinator, "storage", None)
+        if storage is not None:
+            await storage.async_save_thermal_states(self._thermal_models)
+
+    def _get_solar_offset(self) -> float:
+        """Return solar overheat offset in °C when solar surplus & energy management are active."""
+        c = self.coordinator
+        energy_mgr = getattr(c, "energy_manager", None)
+        is_solar_surplus = getattr(c, "solar_surplus", False) is True
+        if not is_solar_surplus and energy_mgr is not None:
+            surplus_fn = getattr(energy_mgr, "is_solar_surplus", None)
+            is_solar_surplus = callable(surplus_fn) and surplus_fn() is True
+        energy_mgmt = (
+            getattr(c, "enable_energy_management", False) is True
+            or getattr(c, "energy_management_enabled", False) is True
+        )
+        if not (is_solar_surplus and energy_mgmt):
+            return 0.0
+        raw_offset = getattr(c, "solar_overheat_offset", None)
+        if (not isinstance(raw_offset, (int, float)) or isinstance(raw_offset, bool)) and energy_mgr is not None:
+            raw_offset = getattr(energy_mgr, "solar_overheat_offset", None)
+        if isinstance(raw_offset, (int, float)) and not isinstance(raw_offset, bool):
+            return float(raw_offset)
+        return 0.0
 
     async def async_update_zone(self, entity_id: str, new_state: Any) -> float:
         """Calculate and update PID demand, autotuner and thermal model for a zone in HEAT or COOL mode."""
         entity_id = self._resolve_zone_id(entity_id)
         attrs = getattr(new_state, "attributes", None) or {}
-        current_temp = attrs.get("current_temperature") if hasattr(attrs, "get") else None
-        target_temp = attrs.get("temperature") if hasattr(attrs, "get") else None
-        st_unit = (attrs.get("temperature_unit") or attrs.get("unit_of_measurement")) if hasattr(attrs, "get") else None
+        is_map = isinstance(attrs, Mapping)
+        current_temp = attrs.get("current_temperature") if is_map else None
+        target_temp = attrs.get("temperature") if is_map else None
+        st_unit = (attrs.get("temperature_unit") or attrs.get("unit_of_measurement")) if is_map else None
 
         if current_temp is None or target_temp is None:
             self.coordinator.demand_aggregator.set_zone_demand(entity_id, 0.0)
@@ -316,7 +339,7 @@ class ZoneController:
             climate_ent = getattr(self.coordinator, "_climate_entities", {}).get(entity_id)
             if climate_ent and getattr(climate_ent, "_safety_fallback_active", False):
                 sensor_fresh = True
-            elif sensor_id and sensor_id != "none" and hasattr(self.hass, "states") and self.hass.states:
+            elif sensor_id and sensor_id != "none" and self.hass and self.hass.states:
                 s_state = self.hass.states.get(sensor_id)
                 if s_state and s_state.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN, "unavailable", "unknown"):
                     reported = getattr(s_state, "last_reported", None) or getattr(s_state, "last_updated", None)
@@ -330,7 +353,7 @@ class ZoneController:
                                 rep_utc = reported if reported.tzinfo else reported.replace(tzinfo=timezone.utc)
                                 if (now_dt - rep_utc).total_seconds() < 7200:
                                     sensor_fresh = True
-                            except Exception:
+                            except (ValueError, TypeError, AttributeError):
                                 pass
             else:
                 reported = getattr(new_state, "last_reported", None) or getattr(new_state, "last_updated", None)
@@ -348,15 +371,12 @@ class ZoneController:
 
         demand = 0.0
 
+        diag = getattr(self.coordinator, "plant_diagnostics", None)
         if zone_mode == ZONE_MODE_BYPASS or hvac_mode not in (HVAC_MODE_HEAT, HVAC_MODE_COOL):
             self._smart_stop_bypass.discard(entity_id)
             demand = 0.0
         elif hvac_mode == HVAC_MODE_HEAT:
-            is_faulty = (
-                self.coordinator.plant_diagnostics.has_critical_sensor_fault(entity_id)
-                if hasattr(self.coordinator, "plant_diagnostics")
-                else False
-            )
+            is_faulty = diag.has_critical_sensor_fault(entity_id) if diag is not None else False
             if is_faulty:
                 _LOGGER.warning(
                     "Zone %s: Heating demand forced to 0%% due to critical sensor fault/low battery",
@@ -386,32 +406,8 @@ class ZoneController:
             # Smart Stop: Calculate Effective Target based on learned Inertia
             thermal_model = self._thermal_models[entity_id]
             target = target_temp
-            c = self.coordinator
-            is_solar_surplus = (
-                getattr(c, "solar_surplus", False) is True
-                or (
-                    hasattr(c, "energy_manager")
-                    and c.energy_manager is not None
-                    and callable(getattr(c.energy_manager, "is_solar_surplus", None))
-                    and getattr(c.energy_manager, "is_solar_surplus")() is True
-                )
-            )
-            energy_mgmt = (
-                getattr(c, "enable_energy_management", False) is True
-                or getattr(c, "energy_management_enabled", False) is True
-            )
-            if is_solar_surplus and energy_mgmt:
-                raw_offset = getattr(c, "solar_overheat_offset", None)
-                if not isinstance(raw_offset, (int, float)) or isinstance(raw_offset, bool):
-                    if hasattr(c, "energy_manager") and c.energy_manager is not None:
-                        raw_offset = getattr(c.energy_manager, "solar_overheat_offset", None)
-                solar_offset = (
-                    float(raw_offset)
-                    if isinstance(raw_offset, (int, float)) and not isinstance(raw_offset, bool)
-                    else 0.0
-                )
-                if getattr(c, "enable_heat_pump", False) is True:
-                    target += solar_offset
+            if getattr(self.coordinator, "enable_heat_pump", False) is True:
+                target += self._get_solar_offset()
 
             effective_target = target
             if thermal_model.thermal_inertia > 0.05:
@@ -486,11 +482,7 @@ class ZoneController:
                                 pass
 
         elif hvac_mode == HVAC_MODE_COOL:
-            is_faulty = (
-                self.coordinator.plant_diagnostics.has_critical_sensor_fault(entity_id)
-                if hasattr(self.coordinator, "plant_diagnostics")
-                else False
-            )
+            is_faulty = diag.has_critical_sensor_fault(entity_id) if diag is not None else False
             if is_faulty:
                 _LOGGER.warning(
                     "Zone %s: Cooling demand forced to 0%% due to critical sensor fault/low battery",
@@ -501,34 +493,11 @@ class ZoneController:
 
             target = target_temp
             c = self.coordinator
-            is_solar_surplus = (
-                getattr(c, "solar_surplus", False) is True
-                or (
-                    hasattr(c, "energy_manager")
-                    and c.energy_manager is not None
-                    and callable(getattr(c.energy_manager, "is_solar_surplus", None))
-                    and getattr(c.energy_manager, "is_solar_surplus")() is True
-                )
-            )
-            energy_mgmt = (
-                getattr(c, "enable_energy_management", False) is True
-                or getattr(c, "energy_management_enabled", False) is True
-            )
-            if is_solar_surplus and energy_mgmt:
-                raw_offset = getattr(c, "solar_overheat_offset", None)
-                if not isinstance(raw_offset, (int, float)) or isinstance(raw_offset, bool):
-                    if hasattr(c, "energy_manager") and c.energy_manager is not None:
-                        raw_offset = getattr(c.energy_manager, "solar_overheat_offset", None)
-                solar_offset = (
-                    float(raw_offset)
-                    if isinstance(raw_offset, (int, float)) and not isinstance(raw_offset, bool)
-                    else 0.0
-                )
-                if (
-                    getattr(c, "enable_heat_pump", False) is True
-                    and getattr(c, "heat_pump_cooling", False) is True
-                ):
-                    target -= solar_offset
+            if (
+                getattr(c, "enable_heat_pump", False) is True
+                and getattr(c, "heat_pump_cooling", False) is True
+            ):
+                target -= self._get_solar_offset()
 
             effective_target = target
             tuner = self._autotuners_cool[entity_id]
@@ -549,19 +518,15 @@ class ZoneController:
 
         # Evaluate and update secondary room split unit
         split_mgr = getattr(self.coordinator, 'split_manager', None)
-        if split_mgr is not None and hasattr(split_mgr, 'has_split') and split_mgr.has_split(entity_id) is True:
-            solar_surplus = False
+        if split_mgr is not None and split_mgr.has_split(entity_id) is True:
             energy_mgr = getattr(self.coordinator, 'energy_manager', None)
+            solar_surplus = False
             if energy_mgr is not None:
                 surplus_fn = getattr(energy_mgr, 'is_solar_surplus', None)
-                if callable(surplus_fn):
-                    solar_surplus = bool(surplus_fn())
-                elif surplus_fn is True:
-                    solar_surplus = True
-            
-            update_fn = getattr(split_mgr, 'async_update_zone_split', None)
-            if callable(update_fn):
-                coro = update_fn(
+                solar_surplus = bool(surplus_fn()) if callable(surplus_fn) else (surplus_fn is True)
+
+            try:
+                coro = split_mgr.async_update_zone_split(
                     climate_id=entity_id,
                     current_temp=current_temp,
                     target_temp=target_temp,
@@ -570,27 +535,34 @@ class ZoneController:
                 )
                 if inspect.iscoroutine(coro):
                     await coro
+            except AttributeError:
+                pass
 
             # Decouple hydronic demand if split is carrying the load in solar/electric mode
-            if hasattr(split_mgr, 'should_suppress_hydronic_demand') and split_mgr.should_suppress_hydronic_demand(entity_id) is True:
-                demand = 0.0
-                _LOGGER.debug(
-                    '[%s] Hydronic demand suppressed to 0.0%% (split is actively conditioning zone)',
-                    entity_id,
-                )
+            try:
+                if split_mgr.should_suppress_hydronic_demand(entity_id) is True:
+                    demand = 0.0
+                    _LOGGER.debug(
+                        '[%s] Hydronic demand suppressed to 0.0%% (split is actively conditioning zone)',
+                        entity_id,
+                    )
+            except AttributeError:
+                pass
 
         # Electric Only priority: blocks hydronic demand only if NO central heat pump exists
         if hvac_mode == HVAC_MODE_HEAT:
             energy_mgr = getattr(self.coordinator, 'energy_manager', None)
-            if energy_mgr is not None and getattr(energy_mgr, 'get_heat_source_priority', None):
-                if energy_mgr.get_heat_source_priority() == SOURCE_PRIORITY_ELECTRIC_ONLY:
-                    hp_enabled = bool(getattr(self.coordinator, "enable_heat_pump", False))
-                    if not hp_enabled:
-                        demand = 0.0
-                        _LOGGER.debug(
-                            '[%s] Hydronic boiler demand forced to 0.0%% (Heat source priority is electric_only and no central heat pump)',
-                            entity_id,
-                        )
+            if energy_mgr is not None:
+                try:
+                    if energy_mgr.get_heat_source_priority() == SOURCE_PRIORITY_ELECTRIC_ONLY:
+                        if not bool(getattr(self.coordinator, "enable_heat_pump", False)):
+                            demand = 0.0
+                            _LOGGER.debug(
+                                '[%s] Hydronic boiler demand forced to 0.0%% (Heat source priority is electric_only and no central heat pump)',
+                                entity_id,
+                            )
+                except AttributeError:
+                    pass
 
         # Cooling validation: if no central Heat Pump with cooling enabled and no split, hydronic cooling demand is 0
         if hvac_mode == HVAC_MODE_COOL:
@@ -611,7 +583,7 @@ class ZoneController:
             tuner = self._autotuners_cool[entity_id] if track_mode == "cool" else self._autotuners_heat[entity_id]
             was_completed = tuner.state == tuner.STATE_COMPLETED
             prev_cycles = len(tuner.completed_cycles)
-            cooling_rate_val = getattr(thermal_model, "cooling_rate", 0.0) if thermal_model else 0.0
+            cooling_rate_val = thermal_model.cooling_rate if thermal_model else 0.0
             tuner.update(
                 current_temp,
                 demand > 0,
@@ -619,10 +591,12 @@ class ZoneController:
                 cooling_rate=cooling_rate_val,
             )
             just_completed = not was_completed and tuner.state == tuner.STATE_COMPLETED
-            if just_completed or getattr(tuner, "weekly_updated_last_tick", False):
+            if just_completed or tuner.weekly_updated_last_tick:
                 self._apply_tuner_pid_to_controller(entity_id, mode=track_mode)
-                if callable(getattr(self.coordinator, "async_notify_pid_entities", None)):
+                try:
                     self.coordinator.async_notify_pid_entities()
+                except AttributeError:
+                    pass
                 if just_completed:
                     _LOGGER.info(
                         "%s Autotuning completed for %s! Smart PID activated. Kp=%.1f, Ki=%.4f, Kd=%.1f",
@@ -632,7 +606,7 @@ class ZoneController:
             if (
                 len(tuner.completed_cycles) > prev_cycles
                 or just_completed
-                or getattr(tuner, "needs_save", False)
+                or tuner.needs_save
             ):
                 if not just_completed and len(tuner.completed_cycles) > prev_cycles:
                     _LOGGER.info(
@@ -645,7 +619,7 @@ class ZoneController:
         # Feed Thermal Observer (with effective demand gating for heating_rate)
         if hvac_mode != HVAC_MODE_COOL and hvac_mode != "cool":
             thermal_model.update(current_temp, demand > 0, hvac_mode=hvac_mode, demand=demand)
-            if hasattr(self.coordinator, "storage"):
+            if getattr(self.coordinator, "storage", None) is not None:
                 self.coordinator.debounced_save_thermal_states(self._thermal_models)
 
         active_tuner = self._autotuners_cool[entity_id] if hvac_mode == HVAC_MODE_COOL else self._autotuners_heat[entity_id]

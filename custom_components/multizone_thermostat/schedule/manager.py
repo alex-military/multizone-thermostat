@@ -157,7 +157,7 @@ class ScheduleProfileManager:
                             if dt.tzinfo is None:
                                 return dt.replace(tzinfo=tz)
                             return dt.astimezone(tz)
-                    except Exception:
+                    except (ValueError, TypeError, KeyError, AttributeError):
                         pass
 
         try:
@@ -227,20 +227,26 @@ class ScheduleProfileManager:
             await self.async_evaluate_schedule(now)
         self._notify_climates()
 
+    def _record_diag(self, event_type: str, details: dict[str, Any] | None = None) -> None:
+        """Record a diagnostic event on the coordinator if available."""
+        try:
+            self.coordinator.record_diagnostic_event(event_type, details)
+        except AttributeError:
+            pass
+
     def check_profile_expiry(self, now: datetime) -> bool:
         """Check if active profile has expired and revert to fallback if so."""
         expired, old_profile, fallback = self._storage.check_profile_expiry(now)
         if expired:
             self._active_smart_starts.clear()
-            if hasattr(self.coordinator, "record_diagnostic_event"):
-                self.coordinator.record_diagnostic_event(
-                    "SCHEDULE_PROFILE_EXPIRED",
-                    {
-                        "expired_profile": old_profile,
-                        "fallback_profile": fallback,
-                        "expired_at": now.isoformat(),
-                    },
-                )
+            self._record_diag(
+                "SCHEDULE_PROFILE_EXPIRED",
+                {
+                    "expired_profile": old_profile,
+                    "fallback_profile": fallback,
+                    "expired_at": now.isoformat(),
+                },
+            )
             return True
         return False
 
@@ -258,9 +264,10 @@ class ScheduleProfileManager:
 
     def get_zone_cooling_rate(self, climate_id: str) -> float:
         """Get zone cooling rate from thermal model or default fallback."""
-        if hasattr(self._smart_return_planner, "get_zone_cooling_rate"):
+        try:
             return self._smart_return_planner.get_zone_cooling_rate(climate_id)
-        return 0.5
+        except AttributeError:
+            return 0.5
 
     def _get_zone_cooling_rate(self, climate_id: str) -> float:
         """Backward-compatible alias for get_zone_cooling_rate."""
@@ -306,15 +313,14 @@ class ScheduleProfileManager:
             "created_at": now.isoformat(),
         }
         await self.async_save_to_storage()
-        if hasattr(self.coordinator, "record_diagnostic_event"):
-            self.coordinator.record_diagnostic_event(
-                "SMART_RETURN_SCHEDULED",
-                {
-                    "arrival_time": arrival_dt.isoformat(),
-                    "preset": preset,
-                    "zones": norm_zones,
-                },
-            )
+        self._record_diag(
+            "SMART_RETURN_SCHEDULED",
+            {
+                "arrival_time": arrival_dt.isoformat(),
+                "preset": preset,
+                "zones": norm_zones,
+            },
+        )
         await self.async_evaluate_schedule(now)
         self._notify_climates()
         return self.calculate_smart_return_plan(arrival_dt, preset, norm_zones, now)
@@ -323,8 +329,7 @@ class ScheduleProfileManager:
         """Cancel active Smart Return."""
         self.smart_return = None
         await self.async_save_to_storage()
-        if hasattr(self.coordinator, "record_diagnostic_event"):
-            self.coordinator.record_diagnostic_event("SMART_RETURN_CANCELLED")
+        self._record_diag("SMART_RETURN_CANCELLED")
         await self.async_evaluate_schedule(now)
         self._notify_climates()
 
@@ -337,19 +342,17 @@ class ScheduleProfileManager:
     def _resolve_preset_temp(self, preset: str, climate_id: str) -> float:
         """Resolve preset temperature for a zone."""
         master_mode = str(getattr(self.coordinator, "master_hvac_mode", "heat")).lower()
-        if hasattr(self.coordinator, "zone_manager") and hasattr(
-            self.coordinator.zone_manager, "get_preset_temperature"
-        ):
+        zone_mgr = getattr(self.coordinator, "zone_manager", None)
+        if zone_mgr is not None:
             try:
-                t = self.coordinator.zone_manager.get_preset_temperature(
-                    preset, climate_id, hvac_mode=master_mode
-                )
-            except TypeError:
-                t = self.coordinator.zone_manager.get_preset_temperature(
-                    preset, climate_id
-                )
-            if t is not None:
-                return float(t)
+                try:
+                    t = zone_mgr.get_preset_temperature(preset, climate_id, hvac_mode=master_mode)
+                except TypeError:
+                    t = zone_mgr.get_preset_temperature(preset, climate_id)
+                if t is not None:
+                    return float(t)
+            except AttributeError:
+                pass
         if master_mode == "cool":
             return float(DEFAULT_COOLING_PRESET_TEMPS.get(preset, 24.5))
         return float(DEFAULT_PRESET_TEMPS.get(preset, 20.0))
@@ -411,20 +414,24 @@ class ScheduleProfileManager:
 
     async def _async_wake_master(self) -> None:
         """Wake up master heating switch if disabled."""
-        is_master_on = True
-        if hasattr(self.coordinator, "get_master_state"):
-            is_master_on = bool(self.coordinator.get_master_state())
-        elif hasattr(self.coordinator, "master_enabled"):
-            is_master_on = bool(getattr(self.coordinator, "master_enabled", True))
+        coord = self.coordinator
+        try:
+            is_master_on = bool(coord.get_master_state())
+        except AttributeError:
+            is_master_on = bool(getattr(coord, "master_enabled", True))
 
         if not is_master_on:
             _LOGGER.info("Smart Return: turning ON master heating switch")
-            if hasattr(self.coordinator, "master_enabled"):
-                self.coordinator.master_enabled = True
-            if hasattr(self.coordinator, "set_master_state"):
-                self.coordinator.set_master_state(True)
-            master_sw = getattr(self.coordinator, "_master_switch", None)
-            if master_sw and hasattr(master_sw, "async_write_ha_state"):
+            try:
+                coord.master_enabled = True
+            except AttributeError:
+                pass
+            try:
+                coord.set_master_state(True)
+            except AttributeError:
+                pass
+            master_sw = getattr(coord, "_master_switch", None)
+            if master_sw is not None:
                 try:
                     master_sw.async_write_ha_state()
                 except Exception as ex:
@@ -432,11 +439,12 @@ class ScheduleProfileManager:
 
     async def _async_wake_zone(self, climate_id: str, climate_ent: Any | None = None) -> None:
         """Wake up a zone to target HVACMode based on master_hvac_mode if currently off."""
-        master_mode = str(getattr(self.coordinator, "master_hvac_mode", "heat")).lower()
+        coord = self.coordinator
+        master_mode = str(getattr(coord, "master_hvac_mode", "heat")).lower()
         target_mode = HVACMode.COOL if master_mode == "cool" else HVACMode.HEAT
 
         if climate_ent is None:
-            climate_ent = getattr(self.coordinator, "_climate_entities", {}).get(climate_id)
+            climate_ent = getattr(coord, "_climate_entities", {}).get(climate_id)
 
         if climate_ent is not None:
             supported = getattr(climate_ent, "hvac_modes", None) or getattr(climate_ent, "_attr_hvac_modes", None)
@@ -450,27 +458,29 @@ class ScheduleProfileManager:
 
         _LOGGER.info("Smart Return: waking up zone %s to %s", climate_id, target_mode)
         if climate_ent is not None:
-            if hasattr(climate_ent, "_hvac_mode"):
+            try:
                 climate_ent._hvac_mode = target_mode
-            if hasattr(climate_ent, "async_set_hvac_mode"):
+            except AttributeError:
+                pass
+            set_mode_fn = getattr(climate_ent, "async_set_hvac_mode", None)
+            if set_mode_fn is not None:
                 try:
-                    res = climate_ent.async_set_hvac_mode(target_mode)
+                    res = set_mode_fn(target_mode)
                     if inspect.isawaitable(res):
                         await res
                 except Exception as ex:
                     _LOGGER.debug("Error calling async_set_hvac_mode on %s: %s", climate_id, ex)
-            elif hasattr(climate_ent, "async_write_ha_state"):
+            else:
                 try:
                     climate_ent.async_write_ha_state()
-                except Exception:
+                except (ValueError, TypeError, AttributeError, RuntimeError):
                     pass
-        if hasattr(self.coordinator, "_async_set_hvac_mode"):
-            try:
-                res = self.coordinator._async_set_hvac_mode(climate_id, target_mode)
-                if inspect.isawaitable(res):
-                    await res
-            except Exception as ex:
-                _LOGGER.debug("Error calling coordinator._async_set_hvac_mode for %s: %s", climate_id, ex)
+        try:
+            res = coord._async_set_hvac_mode(climate_id, target_mode)
+            if inspect.isawaitable(res):
+                await res
+        except Exception as ex:
+            _LOGGER.debug("Error calling coordinator._async_set_hvac_mode for %s: %s", climate_id, ex)
 
     async def async_evaluate_schedule(self, now: datetime | None = None) -> None:
         """Evaluate active schedule profile, smart start, and smart return across all zones."""
@@ -488,7 +498,7 @@ class ScheduleProfileManager:
             if arrival_dt is None and arrival_raw:
                 try:
                     arrival_dt = datetime.fromisoformat(arrival_raw)
-                except Exception:
+                except (ValueError, TypeError):
                     pass
             if arrival_dt is not None:
                 check_now = now
@@ -521,15 +531,16 @@ class ScheduleProfileManager:
                             if z_mode != ZONE_MODE_BYPASS:
                                 await self._async_wake_zone(cid)
 
-                    if not self.scheduler_enabled and hasattr(self.coordinator, "zone_manager"):
-                        await self.coordinator.zone_manager.async_set_global_preset(sr_preset)
+                    if not self.scheduler_enabled:
+                        zone_mgr = getattr(self.coordinator, "zone_manager", None)
+                        if zone_mgr is not None:
+                            await zone_mgr.async_set_global_preset(sr_preset)
                     self.smart_return = None
                     await self.async_save_to_storage()
-                    if hasattr(self.coordinator, "record_diagnostic_event"):
-                        self.coordinator.record_diagnostic_event(
-                            "SMART_RETURN_COMPLETED",
-                            {"preset": sr_preset, "completed_at": now.isoformat()},
-                        )
+                    self._record_diag(
+                        "SMART_RETURN_COMPLETED",
+                        {"preset": sr_preset, "completed_at": now.isoformat()},
+                    )
 
         if not self.scheduler_enabled and self.smart_return is None:
             if self.schedule_overrides or self.smart_start_info:
@@ -576,8 +587,9 @@ class ScheduleProfileManager:
                     or getattr(climate_ent, "_hvac_mode", None) == HVACMode.OFF
                 ):
                     is_off = True
-            if not is_off and hasattr(self.hass, "states") and self.hass.states:
-                st = self.hass.states.get(climate_id)
+            states = self.hass.states if self.hass else None
+            if not is_off and states:
+                st = states.get(climate_id)
                 if st is not None and st.state in (HVACMode.OFF, "off"):
                     is_off = True
 
@@ -590,7 +602,7 @@ class ScheduleProfileManager:
                 if ign_dt is None and ign_raw:
                     try:
                         ign_dt = datetime.fromisoformat(ign_raw)
-                    except Exception:
+                    except (ValueError, TypeError):
                         pass
                 if ign_dt is not None:
                     check_now = now
@@ -600,11 +612,13 @@ class ScheduleProfileManager:
                         ign_dt = ign_dt.replace(tzinfo=check_now.tzinfo)
 
                     if check_now >= ign_dt:
-                        z_mode = None
-                        if hasattr(self.coordinator, "get_zone_mode"):
+                        try:
                             z_mode = self.coordinator.get_zone_mode(climate_id)
-                        elif hasattr(self.coordinator, "zone_manager") and hasattr(self.coordinator.zone_manager, "get_zone_mode"):
-                            z_mode = self.coordinator.zone_manager.get_zone_mode(climate_id)
+                        except AttributeError:
+                            try:
+                                z_mode = self.coordinator.zone_manager.get_zone_mode(climate_id)
+                            except AttributeError:
+                                z_mode = None
 
                         if z_mode != ZONE_MODE_BYPASS:
                             # Wake up master and zone if off
@@ -701,14 +715,13 @@ class ScheduleProfileManager:
             (self.scheduler_enabled or sr_plan)
             and scheduled_zone_presets
             and zone_manager is not None
-            and hasattr(zone_manager, "set_global_preset")
         ):
             routine_mgr = getattr(self.coordinator, "routine_manager", None)
-            geo_enabled = True
-            if hasattr(self.coordinator, "get_persistent_data"):
+            try:
                 raw_geo = self.coordinator.get_persistent_data(KEY_GEOFENCING_TOGGLE, True)
-                if isinstance(raw_geo, bool):
-                    geo_enabled = raw_geo
+                geo_enabled = raw_geo if isinstance(raw_geo, bool) else True
+            except AttributeError:
+                geo_enabled = True
             last_presence = getattr(routine_mgr, "_last_known_presence", None) if routine_mgr else None
             is_away_active = (
                 geo_enabled
@@ -727,14 +740,15 @@ class ScheduleProfileManager:
                     key=lambda p: (-counts[p], priority.get(p, 99)),
                 )
                 cur_gp = getattr(zone_manager, "current_global_preset", None)
-                if cur_gp != dominant_preset and cur_gp != GLOBAL_PRESET_AWAY:
-                    zone_manager.set_global_preset(dominant_preset)
-                    preset_synced = True
-                elif cur_gp == GLOBAL_PRESET_AWAY and dominant_preset == GLOBAL_PRESET_AWAY:
+                try:
+                    if cur_gp != dominant_preset and cur_gp != GLOBAL_PRESET_AWAY:
+                        zone_manager.set_global_preset(dominant_preset)
+                        preset_synced = True
+                    elif cur_gp == GLOBAL_PRESET_AWAY and dominant_preset != GLOBAL_PRESET_AWAY:
+                        zone_manager.set_global_preset(dominant_preset)
+                        preset_synced = True
+                except AttributeError:
                     pass
-                elif cur_gp == GLOBAL_PRESET_AWAY:
-                    zone_manager.set_global_preset(dominant_preset)
-                    preset_synced = True
 
         target_changed = old_overrides != self.schedule_overrides
         smart_start_changed = old_smart_start != self.smart_start_info
@@ -784,34 +798,35 @@ class ScheduleProfileManager:
 
     def _notify_climates(self, climate_ids: set[str] | list[str] | None = None) -> None:
         """Notify climate entities, switches and selects."""
-        if hasattr(self.coordinator, "calendar_manager") and hasattr(
-            self.coordinator.calendar_manager, "_notify_climates_and_sync_trvs"
-        ):
-            self.coordinator.calendar_manager._notify_climates_and_sync_trvs(climate_ids)
-        else:
-            target_ids = (
-                climate_ids
-                if climate_ids is not None
-                else list(getattr(self.coordinator, "_climate_callbacks", {}).keys())
-            )
+        coord = self.coordinator
+        cal_mgr = getattr(coord, "calendar_manager", None)
+        if cal_mgr is not None:
+            try:
+                cal_mgr._notify_climates_and_sync_trvs(climate_ids)
+            except AttributeError:
+                cal_mgr = None
+        if cal_mgr is None:
+            callbacks = getattr(coord, "_climate_callbacks", {})
+            target_ids = climate_ids if climate_ids is not None else list(callbacks.keys())
             for cid in target_ids:
-                cb = getattr(self.coordinator, "_climate_callbacks", {}).get(cid)
+                cb = callbacks.get(cid)
                 if cb:
                     cb()
 
-        for attr in ("_master_switch", "_scheduler_switch"):
-            sw = getattr(self.coordinator, attr, None)
-            if sw and hasattr(sw, "async_write_ha_state"):
-                sw.async_write_ha_state()
+        for attr in ("_master_switch", "_scheduler_switch", "_profile_select", "_schedule_select"):
+            ent = getattr(coord, attr, None)
+            if ent is not None:
+                try:
+                    ent.async_write_ha_state()
+                except AttributeError:
+                    pass
 
-        for attr in ("_profile_select", "_schedule_select"):
-            sel = getattr(self.coordinator, attr, None)
-            if sel and hasattr(sel, "async_write_ha_state"):
-                sel.async_write_ha_state()
-
-        selects = getattr(self.coordinator, "_select_entities", {})
+        selects = getattr(coord, "_select_entities", {})
         if isinstance(selects, dict):
             for key in ("schedule_profile", "global_preset"):
                 sel_ent = selects.get(key)
-                if sel_ent and hasattr(sel_ent, "async_write_ha_state"):
-                    sel_ent.async_write_ha_state()
+                if sel_ent is not None:
+                    try:
+                        sel_ent.async_write_ha_state()
+                    except AttributeError:
+                        pass

@@ -298,7 +298,7 @@ def make_via_device_kwargs(entry_id: str, master_device_id: str | None = None) -
         from homeassistant.helpers.device_registry import DeviceInfo as HADeviceInfo
         if hasattr(HADeviceInfo, "__annotations__") and "via_device_id" in HADeviceInfo.__annotations__ and master_device_id:
             return {"via_device_id": master_device_id}
-    except Exception:
+    except (ImportError, AttributeError):
         pass
     return {"via_device": (DOMAIN, entry_id)}
 

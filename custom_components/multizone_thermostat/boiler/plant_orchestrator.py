@@ -28,6 +28,30 @@ from ..protocols import BoilerBackendProtocol, CoordinatorProtocol
 _LOGGER = logging.getLogger(__name__)
 
 
+def _eval_energy_flag(energy_mgr: Any, method_name: str) -> bool:
+    """Evaluate a boolean or callable energy manager flag safely."""
+    if energy_mgr is None:
+        return False
+    flag = getattr(energy_mgr, method_name, None)
+    if callable(flag):
+        return flag() is True
+    return flag is True
+
+
+def _get_hvac_mode_str(ent: Any) -> str:
+    """Extract normalized HVAC mode string from a climate entity or stub."""
+    try:
+        raw = ent.hvac_mode
+    except AttributeError:
+        return ""
+    if raw is None:
+        return ""
+    try:
+        return str(raw.value)
+    except AttributeError:
+        return str(raw)
+
+
 def check_is_modulating_plant(coordinator: Any, boiler_backend: Any = None, heat_pump_backend: Any = None) -> bool:
     """Return True if the plant has a modulating generator (OpenTherm or Heat Pump)."""
     backend = boiler_backend if boiler_backend is not None else getattr(coordinator, "boiler_backend", None)
@@ -46,35 +70,36 @@ def check_is_modulating_plant(coordinator: Any, boiler_backend: Any = None, heat
 def check_is_dhw_active(coordinator: Any, hass: Any = None) -> bool:
     """Return True if Domestic Hot Water (DHW) production is active."""
     hass = hass or getattr(coordinator, "hass", None)
+    states = hass.states if hass is not None else None
     dhw_sensor = getattr(coordinator, "dhw_active_sensor", None)
-    if dhw_sensor and isinstance(dhw_sensor, str) and hass and hasattr(hass, "states") and hass.states:
-        st = hass.states.get(dhw_sensor)
-        if st and getattr(st, "state", None) not in ("unavailable", "unknown", None):
-            val = str(st.state).lower()
-            if val in ("on", "true", "1", "charging", "heat", "heating", "active"):
+    if dhw_sensor and isinstance(dhw_sensor, str) and states:
+        st = states.get(dhw_sensor)
+        st_val = getattr(st, "state", None) if st is not None else None
+        if st_val not in ("unavailable", "unknown", None):
+            if str(st_val).lower() in ("on", "true", "1", "charging", "heat", "heating", "active"):
                 return True
-            if getattr(st, "attributes", None):
+            st_attrs = getattr(st, "attributes", None)
+            if isinstance(st_attrs, Mapping):
                 for ak in ("charging", "is_charging", "dhw_active", "active"):
-                    av = st.attributes.get(ak)
+                    av = st_attrs.get(ak)
                     if av is True or (isinstance(av, str) and av.lower() in ("true", "on", "1")):
                         return True
             return False
 
-    if hasattr(coordinator, "plant_diagnostics") and getattr(coordinator, "plant_diagnostics", None) is not None:
-        diag_fn = getattr(coordinator.plant_diagnostics, "get_opentherm_diagnostics", None)
-        if callable(diag_fn):
-            try:
-                diag = diag_fn()
-                if isinstance(diag, dict) and diag.get("dhw_active", False):
-                    return True
-            except (KeyError, AttributeError, ValueError, TypeError) as err:
-                _LOGGER.debug("DHW OpenTherm diagnostics check skipped: %s", err)
+    plant_diag = getattr(coordinator, "plant_diagnostics", None)
+    if plant_diag is not None:
+        try:
+            diag = plant_diag.get_opentherm_diagnostics()
+            if isinstance(diag, dict) and diag.get("dhw_active", False):
+                return True
+        except (KeyError, AttributeError, ValueError, TypeError) as err:
+            _LOGGER.debug("DHW OpenTherm diagnostics check skipped: %s", err)
 
-    if hass and hasattr(hass, "states") and hass.states:
+    if states:
         for std_id in ("binary_sensor.boiler_dhw_charging", "binary_sensor.dhw_charging"):
             try:
-                st = hass.states.get(std_id)
-                if st and hasattr(st, "state") and str(st.state).lower() in ("on", "true", "1", "charging", "heat", "heating"):
+                st = states.get(std_id)
+                if st is not None and str(st.state).lower() in ("on", "true", "1", "charging", "heat", "heating"):
                     return True
             except (KeyError, AttributeError, ValueError, TypeError) as err:
                 _LOGGER.debug("DHW sensor %s check skipped: %s", std_id, err)
@@ -117,7 +142,7 @@ class PlantOrchestrator:
         if zone_ctrl is None or not callable(getattr(zone_ctrl, "async_update_zone", None)):
             return
 
-        states = getattr(self.hass, "states", None) if self.hass else None
+        states = self.hass.states if self.hass else None
         climates = getattr(self.coordinator, "_climate_entities", None)
         climates_map = climates if isinstance(climates, dict) else {}
         zones = getattr(self.coordinator, "zones", None)
@@ -152,16 +177,13 @@ class PlantOrchestrator:
                         pid_cool = zone_ctrl.get_pid(cid, "cool")
                     except Exception:
                         pid_cool = None
+                    has_eval_h = getattr(pid_heat, "has_evaluated", None)
+                    has_eval_c = getattr(pid_cool, "has_evaluated", None)
                     if (
-                        isinstance(getattr(pid_heat, "has_evaluated", None), bool) and pid_heat.has_evaluated
-                    ) or (
-                        isinstance(getattr(pid_cool, "has_evaluated", None), bool) and pid_cool.has_evaluated
-                    ) or (
-                        not isinstance(getattr(pid_heat, "has_evaluated", None), bool)
-                        and getattr(pid_heat, "_last_input_time", None) is not None
-                    ) or (
-                        not isinstance(getattr(pid_cool, "has_evaluated", None), bool)
-                        and getattr(pid_cool, "_last_input_time", None) is not None
+                        (isinstance(has_eval_h, bool) and has_eval_h)
+                        or (isinstance(has_eval_c, bool) and has_eval_c)
+                        or (not isinstance(has_eval_h, bool) and getattr(pid_heat, "_last_input_time", None) is not None)
+                        or (not isinstance(has_eval_c, bool) and getattr(pid_cool, "_last_input_time", None) is not None)
                     ):
                         pid_evaluated = True
 
@@ -179,24 +201,24 @@ class PlantOrchestrator:
                         break
 
             state_obj = None
-            if (
-                st is not None
-                and isinstance(getattr(st, "attributes", None), Mapping)
-                and isinstance(getattr(st, "state", None), str)
-            ):
+            if st is not None and isinstance(getattr(st, "attributes", None), Mapping) and isinstance(getattr(st, "state", None), str):
                 state_obj = st
             elif ent is not None:
-                raw_mode = getattr(ent, "hvac_mode", None)
-                mode_str = str(getattr(raw_mode, "value", raw_mode) or "off")
+                mode_str = _get_hvac_mode_str(ent) or "off"
                 attrs: dict[str, Any] = {}
                 if st is not None and isinstance(getattr(st, "attributes", None), Mapping):
                     attrs.update(dict(st.attributes))
-                if getattr(ent, "current_temperature", None) is not None:
-                    attrs.setdefault("current_temperature", ent.current_temperature)
-                if getattr(ent, "target_temperature", None) is not None:
-                    attrs.setdefault("temperature", ent.target_temperature)
-                if getattr(ent, "preset_mode", None) is not None:
-                    attrs.setdefault("preset_mode", ent.preset_mode)
+                for attr_name, key in (
+                    ("current_temperature", "current_temperature"),
+                    ("target_temperature", "temperature"),
+                    ("preset_mode", "preset_mode"),
+                ):
+                    try:
+                        val = getattr(ent, attr_name)
+                    except AttributeError:
+                        val = None
+                    if val is not None:
+                        attrs.setdefault(key, val)
                 state_obj = SimpleNamespace(state=mode_str, attributes=attrs)
 
             if state_obj is None:
@@ -243,31 +265,33 @@ class PlantOrchestrator:
         max_cool_demand = 0.0
         peak_zone = None
         split_mgr = getattr(self.coordinator, "split_manager", None)
+        mode_fn = getattr(self.coordinator, "get_zone_mode", None)
+        dem_fn = getattr(self.demand_aggregator, "get_zone_demand", None)
 
         for cid, ent in list(climate_entities.items()):
-            mode_fn = getattr(self.coordinator, "get_zone_mode", None)
-            z_mode = mode_fn(cid) if callable(mode_fn) else "primary"
-            if z_mode == ZONE_MODE_BYPASS:
+            if callable(mode_fn) and mode_fn(cid) == ZONE_MODE_BYPASS:
                 continue
 
-            hvac_val = str(getattr(ent, "hvac_mode", "") or "")
-            if hasattr(getattr(ent, "hvac_mode", None), "value"):
-                hvac_val = str(ent.hvac_mode.value)
-            if hvac_val != HVAC_MODE_COOL:
+            if _get_hvac_mode_str(ent) != HVAC_MODE_COOL:
                 continue
 
             # If a room split is actively cooling this zone, central hydronic cooling is only needed if no split
-            if split_mgr and hasattr(split_mgr, "has_split") and split_mgr.has_split(cid) is True:
-                if hasattr(split_mgr, "is_split_active") and split_mgr.is_split_active(cid) is True:
-                    continue
+            if split_mgr is not None:
+                try:
+                    if split_mgr.has_split(cid) is True and split_mgr.is_split_active(cid) is True:
+                        continue
+                except AttributeError:
+                    pass
 
             # Prioritize calculated zone cooling demand from demand_aggregator
-            dem_fn = getattr(self.demand_aggregator, "get_zone_demand", None)
             z_dem = float(dem_fn(cid) or 0.0) if callable(dem_fn) else 0.0
 
             if z_dem <= 0.0:
-                curr_t = getattr(ent, "current_temperature", None)
-                targ_t = getattr(ent, "target_temperature", None)
+                try:
+                    curr_t = ent.current_temperature
+                    targ_t = ent.target_temperature
+                except AttributeError:
+                    curr_t = targ_t = None
                 if isinstance(curr_t, (int, float)) and isinstance(targ_t, (int, float)):
                     delta = float(curr_t) - float(targ_t)
                     if delta > 0.2:
@@ -282,7 +306,8 @@ class PlantOrchestrator:
     async def async_tick(self, now: datetime) -> None:
         """Periodic PWM tick for boiler and central heat pump."""
         try:
-            if hasattr(self.coordinator, "anti_seize_manager") and self.coordinator.anti_seize_manager.is_running:
+            anti_seize = getattr(self.coordinator, "anti_seize_manager", None)
+            if anti_seize is not None and anti_seize.is_running is True:
                 return
 
             await self._async_update_boiler()
@@ -291,69 +316,66 @@ class PlantOrchestrator:
 
     async def _async_update_boiler(self, force_refresh_zones: bool = False) -> None:
         """Handle the logic for pushing demand to boiler and central heat pump backends."""
-        climate_entities = getattr(self.coordinator, "_climate_entities", None)
+        coord = self.coordinator
+        climate_entities = getattr(coord, "_climate_entities", None)
         if isinstance(climate_entities, dict):
             for ent in list(climate_entities.values()):
-                if hasattr(ent, "check_sensor_staleness"):
+                try:
                     ent.check_sensor_staleness()
+                except AttributeError:
+                    pass
 
         frost_emergency = False
-        frost_mgr = getattr(self.coordinator, "frost_manager", None)
-        handle_fn = getattr(frost_mgr, "async_handle_frost_emergencies", None)
-        if inspect.iscoroutinefunction(handle_fn):
-            frost_emergency = bool(await handle_fn())
+        frost_mgr = getattr(coord, "frost_manager", None)
+        if frost_mgr is not None:
+            try:
+                res_frost = frost_mgr.async_handle_frost_emergencies()
+                if inspect.isawaitable(res_frost):
+                    frost_emergency = bool(await res_frost)
+            except AttributeError:
+                pass
 
         if not frost_emergency:
-            for climate_id in list(getattr(self.coordinator, "_climate_callbacks", {}).keys()):
-                if hasattr(self.coordinator, "is_zone_in_frost_emergency") and self.coordinator.is_zone_in_frost_emergency(climate_id):
-                    frost_emergency = True
-                    break
+            frost_check_fn = getattr(coord, "is_zone_in_frost_emergency", None)
+            if callable(frost_check_fn):
+                for climate_id in list(getattr(coord, "_climate_callbacks", {}).keys()):
+                    if frost_check_fn(climate_id):
+                        frost_emergency = True
+                        break
 
         hp_backend = self._get_hp_backend()
 
         # Hard stop if master switch is OFF
-        if not self.coordinator.get_master_state() and not frost_emergency:
+        if not coord.get_master_state() and not frost_emergency:
             if not self._master_off_logged:
                 _LOGGER.info("Master switch is OFF (no frost emergency): stopping plant")
                 self._master_off_logged = True
             self.last_aggregate = None
             if self.boiler_backend is not None:
                 await self.boiler_backend.async_emergency_off()
-            if hp_backend is not None and hasattr(hp_backend, "async_emergency_off"):
-                await hp_backend.async_emergency_off()
+            if hp_backend is not None:
+                try:
+                    await hp_backend.async_emergency_off()
+                except AttributeError:
+                    pass
             return
         self._master_off_logged = False
 
         await self._async_refresh_zones_proactively(force=force_refresh_zones)
 
-        master_mode = getattr(self.coordinator, "master_hvac_mode", HVAC_MODE_HEAT)
+        master_mode = getattr(coord, "master_hvac_mode", HVAC_MODE_HEAT)
+        energy_mgr = getattr(coord, "energy_manager", None)
         if master_mode == HVAC_MODE_COOL and not frost_emergency:
             # In cooling mode, gas boiler is strictly OFF (0.0% demand)
             if self.boiler_backend is not None:
                 await self.boiler_backend.async_update(0.0, None, False)
             if (
                 hp_backend is not None
-                and getattr(self.coordinator, "enable_heat_pump", False) is True
-                and getattr(self.coordinator, "heat_pump_cooling", True) is True
+                and getattr(coord, "enable_heat_pump", False) is True
+                and getattr(coord, "heat_pump_cooling", True) is True
             ):
-                energy_mgr = getattr(self.coordinator, "energy_manager", None)
-                solar_surplus = False
-                solar_boost = False
-                if energy_mgr is not None:
-                    surp_fn = getattr(energy_mgr, "is_solar_surplus", None)
-                    if callable(surp_fn):
-                        res = surp_fn()
-                        if res is True or (isinstance(res, bool) and res):
-                            solar_surplus = True
-                    elif surp_fn is True:
-                        solar_surplus = True
-                    boost_fn = getattr(energy_mgr, "is_external_override_active", None)
-                    if callable(boost_fn):
-                        res = boost_fn()
-                        if res is True or (isinstance(res, bool) and res):
-                            solar_boost = True
-                    elif boost_fn is True:
-                        solar_boost = True
+                solar_surplus = _eval_energy_flag(energy_mgr, "is_solar_surplus")
+                solar_boost = _eval_energy_flag(energy_mgr, "is_external_override_active")
 
                 cool_demand, cool_peak = self._calculate_cooling_demand()
                 if (solar_surplus or solar_boost) and cool_demand > 0.0:
@@ -380,32 +402,37 @@ class PlantOrchestrator:
                 )
             return
 
-        plant_diag = getattr(self.coordinator, "plant_diagnostics", None)
-        zones = getattr(self.coordinator, "zones", None)
-        if plant_diag and isinstance(zones, list):
+        plant_diag = getattr(coord, "plant_diagnostics", None)
+        zones = getattr(coord, "zones", None)
+        if plant_diag is not None and isinstance(zones, list):
             for zone in zones:
                 zone_name = zone.get(CONF_ZONE_NAME) if isinstance(zone, dict) else None
                 if zone_name:
                     cid = make_zone_entity_id(zone_name)
-                    if hasattr(plant_diag, "evaluate_zone_anomalies"):
+                    try:
                         plant_diag.evaluate_zone_anomalies(cid)
-                    if not frost_emergency and hasattr(plant_diag, "has_critical_sensor_fault"):
-                        if plant_diag.has_critical_sensor_fault(cid) is True:
-                            self.demand_aggregator.set_zone_demand(cid, 0.0)
+                    except AttributeError:
+                        pass
+                    if not frost_emergency:
+                        try:
+                            if plant_diag.has_critical_sensor_fault(cid) is True:
+                                self.demand_aggregator.set_zone_demand(cid, 0.0)
+                        except AttributeError:
+                            pass
 
         if not frost_emergency and isinstance(climate_entities, dict):
             for climate_id, ent in list(climate_entities.items()):
                 if getattr(ent, "current_temperature", False) is None:
                     self.demand_aggregator.set_zone_demand(climate_id, 0.0)
-                elif (
-                    plant_diag
-                    and hasattr(plant_diag, "has_critical_sensor_fault")
-                    and plant_diag.has_critical_sensor_fault(climate_id) is True
-                ):
-                    self.demand_aggregator.set_zone_demand(climate_id, 0.0)
+                elif plant_diag is not None:
+                    try:
+                        if plant_diag.has_critical_sensor_fault(climate_id) is True:
+                            self.demand_aggregator.set_zone_demand(climate_id, 0.0)
+                    except AttributeError:
+                        pass
 
-        coord_dhw = getattr(self.coordinator, "is_dhw_active", None)
-        if isinstance(coord_dhw, bool) and not isinstance(getattr(type(self.coordinator), "is_dhw_active", None), property):
+        coord_dhw = getattr(coord, "is_dhw_active", None)
+        if isinstance(coord_dhw, bool) and not isinstance(getattr(type(coord), "is_dhw_active", None), property):
             dhw_active = coord_dhw
         else:
             try:
@@ -420,49 +447,45 @@ class PlantOrchestrator:
         )
         self.last_aggregate = agg
 
-        hp_enabled = bool(getattr(self.coordinator, "enable_heat_pump", False) is True and hp_backend is not None)
-        gas_enabled = bool(getattr(self.coordinator, "enable_gas_heater", True) is not False)
+        hp_enabled = bool(getattr(coord, "enable_heat_pump", False) is True and hp_backend is not None)
+        gas_enabled = bool(getattr(coord, "enable_gas_heater", True) is not False)
 
         # Collect priority and solar surplus from energy manager if present
-        energy_mgr = getattr(self.coordinator, "energy_manager", None)
         priority = AUTO
-        solar_surplus = False
+        solar_surplus = _eval_energy_flag(energy_mgr, "is_solar_surplus")
         if energy_mgr is not None:
             prio_fn = getattr(energy_mgr, "get_heat_source_priority", None)
             if callable(prio_fn):
                 res = prio_fn()
                 if isinstance(res, str):
                     priority = res
-            surp_fn = getattr(energy_mgr, "is_solar_surplus", None)
-            if callable(surp_fn):
-                solar_surplus = bool(surp_fn())
-            elif surp_fn is True:
-                solar_surplus = True
 
         # Check heat pump availability (entity online and not unavailable/unknown)
         hp_available = True
-        if hp_backend is not None and getattr(hp_backend, "hp_entity", None) and isinstance(hp_backend.hp_entity, str):
-            st = self.hass.states.get(hp_backend.hp_entity) if hasattr(self.hass, "states") and self.hass.states else None
+        hp_ent = hp_backend.hp_entity if hp_backend is not None else None
+        states = self.hass.states if self.hass else None
+        if isinstance(hp_ent, str) and hp_ent and states:
+            st = states.get(hp_ent)
             if st and st.state in ("unavailable", "unknown"):
                 hp_available = False
 
         # Calculate max zone delta (for COMBINED boost mode) across active heating zones only
         max_delta = 0.0
         if isinstance(climate_entities, dict):
-            mode_fn = getattr(self.coordinator, "get_zone_mode", None)
+            mode_fn = getattr(coord, "get_zone_mode", None)
             for cid, ent in climate_entities.items():
                 try:
                     if callable(mode_fn) and mode_fn(cid) == ZONE_MODE_BYPASS:
                         continue
                 except AttributeError:
                     pass
-                raw_hvac = getattr(ent, "hvac_mode", None)
-                if hasattr(raw_hvac, "value"):
-                    raw_hvac = raw_hvac.value
-                if isinstance(raw_hvac, str) and raw_hvac.lower() in ("off", "cool"):
+                if _get_hvac_mode_str(ent).lower() in ("off", "cool"):
                     continue
-                c_t = getattr(ent, "current_temperature", None)
-                t_t = getattr(ent, "target_temperature", None)
+                try:
+                    c_t = ent.current_temperature
+                    t_t = ent.target_temperature
+                except AttributeError:
+                    c_t = t_t = None
                 if isinstance(c_t, (int, float)) and isinstance(t_t, (int, float)):
                     diff = float(t_t) - float(c_t)
                     if diff > max_delta:

@@ -14,6 +14,7 @@ Switch / SG-Ready relay, or OpenTherm/Number flow temperature modulation) in bot
 Heating and Reversible Cooling modes.
 """
 
+from collections.abc import Mapping
 import logging
 import time
 from typing import Any
@@ -119,12 +120,27 @@ class CentralHeatPumpBackend(BoilerBackend):
             return f_val * 60.0
         return max(0.0, f_val)
 
+    def _get_state(self, entity_id: str | None) -> Any | None:
+        """Safely retrieve an entity state from Home Assistant."""
+        if not entity_id or not self.hass or not self.hass.states:
+            return None
+        return self.hass.states.get(entity_id)
+
+    @staticmethod
+    def _get_attrs(st: Any) -> Mapping[str, Any]:
+        """Safely extract state attributes mapping."""
+        if st is None:
+            return {}
+        try:
+            attrs = st.attributes
+            return attrs if isinstance(attrs, Mapping) else {}
+        except AttributeError:
+            return {}
+
     def _is_currently_on(self, entity_id: str | None = None) -> bool:
         """Check if target entity is currently considered ON."""
         ent = entity_id or self.hp_entity
-        if not ent or not hasattr(self.hass, "states") or not self.hass.states:
-            return False
-        st = self.hass.states.get(ent)
+        st = self._get_state(ent)
         if not st or st.state in ("unavailable", "unknown", "off", None):
             return False
         domain = ent.split(".")[0] if "." in ent else self.hp_type
@@ -133,7 +149,7 @@ class CentralHeatPumpBackend(BoilerBackend):
         if domain in ("number", "input_number"):
             try:
                 val = float(st.state)
-                min_attr = st.attributes.get("min") if getattr(st, "attributes", None) else None
+                min_attr = self._get_attrs(st).get("min")
                 min_val = float(min_attr) if min_attr is not None else 0.0
                 return val > min_val
             except (ValueError, TypeError):
@@ -165,23 +181,23 @@ class CentralHeatPumpBackend(BoilerBackend):
         """Actuate number or input_number entity with min-value protection on turn off."""
         domain = self.hp_entity.split(".")[0] if "." in (self.hp_entity or "") else "number"
         target_domain = domain if domain in ("number", "input_number") else "number"
+        attrs = self._get_attrs(st)
         if wanted_on:
-            num_unit = st.attributes.get("unit_of_measurement") if (st and getattr(st, "attributes", None)) else None
+            num_unit = attrs.get("unit_of_measurement")
             if num_unit is not None and str(num_unit).strip().lower() in ("°f", "f", "fahrenheit"):
                 val = round(from_celsius(target_temp, unit=num_unit), 1)
             else:
                 val = target_temp
         else:
             val = 0.0
-            if st and getattr(st, "attributes", None):
-                min_attr = st.attributes.get("min")
-                if min_attr is not None:
-                    try:
-                        min_val = float(min_attr)
-                        if min_val > 0.0:
-                            val = min_val
-                    except (ValueError, TypeError):
-                        pass
+            min_attr = attrs.get("min")
+            if min_attr is not None:
+                try:
+                    min_val = float(min_attr)
+                    if min_val > 0.0:
+                        val = min_val
+                except (ValueError, TypeError):
+                    pass
 
         current_val = None
         if st and st.state not in ("unavailable", "unknown", None):
@@ -203,12 +219,12 @@ class CentralHeatPumpBackend(BoilerBackend):
         """Actuate climate or water_heater entity with power and setpoint logic."""
         domain = self.hp_entity.split(".")[0] if "." in (self.hp_entity or "") else self.hp_type
         is_water_heater = (domain == "water_heater" or self.hp_type == HP_TYPE_WATER_HEATER)
-        svc_domain = "water_heater" if is_water_heater else "climate"
+        attrs = self._get_attrs(st)
 
         if is_water_heater:
             if wanted_on:
                 out_target = round(from_celsius(target_temp, self.hass), 1)
-                current_target = st.attributes.get("temperature") if (st and getattr(st, "attributes", None)) else None
+                current_target = attrs.get("temperature")
                 if current_target != out_target:
                     await self.hass.services.async_call(
                         "water_heater",
@@ -216,7 +232,7 @@ class CentralHeatPumpBackend(BoilerBackend):
                         {"entity_id": self.hp_entity, "temperature": out_target},
                         blocking=False,
                     )
-                operation_modes = st.attributes.get("operation_list", []) if (st and getattr(st, "attributes", None)) else []
+                operation_modes = attrs.get("operation_list", [])
                 current_op = st.state if st else None
                 if current_op == "off" and operation_modes:
                     for target_mode in ("heat_pump", "eco", "electric", "performance"):
@@ -239,7 +255,7 @@ class CentralHeatPumpBackend(BoilerBackend):
                             )
             else:
                 # wanted_on == False: turn off or reduce setpoint
-                operation_modes = st.attributes.get("operation_list", []) if (st and getattr(st, "attributes", None)) else []
+                operation_modes = attrs.get("operation_list", [])
                 if "off" in operation_modes:
                     if st and st.state != "off":
                         await self.hass.services.async_call(
@@ -250,12 +266,12 @@ class CentralHeatPumpBackend(BoilerBackend):
                         )
                 else:
                     min_t = round(from_celsius(self.min_temp, self.hass), 1)
-                    if st and getattr(st, "attributes", None) and st.attributes.get("min_temp") is not None:
+                    if attrs.get("min_temp") is not None:
                         try:
-                            min_t = float(st.attributes["min_temp"])
+                            min_t = float(attrs["min_temp"])
                         except (ValueError, TypeError):
                             pass
-                    current_target = st.attributes.get("temperature") if (st and getattr(st, "attributes", None)) else None
+                    current_target = attrs.get("temperature")
                     if current_target != min_t:
                         await self.hass.services.async_call(
                             "water_heater",
@@ -268,7 +284,7 @@ class CentralHeatPumpBackend(BoilerBackend):
         # Climate domain
         if wanted_on:
             out_target = round(from_celsius(target_temp, self.hass), 1)
-            current_target = st.attributes.get("temperature") if (st and getattr(st, "attributes", None)) else None
+            current_target = attrs.get("temperature")
             if current_target != out_target:
                 await self.hass.services.async_call(
                     "climate",
@@ -293,19 +309,19 @@ class CentralHeatPumpBackend(BoilerBackend):
     def _get_outdoor_temperature(self) -> float | None:
         """Extract outdoor temperature from configured weather sensor."""
         weather_sensor_id = getattr(self.coordinator, "weather_sensor_id", None)
-        if not weather_sensor_id or not isinstance(weather_sensor_id, str) or not hasattr(self.hass, "states") or not self.hass.states:
+        if not isinstance(weather_sensor_id, str) or not weather_sensor_id:
             return None
-        w_state = self.hass.states.get(weather_sensor_id)
+        w_state = self._get_state(weather_sensor_id)
         if not w_state or getattr(w_state, "state", None) in (None, "unavailable", "unknown"):
             return None
-        if getattr(w_state, "domain", None) == "weather" or str(weather_sensor_id).startswith("weather."):
-            raw_t = w_state.attributes.get("temperature") if getattr(w_state, "attributes", None) else None
+        attrs = self._get_attrs(w_state)
+        if getattr(w_state, "domain", None) == "weather" or weather_sensor_id.startswith("weather."):
+            raw_t = attrs.get("temperature")
         else:
             raw_t = w_state.state
         if isinstance(raw_t, (int, float, str)):
             try:
-                attrs = getattr(w_state, "attributes", None) or {}
-                w_unit = (attrs.get("temperature_unit") or attrs.get("unit_of_measurement")) if hasattr(attrs, "get") else None
+                w_unit = attrs.get("temperature_unit") or attrs.get("unit_of_measurement")
                 return to_celsius(float(raw_t), w_unit, self.hass)
             except (ValueError, TypeError):
                 return None
@@ -430,28 +446,25 @@ class CentralHeatPumpBackend(BoilerBackend):
 
             # 1. Check configured internal humidity sensor for the zone
             h_sensor = z.get("humidity_sensor")
-            if h_sensor and hasattr(self.hass, "states") and self.hass.states:
-                st = self.hass.states.get(h_sensor)
-                if st and st.state not in ("unavailable", "unknown", None):
-                    try:
-                        h_val = float(st.state)
-                    except (ValueError, TypeError):
-                        pass
+            st_h = self._get_state(h_sensor)
+            if st_h and st_h.state not in ("unavailable", "unknown", None):
+                try:
+                    h_val = float(st_h.state)
+                except (ValueError, TypeError):
+                    pass
 
             # 2. Check temperature sensor for the zone
             t_sensor = z.get("temp_sensor")
-            if t_sensor and hasattr(self.hass, "states") and self.hass.states:
-                st = self.hass.states.get(t_sensor)
-                if st and st.state not in ("unavailable", "unknown", None):
-                    try:
-                        attrs = getattr(st, "attributes", None) or {}
-                        t_unit = attrs.get("unit_of_measurement") if hasattr(attrs, "get") else None
-                        t_val = to_celsius(float(st.state), t_unit, self.hass)
-                    except (ValueError, TypeError):
-                        pass
+            st = self._get_state(t_sensor)
+            if st and st.state not in ("unavailable", "unknown", None):
+                t_attrs = self._get_attrs(st)
+                try:
+                    t_val = to_celsius(float(st.state), t_attrs.get("unit_of_measurement"), self.hass)
+                except (ValueError, TypeError):
+                    pass
                 # Also check state attributes if humidity was reported directly on the temp sensor entity
-                if h_val is None and st and getattr(st, "attributes", None):
-                    attr_rh = st.attributes.get("humidity") or st.attributes.get("current_humidity")
+                if h_val is None:
+                    attr_rh = t_attrs.get("humidity") or t_attrs.get("current_humidity")
                     if isinstance(attr_rh, (int, float)):
                         h_val = float(attr_rh)
 
@@ -479,17 +492,17 @@ class CentralHeatPumpBackend(BoilerBackend):
         else:
             # Fallback to weather sensor if no internal zone humidity sensor is configured
             weather_sensor_id = getattr(self.coordinator, "weather_sensor_id", None)
-            if weather_sensor_id and hasattr(self.hass, "states") and self.hass.states:
-                w_st = self.hass.states.get(weather_sensor_id)
-                if w_st and getattr(w_st, "attributes", None):
-                    rh = w_st.attributes.get("humidity")
-                    temp = w_st.attributes.get("temperature")
-                    if isinstance(rh, (int, float)) and isinstance(temp, (int, float)) and float(rh) > 10.0:
-                        w_unit = w_st.attributes.get("temperature_unit") or w_st.attributes.get("unit_of_measurement")
-                        temp_c = to_celsius(float(temp), w_unit, self.hass)
-                        dew_point = self._compute_dew_point(temp_c, float(rh))
-                        if dew_point is not None:
-                            safe_floor = max(safe_floor, round(dew_point + 2.0, 1))
+            w_st = self._get_state(weather_sensor_id) if isinstance(weather_sensor_id, str) else None
+            w_attrs = self._get_attrs(w_st)
+            if w_attrs:
+                rh = w_attrs.get("humidity")
+                temp = w_attrs.get("temperature")
+                if isinstance(rh, (int, float)) and isinstance(temp, (int, float)) and float(rh) > 10.0:
+                    w_unit = w_attrs.get("temperature_unit") or w_attrs.get("unit_of_measurement")
+                    temp_c = to_celsius(float(temp), w_unit, self.hass)
+                    dew_point = self._compute_dew_point(temp_c, float(rh))
+                    if dew_point is not None:
+                        safe_floor = max(safe_floor, round(dew_point + 2.0, 1))
 
         return safe_floor
 
@@ -511,7 +524,7 @@ class CentralHeatPumpBackend(BoilerBackend):
         wanted_on = norm_demand > 0.0 or frost_emergency
 
         domain = self.hp_entity.split(".")[0] if "." in self.hp_entity else self.hp_type
-        st = self.hass.states.get(self.hp_entity) if hasattr(self.hass, "states") and self.hass.states else None
+        st = self._get_state(self.hp_entity)
 
         # Anti-short-cycling guard for heat pump compressor (L3 / ORACLE-3)
         now = time.monotonic()
@@ -609,10 +622,14 @@ class CentralHeatPumpBackend(BoilerBackend):
         diag = getattr(self.coordinator, "plant_diagnostics", None)
         confirmed_hp_on = bool(self._current_running_state)
         if diag:
-            if hasattr(diag, "record_generator_state"):
+            try:
                 diag.record_generator_state("heat_pump", confirmed_hp_on)
-            elif hasattr(diag, "record_boiler_state") and not getattr(self.coordinator, "enable_gas_heater", False):
-                diag.record_boiler_state(confirmed_hp_on)
+            except AttributeError:
+                if not getattr(self.coordinator, "enable_gas_heater", False):
+                    try:
+                        diag.record_boiler_state(confirmed_hp_on)
+                    except AttributeError:
+                        pass
 
         try:
             if domain == "switch" or self.hp_type == HP_TYPE_SWITCH:
@@ -630,7 +647,7 @@ class CentralHeatPumpBackend(BoilerBackend):
                 await self._async_set_number(st, wanted_on, target_temp)
 
             if self.ch_switch:
-                sw_st = self.hass.states.get(self.ch_switch) if hasattr(self.hass, "states") and self.hass.states else None
+                sw_st = self._get_state(self.ch_switch)
                 sw_on = (sw_st.state == "on") if sw_st else None
                 if sw_on != wanted_on:
                     await self.hass.services.async_call(

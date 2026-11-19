@@ -198,7 +198,7 @@ class MultizoneCoordinator:
 
     def get_climate_entity(self, climate_id: str) -> Any | None:
         """Return registered climate entity for a zone id or alias."""
-        canon = self.resolve_zone_id(climate_id) if hasattr(self, "resolve_zone_id") else climate_id
+        canon = self.resolve_zone_id(climate_id)
         return self._climate_entities.get(canon) or self._climate_entities.get(climate_id)
 
     @property
@@ -248,10 +248,15 @@ class MultizoneCoordinator:
     def reset_last_active_time(self) -> None:
         """Reset the last active time timestamp to now."""
         self._last_active_time = time.monotonic()
-        if hasattr(self, "_settings") and isinstance(self._settings, dict):
-            self._settings["last_active_wall_time"] = time.time()
-        if hasattr(self, "storage") and hasattr(self.storage, "debounced_save_settings"):
-            self.storage.debounced_save_settings()
+        settings = getattr(self, "_settings", None)
+        if isinstance(settings, dict):
+            settings["last_active_wall_time"] = time.time()
+        st = getattr(self, "storage", None)
+        if st is not None:
+            try:
+                st.debounced_save_settings()
+            except AttributeError:
+                pass
 
     @property
     def is_modulating_plant(self) -> bool:
@@ -295,7 +300,7 @@ class MultizoneCoordinator:
             if details:
                 entry.update(details)
             self._diagnostics_history.append(entry)
-        except Exception:
+        except (ValueError, TypeError, KeyError, AttributeError):
             pass
 
     @property
@@ -311,8 +316,11 @@ class MultizoneCoordinator:
     def get_persistent_data(self, key: str, default: Any = None) -> Any:
         """Get a persistent setting."""
         st = getattr(self, "storage", None)
-        if st is not None and hasattr(st, "get_data"):
-            return st.get_data(key, default)
+        if st is not None:
+            try:
+                return st.get_data(key, default)
+            except AttributeError:
+                pass
         settings = getattr(self, "_settings", None)
         if isinstance(settings, dict):
             return settings.get(key, default)
@@ -321,18 +329,23 @@ class MultizoneCoordinator:
     async def async_set_persistent_data(self, key: str, value: Any) -> None:
         """Set a persistent setting."""
         st = getattr(self, "storage", None)
-        if st is not None and hasattr(st, "async_set_data"):
-            await st.async_set_data(key, value)
-            return
-        if hasattr(self, "_settings") and isinstance(self._settings, dict):
-            self._settings[key] = value
+        if st is not None:
+            try:
+                await st.async_set_data(key, value)
+                return
+            except AttributeError:
+                pass
+        settings = getattr(self, "_settings", None)
+        if isinstance(settings, dict):
+            settings[key] = value
         settings_store = getattr(self, "_settings_store", None)
         if settings_store is not None:
             await settings_store.async_save(self._settings)
 
     def debounced_save_thermal_states(self, thermal_models) -> None:
-        if hasattr(self, "storage") and self.storage:
-            self.storage.debounced_save_thermal_states(thermal_models)
+        st = getattr(self, "storage", None)
+        if st is not None:
+            st.debounced_save_thermal_states(thermal_models)
 
     async def async_load_storage(self) -> None:
         """Load stored window states and presets."""
@@ -386,26 +399,31 @@ class MultizoneCoordinator:
         """Return True if a dedicated heat-pump min cycle time was explicitly configured."""
         if getattr(self, flag_attr, False) is True:
             return True
-        if hasattr(self, "get_persistent_data"):
-            persisted = self.get_persistent_data(persist_key, None)
-            if persisted is not None and not isinstance(persisted, bool) and isinstance(persisted, (int, float, str)):
-                try:
-                    float(persisted)
-                    return True
-                except (ValueError, TypeError):
-                    return False
+        persisted = self.get_persistent_data(persist_key, None)
+        if persisted is not None and not isinstance(persisted, bool) and isinstance(persisted, (int, float, str)):
+            try:
+                float(persisted)
+                return True
+            except (ValueError, TypeError):
+                return False
         return False
 
     def set_min_cycle_on(self, value: float) -> None:
         self._min_cycle_on = float(value)
         bb = getattr(self, "boiler_backend", None)
-        if bb is not None and hasattr(bb, "set_min_cycle_on"):
-            bb.set_min_cycle_on(int(value))
+        if bb is not None:
+            try:
+                bb.set_min_cycle_on(int(value))
+            except AttributeError:
+                pass
         hp = getattr(self, "heat_pump_backend", None)
-        if hp is not None and hasattr(hp, "set_min_cycle_on") and not self._has_dedicated_hp_cycle_setting(
+        if hp is not None and not self._has_dedicated_hp_cycle_setting(
             "_hp_min_cycle_on_explicit", KEY_HP_MIN_CYCLE_ON
         ):
-            hp.set_min_cycle_on(float(value))
+            try:
+                hp.set_min_cycle_on(float(value))
+            except AttributeError:
+                pass
 
     @property
     def min_cycle_off(self) -> float:
@@ -415,13 +433,19 @@ class MultizoneCoordinator:
     def set_min_cycle_off(self, value: float) -> None:
         self._min_cycle_off = float(value)
         bb = getattr(self, "boiler_backend", None)
-        if bb is not None and hasattr(bb, "set_min_cycle_off"):
-            bb.set_min_cycle_off(int(value))
+        if bb is not None:
+            try:
+                bb.set_min_cycle_off(int(value))
+            except AttributeError:
+                pass
         hp = getattr(self, "heat_pump_backend", None)
-        if hp is not None and hasattr(hp, "set_min_cycle_off") and not self._has_dedicated_hp_cycle_setting(
+        if hp is not None and not self._has_dedicated_hp_cycle_setting(
             "_hp_min_cycle_off_explicit", KEY_HP_MIN_CYCLE_OFF
         ):
-            hp.set_min_cycle_off(float(value))
+            try:
+                hp.set_min_cycle_off(float(value))
+            except AttributeError:
+                pass
 
     @property
     def hp_min_cycle_on(self) -> float:
@@ -432,8 +456,11 @@ class MultizoneCoordinator:
         self._hp_min_cycle_on = float(value)
         self._hp_min_cycle_on_explicit = True
         hp = getattr(self, "heat_pump_backend", None)
-        if hp is not None and hasattr(hp, "set_min_cycle_on"):
-            hp.set_min_cycle_on(float(value))
+        if hp is not None:
+            try:
+                hp.set_min_cycle_on(float(value))
+            except AttributeError:
+                pass
 
     @property
     def hp_min_cycle_off(self) -> float:
@@ -444,8 +471,11 @@ class MultizoneCoordinator:
         self._hp_min_cycle_off = float(value)
         self._hp_min_cycle_off_explicit = True
         hp = getattr(self, "heat_pump_backend", None)
-        if hp is not None and hasattr(hp, "set_min_cycle_off"):
-            hp.set_min_cycle_off(float(value))
+        if hp is not None:
+            try:
+                hp.set_min_cycle_off(float(value))
+            except AttributeError:
+                pass
 
     @property
     def valve_delay(self) -> float:
@@ -454,12 +484,13 @@ class MultizoneCoordinator:
 
     def set_valve_delay(self, value: float) -> None:
         self._valve_delay = float(value)
-        bb = getattr(self, "boiler_backend", None)
-        if bb is not None and hasattr(bb, "set_valve_delay"):
-            bb.set_valve_delay(int(value))
-        hp = getattr(self, "heat_pump_backend", None)
-        if hp is not None and hasattr(hp, "set_valve_delay"):
-            hp.set_valve_delay(int(value))
+        for backend_attr in ("boiler_backend", "heat_pump_backend"):
+            backend = getattr(self, backend_attr, None)
+            if backend is not None:
+                try:
+                    backend.set_valve_delay(int(value))
+                except AttributeError:
+                    pass
 
     @property
     def master_enabled(self) -> bool:
@@ -474,8 +505,9 @@ class MultizoneCoordinator:
     def set_master_state(self, state: bool) -> None:
         """Set master state (called by master switch entity)."""
         self._master_state = state
-        if state and hasattr(self, "split_manager") and self.split_manager:
-            self.split_manager.reset_all_local_manual_overrides()
+        split_mgr = getattr(self, "split_manager", None)
+        if state and split_mgr is not None:
+            split_mgr.reset_all_local_manual_overrides()
 
     async def async_set_master_enable(self, state: bool) -> None:
         """Set master enable state asynchronously and apply actions."""
@@ -521,8 +553,9 @@ class MultizoneCoordinator:
 
     def is_zone_in_frost_emergency(self, climate_id: str) -> bool:
         """Return True if anti-frost is enabled and zone temperature is below the safety threshold."""
-        if hasattr(self, "frost_manager") and self.frost_manager:
-            return self.frost_manager.is_zone_in_frost_emergency(climate_id)
+        fm = getattr(self, "frost_manager", None)
+        if fm is not None:
+            return fm.is_zone_in_frost_emergency(climate_id)
         return False
 
     def is_split_heating_allowed(self) -> bool:
@@ -611,7 +644,7 @@ class MultizoneCoordinator:
 
     def notify_climate(self, climate_id: str) -> None:
         """Trigger state update callback for a single climate entity."""
-        canon = self.resolve_zone_id(climate_id) if hasattr(self, "resolve_zone_id") else climate_id
+        canon = self.resolve_zone_id(climate_id)
         cb = self._climate_callbacks.get(canon) or self._climate_callbacks.get(climate_id)
         if cb:
             cb()
@@ -623,11 +656,13 @@ class MultizoneCoordinator:
 
     async def async_update_all_climates(self) -> None:
         """Trigger zone controller re-evaluation and state write on all registered zones."""
+        zc = getattr(self, "zone_controller", None)
+        states = self.hass.states if self.hass else None
         for entity_id, cb in list(self._climate_callbacks.items()):
-            if hasattr(self, "zone_controller") and self.zone_controller and hasattr(self, "hass") and self.hass:
-                st = self.hass.states.get(entity_id) if hasattr(self.hass, "states") else None
+            if zc is not None and states is not None:
+                st = states.get(entity_id)
                 if st is not None:
-                    coro = self.zone_controller.async_update_zone(entity_id, st)
+                    coro = zc.async_update_zone(entity_id, st)
                     if inspect.iscoroutine(coro):
                         await coro
             cb()

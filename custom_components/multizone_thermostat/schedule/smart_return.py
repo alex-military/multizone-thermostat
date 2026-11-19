@@ -68,7 +68,7 @@ class SmartReturnPlanner:
             except TypeError:
                 try:
                     return float(self._resolve_preset_temp_fn(preset))
-                except Exception:
+                except (ValueError, TypeError, AttributeError):
                     pass
 
         if hasattr(self.coordinator, "get_DynamicPresets") and callable(self.coordinator.get_DynamicPresets):

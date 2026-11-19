@@ -23,11 +23,27 @@ TO_REDACT = {
 }
 
 
+def _pid_params(pid_wrapper: Any) -> dict[str, float] | None:
+    """Extract Kp/Ki/Kd gains from a MultizonePID wrapper safely."""
+    if not pid_wrapper:
+        return None
+    inner = getattr(pid_wrapper, "_pid", None)
+    return {
+        "kp": inner._Kp if inner is not None else 0.0,
+        "ki": inner._Ki if inner is not None else 0.0,
+        "kd": inner._Kd if inner is not None else 0.0,
+    }
+
+
 async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, entry: ConfigEntry
 ) -> dict[str, Any]:
     """Return diagnostics for a config entry."""
     coordinator: MultizoneCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+    plant_diag = getattr(coordinator, "plant_diagnostics", None)
+    hp_backend = getattr(coordinator, "heat_pump_backend", None)
+    boiler_reason = getattr(coordinator, "boiler_status_reason", "N/A")
+    anti_seize_mgr = getattr(coordinator, "anti_seize_manager", None)
 
     # 1. Config Entry Data & Options (redacted for privacy)
     entry_dict = {
@@ -44,11 +60,11 @@ async def async_get_config_entry_diagnostics(
         "boiler_mode": coordinator.boiler_mode,
         "boiler_switch": coordinator.boiler_switch,
         "opentherm_entity": coordinator.opentherm_entity,
-        "opentherm_diagnostics": coordinator.plant_diagnostics.get_opentherm_diagnostics() if hasattr(coordinator, "plant_diagnostics") else None,
+        "opentherm_diagnostics": plant_diag.get_opentherm_diagnostics() if plant_diag is not None else None,
         "dhw_active_sensor": getattr(coordinator, "dhw_active_sensor", None),
         "is_dhw_active": coordinator.is_dhw_active,
         "master_state": coordinator.get_master_state(),
-        "boiler_status_reason": getattr(coordinator, "boiler_status_reason", "N/A"),
+        "boiler_status_reason": boiler_reason,
         "current_global_preset": coordinator.zone_manager.current_global_preset,
         "geofencing_configured": bool(entry.data.get("geofencing_enabled", False)),
         "geofencing_enabled": coordinator.get_persistent_data("geofencing_toggle", True),
@@ -58,14 +74,14 @@ async def async_get_config_entry_diagnostics(
         "min_cycle_off_minutes": coordinator._min_cycle_off,
         "valve_delay_seconds": coordinator._valve_delay,
         "pre_window_state": coordinator._pre_window_state,
-        "anti_seize_running": hasattr(coordinator, "anti_seize_manager") and coordinator.anti_seize_manager.is_running,
+        "anti_seize_running": bool(anti_seize_mgr and anti_seize_mgr.is_running),
         "last_active_time_uptime": round(coordinator._last_active_time, 1),
         # Heat Pump parameters & state
         "enable_heat_pump": getattr(coordinator, "enable_heat_pump", False),
         "heat_pump_cooling": getattr(coordinator, "heat_pump_cooling", False),
-        "hp_cool_min_temp": getattr(coordinator, "hp_cool_min_temp", getattr(coordinator.heat_pump_backend, "cool_min_temp", 7.0) if getattr(coordinator, "heat_pump_backend", None) else 7.0),
-        "hp_cool_max_temp": getattr(coordinator, "hp_cool_max_temp", getattr(coordinator.heat_pump_backend, "cool_max_temp", 18.0) if getattr(coordinator, "heat_pump_backend", None) else 18.0),
-        "heat_pump_status_reason": getattr(coordinator.heat_pump_backend, "status_reason", getattr(coordinator, "boiler_status_reason", "N/A")) if getattr(coordinator, "heat_pump_backend", None) else "N/A",
+        "hp_cool_min_temp": getattr(coordinator, "hp_cool_min_temp", hp_backend.cool_min_temp if hp_backend else 7.0),
+        "hp_cool_max_temp": getattr(coordinator, "hp_cool_max_temp", hp_backend.cool_max_temp if hp_backend else 18.0),
+        "heat_pump_status_reason": getattr(hp_backend, "status_reason", boiler_reason) if hp_backend else "N/A",
         # Energy Management
         "energy_management_enabled": getattr(coordinator, "energy_management_enabled", False),
     }
@@ -75,6 +91,12 @@ async def async_get_config_entry_diagnostics(
 
     # 3. Zones Diagnostic Details
     zones_diag: dict[str, Any] = {}
+    pids_cool = getattr(coordinator, "_pids_cool", {})
+    if not pids_cool:
+        try:
+            pids_cool = coordinator.zone_controller.pids_cool()
+        except AttributeError:
+            pids_cool = {}
     for zone in coordinator.zones:
         z_name = zone.get("name", "Unknown")
         climate_id = make_zone_entity_id(z_name)
@@ -86,16 +108,13 @@ async def async_get_config_entry_diagnostics(
         tuner_cool = coordinator.zone_controller.get_autotuner(climate_id, mode="cool")
         thermal = coordinator.zone_controller.get_thermal_model(climate_id)
         pid = coordinator._pids.get(climate_id)
-        pids_cool = getattr(coordinator, "_pids_cool", {})
-        if not pids_cool and hasattr(coordinator, "zone_controller") and hasattr(coordinator.zone_controller, "pids_cool"):
-            pids_cool = coordinator.zone_controller.pids_cool()
         pid_cool = pids_cool.get(climate_id) if isinstance(pids_cool, dict) else None
 
-        plant_diag = getattr(coordinator, "plant_diagnostics", None)
-        if plant_diag and hasattr(plant_diag, "get_zone_battery_level"):
-            battery_level = plant_diag.get_zone_battery_level(climate_id)
-        elif plant_diag and zone.get("temp_sensor"):
-            battery_level = plant_diag.get_battery_level(zone.get("temp_sensor"))
+        if plant_diag is not None:
+            try:
+                battery_level = plant_diag.get_zone_battery_level(climate_id)
+            except AttributeError:
+                battery_level = plant_diag.get_battery_level(zone.get("temp_sensor")) if zone.get("temp_sensor") else None
         else:
             battery_level = None
 
@@ -109,36 +128,28 @@ async def async_get_config_entry_diagnostics(
             "climates_configured": zone.get("climates") or zone.get("climate_entities", []),
             "switches_configured": zone.get("switches") or zone.get("switch_entities", []),
             "autotuner": {
-                "state": tuner.state if tuner else "N/A",
-                "completed_cycles": len(tuner.completed_cycles) if tuner else 0,
-                "required_cycles": tuner.required_cycles if tuner else 0,
-                "kp": tuner.kp if tuner else 0.0,
-                "ki": tuner.ki if tuner else 0.0,
-                "kd": tuner.kd if tuner else 0.0,
+                "state": tuner.state,
+                "completed_cycles": len(tuner.completed_cycles),
+                "required_cycles": tuner.required_cycles,
+                "kp": tuner.kp,
+                "ki": tuner.ki,
+                "kd": tuner.kd,
             } if tuner else None,
             "autotuner_cool": {
-                "state": tuner_cool.state if tuner_cool else "N/A",
-                "completed_cycles": len(tuner_cool.completed_cycles) if tuner_cool else 0,
-                "required_cycles": tuner_cool.required_cycles if tuner_cool else 0,
-                "kp": tuner_cool.kp if tuner_cool else 0.0,
-                "ki": tuner_cool.ki if tuner_cool else 0.0,
-                "kd": tuner_cool.kd if tuner_cool else 0.0,
+                "state": tuner_cool.state,
+                "completed_cycles": len(tuner_cool.completed_cycles),
+                "required_cycles": tuner_cool.required_cycles,
+                "kp": tuner_cool.kp,
+                "ki": tuner_cool.ki,
+                "kd": tuner_cool.kd,
             } if tuner_cool else None,
             "thermal_model": {
-                "heating_rate": thermal.heating_rate if thermal else 0.0,
-                "cooling_rate": thermal.cooling_rate if thermal else 0.0,
-                "thermal_inertia": thermal.thermal_inertia if thermal else 0.0,
+                "heating_rate": thermal.heating_rate,
+                "cooling_rate": thermal.cooling_rate,
+                "thermal_inertia": thermal.thermal_inertia,
             } if thermal else None,
-            "pid_parameters": {
-                "kp": getattr(getattr(pid, "_pid", None), "_Kp", 0.0) if pid else 0.0,
-                "ki": getattr(getattr(pid, "_pid", None), "_Ki", 0.0) if pid else 0.0,
-                "kd": getattr(getattr(pid, "_pid", None), "_Kd", 0.0) if pid else 0.0,
-            } if pid else None,
-            "pid_parameters_cool": {
-                "kp": getattr(getattr(pid_cool, "_pid", None), "_Kp", 0.0) if pid_cool else 0.0,
-                "ki": getattr(getattr(pid_cool, "_pid", None), "_Ki", 0.0) if pid_cool else 0.0,
-                "kd": getattr(getattr(pid_cool, "_pid", None), "_Kd", 0.0) if pid_cool else 0.0,
-            } if pid_cool else None,
+            "pid_parameters": _pid_params(pid),
+            "pid_parameters_cool": _pid_params(pid_cool),
             "split": {
                 "split_climate_entity": zone.get("split_climate_entity") or zone.get("split_climate"),
                 "split_role": zone.get("split_role"),
@@ -149,16 +160,12 @@ async def async_get_config_entry_diagnostics(
 
         if climate_entity:
             sync_mgr = getattr(climate_entity, "_sync_manager", None)
-            pending_targets = getattr(
-                sync_mgr,
-                "_pending_trv_targets",
-                getattr(climate_entity, "_pending_trv_targets", {}),
-            )
-            last_known_targets = getattr(
-                sync_mgr,
-                "_last_known_trv_targets",
-                getattr(climate_entity, "_last_known_trv_targets", {}),
-            )
+            if sync_mgr is not None:
+                pending_targets = sync_mgr._pending_trv_targets
+                last_known_targets = sync_mgr._last_known_trv_targets
+            else:
+                pending_targets = getattr(climate_entity, "_pending_trv_targets", {})
+                last_known_targets = getattr(climate_entity, "_last_known_trv_targets", {})
             zone_info["current_temperature"] = climate_entity.current_temperature
             zone_info["target_temperature"] = climate_entity.target_temperature
             zone_info["hvac_mode"] = str(climate_entity.hvac_mode)
@@ -173,14 +180,11 @@ async def async_get_config_entry_diagnostics(
     trace_events = getattr(coordinator, "diagnostics_history", [])
 
     # 5. Physical Plant Diagnostics & Building Energy Metrics
-    plant_health = {}
-    if hasattr(coordinator, "plant_diagnostics"):
-        plant_health = coordinator.plant_diagnostics.get_plant_health_summary()
+    plant_health = plant_diag.get_plant_health_summary() if plant_diag is not None else {}
 
     # 6. Energy Management Telemetry
-    energy_telemetry = None
-    if hasattr(coordinator, "energy_manager") and coordinator.energy_manager:
-        energy_telemetry = coordinator.energy_manager.get_diagnostics()
+    energy_mgr = getattr(coordinator, "energy_manager", None)
+    energy_telemetry = energy_mgr.get_diagnostics() if energy_mgr is not None else None
 
     return {
         "timestamp": dt_util.now().isoformat(),
