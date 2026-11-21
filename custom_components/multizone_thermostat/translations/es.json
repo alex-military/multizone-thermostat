@@ -37,7 +37,11 @@
             "data": {
               "climate_entities": "Entidad Climate",
               "trv_preset_sync": "Habilitar Sincronización de Preajustes TRV",
-              "authoritative_climate_sync": "Sincronización Autoritativa del Termostato de Pared"
+              "authoritative_climate_sync": "Sincronización Autoritativa del Termostato de Pared",
+              "trv_calibration_mode": "Modo de Calibración TRV (Offset vs Temp. Externa)",
+              "trv_control_mode": "Modo de control TRV (Estándar vs Válvula por Demanda)",
+              "trv_open_boost": "Impulso de apertura por demanda (°C sobre ambiente/objetivo)",
+              "trv_close_offset": "Compensación de cierre por demanda (°C bajo temp ambiente en reposo)"
             }
           },
           "valve_settings": {
@@ -74,8 +78,8 @@
         }
       },
       "trv_calibration": {
-        "title": "Configuración de TRV (Sensor de Compensación)",
-        "description": "Seleccione las entidades de compensación (calibración) de temperatura para cada TRV en la zona {zone_name}. Por lo general, son entidades `number` proporcionadas por su integración TRV (por ejemplo, Better Thermostat, Z2M, ZHA). Si se deja vacío, usaremos la compensación de temperatura objetivo."
+        "title": "Configuración TRV (Offset / Temperatura Externa)",
+        "description": "Para cada TRV en la zona {zone_name}, seleccione una entidad `number` de offset (`local_temperature_calibration`) o una entrada absoluta de temperatura externa (`external_temperature_input`). Opcionalmente, seleccione la entidad `select` de fuente de sensor (`...__sensor_select`, p. ej. `temperature_sensor_select`) para conmutación automática remoto/local. Si se deja vacío, se usará la compensación de temperatura objetivo."
       },
       "another_zone": {
         "title": "¿Agregar otra zona?",
@@ -180,7 +184,11 @@
             "data": {
               "climate_entities": "Entidad Climate",
               "trv_preset_sync": "Habilitar Sincronización de Preajustes TRV",
-              "authoritative_climate_sync": "Sincronización Autoritativa del Termostato de Pared"
+              "authoritative_climate_sync": "Sincronización Autoritativa del Termostato de Pared",
+              "trv_calibration_mode": "Modo de Calibración TRV (Offset vs Temp. Externa)",
+              "trv_control_mode": "Modo de control TRV (Estándar vs Válvula por Demanda)",
+              "trv_open_boost": "Impulso de apertura por demanda (°C sobre ambiente/objetivo)",
+              "trv_close_offset": "Compensación de cierre por demanda (°C bajo temp ambiente en reposo)"
             }
           },
           "valve_settings": {
@@ -241,7 +249,11 @@
             "data": {
               "climate_entities": "TRVs de Zona / Climates",
               "trv_preset_sync": "Habilitar Sincronización de Preajustes TRV",
-              "authoritative_climate_sync": "Sincronización Autoritativa del Termostato de Pared"
+              "authoritative_climate_sync": "Sincronización Autoritativa del Termostato de Pared",
+              "trv_calibration_mode": "Modo de Calibración TRV (Offset vs Temp. Externa)",
+              "trv_control_mode": "Modo de control TRV (Estándar vs Válvula por Demanda)",
+              "trv_open_boost": "Impulso de apertura por demanda (°C sobre ambiente/objetivo)",
+              "trv_close_offset": "Compensación de cierre por demanda (°C bajo temp ambiente en reposo)"
             }
           },
           "valve_settings": {
@@ -281,12 +293,12 @@
         }
       },
       "trv_calibration_add": {
-        "title": "Configuración de TRV (Sensor Externo) (Agregar)",
-        "description": "Seleccione las entidades de compensación (calibración) de temperatura para cada TRV en la zona {zone_name}. Por lo general, son entidades `number` proporcionadas por su integración TRV (por ejemplo, Better Thermostat, Z2M, ZHA). Si se deja vacío, usaremos la compensación de temperatura objetivo."
+        "title": "Configuración TRV (Offset / Temperatura Externa) (Añadir)",
+        "description": "Para cada TRV en la zona {zone_name}, seleccione una entidad `number` de offset (`local_temperature_calibration`) o una entrada absoluta de temperatura externa (`external_temperature_input`). Opcionalmente, seleccione la entidad `select` de fuente de sensor (`...__sensor_select`, p. ej. `temperature_sensor_select`) para conmutación automática remoto/local. Si se deja vacío, se usará la compensación de temperatura objetivo."
       },
       "trv_calibration_edit": {
-        "title": "Configuración de TRV (Sensor Externo) (Editar)",
-        "description": "Seleccione las entidades de compensación (calibración) de temperatura para cada TRV en la zona {zone_name}. Por lo general, son entidades `number` proporcionadas por su integración TRV (por ejemplo, Better Thermostat, Z2M, ZHA). Si se deja vacío, usaremos la compensación de temperatura objetivo."
+        "title": "Configuración TRV (Offset / Temperatura Externa) (Editar)",
+        "description": "Para cada TRV en la zona {zone_name}, seleccione una entidad `number` de offset (`local_temperature_calibration`) o una entrada absoluta de temperatura externa (`external_temperature_input`). Opcionalmente, seleccione la entidad `select` de fuente de sensor (`...__sensor_select`, p. ej. `temperature_sensor_select`) para conmutación automática remoto/local. Si se deja vacío, se usará la compensación de temperatura objetivo."
       },
       "edit_weather_comp": {
         "title": "Editar Compensación Climática",

@@ -37,7 +37,11 @@
             "data": {
               "climate_entities": "Climate Entity",
               "trv_preset_sync": "Enable TRV Preset Sync",
-              "authoritative_climate_sync": "Authoritative Wall Thermostat Sync"
+              "authoritative_climate_sync": "Authoritative Wall Thermostat Sync",
+              "trv_calibration_mode": "TRV Calibration Mode (Offset vs External Temp)",
+              "trv_control_mode": "TRV Control Mode (Standard vs Demand-Driven Valve)",
+              "trv_open_boost": "Demand-Driven Open Boost (°C above room/target)",
+              "trv_close_offset": "Demand-Driven Close Offset (°C below room temp when idle)"
             }
           },
           "valve_settings": {
@@ -74,8 +78,8 @@
         }
       },
       "trv_calibration": {
-        "title": "TRV Configuration (Offset Sensor)",
-        "description": "Select the temperature offset (calibration) entities for each TRV in zone {zone_name}. These are usually `number` entities provided by your TRV integration (e.g. Better Thermostat, Z2M, ZHA). If left empty, we will use 'Target Temperature Compensation' (faking the target temp to match the external sensor).",
+        "title": "TRV Temperature Feed & Calibration",
+        "description": "For each TRV in zone {zone_name}, select either a temperature offset entity (e.g. `local_temperature_calibration`) or an absolute external temperature input entity (e.g. `external_temperature_input`). Optionally, select the TRV's sensor source `select` entity (`...__sensor_select`, e.g. `temperature_sensor_select`) for automatic remote/local fallback. If left empty, Target Temperature Compensation will be used.",
         "data": {}
       },
       "another_zone": {
@@ -182,7 +186,11 @@
             "data": {
               "climate_entities": "Climate Entity",
               "trv_preset_sync": "Enable TRV Preset Sync",
-              "authoritative_climate_sync": "Authoritative Wall Thermostat Sync"
+              "authoritative_climate_sync": "Authoritative Wall Thermostat Sync",
+              "trv_calibration_mode": "TRV Calibration Mode (Offset vs External Temp)",
+              "trv_control_mode": "TRV Control Mode (Standard vs Demand-Driven Valve)",
+              "trv_open_boost": "Demand-Driven Open Boost (°C above room/target)",
+              "trv_close_offset": "Demand-Driven Close Offset (°C below room temp when idle)"
             }
           },
           "valve_settings": {
@@ -243,7 +251,11 @@
             "data": {
               "climate_entities": "Zone TRVs / Climates",
               "trv_preset_sync": "Enable TRV Preset Sync",
-              "authoritative_climate_sync": "Authoritative Wall Thermostat Sync"
+              "authoritative_climate_sync": "Authoritative Wall Thermostat Sync",
+              "trv_calibration_mode": "TRV Calibration Mode (Offset vs External Temp)",
+              "trv_control_mode": "TRV Control Mode (Standard vs Demand-Driven Valve)",
+              "trv_open_boost": "Demand-Driven Open Boost (°C above room/target)",
+              "trv_close_offset": "Demand-Driven Close Offset (°C below room temp when idle)"
             }
           },
           "valve_settings": {
@@ -283,13 +295,13 @@
         }
       },
       "trv_calibration_add": {
-        "title": "TRV Configuration (Offset Sensor) (Add)",
-        "description": "Select the temperature offset (calibration) entities for each TRV in zone {zone_name}. These are usually `number` entities provided by your TRV integration (e.g. Better Thermostat, Z2M, ZHA). If left empty, we will use 'Target Temperature Compensation' (faking the target temp to match the external sensor).",
+        "title": "TRV Temperature Feed & Calibration (Add)",
+        "description": "For each TRV in zone {zone_name}, select either a temperature offset entity (e.g. `local_temperature_calibration`) or an absolute external temperature input entity (e.g. `external_temperature_input`). Optionally, select the TRV's sensor source `select` entity (`...__sensor_select`, e.g. `temperature_sensor_select`) for automatic remote/local fallback. If left empty, Target Temperature Compensation will be used.",
         "data": {}
       },
       "trv_calibration_edit": {
-        "title": "TRV Configuration (Offset Sensor) (Edit)",
-        "description": "Select the temperature offset (calibration) entities for each TRV in zone {zone_name}. These are usually `number` entities provided by your TRV integration (e.g. Better Thermostat, Z2M, ZHA). If left empty, we will use 'Target Temperature Compensation' (faking the target temp to match the external sensor).",
+        "title": "TRV Temperature Feed & Calibration (Edit)",
+        "description": "For each TRV in zone {zone_name}, select either a temperature offset entity (e.g. `local_temperature_calibration`) or an absolute external temperature input entity (e.g. `external_temperature_input`). Optionally, select the TRV's sensor source `select` entity (`...__sensor_select`, e.g. `temperature_sensor_select`) for automatic remote/local fallback. If left empty, Target Temperature Compensation will be used.",
         "data": {}
       },
       "edit_weather_comp": {

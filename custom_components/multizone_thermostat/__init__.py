@@ -4,6 +4,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 import inspect
 import logging
+import math
 from typing import Any
 
 from homeassistant.components.http import StaticPathConfig
@@ -376,9 +377,18 @@ async def _async_register_services(hass: HomeAssistant) -> None:
         climate_entity = call.data.get("climate_entity") or call.data.get("entity_id")
         if not climate_entity:
             return
-        kp = float(call.data["kp"]) if call.data.get("kp") is not None else None
-        ki = float(call.data["ki"]) if call.data.get("ki") is not None else None
-        kd = float(call.data["kd"]) if call.data.get("kd") is not None else None
+
+        def _parse_pid_val(raw: Any, name: str, min_v: float, max_v: float) -> float | None:
+            if raw is None:
+                return None
+            val = float(raw)
+            if not math.isfinite(val) or not (min_v <= val <= max_v):
+                raise ValueError(f"Parameter '{name}' must be finite between {min_v} and {max_v}, got {raw!r}")
+            return val
+
+        kp = _parse_pid_val(call.data.get("kp"), "kp", 0.1, 500.0)
+        ki = _parse_pid_val(call.data.get("ki"), "ki", 0.0, 10.0)
+        kd = _parse_pid_val(call.data.get("kd"), "kd", 0.0, 50000.0)
         lock_param = call.data.get("lock_parameter")
         unlock_arg = call.data.get("unlock")
         seed_autotuner = bool(call.data.get("seed_autotuner", False))
@@ -388,9 +398,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
             if not zc or not hasattr(zc, "async_set_zone_pid"):
                 continue
             zname = _find_zone_name_for_entity(coord, climate_entity)
-            if seed_autotuner and zname and hasattr(coord, "async_set_pid_manual_unlock"):
-                await coord.async_set_pid_manual_unlock(zname, False)
-            elif unlock_arg is not None and zname and hasattr(coord, "async_set_pid_manual_unlock"):
+            if not seed_autotuner and unlock_arg is not None and zname and hasattr(coord, "async_set_pid_manual_unlock"):
                 await coord.async_set_pid_manual_unlock(zname, bool(unlock_arg))
             updated = await zc.async_set_zone_pid(
                 climate_entity,
@@ -401,6 +409,10 @@ async def _async_register_services(hass: HomeAssistant) -> None:
                 seed_autotuner=seed_autotuner,
             )
             if updated:
+                if seed_autotuner and zname and hasattr(coord, "async_set_pid_manual_unlock"):
+                    tuner = zc.get_autotuner(climate_entity) if hasattr(zc, "get_autotuner") else None
+                    if not getattr(tuner, "manual_overrides", None):
+                        await coord.async_set_pid_manual_unlock(zname, False)
                 if hasattr(coord, "async_notify_pid_entities"):
                     coord.async_notify_pid_entities()
                 orch = getattr(coord, "plant_orchestrator", None)

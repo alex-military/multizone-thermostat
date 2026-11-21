@@ -40,6 +40,16 @@ from .const import (
     CONF_ZONE_TEMP_SENSOR,
     CONF_ZONE_TARGET_TEMP,
     CONF_ZONE_CALIBRATIONS,
+    CONF_ZONE_TRV_CALIBRATION_MODE,
+    CONF_ZONE_TRV_SENSOR_SELECTS,
+    DEFAULT_TRV_CALIB_MODE,
+    CONF_ZONE_TRV_CONTROL_MODE,
+    DEFAULT_TRV_CONTROL_MODE,
+    CONF_ZONE_TRV_OPEN_BOOST,
+    DEFAULT_TRV_OPEN_BOOST,
+    CONF_ZONE_TRV_CLOSE_OFFSET,
+    DEFAULT_TRV_CLOSE_OFFSET,
+    TRV_CONTROL_MODE_DEMAND_DRIVEN,
     CONF_ZONE_ALLOW_PASSIVE_HEAT,
     CONF_ZONE_SENSOR_TIMEOUT,
     DEFAULT_SENSOR_TIMEOUT_MIN,
@@ -109,6 +119,27 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         self._valves = zone_data.get(CONF_ZONE_VALVES, [])
         self._valve_scale = zone_data.get(CONF_VALVE_SCALE, DEFAULT_VALVE_SCALE)
         self._calibrations = zone_data.get(CONF_ZONE_CALIBRATIONS, {})
+        self._trv_calibration_mode: str = zone_data.get(
+            CONF_ZONE_TRV_CALIBRATION_MODE, DEFAULT_TRV_CALIB_MODE
+        )
+        self._trv_sensor_selects: dict[str, str] = (
+            zone_data.get(CONF_ZONE_TRV_SENSOR_SELECTS, {}) or {}
+        )
+        self._trv_control_mode: str = zone_data.get(
+            CONF_ZONE_TRV_CONTROL_MODE, DEFAULT_TRV_CONTROL_MODE
+        )
+        try:
+            self._trv_open_boost: float = float(
+                zone_data.get(CONF_ZONE_TRV_OPEN_BOOST, DEFAULT_TRV_OPEN_BOOST)
+            )
+        except (ValueError, TypeError):
+            self._trv_open_boost = DEFAULT_TRV_OPEN_BOOST
+        try:
+            self._trv_close_offset: float = float(
+                zone_data.get(CONF_ZONE_TRV_CLOSE_OFFSET, DEFAULT_TRV_CLOSE_OFFSET)
+            )
+        except (ValueError, TypeError):
+            self._trv_close_offset = DEFAULT_TRV_CLOSE_OFFSET
         self._sensor_timeout_min = zone_data.get(CONF_ZONE_SENSOR_TIMEOUT, DEFAULT_SENSOR_TIMEOUT_MIN)
         self._authoritative_sync: bool = bool(
             zone_data.get(CONF_ZONE_AUTHORITATIVE_SYNC, DEFAULT_AUTHORITATIVE_SYNC)
@@ -151,6 +182,11 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             valves=self._valves,
             valve_scale=self._valve_scale,
             authoritative_sync=self._authoritative_sync,
+            calibration_mode=self._trv_calibration_mode,
+            trv_sensor_selects=self._trv_sensor_selects,
+            trv_control_mode=self._trv_control_mode,
+            trv_open_boost=self._trv_open_boost,
+            trv_close_offset=self._trv_close_offset,
         )
 
     @property
@@ -200,6 +236,12 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             "valves": self._valves,
             "valve_scale": self._valve_scale,
             "calibrations": self._calibrations,
+            "trv_calibration_mode": self._trv_calibration_mode,
+            "trv_sensor_selects": self._trv_sensor_selects,
+            "trv_control_mode": self._trv_control_mode,
+            "trv_open_boost": self._trv_open_boost,
+            "trv_close_offset": self._trv_close_offset,
+            "trv_demand_valve_open": getattr(self._sync_manager, "demand_valve_open", None),
             "hybrid_zone": True,
             "local_pwm_active": self._sync_manager.local_pwm_state,
             "boiler_entity_id": self._coordinator.boiler_switch,
@@ -354,6 +396,20 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
                 )
             )
 
+        if self._climates and self._temp_sensor and self._calibrations:
+            self._unsub_listeners.append(
+                async_track_time_interval(
+                    self.hass, self._async_ext_temp_heartbeat_tick, timedelta(minutes=10)
+                )
+            )
+
+        if self._climates and self._trv_control_mode == TRV_CONTROL_MODE_DEMAND_DRIVEN:
+            self._unsub_listeners.append(
+                async_track_time_interval(
+                    self.hass, self._async_trv_demand_tick, timedelta(seconds=10)
+                )
+            )
+
         await self._trigger_trv_sync()
         if self._valves:
             await self._sync_manager.async_sync_proportional_valves(self._hvac_mode)
@@ -378,6 +434,20 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             # attendere il prossimo aggiornamento periodico.
             self._update_current_temp()
             self.async_write_ha_state()
+            if self._safety_fallback_active and self._calibrations and self._climates:
+                self.hass.async_create_task(
+                    self._sync_manager.async_external_temp_heartbeat(
+                        master_current_temp=self._current_temperature,
+                        safety_fallback_active=True,
+                        has_external_sensor=bool(self._temp_sensor),
+                    )
+                )
+            if (
+                self._safety_fallback_active
+                and self._climates
+                and self._trv_control_mode == TRV_CONTROL_MODE_DEMAND_DRIVEN
+            ):
+                self.hass.async_create_task(self._trigger_trv_sync())
             return
 
         try:
@@ -518,12 +588,18 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
 
     async def _trigger_trv_sync(self) -> None:
         """Helper to invoke SyncManager's TRV sync."""
+        zone_demand = (
+            self._coordinator.get_zone_demand(self.entity_id)
+            if hasattr(self._coordinator, "get_zone_demand")
+            else None
+        )
         await self._sync_manager.async_sync_trvs(
             master_hvac_mode=self._hvac_mode,
             master_target_temp=self.target_temperature,
             master_current_temp=self._current_temperature,
             safety_fallback_active=self._safety_fallback_active,
-            has_external_sensor=bool(self._temp_sensor)
+            has_external_sensor=bool(self._temp_sensor),
+            zone_demand=zone_demand,
         )
 
     async def _async_pwm_tick(self, now: Any) -> None:
@@ -534,4 +610,30 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
     async def _async_valve_tick(self, now: Any) -> None:
         """Evaluate and synchronize proportional valves."""
         await self._sync_manager.async_sync_proportional_valves(self._hvac_mode)
+
+    async def _async_ext_temp_heartbeat_tick(self, now: Any) -> None:
+        """Periodically refresh external temperature feed and fallback source on TRVs."""
+        self.check_sensor_staleness()
+        await self._sync_manager.async_external_temp_heartbeat(
+            master_current_temp=self._current_temperature,
+            safety_fallback_active=self._safety_fallback_active,
+            has_external_sensor=bool(self._temp_sensor),
+        )
+
+    async def _async_trv_demand_tick(self, now: Any) -> None:
+        """Periodically re-evaluate demand-driven TRV open/close targets."""
+        self.check_sensor_staleness()
+        zone_demand = (
+            self._coordinator.get_zone_demand(self.entity_id)
+            if hasattr(self._coordinator, "get_zone_demand")
+            else None
+        )
+        await self._sync_manager.async_demand_driven_tick(
+            master_hvac_mode=self._hvac_mode,
+            master_target_temp=self.target_temperature,
+            master_current_temp=self._current_temperature,
+            safety_fallback_active=self._safety_fallback_active,
+            has_external_sensor=bool(self._temp_sensor),
+            zone_demand=zone_demand,
+        )
 

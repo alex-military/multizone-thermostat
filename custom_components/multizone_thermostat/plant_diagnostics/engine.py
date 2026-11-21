@@ -128,6 +128,7 @@ class PlantDiagnosticsEngine:
             "last_temp_seen": None,
             "last_temp_time": None,
             "last_heating_time": None,
+            "trv_closed_start_time": None,
         })
         boiler_on = self.coordinator.get_master_state() and self._current_boiler_start is not None
         return evaluate_zone_anomalies(self.coordinator, self.hass, climate_id, state, boiler_on)

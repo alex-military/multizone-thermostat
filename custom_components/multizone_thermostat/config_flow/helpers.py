@@ -81,3 +81,32 @@ def flatten_zone_user_input(user_input: dict[str, Any]) -> dict[str, Any]:
             flattened.update(sec)
     return flattened
 
+
+TRV_SENSOR_SELECT_SUFFIX = "__sensor_select"
+
+
+def parse_trv_calibration_input(
+    user_input: dict[str, Any] | None,
+    climates: list[str] | None = None,
+) -> tuple[dict[str, str], dict[str, str]]:
+    """Split TRV calibration form input into calibration entities and sensor select entities."""
+    calibrations: dict[str, str] = {}
+    sensor_selects: dict[str, str] = {}
+    if not isinstance(user_input, dict):
+        return calibrations, sensor_selects
+
+    allowed = set(climates) if climates is not None else None
+    for key, raw_val in user_input.items():
+        if not isinstance(raw_val, str):
+            continue
+        val = raw_val.strip()
+        if not val or val.lower() == "none":
+            continue
+        if key.endswith(TRV_SENSOR_SELECT_SUFFIX):
+            trv_id = key[: -len(TRV_SENSOR_SELECT_SUFFIX)]
+            if allowed is None or trv_id in allowed:
+                sensor_selects[trv_id] = val
+        elif allowed is None or key in allowed:
+            calibrations[key] = val
+    return calibrations, sensor_selects
+

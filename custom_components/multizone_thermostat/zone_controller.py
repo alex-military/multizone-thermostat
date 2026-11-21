@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import inspect
 import logging
+import math
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -121,10 +122,54 @@ class ZoneController:
         if not tuner:
             return False
         if seed_autotuner:
-            eff_kp = kp if kp is not None else tuner.kp
-            eff_ki = ki if ki is not None else tuner.ki
-            eff_kd = kd if kd is not None else tuner.kd
-            tuner.seed_learned_pid(kp=float(eff_kp), ki=float(eff_ki), kd=float(eff_kd))
+            eff_kp = kp if kp is not None else (tuner.kp if tuner.kp > 0.0 else None)
+            if eff_kp is None or not math.isfinite(float(eff_kp)) or float(eff_kp) <= 0.0:
+                _LOGGER.warning(
+                    "Cannot seed autotuner for %s without a positive Kp (got %s)",
+                    climate_id,
+                    eff_kp,
+                )
+                return False
+            is_full_seed = kp is not None and ki is not None and kd is not None
+            eff_ki = (
+                ki
+                if ki is not None
+                else (tuner._learned_ki if not is_full_seed and tuner._learned_ki > 0 else tuner.ki)
+            )
+            eff_kd = (
+                kd
+                if kd is not None
+                else (tuner._learned_kd if not is_full_seed and tuner._learned_kd > 0 else tuner.kd)
+            )
+            eff_ki_f = float(eff_ki)
+            eff_kd_f = float(eff_kd)
+            if (
+                not math.isfinite(eff_ki_f)
+                or eff_ki_f < 0.0
+                or not math.isfinite(eff_kd_f)
+                or eff_kd_f < 0.0
+            ):
+                _LOGGER.warning(
+                    "Cannot seed autotuner for %s with invalid Ki=%s or Kd=%s",
+                    climate_id,
+                    eff_ki,
+                    eff_kd,
+                )
+                return False
+            tuner.seed_learned_pid(
+                kp=float(eff_kp),
+                ki=eff_ki_f,
+                kd=eff_kd_f,
+                clear_overrides=is_full_seed,
+            )
+            if not is_full_seed:
+                if kp is not None:
+                    tuner.manual_overrides.pop("Kp", None)
+                if ki is not None:
+                    tuner.manual_overrides.pop("Ki", None)
+                if kd is not None:
+                    tuner.manual_overrides.pop("Kd", None)
+                tuner._sync_effective_pid()
         else:
             if lock_param is not None:
                 tuner.lock_param(None if str(lock_param).lower() == "all" else str(lock_param))

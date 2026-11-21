@@ -4,6 +4,7 @@ import time
 
 from homeassistant.core import HomeAssistant
 from .base import BoilerBackend
+from .valve_readiness import evaluate_trvs_ready
 from ..const import to_celsius, from_celsius
 
 _LOGGER = logging.getLogger(__name__)
@@ -21,6 +22,7 @@ class OpenThermBoilerBackend(BoilerBackend):
         min_temp: float,
         max_temp: float,
         ch_switch: str | None = None,
+        valve_delay: int = 0,
     ) -> None:
         """Initialize OpenTherm backend."""
         self.hass = hass
@@ -29,8 +31,15 @@ class OpenThermBoilerBackend(BoilerBackend):
         self.opentherm_min_temp = min_temp
         self.opentherm_max_temp = max_temp
         self.ch_switch = ch_switch
+        self._valve_delay = int(valve_delay)
+        self._trv_wait_start: float | None = None
+        self._valve_delay_start: float | None = None
         self._status_reason = "INIT"
         self._pending_command: tuple[str, float] | None = None
+
+    def set_valve_delay(self, value: int) -> None:
+        """Set the valve delay time (seconds)."""
+        self._valve_delay = int(value)
 
     @property
     def status_reason(self) -> str:
@@ -154,9 +163,59 @@ class OpenThermBoilerBackend(BoilerBackend):
                 self._pending_command = None
 
         if norm_demand > 0.0:
+            cold_start = not confirmed_on
+            if cold_start and not frost_emergency and peak_zone != "Anti-Seize":
+                trvs_ready, has_any_trvs = evaluate_trvs_ready(self.hass, self.coordinator)
+                if not trvs_ready and has_any_trvs:
+                    self._valve_delay_start = None
+                    now_mono = time.monotonic()
+                    if self._trv_wait_start is None:
+                        self._trv_wait_start = now_mono
+                    elapsed = now_mono - self._trv_wait_start
+                    if elapsed < 120.0:
+                        self._status_reason = (
+                            f"HOLD_TRV_CLOSED - Waiting for TRVs to open ({round(120.0 - elapsed)}s remaining)"
+                        )
+                        _LOGGER.warning(
+                            "OpenTherm %s: Boiler wants cold start, but demanding TRVs are closed. Waiting (%.0fs/120s)",
+                            self.opentherm_entity,
+                            elapsed,
+                        )
+                        return
+                    _LOGGER.info(
+                        "OpenTherm %s: TRV opening grace period (120s) elapsed. Proceeding with boiler ignition.",
+                        self.opentherm_entity,
+                    )
+                self._trv_wait_start = None
+
+                if self._valve_delay > 0:
+                    now_mono = time.monotonic()
+                    if self._valve_delay_start is None:
+                        self._valve_delay_start = now_mono
+                    vd_elapsed = now_mono - self._valve_delay_start
+                    if vd_elapsed < self._valve_delay:
+                        remaining = round(self._valve_delay - vd_elapsed)
+                        self._status_reason = (
+                            f"WAITING_VALVES - Valve delay active ({remaining}s remaining)"
+                        )
+                        _LOGGER.debug(
+                            "OpenTherm %s: Waiting %ss for valves to open (%ss remaining)",
+                            self.opentherm_entity,
+                            self._valve_delay,
+                            remaining,
+                        )
+                        return
+                self._valve_delay_start = None
+            else:
+                self._trv_wait_start = None
+                self._valve_delay_start = None
+
             self._status_reason = f"MODULATING - Target water: {target_temp}°C (Demand: {round(demand, 1)}% from {peak_zone or 'None'})"
-        elif self._status_reason != "OFF - Emergency/Master OFF":
-            self._status_reason = "OFF - No Demand"
+        else:
+            self._trv_wait_start = None
+            self._valve_delay_start = None
+            if self._status_reason != "OFF - Emergency/Master OFF":
+                self._status_reason = "OFF - No Demand"
 
         try:
             st = self.hass.states.get(self.opentherm_entity)
@@ -258,5 +317,7 @@ class OpenThermBoilerBackend(BoilerBackend):
 
     async def async_emergency_off(self) -> None:
         """Force OpenTherm boiler off immediately."""
+        self._trv_wait_start = None
+        self._valve_delay_start = None
         self._status_reason = "OFF - Emergency/Master OFF"
         await self.async_update(0.0, None, False)

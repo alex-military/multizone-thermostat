@@ -31,7 +31,7 @@ A comprehensive, 100% UI-configured custom integration for Home Assistant provid
 - 🔥 **Dual Boiler Drive**: Supports **ON/OFF Relay (PWM)**, **Modulating OpenTherm** (0–100% demand mapped to flow temperature), and **Centralized Condo / District Heating** (no boiler switch).
 - 🧠 **Adaptive Autotuning (Hysteresis → Silent PID)**: Starts safely in Hysteresis, passively learns room thermal response, and transitions to continuous PID with weekly smoothed EMA and per-zone manual tuning controls.
 - 🏠 **Hierarchical Zone Modes**: Per-zone `Primary`, `Secondary` (passive heat sharing), and `Bypass` selector directly on Lovelace cards.
-- 🎛️ **Broad Actuator Support**: Smart TRVs (`climate.*`, multi-TRV aggregation, physical dial sync), **0–100% / 0–10V proportional valves**, and **PWM relay actuators**.
+- 🎛️ **Broad Actuator Support**: Smart TRVs (`climate.*`, multi-TRV aggregation, physical dial sync, `external_temperature_input` feed & `select.*` sensor-source switching, **Demand-Driven** bounded overdrive), **0–100% / 0–10V proportional valves**, and **PWM relay actuators**.
 - 📅 **Weekly Scheduling, Geofencing & Smart Return**: Visual 24h schedule matrix, Local Calendar integration, presence-based presets, and predictive pre-heating based on room inertia.
 
 ### Hybrid Plant, Cooling & Solar *(v6.1.0-beta)*
@@ -41,8 +41,8 @@ A comprehensive, 100% UI-configured custom integration for Home Assistant provid
 - 🌡️ **Four-Season Dual-Track Engine**: Independent winter/summer preset memories, dual-track PID loops, indoor dew-point anti-condensation, and automatic summer card filtering.
 
 ### Safety, Diagnostics & Lovelace UI
-- 🛡️ **Plant & Pipe Safeguards**: Anti-short-cycle timers (boiler & heat pump), motorized valve opening delay, summer anti-seize exercise, persistent anti-frost protection, and window-open cutouts.
-- 🚨 **Hydraulic & Energy Diagnostics**: Stuck-valve and ghost-heating detection, wireless sensor watchdog with TRV fallback, OpenTherm telemetry & DHW priority, European Energy Class (`A4`–`G`), and thermal retention metrics.
+- 🛡️ **Plant & Pipe Safeguards**: Anti-short-cycle timers (boiler & heat pump), motorized valve opening delay & **TRV hydraulic valve-readiness guard (`HOLD_TRV_CLOSED`)**, summer anti-seize exercise, persistent anti-frost protection, and window-open cutouts.
+- 🚨 **Hydraulic & Energy Diagnostics**: Stuck-valve, TRV non-opening (`trv_not_opening`), and ghost-heating detection, wireless sensor watchdog with TRV fallback, OpenTherm telemetry & DHW priority, European Energy Class (`A4`–`G`), and thermal retention metrics.
 - 🎨 **Visual Twin Lovelace Cards & Auto-Dashboards**: Custom cards matching Home Assistant native styling and auto-generated dashboard strategies in **6 languages** (`EN`, `IT`, `ES`, `FR`, `DE`, `RU`).
 
 ---

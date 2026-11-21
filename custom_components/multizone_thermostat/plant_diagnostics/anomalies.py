@@ -16,9 +16,11 @@ from .const import (
     ANOMALY_LOW_BATTERY,
     ANOMALY_SENSOR_FAULT,
     ANOMALY_SENSOR_TIMEOUT,
+    ANOMALY_TRV_NOT_OPENING,
     ANOMALY_LABELS,
 )
-from ..const import to_celsius
+from ..boiler.valve_readiness import is_trv_reported_closed
+from ..const import CONF_ZONE_CLIMATES, to_celsius
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -474,6 +476,7 @@ def evaluate_zone_anomalies(
         # If the zone is Bypassed, it is intentionally excluded from heating
         zone_mode = coordinator.get_zone_mode(climate_id)
         if zone_mode == "bypass":
+            state["trv_closed_start_time"] = None
             state["active_anomaly"] = ANOMALY_NONE
             state["anomaly_details"] = "Zone bypassed (Excluded from heating)"
             return ANOMALY_NONE, state["anomaly_details"]
@@ -537,6 +540,42 @@ def evaluate_zone_anomalies(
                 return ANOMALY_GHOST_HEATING, state["anomaly_details"]
         else:
             state["ghost_heat_start_temp"] = None
+
+        # 4b. Active TRV Closed Diagnostic (non-blocking):
+        # Heating demand > 20% with active heat generator for > 5 min while all zone TRVs report closed/idle
+        trv_list = (
+            (zone.get(CONF_ZONE_CLIMATES) or zone.get("climates") or zone.get("climate_entities") or [])
+            if zone
+            else []
+        )
+        all_trvs_closed = False
+        if boiler_on and demand > 20.0 and trv_list:
+            any_telemetry = False
+            all_closed = True
+            for trv_eid in trv_list:
+                trv_st = hass.states.get(trv_eid)
+                closed_flag = is_trv_reported_closed(trv_st)
+                if closed_flag is None:
+                    all_closed = False
+                    break
+                any_telemetry = True
+                if not closed_flag:
+                    all_closed = False
+                    break
+            all_trvs_closed = any_telemetry and all_closed
+
+        if all_trvs_closed:
+            if state.get("trv_closed_start_time") is None:
+                state["trv_closed_start_time"] = now_mono
+            elif (now_mono - state["trv_closed_start_time"]) > 300:
+                state["active_anomaly"] = ANOMALY_TRV_NOT_OPENING
+                state["anomaly_details"] = (
+                    f"Heating demand at {round(demand, 1)}% with central generator ON for >5 min, "
+                    "but all zone TRVs still report closed/idle"
+                )
+                return ANOMALY_TRV_NOT_OPENING, state["anomaly_details"]
+        else:
+            state["trv_closed_start_time"] = None
 
         # No active anomaly
         state["active_anomaly"] = ANOMALY_NONE

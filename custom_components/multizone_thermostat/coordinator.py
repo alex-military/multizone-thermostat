@@ -209,6 +209,7 @@ class MultizoneCoordinator:
                 self.opentherm_min_temp, 
                 self.opentherm_max_temp,
                 self.opentherm_ch_switch,
+                int(getattr(self, "_valve_delay", 0)),
             )
         else:
             self.boiler_backend = RelayBoilerBackend(

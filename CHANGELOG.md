@@ -1,5 +1,21 @@
 # Changelog
 
+## [6.0.22] - 2026-11-21
+### Feat & Fix: 3-Layer TRV Architecture (Discussion #13) & Auto EMA PID Baseline Seeding (#54)
+- **TRV Layer 1 — External Temperature Feed & Sensor Source Switching**:
+  - Added per-zone `trv_calibration_mode` (`"auto"` default, `"offset"`, `"external"`) with automatic detection of `external_temperature_input` entities, °C/°F conversion, step rounding, min/max clamping, `1200 s` anti-offline heartbeat keep-alive, and `60 s` jitter rate-limit (`<= 0.1 °C`).
+  - Added optional per-TRV `trv_sensor_selects` (`select.*`) in Setup/Options TRV Calibration flows to switch TRVs between remote/external and local/internal sensor sources (filtering out `"offline"` options) and revert safely when `safety_fallback_active` triggers.
+- **TRV Layer 2 — Demand-Driven Valve Mode (`trv_control_mode: demand_driven`)**:
+  - Added optional per-zone `trv_control_mode` (`"standard"` default vs `"demand_driven"`), `trv_open_boost` (default `+1.5 °C`), and `trv_close_offset` (default `1.0 °C`) with `>= 5%` open / `0%` close hysteresis, `60 s` anti-chatter debounce, `10 s` evaluation tick (including `check_sensor_staleness()`), and idle no-chatter guard.
+  - Bounded overdrive `min(trv_max, eff_room + trv_open_boost, eff_target + trv_open_boost)` automatically reverts to `"standard"` mode on room sensor dropout/fallback while preserving relative `physical_sync` dial deltas.
+- **TRV Layer 3 — Unified Hydraulic Guard & Active Diagnostics**:
+  - Extracted shared `boiler/valve_readiness.py` supporting both valve position attributes (`> 10%`) and `hvac_action` fallback (`"heating"` vs `"idle"`/`"off"`/`"cooling"`), enforcing `HOLD_TRV_CLOSED` (up to `120 s` max) and `valve_delay` across Relay and OpenTherm cold-starts (without cutting an already-running burner).
+  - Added non-blocking active diagnostic `trv_not_opening` (`ANOMALY_TRV_NOT_OPENING`) when zone heating demand `> 20%` and central generator is ON for `> 5` minutes while all zone TRVs report closed/idle.
+- **PID Auto EMA Baseline Seed UI & Backend Hardening**:
+  - Added a "Manual Override / Auto EMA Baseline" mode switcher, `0–100%` gain scaling hint, and 3-field `Kp / Ki / Kd` baseline seed form in `zone_energy_card.js` (with `#pid-modal-cancel` re-translation on every modal open across all 6 languages) and rebuilt `multizone-thermostat-card*.js`.
+  - Preserved pure PI mode (`Kd = 0.0`) across `PassiveAutotuneObserver` weekly EMA updates and storage restarts (`_seeded_pi_only`), fixed `Kp < 10.0` weekly EMA step clamping, guarded `async_set_zone_pid` partial seeding against idle/empty `Kp` and untouched override loss, and fixed `set_pid_parameters` manual unlock switch ordering.
+- **Bilingual Documentation**: Updated `README.md` and EN/IT wiki pages (`setup_wizard.md`, `diagnostics_safety.md`, `faq_troubleshooting.md`, `entities_services.md`).
+
 ## [6.0.15] - 2026-11-15
 ### Fix: Prevent Duplicated Zone Dial Cards & False "Zona Esclusa / Bypass" Cards on Dashboard
 - **Root Cause**: `MultizonePIDManualUnlockSwitch` and `MultizoneZonePIDNumber` exposed a `climate_entity` state attribute; the Lovelace dashboard strategy (`dashboard_strategy.js`), `autoDiscoverSwitch` (`02_helpers.js`), and `scheduler_card.js` treated every `switch.*`/`select.*` with `climate_entity` as a zone mode controller, spawning a duplicate Dial Card per zone locked as "Zona Esclusa / Bypass" because PID Manual Unlock defaults to `OFF`.

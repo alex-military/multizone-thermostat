@@ -192,6 +192,11 @@ sched_nav_title: "Programmazione",
     pid_restore_backup_confirm_msg: "Ripristinare i parametri PID calcolati dall'autotuner prima dell'ultimo reset?",
     pid_restore_backup_confirm_btn: "Ripristina PID",
     pid_learning_status: "Apprendimento",
+    pid_mode_manual: "Override Manuale",
+    pid_mode_seed: "Baseline Auto EMA",
+    pid_modal_seed_info: "Imposta Kp, Ki e Kd come baseline appresa di partenza: l'autotuner continua ad ottimizzare settimanalmente via Auto EMA. Usa Kd = 0 per controllo PI puro.",
+    pid_modal_scale_note: "Scala uscita 0–100% con dt in secondi (es. Kp = 100 → 100% di richiesta con 1 °C di errore; Kd = 0 per solo PI).",
+    pid_modal_seed_save: "Imposta Baseline",
     sched_all_zones_row: "Tutte le Zone (Generale)",
     sched_base_tag: "Base"
   },
@@ -329,6 +334,11 @@ sched_nav_title: "Schedule",
     pid_restore_backup_confirm_msg: "Restore the PID parameters learned by the autotuner before the last reset?",
     pid_restore_backup_confirm_btn: "Restore PID",
     pid_learning_status: "Learning",
+    pid_mode_manual: "Manual Override",
+    pid_mode_seed: "Auto EMA Baseline",
+    pid_modal_seed_info: "Sets Kp, Ki, and Kd as the learned starting baseline so weekly Auto EMA optimization keeps refining from these values. Use Kd = 0 for pure PI control.",
+    pid_modal_scale_note: "0–100% demand scale with dt in seconds (e.g. Kp = 100 → 100% demand per 1 °C error; Kd = 0 for PI-only).",
+    pid_modal_seed_save: "Seed Baseline",
     sched_all_zones_row: "All Zones (General)",
     sched_base_tag: "Base"
   },
@@ -466,6 +476,11 @@ sched_nav_title: "Расписание",
     pid_restore_backup_confirm_msg: "Восстановить параметры PID, вычисленные автонастройкой до последнего сброса?",
     pid_restore_backup_confirm_btn: "Восстановить PID",
     pid_learning_status: "Обучение",
+    pid_mode_manual: "Ручной режим",
+    pid_mode_seed: "База Авто EMA",
+    pid_modal_seed_info: "Задает Kp, Ki и Kd как обученную стартовую базу: еженедельный Auto EMA продолжит адаптацию от этих значений. Укажите Kd = 0 для чистого PI.",
+    pid_modal_scale_note: "Шкала 0–100% запроса, dt в секундах (напр. Kp = 100 → 100% при ошибке 1 °C; Kd = 0 для PI).",
+    pid_modal_seed_save: "Задать базу",
     sched_all_zones_row: "Все зоны (Общее)",
     sched_base_tag: "База"
   },
@@ -602,6 +617,11 @@ sched_nav_title: "Programmation",
     pid_restore_backup_confirm_msg: "Restaurer les paramètres PID calculés par l'autotuner avant la dernière réinitialisation ?",
     pid_restore_backup_confirm_btn: "Restaurer PID",
     pid_learning_status: "Apprentissage",
+    pid_mode_manual: "Forçage Manuel",
+    pid_mode_seed: "Base Auto EMA",
+    pid_modal_seed_info: "Définit Kp, Ki et Kd comme base apprise initiale : l'Auto EMA hebdomadaire continue d'optimiser depuis ces valeurs. Mettez Kd = 0 pour un mode PI pur.",
+    pid_modal_scale_note: "Échelle de demande 0–100% avec dt en secondes (ex. Kp = 100 → 100% par 1 °C d'erreur ; Kd = 0 pour PI seul).",
+    pid_modal_seed_save: "Définir la base",
     sched_all_zones_row: "Toutes les Zones (Général)",
     sched_base_tag: "Base"
   },
@@ -737,6 +757,11 @@ sched_nav_title: "Zeitplan",
     pid_restore_backup_confirm_msg: "Die vor dem letzten Zurücksetzen vom Autotuner gelernten PID-Parameter wiederherstellen?",
     pid_restore_backup_confirm_btn: "PID Wiederherstellen",
     pid_learning_status: "Lernen",
+    pid_mode_manual: "Manueller Override",
+    pid_mode_seed: "Auto-EMA-Basis",
+    pid_modal_seed_info: "Setzt Kp, Ki und Kd als gelernte Startbasis, sodass die wöchentliche Auto-EMA-Optimierung darauf aufbaut. Kd = 0 für reinen PI-Betrieb.",
+    pid_modal_scale_note: "0–100% Bedarfsskala mit dt in Sekunden (z. B. Kp = 100 → 100% pro 1 °C Fehler; Kd = 0 für reinen PI).",
+    pid_modal_seed_save: "Basis setzen",
     sched_all_zones_row: "Alle Zonen (Allgemein)",
     sched_base_tag: "Basis"
   },
@@ -873,6 +898,11 @@ sched_nav_title: "Programación",
     pid_restore_backup_confirm_msg: "¿Restaurar los parámetros PID calculados por el autotuner antes del último reinicio?",
     pid_restore_backup_confirm_btn: "Restaurar PID",
     pid_learning_status: "Aprendiendo",
+    pid_mode_manual: "Anulación Manual",
+    pid_mode_seed: "Base Auto EMA",
+    pid_modal_seed_info: "Establece Kp, Ki y Kd como base aprendida inicial para que Auto EMA semanal siga optimizando desde estos valores. Usa Kd = 0 para PI puro.",
+    pid_modal_scale_note: "Escala 0–100% de demanda con dt en segundos (ej. Kp = 100 → 100% por 1 °C de error; Kd = 0 para solo PI).",
+    pid_modal_seed_save: "Fijar Base",
     sched_all_zones_row: "Todas las Zonas (General)",
     sched_base_tag: "Base"
   }
@@ -5414,6 +5444,47 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
         font-size: 1em;
         font-weight: 600;
       }
+      .pid-modal-mode-tabs {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 10px;
+      }
+      .pid-mode-tab {
+        flex: 1;
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        background: rgba(15, 23, 42, 0.45);
+        color: var(--secondary-text-color, #94a3b8);
+        border-radius: 8px;
+        padding: 6px 8px;
+        font-size: 0.78em;
+        font-weight: 600;
+        cursor: pointer;
+        text-align: center;
+      }
+      .pid-mode-tab.active {
+        background: rgba(245, 158, 11, 0.16);
+        border-color: rgba(245, 158, 11, 0.55);
+        color: #fbbf24;
+      }
+      .pid-modal-scale-note {
+        font-size: 0.76em;
+        line-height: 1.4;
+        color: var(--secondary-text-color, #94a3b8);
+        background: rgba(56, 189, 248, 0.08);
+        border: 1px solid rgba(56, 189, 248, 0.22);
+        border-radius: 8px;
+        padding: 8px 10px;
+        margin-bottom: 10px;
+      }
+      .pid-modal-seed-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        margin-bottom: 14px;
+      }
+      .pid-modal-seed-grid .pid-modal-input-wrap {
+        margin-bottom: 0;
+      }
       .pid-modal-actions {
         display: flex;
         justify-content: flex-end;
@@ -5538,10 +5609,29 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
       <div class="pid-modal-backdrop" id="pid-modal-backdrop">
         <div class="pid-modal">
           <div class="pid-modal-title" id="pid-modal-title"></div>
+          <div class="pid-modal-mode-tabs" id="pid-modal-mode-tabs" style="display:none;">
+            <button type="button" class="pid-mode-tab active" id="pid-tab-manual" data-mode="manual"></button>
+            <button type="button" class="pid-mode-tab" id="pid-tab-seed" data-mode="seed"></button>
+          </div>
           <div class="pid-modal-warn" id="pid-modal-warn"></div>
+          <div class="pid-modal-scale-note" id="pid-modal-scale-note" style="display:none;"></div>
           <div class="pid-modal-input-wrap" id="pid-modal-input-wrap">
             <label for="pid-modal-input" id="pid-modal-input-label"></label>
             <input type="number" id="pid-modal-input" />
+          </div>
+          <div class="pid-modal-seed-grid" id="pid-modal-seed-wrap" style="display:none;">
+            <div class="pid-modal-input-wrap">
+              <label for="pid-seed-kp">Kp</label>
+              <input type="number" id="pid-seed-kp" min="0.1" max="500" step="0.1" />
+            </div>
+            <div class="pid-modal-input-wrap">
+              <label for="pid-seed-ki">Ki</label>
+              <input type="number" id="pid-seed-ki" min="0" max="10" step="0.0001" />
+            </div>
+            <div class="pid-modal-input-wrap">
+              <label for="pid-seed-kd">Kd</label>
+              <input type="number" id="pid-seed-kd" min="0" max="50000" step="1" />
+            </div>
           </div>
           <div class="pid-modal-actions">
             <button type="button" class="pid-btn pid-btn-cancel" id="pid-modal-cancel">${t('pid_modal_cancel')}</button>
@@ -5561,6 +5651,7 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
   _bindPidEvents() {
     this._activePidParam = null;
     this._modalMode = null;
+    this._pidEditAction = 'manual';
 
     const closeModal = () => {
       const backdrop = this.shadowRoot.getElementById('pid-modal-backdrop');
@@ -5618,6 +5709,16 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
       });
     }
 
+    const manualTab = this.shadowRoot.getElementById('pid-tab-manual');
+    const seedTab = this.shadowRoot.getElementById('pid-tab-seed');
+    [manualTab, seedTab].forEach((tab) => {
+      if (!tab) return;
+      tab.addEventListener('click', () => {
+        if (this._modalMode !== 'edit') return;
+        this._setPidEditAction(tab.dataset.mode);
+      });
+    });
+
     const confirmBtn = this.shadowRoot.getElementById('pid-modal-confirm');
     if (confirmBtn) {
       confirmBtn.addEventListener('click', async () => {
@@ -5637,6 +5738,25 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
           return;
         }
         if (this._modalMode === 'edit' && this._activePidParam) {
+          if (this._pidEditAction === 'seed') {
+            const kpEl = this.shadowRoot.getElementById('pid-seed-kp');
+            const kiEl = this.shadowRoot.getElementById('pid-seed-ki');
+            const kdEl = this.shadowRoot.getElementById('pid-seed-kd');
+            const kp = kpEl ? parseFloat(kpEl.value) : NaN;
+            const ki = kiEl ? parseFloat(kiEl.value) : NaN;
+            const kd = kdEl ? parseFloat(kdEl.value) : NaN;
+            if (!isNaN(kp) && kp >= 0.1 && !isNaN(ki) && ki >= 0 && !isNaN(kd) && kd >= 0) {
+              await this._hass.callService('multizone_thermostat', 'set_pid_parameters', {
+                climate_entity: this._config.entity,
+                kp,
+                ki,
+                kd,
+                seed_autotuner: true,
+              });
+            }
+            closeModal();
+            return;
+          }
           const inputEl = this.shadowRoot.getElementById('pid-modal-input');
           const parsed = inputEl ? parseFloat(inputEl.value) : NaN;
           if (!isNaN(parsed)) {
@@ -5652,6 +5772,37 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
     }
   }
 
+  _setPidEditAction(action) {
+    const t = (k) => getTranslation(this._hass, k);
+    this._pidEditAction = action === 'seed' ? 'seed' : 'manual';
+    const manualTab = this.shadowRoot.getElementById('pid-tab-manual');
+    const seedTab = this.shadowRoot.getElementById('pid-tab-seed');
+    const warnEl = this.shadowRoot.getElementById('pid-modal-warn');
+    const inputWrap = this.shadowRoot.getElementById('pid-modal-input-wrap');
+    const seedWrap = this.shadowRoot.getElementById('pid-modal-seed-wrap');
+    const restoreBtn = this.shadowRoot.getElementById('pid-modal-restore');
+    const confirmBtn = this.shadowRoot.getElementById('pid-modal-confirm');
+
+    if (manualTab) manualTab.classList.toggle('active', this._pidEditAction === 'manual');
+    if (seedTab) seedTab.classList.toggle('active', this._pidEditAction === 'seed');
+    if (warnEl) {
+      warnEl.innerText = this._pidEditAction === 'seed' ? t('pid_modal_seed_info') : t('pid_modal_warn');
+    }
+    if (inputWrap) inputWrap.style.display = this._pidEditAction === 'manual' ? 'block' : 'none';
+    if (seedWrap) seedWrap.style.display = this._pidEditAction === 'seed' ? 'grid' : 'none';
+    if (restoreBtn) {
+      const overrides = (this._latestPidInfo && this._latestPidInfo.overrides) || [];
+      restoreBtn.style.display = (this._pidEditAction === 'manual' && overrides.includes(this._activePidParam))
+        ? 'inline-block'
+        : 'none';
+      restoreBtn.innerText = t('pid_modal_restore');
+    }
+    if (confirmBtn) {
+      confirmBtn.className = 'pid-btn pid-btn-save';
+      confirmBtn.innerText = this._pidEditAction === 'seed' ? t('pid_modal_seed_save') : t('pid_modal_save');
+    }
+  }
+
   _openPidEditModal(param) {
     const t = (k) => getTranslation(this._hass, k);
     this._modalMode = 'edit';
@@ -5659,23 +5810,32 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
 
     const specs = {
       Kp: { min: 0.1, max: 500, step: 0.1 },
-      Ki: { min: 0, max: 1, step: 0.0001 },
+      Ki: { min: 0, max: 10, step: 0.0001 },
       Kd: { min: 0, max: 50000, step: 1 },
     }[param];
 
     const titleEl = this.shadowRoot.getElementById('pid-modal-title');
-    const warnEl = this.shadowRoot.getElementById('pid-modal-warn');
-    const inputWrap = this.shadowRoot.getElementById('pid-modal-input-wrap');
+    const modeTabs = this.shadowRoot.getElementById('pid-modal-mode-tabs');
+    const manualTab = this.shadowRoot.getElementById('pid-tab-manual');
+    const seedTab = this.shadowRoot.getElementById('pid-tab-seed');
+    const scaleNoteEl = this.shadowRoot.getElementById('pid-modal-scale-note');
     const labelEl = this.shadowRoot.getElementById('pid-modal-input-label');
     const inputEl = this.shadowRoot.getElementById('pid-modal-input');
-    const restoreBtn = this.shadowRoot.getElementById('pid-modal-restore');
-    const confirmBtn = this.shadowRoot.getElementById('pid-modal-confirm');
+    const seedKpEl = this.shadowRoot.getElementById('pid-seed-kp');
+    const seedKiEl = this.shadowRoot.getElementById('pid-seed-ki');
+    const seedKdEl = this.shadowRoot.getElementById('pid-seed-kd');
+    const cancelBtn = this.shadowRoot.getElementById('pid-modal-cancel');
     const valEl = this.shadowRoot.getElementById(`pid-val-${param.toLowerCase()}`);
     const backdrop = this.shadowRoot.getElementById('pid-modal-backdrop');
 
     if (titleEl) titleEl.innerText = `⚠️ ${t('pid_modal_title')} (${param})`;
-    if (warnEl) warnEl.innerText = t('pid_modal_warn');
-    if (inputWrap) inputWrap.style.display = 'block';
+    if (modeTabs) modeTabs.style.display = 'flex';
+    if (manualTab) manualTab.innerText = t('pid_mode_manual');
+    if (seedTab) seedTab.innerText = t('pid_mode_seed');
+    if (scaleNoteEl) {
+      scaleNoteEl.style.display = 'block';
+      scaleNoteEl.innerText = t('pid_modal_scale_note');
+    }
     if (labelEl) labelEl.innerText = `${t('pid_modal_value')} (${param})`;
     if (inputEl && specs) {
       inputEl.min = String(specs.min);
@@ -5684,15 +5844,12 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
       const curNum = valEl ? parseFloat(valEl.innerText) : NaN;
       inputEl.value = isNaN(curNum) ? '0' : String(curNum);
     }
-    if (restoreBtn) {
-      const overrides = (this._latestPidInfo && this._latestPidInfo.overrides) || [];
-      restoreBtn.style.display = overrides.includes(param) ? 'inline-block' : 'none';
-      restoreBtn.innerText = t('pid_modal_restore');
-    }
-    if (confirmBtn) {
-      confirmBtn.className = 'pid-btn pid-btn-save';
-      confirmBtn.innerText = t('pid_modal_save');
-    }
+    const latest = this._latestPidInfo || {};
+    if (seedKpEl) seedKpEl.value = (latest.kp !== null && latest.kp !== undefined && Number(latest.kp) > 0) ? String(latest.kp) : '100';
+    if (seedKiEl) seedKiEl.value = (latest.ki !== null && latest.ki !== undefined) ? String(latest.ki) : '0.1';
+    if (seedKdEl) seedKdEl.value = (latest.kd !== null && latest.kd !== undefined) ? String(latest.kd) : '0';
+    if (cancelBtn) cancelBtn.innerText = t('pid_modal_cancel');
+    this._setPidEditAction('manual');
     if (backdrop) backdrop.classList.add('open');
   }
 
@@ -5702,15 +5859,23 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
     this._activePidParam = null;
 
     const titleEl = this.shadowRoot.getElementById('pid-modal-title');
+    const modeTabs = this.shadowRoot.getElementById('pid-modal-mode-tabs');
     const warnEl = this.shadowRoot.getElementById('pid-modal-warn');
+    const scaleNoteEl = this.shadowRoot.getElementById('pid-modal-scale-note');
     const inputWrap = this.shadowRoot.getElementById('pid-modal-input-wrap');
+    const seedWrap = this.shadowRoot.getElementById('pid-modal-seed-wrap');
+    const cancelBtn = this.shadowRoot.getElementById('pid-modal-cancel');
     const restoreBtn = this.shadowRoot.getElementById('pid-modal-restore');
     const confirmBtn = this.shadowRoot.getElementById('pid-modal-confirm');
     const backdrop = this.shadowRoot.getElementById('pid-modal-backdrop');
 
     if (titleEl) titleEl.innerText = `🔄 ${t('pid_reset_title')}`;
+    if (modeTabs) modeTabs.style.display = 'none';
     if (warnEl) warnEl.innerText = t('pid_reset_confirm_msg');
+    if (scaleNoteEl) scaleNoteEl.style.display = 'none';
     if (inputWrap) inputWrap.style.display = 'none';
+    if (seedWrap) seedWrap.style.display = 'none';
+    if (cancelBtn) cancelBtn.innerText = t('pid_modal_cancel');
     if (restoreBtn) restoreBtn.style.display = 'none';
     if (confirmBtn) {
       confirmBtn.className = 'pid-btn pid-btn-danger';
@@ -5725,8 +5890,12 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
     this._activePidParam = null;
 
     const titleEl = this.shadowRoot.getElementById('pid-modal-title');
+    const modeTabs = this.shadowRoot.getElementById('pid-modal-mode-tabs');
     const warnEl = this.shadowRoot.getElementById('pid-modal-warn');
+    const scaleNoteEl = this.shadowRoot.getElementById('pid-modal-scale-note');
     const inputWrap = this.shadowRoot.getElementById('pid-modal-input-wrap');
+    const seedWrap = this.shadowRoot.getElementById('pid-modal-seed-wrap');
+    const cancelBtn = this.shadowRoot.getElementById('pid-modal-cancel');
     const restoreBtn = this.shadowRoot.getElementById('pid-modal-restore');
     const confirmBtn = this.shadowRoot.getElementById('pid-modal-confirm');
     const backdrop = this.shadowRoot.getElementById('pid-modal-backdrop');
@@ -5737,8 +5906,12 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
       : '';
 
     if (titleEl) titleEl.innerText = `↩️ ${t('pid_restore_backup_title')}`;
+    if (modeTabs) modeTabs.style.display = 'none';
     if (warnEl) warnEl.innerText = `${t('pid_restore_backup_confirm_msg')}${bpText}`;
+    if (scaleNoteEl) scaleNoteEl.style.display = 'none';
     if (inputWrap) inputWrap.style.display = 'none';
+    if (seedWrap) seedWrap.style.display = 'none';
+    if (cancelBtn) cancelBtn.innerText = t('pid_modal_cancel');
     if (restoreBtn) restoreBtn.style.display = 'none';
     if (confirmBtn) {
       confirmBtn.className = 'pid-btn pid-btn-save';

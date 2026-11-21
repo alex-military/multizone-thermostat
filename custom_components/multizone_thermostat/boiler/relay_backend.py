@@ -15,6 +15,7 @@ from homeassistant.const import (
 )
 
 from .base import BoilerBackend
+from .valve_readiness import evaluate_trvs_ready
 from ..pwm_engine import PWMEngine
 from ..const import CONF_ZONE_NAME, CONF_ZONE_CLIMATES, ZONE_MODE_PRIMARY, ZONE_MODE_SECONDARY, make_zone_entity_id
 
@@ -307,44 +308,7 @@ class RelayBoilerBackend(BoilerBackend):
 
             _LOGGER.debug("PWM Tick: Boiler -> ON (Peak Demand: %.1f%%)", demand)
 
-            trvs_ready = False
-            for zone in self.coordinator.zones:
-                climate_id = make_zone_entity_id(zone[CONF_ZONE_NAME])
-                mode = self.coordinator.get_zone_mode(climate_id)
-                if mode in (ZONE_MODE_PRIMARY, ZONE_MODE_SECONDARY) and self.coordinator.get_zone_demand(climate_id) > 0:
-                    trv_list = zone.get(CONF_ZONE_CLIMATES) or zone.get("climates") or zone.get("climate_entities") or []
-                    if not trv_list:
-                        # Zone has no TRVs (e.g. relay only). Heat path is fully open by default.
-                        trvs_ready = True
-                        break
-                    
-                    for trv in trv_list:
-                        trv_state = self.hass.states.get(trv)
-                        if trv_state and trv_state.state not in ("unavailable", "unknown"):
-                            position = None
-                            for attr in ["position", "valve_position", "pi_heating_demand", "heating_demand", "valve_state"]:
-                                if attr in trv_state.attributes:
-                                    position = trv_state.attributes[attr]
-                                    break
-                            if position is not None:
-                                try:
-                                    if float(position) > 10.0:
-                                        trvs_ready = True
-                                        break
-                                except (ValueError, TypeError):
-                                    if isinstance(position, str) and position.lower() in ("open", "heating", "on", "true"):
-                                        trvs_ready = True
-                                        break
-                            else:
-                                trvs_ready = True
-                                break
-                if trvs_ready:
-                    break
-
-            has_any_trvs = any(
-                (zone.get(CONF_ZONE_CLIMATES) or zone.get("climates") or zone.get("climate_entities") or [])
-                for zone in self.coordinator.zones
-            )
+            trvs_ready, has_any_trvs = evaluate_trvs_ready(self.hass, self.coordinator)
             if not trvs_ready and has_any_trvs and not frost_emergency and peak_zone != "Anti-Seize":
                 if self._trv_wait_start is None:
                     self._trv_wait_start = time.monotonic()

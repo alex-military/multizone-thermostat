@@ -11,6 +11,7 @@ ANOMALY_SENSOR_FAULT = "sensor_fault"
 ANOMALY_SENSOR_TIMEOUT = "sensor_timeout"
 ANOMALY_BOILER_LOW_PRESSURE = "boiler_low_pressure"
 ANOMALY_BOILER_FAULT = "boiler_fault"
+ANOMALY_TRV_NOT_OPENING = "trv_not_opening"
 
 # Human-readable anomaly labels
 ANOMALY_LABELS = {
@@ -25,4 +26,5 @@ ANOMALY_LABELS = {
     ANOMALY_SENSOR_TIMEOUT: "Watchdog: Sensor offline / no data received",
     ANOMALY_BOILER_LOW_PRESSURE: "Boiler circuit pressure low (< 0.8 bar)",
     ANOMALY_BOILER_FAULT: "OpenTherm boiler fault alarm",
+    ANOMALY_TRV_NOT_OPENING: "TRV valve not opening despite active zone heating demand",
 }

@@ -37,6 +37,15 @@ from ..const import (
     CONF_ZONE_WINDOW_SENSOR,
     CONF_ZONE_ANTI_SEIZE,
     CONF_ZONE_CALIBRATIONS,
+    CONF_ZONE_TRV_CALIBRATION_MODE,
+    CONF_ZONE_TRV_SENSOR_SELECTS,
+    DEFAULT_TRV_CALIB_MODE,
+    CONF_ZONE_TRV_CONTROL_MODE,
+    DEFAULT_TRV_CONTROL_MODE,
+    CONF_ZONE_TRV_OPEN_BOOST,
+    DEFAULT_TRV_OPEN_BOOST,
+    CONF_ZONE_TRV_CLOSE_OFFSET,
+    DEFAULT_TRV_CLOSE_OFFSET,
     CONF_ZONE_ALLOW_PASSIVE_HEAT,
     CONF_ZONE_SENSOR_TIMEOUT,
     DEFAULT_SENSOR_TIMEOUT_MIN,
@@ -62,7 +71,7 @@ from ..plant_diagnostics.anomalies import find_suggested_dhw_sensor
 
 from .validators import validate_opentherm_temps, validate_zone_input, validate_geofencing
 from .schemas import *
-from .helpers import _get_switch_entities, _get_climate_entities, _get_binary_sensor_entities, _get_temperature_sensor_entities, _remove_entity_from_registry, flatten_zone_user_input
+from .helpers import _get_switch_entities, _get_climate_entities, _get_binary_sensor_entities, _get_temperature_sensor_entities, _remove_entity_from_registry, flatten_zone_user_input, parse_trv_calibration_input
 
 
 from .options_flow import MultizoneOptionsFlow
@@ -191,6 +200,11 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_ZONE_SENSOR_TIMEOUT: user_input.get(CONF_ZONE_SENSOR_TIMEOUT, DEFAULT_SENSOR_TIMEOUT_MIN),
                     CONF_ZONE_TARGET_TEMP: user_input.get(CONF_ZONE_TARGET_TEMP, 20.0),
                     CONF_ZONE_CALIBRATIONS: {},
+                    CONF_ZONE_TRV_CALIBRATION_MODE: user_input.get(CONF_ZONE_TRV_CALIBRATION_MODE, DEFAULT_TRV_CALIB_MODE),
+                    CONF_ZONE_TRV_SENSOR_SELECTS: {},
+                    CONF_ZONE_TRV_CONTROL_MODE: user_input.get(CONF_ZONE_TRV_CONTROL_MODE, DEFAULT_TRV_CONTROL_MODE),
+                    CONF_ZONE_TRV_OPEN_BOOST: float(user_input.get(CONF_ZONE_TRV_OPEN_BOOST, DEFAULT_TRV_OPEN_BOOST)),
+                    CONF_ZONE_TRV_CLOSE_OFFSET: float(user_input.get(CONF_ZONE_TRV_CLOSE_OFFSET, DEFAULT_TRV_CLOSE_OFFSET)),
                 }
                 
                 if user_input.get(CONF_ZONE_TEMP_SENSOR) and user_input[CONF_ZONE_TEMP_SENSOR] != "none":
@@ -227,7 +241,12 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     ) -> config_entries.FlowResult:
         """Step 3: Map calibration entities for TRVs."""
         if user_input is not None:
-            self._current_zone_data[CONF_ZONE_CALIBRATIONS] = user_input
+            climates = self._current_zone_data.get(CONF_ZONE_CLIMATES, [])
+            calibrations, sensor_selects = parse_trv_calibration_input(
+                user_input, climates=climates
+            )
+            self._current_zone_data[CONF_ZONE_CALIBRATIONS] = calibrations
+            self._current_zone_data[CONF_ZONE_TRV_SENSOR_SELECTS] = sensor_selects
             self._zones.append(self._current_zone_data)
             self._current_zone_data = None
             return await self.async_step_another_zone()

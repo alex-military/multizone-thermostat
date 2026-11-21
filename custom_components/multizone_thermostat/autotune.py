@@ -60,6 +60,7 @@ class PassiveAutotuneObserver:
         self._learned_kd = 0.0
         self.manual_overrides: dict[str, float] = {}
         self._pre_reset_snapshot: dict[str, Any] | None = None
+        self._seeded_pi_only: bool = False
         self.weekly_updated_last_tick = False
         self.needs_save = False
 
@@ -89,7 +90,16 @@ class PassiveAutotuneObserver:
                 self._sync_effective_pid()
             else:
                 self._compute_final_pid()
+            if "seeded_pi_only" in data:
+                self._seeded_pi_only = bool(data["seeded_pi_only"])
+            else:
+                self._seeded_pi_only = bool(
+                    self._learned_kp > 0.0
+                    and self._learned_kd == 0.0
+                    and any(isinstance(c, dict) and c.get("seeded") for c in self.completed_cycles)
+                )
         else:
+            self._seeded_pi_only = False
             self._sync_effective_pid()
 
     def dump_state(self) -> dict:
@@ -99,6 +109,7 @@ class PassiveAutotuneObserver:
             "manual_overrides": dict(self.manual_overrides),
             "weekly_candidates": list(self.weekly_candidates),
             "last_weekly_update": self.last_weekly_update,
+            "seeded_pi_only": self._seeded_pi_only,
             "learned_pid": {
                 "Kp": self._learned_kp,
                 "Ki": self._learned_ki,
@@ -128,24 +139,26 @@ class PassiveAutotuneObserver:
             self.manual_overrides["Kd"] = float(kd)
         self._sync_effective_pid()
 
-    def seed_learned_pid(self, kp: float, ki: float, kd: float) -> None:
+    def seed_learned_pid(self, kp: float, ki: float, kd: float, clear_overrides: bool = True) -> None:
         """Seed learned PID values and switch tuner to completed Auto EMA mode."""
         self._learned_kp = float(kp)
         self._learned_ki = float(ki)
         self._learned_kd = float(kd)
+        self._seeded_pi_only = (float(kd) == 0.0)
         self.state = self.STATE_COMPLETED
         while len(self.completed_cycles) < self.required_cycles:
             self.completed_cycles.append(
                 {
-                    "kp": float(kp),
-                    "ki": float(ki),
-                    "kd": float(kd),
+                    "Kp": float(kp),
+                    "Ki": float(ki),
+                    "Kd": float(kd),
                     "seeded": True,
                 }
             )
         if self.last_weekly_update <= 0.0:
             self.last_weekly_update = time.time()
-        self.manual_overrides.clear()
+        if clear_overrides:
+            self.manual_overrides.clear()
         self._sync_effective_pid()
         self.needs_save = True
 
@@ -222,6 +235,7 @@ class PassiveAutotuneObserver:
         self._learned_kp = 0.0
         self._learned_ki = 0.0
         self._learned_kd = 0.0
+        self._seeded_pi_only = False
         if not keep_manual_overrides:
             self.manual_overrides.clear()
         self._sync_effective_pid()
@@ -478,7 +492,9 @@ class PassiveAutotuneObserver:
                 ("_learned_kd", med_kd),
             ):
                 prev = getattr(self, attr)
-                if prev > 0.0:
+                if attr == "_learned_kd" and prev == 0.0 and self._seeded_pi_only:
+                    new_val = 0.0
+                elif prev > 0.0:
                     ema = (1.0 - self.WEEKLY_EMA_ALPHA) * prev + self.WEEKLY_EMA_ALPHA * target
                     min_allowed = prev * (1.0 - self.WEEKLY_MAX_STEP_PCT)
                     max_allowed = prev * (1.0 + self.WEEKLY_MAX_STEP_PCT)
@@ -486,7 +502,8 @@ class PassiveAutotuneObserver:
                 else:
                     new_val = target
                 if attr == "_learned_kp":
-                    new_val = min(max(new_val, 10.0), 500.0)
+                    kp_floor = max(0.1, min(10.0, 0.5 * prev)) if prev > 0.0 else 10.0
+                    new_val = min(max(new_val, kp_floor), 500.0)
                 setattr(self, attr, new_val)
 
             self._sync_effective_pid()
@@ -507,13 +524,14 @@ class PassiveAutotuneObserver:
         if not self.completed_cycles:
             return
 
-        avg_kp = sum(c["Kp"] for c in self.completed_cycles) / len(self.completed_cycles)
-        avg_ki = sum(c["Ki"] for c in self.completed_cycles) / len(self.completed_cycles)
-        avg_kd = sum(c["Kd"] for c in self.completed_cycles) / len(self.completed_cycles)
+        avg_kp = sum(c.get("Kp", c.get("kp", 0.0)) for c in self.completed_cycles) / len(self.completed_cycles)
+        avg_ki = sum(c.get("Ki", c.get("ki", 0.0)) for c in self.completed_cycles) / len(self.completed_cycles)
+        avg_kd = sum(c.get("Kd", c.get("kd", 0.0)) for c in self.completed_cycles) / len(self.completed_cycles)
 
         self._learned_kp = avg_kp
         self._learned_ki = avg_ki
         self._learned_kd = avg_kd
+        self._seeded_pi_only = False
         self._sync_effective_pid()
 
         _LOGGER.info(

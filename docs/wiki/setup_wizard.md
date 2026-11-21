@@ -21,7 +21,7 @@ flowchart TD
     S1b -->|No| Zone1["Step 2: Add First Thermal Zone"]
     C_PDC --> Zone1
     Zone1 --> CalibCheck{"TRVs + External Sensor?"}
-    CalibCheck -->|Yes| S3["Step 3: TRV Offset Calibration Mapping"]
+    CalibCheck -->|Yes| S3["Step 3: TRV Calibration & Sensor Mapping"]
     CalibCheck -->|No| S4{"Add Another Zone?"}
     S3 --> S4
     S4 -->|Yes| Zone1
@@ -78,8 +78,10 @@ Organized into collapsible accordion sections:
   * **Humidity Sensor (`humidity_sensor`)** *(Optional)*: Used for indoor dew-point anti-condensation protection during hydronic cooling.
   * **Emitter Type (`emitter_type`)**: Choose `radiator`, `underfloor`, or `fancoil` to tailor flow curves and safety ceilings.
   * **Base Target Temperature**: Initial setpoint (e.g. 20.5 °C).
-* **▶ Smart Radiator TRVs (Standard)** <span class="badge-stable">STABLE</span>:
+* **▶ Smart Radiator TRVs (Standard & Demand-Driven)** <span class="badge-stable">STABLE</span>:
   * Select smart radiator valves (`climate.*`). The system synchronizes setpoints and averages temperatures.
+  * **TRV Control Mode (`trv_control_mode`)**: Choose `"standard"` (default; sends direct zone setpoint) or `"demand_driven"` (**Smart Bounded Overdrive**) for TRVs whose internal proportional algorithm pinches/closes too early before the room reaches target.
+  * **Demand-Driven Tuning**: Configure `trv_open_boost` (default `+1.5 °C`, range `0.0–5.0 °C`) and `trv_close_offset` (default `1.0 °C`, range `0.0–5.0 °C`). Uses zone PID demand hysteresis (`>= 5.0%` opens, `<= 0.0%` closes), `60 s` anti-chatter debounce, `10 s` evaluation tick, and an idle no-chatter guard. Compatible with `physical_sync` relative deltas and automatically reverts to `"standard"` mode if `safety_fallback_active` triggers.
 * **▶ Proportional & 0-10V Analog Actuators** <span class="badge-stable">STABLE</span>:
   * For gradual motorized valves or 0–10V dimmer modules (`valve.*` or `number.*`).
   * **Valve Scale**: Choose between **Percentage (0–100%)** or **Voltage (0.0–10.0 V)**.
@@ -94,6 +96,20 @@ Organized into collapsible accordion sections:
   * **Window Sensors**: Automatically halts heating/cooling when windows are opened.
   * **Sensor Watchdog Timeout**: Maximum minutes before declaring a wireless sensor offline and switching to TRV internal sensors.
   * **Summer Anti-Seize & Passive Heat Intake**.
+
+---
+
+#### Step 3: TRV Calibration, External Temperature Feed & Sensor Select
+<span class="badge-stable">STABLE</span>
+
+When a zone uses smart TRVs alongside a primary room sensor:
+* **Calibration Mode (`trv_calibration_mode`)**:
+  * `"auto"` *(default)*: Auto-detects `external_temperature_input` in the calibration entity ID; otherwise falls back to offset mode.
+  * `"offset"`: Dynamically injects local temperature calibration offsets (`number.*`).
+  * `"external"`: For TRVs exposing `number.*external_temperature_input` (e.g. Sonoff TRVZB, Aqara, Tuya/Zigbee2MQTT), writes the room sensor temperature directly in °C (rounded to entity step, clamped to min/max) with a `1200 s` (20 min) anti-offline heartbeat keep-alive and a `60 s` jitter rate-limit on `<= 0.1 °C` deltas.
+* **TRV Sensor Source Select (`trv_sensor_selects`)** *(Optional)*:
+  * Maps each TRV `climate.*` entity to its `select.*` sensor-source entity directly in the Setup/Options **TRV Calibration** screen.
+  * Automatically switches the TRV to its external/remote sensor when active (excluding `"offline"` options such as `remote_source_offline`) and reverts cleanly to the internal/local sensor if `safety_fallback_active` triggers (stale or unavailable room sensor).
 
 ---
 
@@ -150,11 +166,12 @@ Use this reference table to find exactly where to activate and tune every single
 | **Thermal Pre-Storage (Wall Overheating)** | *Configure → Configure Solar & Batteries* | `solar_overheat_offset` (0.0 °C to +3.0 °C) |
 | **AI Optimizer Bridge (EMHASS / Predbat)** | *Configure → Configure Solar & Batteries* | `external_solar_override_entity` (Watt sensor or boolean) |
 | **Boiler Anti-Short-Cycle Protection** | *Settings → Devices & Services → Master Entities* | `number.master_control_min_cycle_on` and `min_cycle_off` (default: 5 min) |
-| **Motorized Valve Opening Delay** | *Settings → Devices & Services → Master Entities* | `number.master_control_valve_delay` (default: 0 sec, 90-120s recommended for wax actuators) |
+| **Motorized Valve Opening Delay & TRV Guard** | *Settings → Devices & Services → Master Entities* | `number.master_control_valve_delay` (default: 0 sec, 90-120s recommended; runs after the automatic up to 120 s `HOLD_TRV_CLOSED` guard) |
 | **Summer Anti-Seize Valve Exercise** | *Settings → Devices & Services → Master Entities* | `number.master_control_anti_seize_idle_days` (15 days) and `duration` (2 min) |
 | **Emergency Anti-Frost Protection** | *Settings → Devices & Services → Master Entities* | `number.master_control_anti_frost_temperature` (default: 7.0 °C) |
 | **Window Open Contact Sensor** | *Configure → Edit Zone → [Room] → Protections* | `window_sensor` (`binary_sensor.*`) |
-| **TRV Calibration Offset Injection** | *Configure → Edit Zone → [Room] → TRV Calibration* | Calibration offset entity (e.g. `number.trv_calibration_offset`) |
+| **TRV Calibration & External Temp Feed** | *Configure → Edit Zone → [Room] → TRV Calibration* | `trv_calibration_mode` (`auto`, `offset`, `external`), `number.*external_temperature_input` / offset entity, `trv_sensor_selects` (`select.*`) |
+| **TRV Demand-Driven Valve Mode** | *Configure → Edit Zone → [Room] → Smart Radiator TRVs* | `trv_control_mode` (`standard`, `demand_driven`), `trv_open_boost` (`0.0–5.0 °C`, default `1.5 °C`), `trv_close_offset` (`0.0–5.0 °C`, default `1.0 °C`) |
 | **Proportional 0–100% or 0–10V Valves** | *Configure → Edit Zone → [Room] → Proportional Valves* | `valve_entities`, scale `percent` (0-100%) or `volt` (0-10.0 V) |
 | **Weekly Matrix Scheduling** | *Lovelace Scheduler Card* | 24-hour visual matrix with profiles (Standard, Weekend, Smart Working, Custom) |
 | **Predictive Smart Return** | *Lovelace Scheduler Card* or HA Service | `multizone_thermostat.set_smart_return` |
