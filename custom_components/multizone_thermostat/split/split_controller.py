@@ -15,7 +15,9 @@ from homeassistant.const import ATTR_ENTITY_ID, ATTR_TEMPERATURE
 
 from ..const import (
     CONF_ZONE_NAME,
+    get_state_temp_unit,
     make_zone_entity_id,
+    resolve_zone_id_safe,
     to_celsius,
     from_celsius,
     HVAC_MODE_HEAT,
@@ -73,6 +75,7 @@ class SplitZoneManager:
         self._last_command_timestamps: dict[str, float] = {}
         self._solar_run_start_timestamps: dict[str, float] = {}
         self._local_split_manual_on: dict[str, bool] = {}
+        self._failsafe_tripped: set[str] = set()
 
         self._setup_zones()
 
@@ -131,10 +134,12 @@ class SplitZoneManager:
 
     def is_local_manual_on(self, climate_id: str) -> bool:
         """Return True if zone split has been manually forced ON locally."""
+        climate_id = resolve_zone_id_safe(self.coordinator, climate_id)
         return self._local_split_manual_on.get(climate_id, False)
 
     def set_local_manual_on(self, climate_id: str, state: bool) -> None:
         """Set local manual override for split (only runs local split, never boiler)."""
+        climate_id = resolve_zone_id_safe(self.coordinator, climate_id)
         split_conf = self._splits.get(climate_id)
         if split_conf and split_conf.get("split_entity_id") == climate_id:
             _LOGGER.warning("Ignoring manual split override: split_entity matches zone_id '%s'", climate_id)
@@ -143,9 +148,12 @@ class SplitZoneManager:
         self._local_split_manual_on[climate_id] = bool(state)
         self._split_active_states[climate_id] = bool(state)
         if not state:
-            # When manually turned off, turn off split immediately
+            # When manually turned off, turn off split immediately and sync command cache
             if split_conf:
                 split_entity = split_conf["split_entity_id"]
+                self._last_split_commands[climate_id] = {"mode": HVAC_MODE_OFF, "target": None}
+                self._last_command_timestamps[climate_id] = time.monotonic()
+                self._failsafe_tripped.discard(climate_id)
                 self.hass.async_create_task(
                     self.hass.services.async_call(
                         "climate",
@@ -163,18 +171,22 @@ class SplitZoneManager:
 
     def has_split(self, climate_id: str) -> bool:
         """Return True if zone has an associated split AC entity."""
+        climate_id = resolve_zone_id_safe(self.coordinator, climate_id)
         return climate_id in self._splits
 
     def get_split_info(self, climate_id: str) -> dict[str, Any] | None:
         """Get configuration details for a zone split."""
+        climate_id = resolve_zone_id_safe(self.coordinator, climate_id)
         return self._splits.get(climate_id)
 
     def is_quick_boost_active(self, climate_id: str) -> bool:
         """Return True if Quick Heat Boost is currently engaged for this zone."""
+        climate_id = resolve_zone_id_safe(self.coordinator, climate_id)
         return self._quick_boost_states.get(climate_id, False)
 
     def is_split_active(self, climate_id: str) -> bool:
         """Return True if split unit is currently running (heating or cooling)."""
+        climate_id = resolve_zone_id_safe(self.coordinator, climate_id)
         return self._split_active_states.get(climate_id, False)
 
     def is_split_heating_allowed(self) -> bool:
@@ -200,35 +212,50 @@ class SplitZoneManager:
         surplus or Electric Priority), the radiator valve is closed and boiler demand is 0%.
         EXCEPTION: During Quick Boost, both split and radiators run simultaneously for maximum speed.
         """
+        climate_id = resolve_zone_id_safe(self.coordinator, climate_id)
         if not self.has_split(climate_id):
             return False
 
         # Never suppress hydronic heating during a frost emergency on this zone
-        frost_mgr = getattr(self.coordinator, "frost_protection", None) or getattr(self.coordinator, "anti_frost", None)
-        if frost_mgr is not None and callable(getattr(frost_mgr, "is_zone_in_frost_emergency", None)):
-            if frost_mgr.is_zone_in_frost_emergency(climate_id) is True:
-                return False
+        coord_frost_fn = getattr(self.coordinator, "is_zone_in_frost_emergency", None)
+        if callable(coord_frost_fn) and coord_frost_fn(climate_id) is True:
+            return False
+        for attr_name in ("frost_manager", "frost_protection", "anti_frost"):
+            frost_mgr = getattr(self.coordinator, attr_name, None)
+            if frost_mgr is not None and callable(getattr(frost_mgr, "is_zone_in_frost_emergency", None)):
+                if frost_mgr.is_zone_in_frost_emergency(climate_id) is True:
+                    return False
 
         # Fail-safe: verify actual split entity state when available
         split_conf = self._splits.get(climate_id)
         if split_conf and hasattr(self.hass, "states") and self.hass.states:
             split_st = self.hass.states.get(split_conf["split_entity_id"])
-            raw_state = getattr(split_st, "state", None) if split_st is not None else None
+            if split_st is None:
+                return False
+            raw_state = getattr(split_st, "state", None)
             if isinstance(raw_state, str):
                 if raw_state in ("unavailable", "unknown"):
                     return False
                 cmd_mode = self._last_split_commands.get(climate_id, {}).get("mode")
+                is_expecting_active = self.is_split_active(climate_id) or cmd_mode in (
+                    HVAC_MODE_HEAT,
+                    HVAC_MODE_COOL,
+                )
                 wrong_mode = (
                     (cmd_mode == HVAC_MODE_HEAT and raw_state == HVAC_MODE_COOL)
                     or (cmd_mode == HVAC_MODE_COOL and raw_state == HVAC_MODE_HEAT)
                 )
-                if (
-                    (raw_state in (HVAC_MODE_OFF, "off", "fan_only", "dry") or wrong_mode)
-                    and not self.is_local_manual_on(climate_id)
-                    and (time.monotonic() - self._last_command_timestamps.get(climate_id, 0.0)) > 30.0
-                ):
-                    self._last_split_commands.pop(climate_id, None)
-                    return False
+                is_inactive_or_wrong = raw_state in (HVAC_MODE_OFF, "off", "fan_only", "dry") or wrong_mode
+                if not is_expecting_active or not is_inactive_or_wrong:
+                    self._failsafe_tripped.discard(climate_id)
+                elif not self.is_local_manual_on(climate_id):
+                    if (
+                        climate_id in self._failsafe_tripped
+                        or (time.monotonic() - self._last_command_timestamps.get(climate_id, 0.0)) > 30.0
+                    ):
+                        self._failsafe_tripped.add(climate_id)
+                        self._last_split_commands.pop(climate_id, None)
+                        return False
 
         # If master switch is OFF or local manual override is active, strictly decouple hydronics
         master_on = (
@@ -266,6 +293,7 @@ class SplitZoneManager:
         Overcomes the ceiling effect (where high ceiling probe reads hot air prematurely
         and ramps down the inverter before the living zone reaches target).
         """
+        climate_id = resolve_zone_id_safe(self.coordinator, climate_id)
         split_conf = self._splits.get(climate_id)
         if not split_conf or not split_conf.get("split_sensor_injection", True):
             return target_temp
@@ -279,7 +307,7 @@ class SplitZoneManager:
                 c_temp = s_state.attributes.get("current_temperature")
                 if c_temp is not None:
                     try:
-                        ceiling_temp = to_celsius(float(c_temp), None, self.hass)
+                        ceiling_temp = to_celsius(float(c_temp), get_state_temp_unit(s_state), self.hass)
                     except (ValueError, TypeError):
                         pass
 
@@ -320,6 +348,7 @@ class SplitZoneManager:
 
         Returns (desired_mode, desired_target, is_heating_active).
         """
+        climate_id = resolve_zone_id_safe(self.coordinator, climate_id)
         if not self.has_split(climate_id):
             return (HVAC_MODE_OFF, None, False)
 
@@ -423,7 +452,13 @@ class SplitZoneManager:
                 self._split_active_states[climate_id] = False
                 return (HVAC_MODE_OFF, target_temp, False)
 
-        # Winter / Heating Mode Evaluation
+        # Winter / Heating Mode Evaluation (do not enter heating when zone is explicitly OFF/fan_only/dry)
+        if zone_hvac_mode != HVAC_MODE_HEAT and not is_local_manual:
+            self._quick_boost_states[climate_id] = False
+            self._split_active_states[climate_id] = False
+            self._solar_run_start_timestamps.pop(climate_id, None)
+            return (HVAC_MODE_OFF, None, False)
+
         if not self.is_split_heating_allowed():
             self._quick_boost_states[climate_id] = False
             self._split_active_states[climate_id] = False
@@ -580,6 +615,8 @@ class SplitZoneManager:
                         {ATTR_ENTITY_ID: split_entity, ATTR_TEMPERATURE: out_target},
                         blocking=False,
                     )
+            if desired_mode == HVAC_MODE_OFF:
+                self._failsafe_tripped.discard(climate_id)
             self._last_split_commands[climate_id] = {
                 "mode": desired_mode,
                 "target": desired_target,

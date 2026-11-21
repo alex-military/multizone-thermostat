@@ -157,7 +157,7 @@ class MultizoneThermostatButtonCard extends HTMLElement {
     // Update temperatures
     const tempCurrentEl = this.shadowRoot.querySelector('.temp-current');
     if (tempCurrentEl) {
-      const curStr = currentTemp !== undefined ? `${currentTemp}${getTempUnit(this._hass)}` : '--' + getTempUnit(this._hass);
+      const curStr = (currentTemp !== undefined && currentTemp !== null) ? `${currentTemp}${getTempUnit(this._hass)}` : '--' + getTempUnit(this._hass);
       tempCurrentEl.innerHTML = `<span class="temp-current-val">${curStr}</span>`;
     }
     const step = this.getStep(climateState);
@@ -239,6 +239,7 @@ class MultizoneThermostatButtonCard extends HTMLElement {
 
     style.textContent = `
       ha-card {
+        display: block;
         padding: 16px;
         position: relative;
         overflow: hidden;
@@ -630,7 +631,7 @@ class MultizoneThermostatButtonCard extends HTMLElement {
   }
 
   renderMinimized(title, currentTemp) {
-    const curStr = currentTemp !== undefined ? `${currentTemp}${getTempUnit(this._hass)}` : '--' + getTempUnit(this._hass);
+    const curStr = (currentTemp !== undefined && currentTemp !== null) ? `${currentTemp}${getTempUnit(this._hass)}` : '--' + getTempUnit(this._hass);
     this.shadowRoot.innerHTML = `
       <style>
         ha-card {
@@ -660,7 +661,7 @@ class MultizoneThermostatButtonCard extends HTMLElement {
       <ha-card>
         <div class="min-left">
           <ha-icon icon="mdi:snowflake-off" style="--mdc-icon-size: 18px; color: #64748b;"></ha-icon>
-          <span style="font-weight: 600;">${title}</span>
+          <span style="font-weight: 600;">${escapeHtml(title)}</span>
           <span class="min-tag">${getTranslation(this._hass, 'winter_only') || 'Solo Inverno'}</span>
         </div>
         <div class="min-temp">${curStr}</div>

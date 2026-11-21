@@ -21,6 +21,7 @@ class SimulatedRoom:
     last_reported_temp: float | None = 19.0
     energy_delivered_wh: float = 0.0
     discomfort_degree_hours: float = 0.0
+    overshoot_degree_hours: float = 0.0
 
     def step(self, dt_hours: float, t_flow: float, t_out: float) -> None:
         p_loss_w = (self.current_temp - t_out) * self.heat_loss_coeff
@@ -34,7 +35,11 @@ class SimulatedRoom:
 
         self.current_temp += ((p_gain_w - p_loss_w) * dt_hours) / self.thermal_capacity
         self.energy_delivered_wh += p_gain_w * dt_hours
-        self.discomfort_degree_hours += max(0.0, self.target_temp - self.current_temp) * dt_hours
+        self.overshoot_degree_hours += max(0.0, self.current_temp - self.target_temp) * dt_hours
+        self.discomfort_degree_hours += (
+            max(0.0, self.target_temp - self.current_temp)
+            + max(0.0, self.current_temp - (self.target_temp + 0.5))
+        ) * dt_hours
 
         self.last_reported_temp = None if self.sensor_fault else round(self.current_temp, 2)
 
@@ -42,6 +47,7 @@ class SimulatedRoom:
 @dataclass
 class SimulatedBoiler:
     ch_enabled: bool = False
+    dhw_active: bool = False
     target_flow_temp: float = 35.0
     current_flow_temp: float = 20.0
     inertia_tau_hours: float = 0.05
@@ -114,9 +120,9 @@ class PlantSimulator:
         self.simulated_time_hours += dt_hours
 
         flows = []
-        if self.boiler.ch_enabled:
+        if self.boiler.ch_enabled or self.boiler.current_flow_temp > (self.boiler.idle_temp + 0.1):
             flows.append(self.boiler.current_flow_temp)
-        if self.heat_pump.running:
+        if self.heat_pump.running or self.heat_pump.current_flow_temp > (self.heat_pump.idle_temp + 0.1):
             flows.append(self.heat_pump.current_flow_temp)
         self.last_effective_flow = max(flows) if flows else self.t_out
 

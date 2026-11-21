@@ -67,6 +67,16 @@ from .const import (
 )
 
 
+def _float_or(val: Any, default: float) -> float:
+    """Convert configuration numeric field safely, treating None or empty string as default."""
+    if val is None or val == "" or isinstance(val, bool):
+        return float(default)
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return float(default)
+
+
 @dataclass
 class PlantConfig:
     """Typed plant configuration container."""
@@ -128,8 +138,8 @@ class PlantConfig:
             boiler_mode=raw.get(CONF_BOILER_MODE, MODE_RELAY),
             boiler_switch=raw.get(CONF_BOILER_SWITCH),
             opentherm_entity=raw.get(CONF_OPENTHERM_ENTITY),
-            opentherm_min_temp=float(raw.get(CONF_OPENTHERM_MIN_TEMP, 35.0)),
-            opentherm_max_temp=float(raw.get(CONF_OPENTHERM_MAX_TEMP, 75.0)),
+            opentherm_min_temp=_float_or(raw.get(CONF_OPENTHERM_MIN_TEMP), 35.0),
+            opentherm_max_temp=_float_or(raw.get(CONF_OPENTHERM_MAX_TEMP), 75.0),
             opentherm_ch_switch=raw.get(CONF_OPENTHERM_CH_SWITCH),
             dhw_active_sensor=raw.get(CONF_DHW_ACTIVE_SENSOR),
             has_mixing_valve=bool(raw.get(CONF_HAS_MIXING_VALVE, DEFAULT_HAS_MIXING_VALVE)),
@@ -141,23 +151,23 @@ class PlantConfig:
             enable_heat_pump=bool(raw.get(CONF_ENABLE_HEAT_PUMP, False)),
             heat_pump_type=raw.get(CONF_HEAT_PUMP_TYPE, HP_TYPE_CLIMATE),
             heat_pump_entity=raw.get(CONF_HEAT_PUMP_ENTITY),
-            heat_pump_min_temp=float(raw.get(CONF_HEAT_PUMP_MIN_TEMP, 25.0)),
-            heat_pump_max_temp=float(raw.get(CONF_HEAT_PUMP_MAX_TEMP, 55.0)),
+            heat_pump_min_temp=_float_or(raw.get(CONF_HEAT_PUMP_MIN_TEMP), 25.0),
+            heat_pump_max_temp=_float_or(raw.get(CONF_HEAT_PUMP_MAX_TEMP), 55.0),
             heat_pump_ch_switch=raw.get(CONF_HEAT_PUMP_CH_SWITCH),
             heat_pump_cooling=bool(raw.get(CONF_HEAT_PUMP_COOLING, DEFAULT_HEAT_PUMP_COOLING)),
-            hp_cool_min_temp=float(raw.get("hp_cool_min_temp", raw.get("heat_pump_cool_min_temp", DEFAULT_HP_COOL_MIN_TEMP))),
-            hp_cool_max_temp=float(raw.get("hp_cool_max_temp", raw.get("heat_pump_cool_max_temp", DEFAULT_HP_COOL_MAX_TEMP))),
-            master_hvac_mode=DEFAULT_MASTER_OPERATION_MODE,
+            hp_cool_min_temp=_float_or(raw.get("hp_cool_min_temp", raw.get("heat_pump_cool_min_temp")), DEFAULT_HP_COOL_MIN_TEMP),
+            hp_cool_max_temp=_float_or(raw.get("hp_cool_max_temp", raw.get("heat_pump_cool_max_temp")), DEFAULT_HP_COOL_MAX_TEMP),
+            master_hvac_mode=raw.get("master_hvac_mode", DEFAULT_MASTER_OPERATION_MODE),
             energy_management_enabled=bool(raw.get(CONF_ENERGY_MANAGEMENT_ENABLED, False)),
             solar_power_sensor=raw.get(CONF_SOLAR_POWER_SENSOR),
             grid_export_sensor=raw.get(CONF_GRID_EXPORT_SENSOR),
             battery_soc_sensor=raw.get(CONF_BATTERY_SOC_SENSOR),
             external_solar_override_entity=raw.get(CONF_EXTERNAL_SOLAR_OVERRIDE_ENTITY),
-            solar_export_threshold=float(raw.get(CONF_SOLAR_EXPORT_THRESHOLD, DEFAULT_SOLAR_EXPORT_THRESHOLD)),
-            battery_min_reserve_soc=float(raw.get(CONF_BATTERY_MIN_RESERVE_SOC, DEFAULT_BATTERY_MIN_RESERVE_SOC)),
-            min_cycle_on=float(raw.get(CONF_MIN_CYCLE_ON, DEFAULT_MIN_CYCLE_ON)),
-            min_cycle_off=float(raw.get(CONF_MIN_CYCLE_OFF, DEFAULT_MIN_CYCLE_OFF)),
-            valve_delay=float(raw.get(CONF_VALVE_DELAY, DEFAULT_VALVE_DELAY)),
+            solar_export_threshold=_float_or(raw.get(CONF_SOLAR_EXPORT_THRESHOLD), DEFAULT_SOLAR_EXPORT_THRESHOLD),
+            battery_min_reserve_soc=_float_or(raw.get(CONF_BATTERY_MIN_RESERVE_SOC), DEFAULT_BATTERY_MIN_RESERVE_SOC),
+            min_cycle_on=_float_or(raw.get(CONF_MIN_CYCLE_ON), DEFAULT_MIN_CYCLE_ON),
+            min_cycle_off=_float_or(raw.get(CONF_MIN_CYCLE_OFF), DEFAULT_MIN_CYCLE_OFF),
+            valve_delay=_float_or(raw.get(CONF_VALVE_DELAY), DEFAULT_VALVE_DELAY),
         )
 
 

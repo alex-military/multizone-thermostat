@@ -100,27 +100,34 @@ class MultizonePlantAnomalyBinarySensor(BinarySensorEntity):
                 return
             summary = engine.get_plant_health_summary()
             anomalies = summary.get("anomalies", [])
+            notif_id = f"multizone_thermostat_plant_anomaly_{self._entry_id}"
             if anomalies and not self._notified_active:
-                self._notified_active = True
                 bullet_lines = "\n".join([f"- **{a['zone']}**: {a['description']}" for a in anomalies])
-                await self.hass.services.async_call(
-                    "persistent_notification",
-                    "create",
-                    {
-                        "notification_id": "multizone_thermostat_plant_anomaly",
-                        "title": "Multizone Thermostat — Plant Notification",
-                        "message": f"Warning: anomalies detected in heating plant:\n\n{bullet_lines}\n\nCheck Diagnostics dashboard for details.",
-                    },
-                )
+                try:
+                    await self.hass.services.async_call(
+                        "persistent_notification",
+                        "create",
+                        {
+                            "notification_id": notif_id,
+                            "title": "Multizone Thermostat — Plant Notification",
+                            "message": f"Warning: anomalies detected in heating plant:\n\n{bullet_lines}\n\nCheck Diagnostics dashboard for details.",
+                        },
+                    )
+                    self._notified_active = True
+                except Exception as err:
+                    _LOGGER.debug("Failed to create plant anomaly notification %s: %s", notif_id, err)
             elif not anomalies and self._notified_active:
-                self._notified_active = False
-                await self.hass.services.async_call(
-                    "persistent_notification",
-                    "dismiss",
-                    {
-                        "notification_id": "multizone_thermostat_plant_anomaly",
-                    },
-                )
+                try:
+                    await self.hass.services.async_call(
+                        "persistent_notification",
+                        "dismiss",
+                        {
+                            "notification_id": notif_id,
+                        },
+                    )
+                    self._notified_active = False
+                except Exception as err:
+                    _LOGGER.debug("Failed to dismiss plant anomaly notification %s: %s", notif_id, err)
 
         self.async_on_remove(
             async_track_time_interval(

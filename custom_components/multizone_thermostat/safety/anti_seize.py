@@ -15,6 +15,7 @@ from ..const import (
     CONF_ZONE_NAME,
     CONF_ZONE_SPLIT_ROLE,
     SPLIT_ROLE_COOLING_ONLY,
+    HVAC_MODE_COOL,
     HVAC_MODE_HEAT,
     KEY_ANTI_SEIZE_DURATION,
     KEY_ANTI_SEIZE_ENABLED,
@@ -47,12 +48,47 @@ class AntiSeizeManager:
         """Return True if anti-seize cycle is currently running."""
         return self._running
 
+    def _has_active_frost_emergency(self) -> bool:
+        """Return True if any zone currently reports a frost emergency."""
+        frost_fn = getattr(self.coordinator, "is_zone_in_frost_emergency", None)
+        frost_mgr = getattr(self.coordinator, "frost_manager", None)
+        mgr_fn = getattr(frost_mgr, "is_zone_in_frost_emergency", None) if frost_mgr is not None else None
+        for zone in getattr(self.coordinator, "zones", []) or []:
+            if not isinstance(zone, dict):
+                continue
+            zname = zone.get(CONF_ZONE_NAME) or zone.get("zone_name")
+            if not zname:
+                continue
+            cid = zone.get("climate_id") or make_zone_entity_id(zname)
+            if callable(frost_fn) and frost_fn(cid) is True:
+                return True
+            if callable(mgr_fn) and mgr_fn(cid) is True:
+                return True
+        return False
+
     def check_anti_seize(self, now: datetime | None = None) -> None:
         """Check if we need to run the anti-seize routine."""
         if not self.coordinator.get_persistent_data(KEY_ANTI_SEIZE_ENABLED, False):
             return
 
         if self._running or (self._task is not None and not self._task.done()):
+            return
+
+        if getattr(self.coordinator, "is_dhw_active", False) is True:
+            _LOGGER.debug("Anti-seize deferred: DHW production is active")
+            return
+
+        if self._has_active_frost_emergency():
+            _LOGGER.debug("Anti-seize deferred: frost emergency is active")
+            return
+
+        master_mode = getattr(self.coordinator, "master_hvac_mode", HVAC_MODE_HEAT)
+        hp_backend = getattr(self.coordinator, "heat_pump_backend", None)
+        if master_mode == HVAC_MODE_COOL and (
+            (callable(getattr(self.coordinator, "get_master_state", None)) and self.coordinator.get_master_state() is True)
+            or getattr(hp_backend, "_current_running_state", False) is True
+        ):
+            _LOGGER.debug("Anti-seize deferred: plant is actively cooling")
             return
 
         idle_seconds = time.monotonic() - self.coordinator.last_active_time
@@ -82,6 +118,14 @@ class AntiSeizeManager:
         hp_backend = getattr(self.coordinator, "heat_pump_backend", None)
 
         if gas_enabled and boiler_backend is not None:
+            if (
+                hp_backend is not None
+                and getattr(hp_backend, "_current_running_state", False) is True
+                and hasattr(hp_backend, "async_emergency_off")
+            ):
+                res_hp = hp_backend.async_emergency_off()
+                if inspect.isawaitable(res_hp):
+                    await res_hp
             demand = ANTI_SEIZE_MODULATING_DEMAND if getattr(boiler_backend, "is_modulating", False) is True else 100.0
             await boiler_backend.async_update(demand, "Anti-Seize", False)
         elif not gas_enabled and hp_enabled and hp_backend is not None:
@@ -135,7 +179,12 @@ class AntiSeizeManager:
             zones_to_open = []
 
             for zone in self.coordinator.zones:
-                climate_id = make_zone_entity_id(zone[CONF_ZONE_NAME])
+                if not isinstance(zone, dict):
+                    continue
+                zname = zone.get(CONF_ZONE_NAME) or zone.get("zone_name")
+                if not zname:
+                    continue
+                climate_id = zone.get("climate_id") or make_zone_entity_id(zname)
                 if not zone.get(CONF_ZONE_ANTI_SEIZE, True):
                     _LOGGER.debug("Skipping zone %s (anti-seize disabled)", climate_id)
                     continue
@@ -211,6 +260,8 @@ class AntiSeizeManager:
             _LOGGER.warning("Anti-seize routine was cancelled! Initiating emergency shutdown of boiler and valves.")
 
             async def _emergency_cleanup():
+                if self._has_active_frost_emergency():
+                    return
                 await self._turn_boiler_off()
                 for climate_id, old_state in self._pre_anti_seize_state.items():
                     if hasattr(self.coordinator, "set_zone_demand") and climate_id in self._pre_anti_seize_demand:

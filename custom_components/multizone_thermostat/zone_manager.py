@@ -23,6 +23,10 @@ from .const import (
     DEFAULT_COOLING_PRESET_TEMPS,
     HVAC_MODE_HEAT,
     HVAC_MODE_COOL,
+    to_celsius,
+    from_celsius,
+    get_state_temp_unit,
+    resolve_zone_id_safe,
 )
 from .plant_config import get_zone_name, get_zone_climates
 
@@ -76,6 +80,7 @@ class ZoneManager:
 
     def record_manual_temp(self, entity_id: str, temp: float, hvac_mode: str | None = None) -> None:
         """Record manual temperature separated by season."""
+        entity_id = resolve_zone_id_safe(self.coordinator, entity_id)
         effective_mode = hvac_mode
         if effective_mode is None:
             if hasattr(self.coordinator, "get_master_hvac_mode") and callable(self.coordinator.get_master_hvac_mode):
@@ -189,6 +194,7 @@ class ZoneManager:
 
     def get_zone(self, climate_entity: str) -> dict | None:
         """Get the zone configuration dict by entity_id."""
+        climate_entity = resolve_zone_id_safe(self.coordinator, climate_entity)
         for zone in self.zones:
             cid = zone.get("climate_id") or make_zone_entity_id(zone.get(CONF_ZONE_NAME, ""))
             if cid == climate_entity:
@@ -197,6 +203,7 @@ class ZoneManager:
 
     def is_passive_heat_allowed(self, climate_id: str) -> bool:
         """Return True if passive heat is allowed dynamically or via zone config."""
+        climate_id = resolve_zone_id_safe(self.coordinator, climate_id)
         z = self.get_zone(climate_id)
         if z:
             zone_name = z.get(CONF_ZONE_NAME, "")
@@ -209,6 +216,7 @@ class ZoneManager:
 
     def get_zone_mode(self, climate_entity: str) -> str:
         """Get current zone mode, prioritizing window-open bypass and calendar overrides."""
+        climate_entity = resolve_zone_id_safe(self.coordinator, climate_entity)
         if climate_entity in self._pre_window_state and self._zone_modes.get(climate_entity) == ZONE_MODE_BYPASS:
             return ZONE_MODE_BYPASS
         if hasattr(self.coordinator, "calendar_manager") and climate_entity in self.coordinator.calendar_manager.mode_overrides:
@@ -217,6 +225,7 @@ class ZoneManager:
 
     def set_zone_mode(self, climate_entity: str, mode: str, save_to_preset: bool = True) -> None:
         """Set zone mode and persist/update dependencies."""
+        climate_entity = resolve_zone_id_safe(self.coordinator, climate_entity)
         self._zone_modes[climate_entity] = mode
         self.coordinator.demand_aggregator.set_zone_mode(climate_entity, mode)
 
@@ -275,7 +284,11 @@ class ZoneManager:
                     st = self.hass.states.get(cid)
                     if st and st.attributes.get("temperature") is not None:
                         try:
-                            cur_temp = float(st.attributes["temperature"])
+                            cur_temp = to_celsius(
+                                float(st.attributes["temperature"]),
+                                get_state_temp_unit(st),
+                                self.hass,
+                            )
                         except (ValueError, TypeError):
                             pass
                 if cur_temp is not None:
@@ -317,20 +330,24 @@ class ZoneManager:
             if target_temp is not None:
                 t_val = float(target_temp)
                 climate_ent = getattr(self.coordinator, "_climate_entities", {}).get(climate_id)
-                if climate_ent is not None and hasattr(climate_ent, "_target_temperature"):
-                    climate_ent._target_temperature = t_val
                 sched_mgr = getattr(self.coordinator, "schedule_manager", None)
                 if sched_mgr and getattr(sched_mgr, "scheduler_enabled", False) is True:
                     if preset == "manual":
                         sched_mgr.record_manual_override(climate_id, t_val)
                     elif hasattr(sched_mgr, "manual_overrides") and isinstance(sched_mgr.manual_overrides, dict):
                         sched_mgr.manual_overrides.pop(climate_id, None)
-                await self.hass.services.async_call(
-                    CLIMATE_DOMAIN,
-                    SERVICE_SET_TEMPERATURE,
-                    {ATTR_ENTITY_ID: climate_id, ATTR_TEMPERATURE: t_val},
-                    blocking=False,
-                )
+                apply_fn = getattr(climate_ent, "async_apply_internal_target", None) if climate_ent is not None else None
+                if inspect.iscoroutinefunction(apply_fn):
+                    await apply_fn(t_val)
+                else:
+                    if climate_ent is not None and hasattr(climate_ent, "_target_temperature"):
+                        climate_ent._target_temperature = t_val
+                    await self.hass.services.async_call(
+                        CLIMATE_DOMAIN,
+                        SERVICE_SET_TEMPERATURE,
+                        {ATTR_ENTITY_ID: climate_id, ATTR_TEMPERATURE: round(from_celsius(t_val, self.hass), 1)},
+                        blocking=False,
+                    )
 
             # Determine zone mode
             mode = None
@@ -349,6 +366,7 @@ class ZoneManager:
 
     async def async_sync_trv_preset(self, zone_id: str, new_state: str) -> None:
         """Sync TRV activation/presets based on Zone state (heat/off)."""
+        zone_id = resolve_zone_id_safe(self.coordinator, zone_id)
         zone = self.get_zone(zone_id)
         if not zone:
             return
@@ -474,12 +492,16 @@ class ZoneManager:
                         was_off = False
                     
                     if was_off:
+                        if self._zone_modes.get(climate_id) != was_mode:
+                            self.coordinator.record_diagnostic_event("WINDOW_CLOSED_RESTORE", {"sensor": sensor_id, "zone": climate_id, "mode": was_mode})
+                            self.set_zone_mode(climate_id, was_mode, save_to_preset=False)
+                            if zone_select and hasattr(zone_select, "async_write_ha_state"):
+                                zone_select.async_write_ha_state()
                         if hasattr(self.coordinator, "_async_set_hvac_mode"):
                             self.hass.async_create_task(self.coordinator._async_set_hvac_mode(climate_id, HVACMode.OFF))
                         elif climate_ent := getattr(self.coordinator, "_climate_entities", {}).get(climate_id):
                             self.hass.async_create_task(climate_ent.async_set_hvac_mode(HVACMode.OFF))
-
-                    if self._zone_modes.get(climate_id) != was_mode:
+                    elif self._zone_modes.get(climate_id) != was_mode:
                         self.coordinator.record_diagnostic_event("WINDOW_CLOSED_RESTORE", {"sensor": sensor_id, "zone": climate_id, "mode": was_mode})
                         if zone_select:
                             self.hass.async_create_task(zone_select.async_select_option(was_mode))
@@ -494,6 +516,7 @@ class ZoneManager:
         hvac_mode: str | None = None,
     ) -> None:
         """Update the target temperature of a specific zone in a preset (heat or cool track) and save."""
+        zone_id = resolve_zone_id_safe(self.coordinator, zone_id)
         is_cool = (hvac_mode == HVAC_MODE_COOL) or (hvac_mode is None and self.active_preset_track == HVAC_MODE_COOL)
         target_track = self._presets_cool if is_cool else self._presets_heat
 
@@ -515,6 +538,7 @@ class ZoneManager:
         hvac_mode: str | None = None,
     ) -> float | None:
         """Resolve preset temperature dynamically for heating or cooling track."""
+        climate_id = resolve_zone_id_safe(self.coordinator, climate_id)
         is_cool = (hvac_mode == HVAC_MODE_COOL) or (hvac_mode is None and self.active_preset_track == HVAC_MODE_COOL)
         target_track = self._presets_cool if is_cool else self._presets_heat
         default_temps = DEFAULT_COOLING_PRESET_TEMPS if is_cool else DEFAULT_PRESET_TEMPS

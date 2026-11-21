@@ -29,6 +29,7 @@ class ListenerManager:
         self.coordinator = coordinator
         self.hass = coordinator.hass
         self._unsub_listeners: list = coordinator._unsub_listeners
+        self._startup_tasks: list[Any] = []
 
     def async_setup_listeners(self) -> None:
         """Set up state change listeners for all climate entities and timers."""
@@ -108,7 +109,9 @@ class ListenerManager:
 
         # Phase 11: Start EnergyManager tracking
         if hasattr(coord, "energy_manager") and coord.energy_manager:
-            self.hass.async_create_task(coord.energy_manager.async_start())
+            task = self.hass.async_create_task(coord.energy_manager.async_start())
+            if task is not None and callable(getattr(task, "cancel", None)):
+                self._startup_tasks.append(task)
 
         # Listen every 5 minutes for Calendar API checks
         if coord.global_calendar_id:
@@ -120,11 +123,21 @@ class ListenerManager:
                 )
             )
             # Check immediately on startup
-            self.hass.async_create_task(coord.calendar_manager.async_check_global_calendar(dt_util.now()))
+            task = self.hass.async_create_task(coord.calendar_manager.async_check_global_calendar(dt_util.now()))
+            if task is not None and callable(getattr(task, "cancel", None)):
+                self._startup_tasks.append(task)
 
     def async_teardown_listeners(self) -> None:
         """Remove all state change listeners and cancel background tasks."""
         coord = self.coordinator
+        for task in list(self._startup_tasks):
+            try:
+                done_fn = getattr(task, "done", None)
+                if not callable(done_fn) or not done_fn():
+                    task.cancel()
+            except Exception:
+                pass
+        self._startup_tasks.clear()
         if hasattr(coord, "routine_manager") and coord.routine_manager:
             coord.routine_manager.cleanup()
         if hasattr(coord, "anti_seize_manager") and coord.anti_seize_manager:
@@ -137,6 +150,9 @@ class ListenerManager:
         if hasattr(coord, "boiler_backend") and coord.boiler_backend:
             if hasattr(coord.boiler_backend, "cancel_pending_tasks"):
                 coord.boiler_backend.cancel_pending_tasks()
+        if hasattr(coord, "heat_pump_backend") and coord.heat_pump_backend:
+            if hasattr(coord.heat_pump_backend, "cancel_pending_tasks"):
+                coord.heat_pump_backend.cancel_pending_tasks()
 
         if hasattr(coord, "energy_manager") and coord.energy_manager:
             coord.energy_manager.async_stop()

@@ -15,6 +15,7 @@ from .helpers import (
     _get_temperature_sensor_entities,
     _remove_entity_from_registry,
     flatten_zone_user_input,
+    parse_trv_calibration_input,
 )
 from ..plant_diagnostics.anomalies import find_suggested_dhw_sensor
 from ..const import *
@@ -126,6 +127,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
         self._global_calendar: str | None = None
         self._current_zone_name: str | None = None
         self._current_zone_data: dict[str, Any] | None = None
+        self._editing_zone_index: int | None = None
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -273,10 +275,11 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
         if user_input is not None:
             self._boiler_switch = user_input[CONF_BOILER_SWITCH]
             self._dhw_active_sensor = user_input.get(CONF_DHW_ACTIVE_SENSOR) or None
+            self._has_mixing_valve = user_input.get(CONF_HAS_MIXING_VALVE, self._has_mixing_valve)
             return self._save_options()
 
         suggested_dhw = self._dhw_active_sensor or find_suggested_dhw_sensor(self.hass)
-        schema = get_options_boiler_relay_schema(self._boiler_switch, suggested_dhw)
+        schema = get_options_boiler_relay_schema(self._boiler_switch, suggested_dhw, self._has_mixing_valve)
         return self.async_show_form(step_id="boiler_relay", data_schema=schema)
 
     async def async_step_boiler_opentherm(
@@ -426,6 +429,11 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                     CONF_ZONE_SENSOR_TIMEOUT: user_input.get(CONF_ZONE_SENSOR_TIMEOUT, DEFAULT_SENSOR_TIMEOUT_MIN),
                     CONF_ZONE_TARGET_TEMP: user_input.get(CONF_ZONE_TARGET_TEMP, 20.0),
                     CONF_ZONE_CALIBRATIONS: {},
+                    CONF_ZONE_TRV_CALIBRATION_MODE: user_input.get(CONF_ZONE_TRV_CALIBRATION_MODE, DEFAULT_TRV_CALIB_MODE),
+                    CONF_ZONE_TRV_SENSOR_SELECTS: {},
+                    CONF_ZONE_TRV_CONTROL_MODE: user_input.get(CONF_ZONE_TRV_CONTROL_MODE, DEFAULT_TRV_CONTROL_MODE),
+                    CONF_ZONE_TRV_OPEN_BOOST: float(user_input.get(CONF_ZONE_TRV_OPEN_BOOST, DEFAULT_TRV_OPEN_BOOST)),
+                    CONF_ZONE_TRV_CLOSE_OFFSET: float(user_input.get(CONF_ZONE_TRV_CLOSE_OFFSET, DEFAULT_TRV_CLOSE_OFFSET)),
                     CONF_ZONE_EMITTER_TYPE: user_input.get(CONF_ZONE_EMITTER_TYPE, DEFAULT_ZONE_EMITTER_TYPE),
                     # Phase 11 Split Settings
                     CONF_ZONE_SPLIT_CLIMATE: split_climate,
@@ -438,7 +446,10 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                 
                 if user_input.get(CONF_ZONE_TEMP_SENSOR) and user_input[CONF_ZONE_TEMP_SENSOR] != "none":
                     zone_data[CONF_ZONE_TEMP_SENSOR] = user_input[CONF_ZONE_TEMP_SENSOR]
-                    
+
+                if user_input.get(CONF_ZONE_HUMIDITY_SENSOR) and user_input[CONF_ZONE_HUMIDITY_SENSOR] != "none":
+                    zone_data[CONF_ZONE_HUMIDITY_SENSOR] = user_input[CONF_ZONE_HUMIDITY_SENSOR]
+
                 if user_input.get(CONF_ZONE_WINDOW_SENSOR) and user_input[CONF_ZONE_WINDOW_SENSOR] != "none":
                     zone_data[CONF_ZONE_WINDOW_SENSOR] = user_input[CONF_ZONE_WINDOW_SENSOR]
                     
@@ -459,7 +470,12 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
     ) -> config_entries.FlowResult:
         """Map calibration entities for TRVs (when adding a new zone)."""
         if user_input is not None:
-            self._current_zone_data[CONF_ZONE_CALIBRATIONS] = user_input
+            climates = self._current_zone_data.get(CONF_ZONE_CLIMATES, [])
+            calibrations, sensor_selects = parse_trv_calibration_input(
+                user_input, climates=climates
+            )
+            self._current_zone_data[CONF_ZONE_CALIBRATIONS] = calibrations
+            self._current_zone_data[CONF_ZONE_TRV_SENSOR_SELECTS] = sensor_selects
             self._zones.append(self._current_zone_data)
             self._current_zone_data = None
             return self._save_options()
@@ -519,6 +535,16 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                 ("sensor", f"{DOMAIN}_{self.config_entry.entry_id}_thermal_retention_{climate_id_for_unique}"),
                 ("sensor", f"{DOMAIN}_{self.config_entry.entry_id}_radiator_sizing_{safe_name}"),
                 ("sensor", f"{DOMAIN}_{self.config_entry.entry_id}_radiator_sizing_{climate_id_for_unique}"),
+                ("switch", f"{DOMAIN}_{self.config_entry.entry_id}_pid_manual_unlock_{safe_name}"),
+                ("switch", f"{DOMAIN}_{self.config_entry.entry_id}_pid_manual_unlock_{climate_id_for_unique}"),
+                ("number", f"{DOMAIN}_{self.config_entry.entry_id}_pid_kp_{safe_name}"),
+                ("number", f"{DOMAIN}_{self.config_entry.entry_id}_pid_kp_{climate_id_for_unique}"),
+                ("number", f"{DOMAIN}_{self.config_entry.entry_id}_pid_ki_{safe_name}"),
+                ("number", f"{DOMAIN}_{self.config_entry.entry_id}_pid_ki_{climate_id_for_unique}"),
+                ("number", f"{DOMAIN}_{self.config_entry.entry_id}_pid_kd_{safe_name}"),
+                ("number", f"{DOMAIN}_{self.config_entry.entry_id}_pid_kd_{climate_id_for_unique}"),
+                ("button", f"{DOMAIN}_{self.config_entry.entry_id}_reset_autotune_{safe_name}"),
+                ("button", f"{DOMAIN}_{self.config_entry.entry_id}_reset_autotune_{climate_id_for_unique}"),
             ]
             for domain_name, unique_id in zone_unique_ids:
                 ent_id = ent_reg.async_get_entity_id(domain_name, DOMAIN, unique_id)
@@ -529,10 +555,20 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             try:
                 from homeassistant.helpers import device_registry as dr
                 dev_reg = dr.async_get(self.hass)
-                device = dev_reg.async_get_device(identifiers={(DOMAIN, f"{self.config_entry.entry_id}_zone_{safe_name}")})
-                if device is not None:
-                    dev_reg.async_remove_device(device.id)
-                    _LOGGER.debug("Removed zone device %s from device registry", device.id)
+                slug_name = climate_id_for_unique.replace(f"climate.{DOMAIN}_", "", 1)
+                for zone_ident in dict.fromkeys((safe_name, slug_name)):
+                    device = dev_reg.async_get_device(identifiers={(DOMAIN, f"{self.config_entry.entry_id}_zone_{zone_ident}")})
+                    if device is not None:
+                        try:
+                            dev_entities = er.async_entries_for_device(ent_reg, device.id, include_disabled_entities=True)
+                        except TypeError:
+                            dev_entities = er.async_entries_for_device(ent_reg, device.id)
+                        if isinstance(dev_entities, (list, tuple)):
+                            for dev_ent in list(dev_entities):
+                                if getattr(dev_ent, "entity_id", None):
+                                    ent_reg.async_remove(dev_ent.entity_id)
+                        dev_reg.async_remove_device(device.id)
+                        _LOGGER.debug("Removed zone device %s from device registry", device.id)
             except Exception as ex:
                 _LOGGER.debug("Error removing device from registry: %s", ex)
             
@@ -563,6 +599,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                 if not climates and not switches and not valves and not split_climate:
                     errors["base"] = "no_actuators_selected"
                 else:
+                    edited_idx: int | None = None
                     for i, z in enumerate(self._zones):
                         if z.get(CONF_ZONE_NAME, 'Unnamed Zone') == self._current_zone_name:
                             self._zones[i][CONF_ZONE_CLIMATES] = climates
@@ -571,6 +608,12 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                             self._zones[i][CONF_VALVE_SCALE] = user_input.get(CONF_VALVE_SCALE, DEFAULT_VALVE_SCALE)
                             self._zones[i][CONF_ZONE_TRV_SYNC] = user_input.get(CONF_ZONE_TRV_SYNC, DEFAULT_TRV_SYNC)
                             self._zones[i][CONF_ZONE_AUTHORITATIVE_SYNC] = user_input.get(CONF_ZONE_AUTHORITATIVE_SYNC, DEFAULT_AUTHORITATIVE_SYNC)
+                            self._zones[i][CONF_ZONE_TRV_CALIBRATION_MODE] = user_input.get(CONF_ZONE_TRV_CALIBRATION_MODE, DEFAULT_TRV_CALIB_MODE)
+                            self._zones[i][CONF_ZONE_TRV_CONTROL_MODE] = user_input.get(CONF_ZONE_TRV_CONTROL_MODE, DEFAULT_TRV_CONTROL_MODE)
+                            self._zones[i][CONF_ZONE_TRV_OPEN_BOOST] = float(user_input.get(CONF_ZONE_TRV_OPEN_BOOST, DEFAULT_TRV_OPEN_BOOST))
+                            self._zones[i][CONF_ZONE_TRV_CLOSE_OFFSET] = float(user_input.get(CONF_ZONE_TRV_CLOSE_OFFSET, DEFAULT_TRV_CLOSE_OFFSET))
+                            self._zones[i].setdefault(CONF_ZONE_CALIBRATIONS, {})
+                            self._zones[i].setdefault(CONF_ZONE_TRV_SENSOR_SELECTS, {})
                             self._zones[i][CONF_ZONE_WEIGHT] = float(user_input.get(CONF_ZONE_WEIGHT, DEFAULT_ZONE_WEIGHT))
                             self._zones[i][CONF_ZONE_ANTI_SEIZE] = user_input.get(CONF_ZONE_ANTI_SEIZE, True)
                             self._zones[i][CONF_ZONE_ALLOW_PASSIVE_HEAT] = user_input.get(CONF_ZONE_ALLOW_PASSIVE_HEAT, False)
@@ -591,17 +634,48 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                             elif CONF_ZONE_TEMP_SENSOR in self._zones[i]:
                                 del self._zones[i][CONF_ZONE_TEMP_SENSOR]
 
+                            if user_input.get(CONF_ZONE_HUMIDITY_SENSOR) and user_input[CONF_ZONE_HUMIDITY_SENSOR] != "none":
+                                self._zones[i][CONF_ZONE_HUMIDITY_SENSOR] = user_input[CONF_ZONE_HUMIDITY_SENSOR]
+                            elif CONF_ZONE_HUMIDITY_SENSOR in self._zones[i]:
+                                del self._zones[i][CONF_ZONE_HUMIDITY_SENSOR]
+
                             if user_input.get(CONF_ZONE_WINDOW_SENSOR) and user_input[CONF_ZONE_WINDOW_SENSOR] != "none":
                                 self._zones[i][CONF_ZONE_WINDOW_SENSOR] = user_input[CONF_ZONE_WINDOW_SENSOR]
                             elif CONF_ZONE_WINDOW_SENSOR in self._zones[i]:
                                 del self._zones[i][CONF_ZONE_WINDOW_SENSOR]
 
+                            edited_idx = i
                             break
-                    
+
+                    if (
+                        edited_idx is not None
+                        and CONF_ZONE_TEMP_SENSOR in self._zones[edited_idx]
+                        and climates
+                    ):
+                        self._editing_zone_index = edited_idx
+                        self._current_zone_data = self._zones[edited_idx]
+                        return await self.async_step_trv_calibration_edit()
+
+                    if edited_idx is not None:
+                        if not climates:
+                            self._zones[edited_idx][CONF_ZONE_CALIBRATIONS] = {}
+                            self._zones[edited_idx][CONF_ZONE_TRV_SENSOR_SELECTS] = {}
+                        else:
+                            allowed = set(climates)
+                            self._zones[edited_idx][CONF_ZONE_CALIBRATIONS] = {
+                                k: v for k, v in (self._zones[edited_idx].get(CONF_ZONE_CALIBRATIONS) or {}).items() if k in allowed
+                            }
+                            self._zones[edited_idx][CONF_ZONE_TRV_SENSOR_SELECTS] = {
+                                k: v for k, v in (self._zones[edited_idx].get(CONF_ZONE_TRV_SENSOR_SELECTS) or {}).items() if k in allowed
+                            }
+
                     self._current_zone_name = None
+                    self._current_zone_data = None
+                    self._editing_zone_index = None
                     return self._save_options()
 
         if self._current_zone_name is None:
+            self._editing_zone_index = None
             zone_options = {z.get(CONF_ZONE_NAME, 'Unnamed Zone'): z.get(CONF_ZONE_NAME, 'Unnamed Zone') for z in self._zones}
             if user_input is not None and "zone_name" in user_input:
                 self._current_zone_name = user_input["zone_name"]
@@ -626,6 +700,39 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             data_schema=schema,
             errors=errors,
             description_placeholders={"zone_name": self._current_zone_name}
+        )
+
+    async def async_step_trv_calibration_edit(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.FlowResult:
+        """Map calibration and sensor select entities for TRVs (when editing a zone)."""
+        if self._current_zone_data is None:
+            return self._save_options()
+
+        if user_input is not None:
+            climates = self._current_zone_data.get(CONF_ZONE_CLIMATES, [])
+            calibrations, sensor_selects = parse_trv_calibration_input(
+                user_input, climates=climates
+            )
+            if (
+                self._editing_zone_index is not None
+                and 0 <= self._editing_zone_index < len(self._zones)
+            ):
+                self._zones[self._editing_zone_index][CONF_ZONE_CALIBRATIONS] = calibrations
+                self._zones[self._editing_zone_index][CONF_ZONE_TRV_SENSOR_SELECTS] = sensor_selects
+            else:
+                self._current_zone_data[CONF_ZONE_CALIBRATIONS] = calibrations
+                self._current_zone_data[CONF_ZONE_TRV_SENSOR_SELECTS] = sensor_selects
+            self._current_zone_name = None
+            self._current_zone_data = None
+            self._editing_zone_index = None
+            return self._save_options()
+
+        schema = get_options_trv_calibration_edit_schema(self._current_zone_data)
+        return self.async_show_form(
+            step_id="trv_calibration_edit",
+            data_schema=schema,
+            description_placeholders={"zone_name": self._current_zone_data[CONF_ZONE_NAME]},
         )
 
     async def async_step_edit_geofencing(
@@ -747,7 +854,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
             data[CONF_GRID_EXPORT_INVERTED] = self._grid_export_inverted
 
         self.hass.config_entries.async_update_entry(
-            self.config_entry, data=data, options=self.config_entry.options
+            self.config_entry, data=data, options={}
         )
         
         has_listeners = bool(
@@ -759,4 +866,4 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                 self.hass.config_entries.async_reload(self.config_entry.entry_id)
             )
         
-        return self.async_create_entry(title="", data=self.config_entry.options)
+        return self.async_create_entry(title="", data={})

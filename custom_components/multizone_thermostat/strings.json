@@ -30,7 +30,8 @@
           "name": "Zone Name",
           "temp_sensor": "Zone Temperature Sensor",
           "target_temperature": "Base Target Temperature",
-          "emitter_type": "Emitter Type"
+          "emitter_type": "Emitter Type",
+          "humidity_sensor": "Humidity Sensor (Optional)"
         },
         "sections": {
           "trv_settings": {
@@ -39,7 +40,11 @@
             "data": {
               "climate_entities": "Climate Entity",
               "trv_preset_sync": "Enable TRV Preset Sync",
-              "authoritative_climate_sync": "Authoritative Wall Thermostat Sync"
+              "authoritative_climate_sync": "Authoritative Wall Thermostat Sync",
+              "trv_calibration_mode": "TRV Calibration Mode (Offset vs External Temp)",
+              "trv_control_mode": "TRV Control Mode (Standard vs Demand-Driven Valve)",
+              "trv_open_boost": "Demand-Driven Open Boost (°C above room/target)",
+              "trv_close_offset": "Demand-Driven Close Offset (°C below room temp when idle)"
             }
           },
           "valve_settings": {
@@ -84,12 +89,13 @@
         "data_description": {
           "name": "A friendly name for this zone",
           "temp_sensor": "Zone primary ambient temperature sensor",
-          "target_temperature": "Default setpoint target for this zone"
+          "target_temperature": "Default setpoint target for this zone",
+          "humidity_sensor": "Optional room humidity sensor used for dew-point protection during cooling"
         }
       },
       "trv_calibration": {
-        "title": "TRV Configuration (Offset Sensor)",
-        "description": "Select the temperature offset (calibration) entities for each TRV in zone {zone_name}. These are usually `number` entities provided by your TRV integration (e.g. Better Thermostat, Z2M, ZHA). If left empty, we will use 'Target Temperature Compensation' (faking the target temp to match the external sensor).",
+        "title": "TRV Temperature Feed & Calibration",
+        "description": "For each TRV in zone {zone_name}, select either a temperature offset entity (e.g. `local_temperature_calibration`) or an absolute external temperature input entity (e.g. `external_temperature_input`). Optionally, select the TRV's sensor source `select` entity (`...__sensor_select`, e.g. `temperature_sensor_select`) for automatic remote/local fallback. If left empty, Target Temperature Compensation will be used.",
         "data": {}
       },
       "another_zone": {
@@ -195,7 +201,8 @@
       "invalid_temp_range": "Minimum temperature must be lower than maximum temperature.",
       "no_actuators_selected": "You must select at least one climate entity or switch for the zone.",
       "zone_name_exists": "A zone with this name already exists.",
-      "no_plants_selected": "You must select at least one central heating plant (Gas boiler or Heat pump)."
+      "no_plants_selected": "You must select at least one central heating plant (Gas boiler or Heat pump).",
+      "hp_temps_invalid": "Heat pump heating/cooling minimum temperature must be lower than maximum temperature."
     }
   },
   "options": {
@@ -244,7 +251,8 @@
           "temp_sensor": "Zone Temperature Sensor",
           "target_temperature": "Base Target Temperature",
           "sensor_timeout_min": "Sensor Watchdog Timeout (minutes)",
-          "emitter_type": "Emitter Type"
+          "emitter_type": "Emitter Type",
+          "humidity_sensor": "Humidity Sensor (Optional)"
         },
         "sections": {
           "trv_settings": {
@@ -253,7 +261,11 @@
             "data": {
               "climate_entities": "Climate Entity",
               "trv_preset_sync": "Enable TRV Preset Sync",
-              "authoritative_climate_sync": "Authoritative Wall Thermostat Sync"
+              "authoritative_climate_sync": "Authoritative Wall Thermostat Sync",
+              "trv_calibration_mode": "TRV Calibration Mode (Offset vs External Temp)",
+              "trv_control_mode": "TRV Control Mode (Standard vs Demand-Driven Valve)",
+              "trv_open_boost": "Demand-Driven Open Boost (°C above room/target)",
+              "trv_close_offset": "Demand-Driven Close Offset (°C below room temp when idle)"
             }
           },
           "valve_settings": {
@@ -301,7 +313,8 @@
           "window_sensor": "Automatically bypass the zone when this sensor is open",
           "sensor_timeout_min": "Max duration without updates before falling back to onboard TRV sensors / safety mode",
           "name": "A friendly name for this zone (pre-filled from climate entity name)",
-          "trv_preset_sync": "Automatically sync preset mode when HVAC mode changes (for physical TRV valves)"
+          "trv_preset_sync": "Automatically sync preset mode when HVAC mode changes (for physical TRV valves)",
+          "humidity_sensor": "Optional room humidity sensor used for dew-point protection during cooling"
         }
       },
       "remove_zone": {
@@ -318,7 +331,8 @@
           "zone_name": "Zone",
           "temp_sensor": "Zone Temperature Sensor",
           "target_temperature": "Base Target Temperature",
-          "emitter_type": "Emitter Type"
+          "emitter_type": "Emitter Type",
+          "humidity_sensor": "Humidity Sensor (Optional)"
         },
         "sections": {
           "trv_settings": {
@@ -327,7 +341,11 @@
             "data": {
               "climate_entities": "Zone TRVs / Climates",
               "trv_preset_sync": "Enable TRV Preset Sync",
-              "authoritative_climate_sync": "Authoritative Wall Thermostat Sync"
+              "authoritative_climate_sync": "Authoritative Wall Thermostat Sync",
+              "trv_calibration_mode": "TRV Calibration Mode (Offset vs External Temp)",
+              "trv_control_mode": "TRV Control Mode (Standard vs Demand-Driven Valve)",
+              "trv_open_boost": "Demand-Driven Open Boost (°C above room/target)",
+              "trv_close_offset": "Demand-Driven Close Offset (°C below room temp when idle)"
             }
           },
           "valve_settings": {
@@ -368,6 +386,9 @@
               "split_sensor_injection": "Inject Room Sensor (Bypass Ceiling Probe)"
             }
           }
+        },
+        "data_description": {
+          "humidity_sensor": "Optional room humidity sensor used for dew-point protection during cooling"
         }
       },
       "edit_geofencing": {
@@ -379,13 +400,13 @@
         }
       },
       "trv_calibration_add": {
-        "title": "TRV Configuration (Offset Sensor) (Add)",
-        "description": "Select the temperature offset (calibration) entities for each TRV in zone {zone_name}. These are usually `number` entities provided by your TRV integration (e.g. Better Thermostat, Z2M, ZHA). If left empty, we will use 'Target Temperature Compensation' (faking the target temp to match the external sensor).",
+        "title": "TRV Temperature Feed & Calibration (Add)",
+        "description": "For each TRV in zone {zone_name}, select either a temperature offset entity (e.g. `local_temperature_calibration`) or an absolute external temperature input entity (e.g. `external_temperature_input`). Optionally, select the TRV's sensor source `select` entity (`...__sensor_select`, e.g. `temperature_sensor_select`) for automatic remote/local fallback. If left empty, Target Temperature Compensation will be used.",
         "data": {}
       },
       "trv_calibration_edit": {
-        "title": "TRV Configuration (Offset Sensor) (Edit)",
-        "description": "Select the temperature offset (calibration) entities for each TRV in zone {zone_name}. These are usually `number` entities provided by your TRV integration (e.g. Better Thermostat, Z2M, ZHA). If left empty, we will use 'Target Temperature Compensation' (faking the target temp to match the external sensor).",
+        "title": "TRV Temperature Feed & Calibration (Edit)",
+        "description": "For each TRV in zone {zone_name}, select either a temperature offset entity (e.g. `local_temperature_calibration`) or an absolute external temperature input entity (e.g. `external_temperature_input`). Optionally, select the TRV's sensor source `select` entity (`...__sensor_select`, e.g. `temperature_sensor_select`) for automatic remote/local fallback. If left empty, Target Temperature Compensation will be used.",
         "data": {}
       },
       "edit_weather_comp": {
@@ -470,7 +491,8 @@
       "no_climates_available": "All available climate entities are already configured as zones.",
       "no_temp_sensors_found": "No temperature sensors found in Home Assistant.",
       "no_switches_found": "No switch entities found in Home Assistant.",
-      "no_virtual_thermostats": "No virtual thermostats configured."
+      "no_virtual_thermostats": "No virtual thermostats configured.",
+      "zone_not_found": "Selected zone was not found."
     },
     "error": {
       "zone_name_required": "Zone name cannot be empty.",

@@ -6,6 +6,7 @@ from .flow_curve import (
     EMITTER_RADIATOR,
     EMITTER_UNDERFLOOR,
     EMITTER_FANCOIL,
+    UNDERFLOOR_MAX_FLOW_TEMP,
 )
 """Central Heat Pump (PDC) Backend for Multizone Thermostat (Phase 11).
 
@@ -21,6 +22,7 @@ from typing import Any
 
 from homeassistant.core import HomeAssistant
 from .base import BoilerBackend
+from .valve_readiness import evaluate_trvs_ready
 from ..const import (
     HP_TYPE_CLIMATE,
     HP_TYPE_SWITCH,
@@ -29,6 +31,7 @@ from ..const import (
     HVAC_MODE_COOL,
     HVAC_MODE_OFF,
     KEY_FROST_FLOW_TEMP,
+    DEFAULT_FROST_FLOW_TEMP,
     to_celsius,
     from_celsius,
     KEY_HP_MIN_CYCLE_ON,
@@ -77,6 +80,7 @@ class CentralHeatPumpBackend(BoilerBackend):
         self.reversible_cooling = bool(reversible_cooling)
         self._status_reason = "INIT"
         self._last_state_on: bool | None = None
+        self._trv_wait_start: float | None = None
         self._valve_delay_start: float | None = None
         # Anti-short-cycle guards (L3 / ORACLE-3)
         raw_on = (
@@ -471,15 +475,21 @@ class CentralHeatPumpBackend(BoilerBackend):
             # 3. If temperature not resolved from sensor, check associated climate entity
             if t_val is None:
                 climates = getattr(self.coordinator, "_climate_entities", {}) or {}
-                for cid, c_obj in climates.items():
-                    if z.get("name") and z.get("name") in cid:
-                        cur_t = getattr(c_obj, "current_temperature", None)
-                        if isinstance(cur_t, (int, float)):
-                            t_val = float(cur_t)
-                        cur_h = getattr(c_obj, "current_humidity", None)
-                        if h_val is None and isinstance(cur_h, (int, float)):
-                            h_val = float(cur_h)
-                        break
+                z_name = z.get("name") or z.get("zone_name") or ""
+                target_cid = z.get("climate_id") or (make_zone_entity_id(z_name) if z_name else "")
+                c_obj = climates.get(target_cid) if target_cid else None
+                if c_obj is None and z_name:
+                    for cid, candidate in climates.items():
+                        if z_name in cid:
+                            c_obj = candidate
+                            break
+                if c_obj is not None:
+                    cur_t = getattr(c_obj, "current_temperature", None)
+                    if isinstance(cur_t, (int, float)):
+                        t_val = float(cur_t)
+                    cur_h = getattr(c_obj, "current_humidity", None)
+                    if h_val is None and isinstance(cur_h, (int, float)):
+                        h_val = float(cur_h)
 
             if t_val is not None and h_val is not None and 5.0 <= h_val <= 100.0:
                 dp = self._compute_dew_point(t_val, h_val)
@@ -529,17 +539,20 @@ class CentralHeatPumpBackend(BoilerBackend):
         # Anti-short-cycling guard for heat pump compressor (L3 / ORACLE-3)
         now = time.monotonic()
         elapsed = now - self._last_switch_time if self._last_switch_time > 0 else 99999.0
+        hold_active = False
 
         if wanted_on and not self._current_running_state:
             if elapsed < self.min_cycle_off and not frost_emergency:
                 rem = self.min_cycle_off - elapsed
                 self._status_reason = f"HOLD_OFF - PDC anti-short-cycle: {rem:.0f}s"
                 wanted_on = False
+                hold_active = True
         elif not wanted_on and self._current_running_state:
             if elapsed < self.min_cycle_on and not frost_emergency:
                 rem = self.min_cycle_on - elapsed
                 self._status_reason = f"HOLD_ON - PDC min run time: {rem:.0f}s"
                 wanted_on = True
+                hold_active = True
             else:
                 self._last_switch_time = now
                 self._current_running_state = False
@@ -576,19 +589,58 @@ class CentralHeatPumpBackend(BoilerBackend):
 
             if frost_emergency:
                 p_val = self.coordinator.get_persistent_data(KEY_FROST_FLOW_TEMP, None) if hasattr(self.coordinator, "get_persistent_data") else None
-                if isinstance(p_val, (int, float)):
+                if isinstance(p_val, (int, float)) and not isinstance(p_val, bool):
                     frost_flow = float(p_val)
                 else:
-                    frost_flow = float(getattr(self.coordinator, "frost_flow_temp", 40.0))
+                    raw_ff = getattr(self.coordinator, "frost_flow_temp", None)
+                    frost_flow = (
+                        float(raw_ff)
+                        if isinstance(raw_ff, (int, float)) and not isinstance(raw_ff, bool)
+                        else DEFAULT_FROST_FLOW_TEMP
+                    )
                 target_temp = max(self.min_temp, min(curve.t_max, frost_flow))
             elif outdoor_temp is not None:
                 target_temp = curve.flow_for_demand(demand, outdoor_temp)
             else:
-                target_temp = self.min_temp + norm_demand * (self.max_temp - self.min_temp)
+                target_temp = self.min_temp + norm_demand * (curve.t_max - self.min_temp)
+            if (emitter == EMITTER_UNDERFLOOR or self._has_mixed_underfloor()) and not has_mixing:
+                target_temp = min(target_temp, UNDERFLOOR_MAX_FLOW_TEMP)
             target_temp = round(target_temp, 1)
 
         if wanted_on:
-            if self.valve_delay > 0 and not self._is_currently_on(self.hp_entity):
+            is_cold_start = not self._is_currently_on(self.hp_entity)
+            if (
+                is_cold_start
+                and hvac_mode in (HVAC_MODE_HEAT, "heat")
+                and not frost_emergency
+                and peak_zone != "Anti-Seize"
+            ):
+                trvs_ready, has_any_trvs = evaluate_trvs_ready(self.hass, self.coordinator)
+                if not trvs_ready and has_any_trvs:
+                    self._valve_delay_start = None
+                    now_mono = time.monotonic()
+                    if self._trv_wait_start is None:
+                        self._trv_wait_start = now_mono
+                    elapsed = now_mono - self._trv_wait_start
+                    if elapsed < 120.0:
+                        self._status_reason = (
+                            f"HOLD_TRV_CLOSED - Waiting for TRVs to open ({round(120.0 - elapsed)}s remaining)"
+                        )
+                        _LOGGER.debug(
+                            "HeatPump %s: Waiting for TRVs to open before cold start (%.1fs/120s)",
+                            self.hp_entity,
+                            elapsed,
+                        )
+                        return
+                    _LOGGER.info(
+                        "HeatPump %s: TRV opening grace period (120s) elapsed. Proceeding.",
+                        self.hp_entity,
+                    )
+                self._trv_wait_start = None
+            else:
+                self._trv_wait_start = None
+
+            if self.valve_delay > 0 and is_cold_start:
                 now_mono = time.monotonic()
                 if self._valve_delay_start is None:
                     self._valve_delay_start = now_mono
@@ -609,18 +661,21 @@ class CentralHeatPumpBackend(BoilerBackend):
                 self._last_switch_time = time.monotonic()
                 self._current_running_state = True
 
-            if not self._status_reason.startswith("HOLD_"):
+            if not hold_active:
                 self._status_reason = (
                     f"HP_{hvac_mode.upper()} - Target: {target_temp}°C "
                     f"(Demand: {round(demand, 1)}% from {peak_zone or 'None'})"
                 )
         else:
+            self._trv_wait_start = None
             self._valve_delay_start = None
-            if not self._status_reason.startswith("HOLD_"):
+            if not hold_active and self._status_reason != "OFF - Emergency/Master OFF":
                 self._status_reason = "OFF - No Demand"
 
         diag = getattr(self.coordinator, "plant_diagnostics", None)
         confirmed_hp_on = bool(self._current_running_state)
+        if (confirmed_hp_on or wanted_on) and hasattr(self.coordinator, "reset_last_active_time"):
+            self.coordinator.reset_last_active_time()
         if diag:
             try:
                 diag.record_generator_state("heat_pump", confirmed_hp_on)
@@ -661,8 +716,10 @@ class CentralHeatPumpBackend(BoilerBackend):
 
     async def async_emergency_off(self) -> None:
         """Force Central Heat Pump off immediately."""
+        if self._current_running_state:
+            self._last_switch_time = time.monotonic()
         self._current_running_state = False
-        self._last_switch_time = 0.0
+        self._trv_wait_start = None
         self._valve_delay_start = None
         self._status_reason = "OFF - Emergency/Master OFF"
         await self.async_update(0.0, None, False, HVAC_MODE_OFF)

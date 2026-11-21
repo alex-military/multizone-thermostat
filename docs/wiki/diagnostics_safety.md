@@ -24,16 +24,20 @@ flowchart TD
     
     Diagnosi --> CheckSonda{"No Sensor Updates<br>for > 240 Minutes?"}
     CheckSonda -->|Yes| AllarmeSonda["⚠️ Wireless Sensor Watchdog Timeout<br>-> Fallback to TRV Internal Sensor"]
+    
+    Diagnosi --> CheckTrvOpen{"Zone Demand > 20% & Generator ON > 5 min<br>but All Zone TRVs Closed/Idle?"}
+    CheckTrvOpen -->|Yes| AllarmeTrvOpen["⚠️ trv_not_opening<br>(Non-Blocking Alert)"]
 ```
 
-### The 4 Core Mechanical Anomalies
+### The 5 Core Mechanical Anomalies
 
 | Anomaly | Trigger Criteria | Automated System Response |
 |---|---|---|
 | **Stuck Closed Valve** | Room demands heat for > 45 minutes with boiler running, but room temperature continues to drop. | Red alert on Lovelace card, persistent notification in Home Assistant, and activation of `binary_sensor.heating_zones_[room]_anomaly`. |
+| **TRV Valve Not Opening (`trv_not_opening`)** | *"TRV valve not opening despite active zone heating demand"*: zone heating demand > 20% and central boiler/heat generator is active (`boiler_on`) for > 5 minutes while all zone TRVs still report closed/`idle`. | **Non-blocking diagnostic alert**: flags the affected zone without halting the central plant so other zones continue to be served. |
 | **Ghost Heating (Leakage)** | Room temperature rises significantly while the room valve/relay is commanded to 0%. | Warns of damaged valve seats, poor actuator seating, or faulty bypass valves. |
 | **Trapped Radiator Air** | Valve is open 100% but warm-up rate is less than 30% of historical rate $R$. | Flags radiator as needing manual air bleeding to restore heat transfer. |
-| **Sensor Watchdog Timeout** | Wireless sensor battery dies or loses signal for > 240 minutes (`CONF_ZONE_SENSOR_TIMEOUT`). | **Instant graceful fallback**: automatically regulates using the TRV's internal temperature probe, preventing freezing. |
+| **Sensor Watchdog Timeout** | Wireless sensor battery dies or loses signal for > 240 minutes (`CONF_ZONE_SENSOR_TIMEOUT`). | **Instant graceful fallback (`safety_fallback_active`)**: automatically regulates using the TRV's internal sensor, reverts `trv_sensor_selects` to the internal/local sensor, and reverts `demand_driven` TRVs to `standard` mode. |
 
 ---
 
@@ -45,9 +49,10 @@ Frequent starts reduce efficiency and wear out burners or compressors:
 * **Central Heat Pump**: Dedicated `number.master_control_hp_min_cycle_on` / `hp_min_cycle_off` (independent from boiler cycles).
 * **Plant Diagnostics**: Cycle frequency (`cycles/hour`) and 24h runtime tracking work for both gas boilers and heat-pump-only plants.
 
-### 2. Motorized Valve Opening Delay (`number.master_control_valve_delay`)
+### 2. Motorized Valve Opening Delay & Hydraulic TRV Guard (`number.master_control_valve_delay`)
 Wax thermal actuators require 90 to 180 seconds to stroke open.
 Setting a delay (e.g. **120 seconds**) ensures the boiler/heat pump and circulator start only when valves are fully open, eliminating water hammer and pipe overpressure.
+* **Unified TRV Valve-Readiness Guard (`HOLD_TRV_CLOSED`)**: `HOLD_TRV_CLOSED` automatically holds heat generator ignition up to **120 s max** while demanding zone TRVs still report closed—inspecting valve position attributes (`position`, `valve_position`, `pi_heating_demand`, `heating_demand` > 10%) as well as `hvac_action` fallback (`"heating"` vs `"idle"`/`"off"`), followed by the optional motorized `valve_delay` (`number.master_control_valve_delay`) if `> 0 s`. Applies to **Relay Boiler**, **OpenTherm cold-start only** (never kills an already-running burner), and **Central Heat Pump in HEAT mode**.
 
 ### 3. Summer Anti-Seize Exercise
 During warm months, valves and circulators sit dormant, risking calcification and seizing:
@@ -63,6 +68,10 @@ If any room falls below `number.master_control_anti_frost_temperature` (default:
 * **Underfloor Hard Thermal Ceiling**: Enforces a strict **40.0 °C** max water temperature on unmixed underfloor radiant systems, even in mixed radiator/underfloor setups.
 * **Indoor Dew-Point Anti-Condensation**: Keeps chilled cooling water at least **+2.0 °C** above the worst-case indoor dew point across zones actively demanding cooling.
 * **Window Open Cutout**: Opening a window immediately clears zone demand and cancels any local split manual override.
+
+### 6. TRV Demand-Driven Bounded Overdrive & Safety Reversion
+* **Bounded Overdrive (`trv_control_mode: demand_driven`)**: Prevents smart TRVs from pinching/closing early via PID demand hysteresis (`>= 5.0%` opens, `<= 0.0%` closes), `60 s` anti-chatter debounce, `10 s` evaluation tick, and an idle no-chatter guard. Open target is strictly bounded to `min(trv_max, room_temp + trv_open_boost, zone_target + trv_open_boost)` (never blasts a fixed 30 °C), and close target to `max(trv_min, min(zone_target, room_temp - trv_close_offset))`.
+* **Automatic Safety Reversion (`safety_fallback_active`)**: If the primary room sensor is lost or stale, `demand_driven` TRVs automatically revert to `standard` mode (direct zone setpoint) and `trv_sensor_selects` switches back to the TRV's internal/local sensor so each valve regulates autonomously.
 
 ---
 

@@ -829,6 +829,13 @@ class MultizoneThermostatPresetCardEditor extends HTMLElement {
     }
   }
 
+  disconnectedCallback() {
+    if (this._discoverTimer) {
+      clearTimeout(this._discoverTimer);
+      this._discoverTimer = null;
+    }
+  }
+
   configChanged(newConfig) {
     const event = new Event("config-changed", {
       bubbles: true,
@@ -860,7 +867,9 @@ class MultizoneThermostatPresetCardEditor extends HTMLElement {
       currentEntity = findPresetEntity(this._hass) || '';
       if (currentEntity) {
         // Defer the config change slightly to let the editor finish rendering
-        setTimeout(() => {
+        if (this._discoverTimer) clearTimeout(this._discoverTimer);
+        this._discoverTimer = setTimeout(() => {
+          this._discoverTimer = null;
           this._config = { ...this._config, entity: currentEntity };
           this.configChanged(this._config);
         }, 100);

@@ -6,7 +6,7 @@ import time
 from typing import Any
 from collections import deque
 
-from ..const import CONF_ZONE_NAME, make_zone_entity_id
+from ..const import CONF_ZONE_NAME, MODE_CENTRAL, MODE_NONE, make_zone_entity_id, resolve_zone_id_safe
 from .const import (
     ANOMALY_NONE,
     ANOMALY_VALVE_STUCK_CLOSED,
@@ -102,7 +102,23 @@ class PlantDiagnosticsEngine:
 
     def is_any_generator_running(self) -> bool:
         """Return True if at least one generator is actively running."""
-        return any(v is not None for v in self._current_generator_start.values()) or (self._current_boiler_start is not None)
+        if any(v is not None for v in self._current_generator_start.values()) or (self._current_boiler_start is not None):
+            return True
+        boiler_mode = getattr(self.coordinator, "boiler_mode", None)
+        enable_hp = getattr(self.coordinator, "enable_heat_pump", False) is True
+        if boiler_mode in (MODE_CENTRAL, MODE_NONE) and not enable_hp:
+            orch = getattr(self.coordinator, "plant_orchestrator", None)
+            last_agg = getattr(orch, "last_aggregate", None) if orch is not None else None
+            agg_demand = getattr(last_agg, "demand", None)
+            if isinstance(agg_demand, (int, float)) and not isinstance(agg_demand, bool) and float(agg_demand) > 0.0:
+                return True
+            zone_demands = getattr(self.coordinator, "zone_demands", None)
+            if isinstance(zone_demands, dict) and any(
+                isinstance(v, (int, float)) and not isinstance(v, bool) and float(v) > 0.0
+                for v in zone_demands.values()
+            ):
+                return True
+        return False
 
     def _resolve_default_generator_id(self, generator_id: str | None) -> str:
         """Resolve which generator track to inspect when generator_id is omitted."""
@@ -171,12 +187,14 @@ class PlantDiagnosticsEngine:
         return get_battery_level(self.hass, entity_id)
 
     def get_zone_battery_level(self, climate_id: str) -> int | None:
+        climate_id = resolve_zone_id_safe(self.coordinator, climate_id)
         return get_zone_battery_level(self.coordinator, self.hass, climate_id)
 
     def get_opentherm_diagnostics(self) -> dict[str, Any]:
         return get_opentherm_diagnostics(self.coordinator, self.hass)
 
     def evaluate_zone_anomalies(self, climate_id: str) -> tuple[str, str]:
+        climate_id = resolve_zone_id_safe(self.coordinator, climate_id)
         state = self._zone_anomaly_state.setdefault(climate_id, {
             "active_anomaly": ANOMALY_NONE,
             "anomaly_details": "No anomaly detected",
@@ -186,21 +204,26 @@ class PlantDiagnosticsEngine:
             "last_temp_seen": None,
             "last_temp_time": None,
             "last_heating_time": None,
+            "trv_closed_start_time": None,
         })
         boiler_on = self.coordinator.get_master_state() and self.is_any_generator_running()
         return evaluate_zone_anomalies(self.coordinator, self.hass, climate_id, state, boiler_on)
 
     def get_zone_energy_class(self, climate_id: str) -> str:
+        climate_id = resolve_zone_id_safe(self.coordinator, climate_id)
         return get_zone_energy_class(self.coordinator, self.hass, climate_id)
 
     def get_zone_thermal_retention_hours(self, climate_id: str) -> float | None:
+        climate_id = resolve_zone_id_safe(self.coordinator, climate_id)
         return get_zone_thermal_retention_hours(self.coordinator, climate_id)
 
     def get_zone_radiator_sizing(self, climate_id: str) -> str:
+        climate_id = resolve_zone_id_safe(self.coordinator, climate_id)
         return get_zone_radiator_sizing(self.coordinator, climate_id)
 
     def has_critical_sensor_fault(self, climate_id: str) -> bool:
-        """Return True if the zone sensor has a low battery, implausible reading, or watchdog timeout."""
+        """Return True if the zone sensor has an implausible reading or critical watchdog timeout."""
+        climate_id = resolve_zone_id_safe(self.coordinator, climate_id)
         state = self._zone_anomaly_state.get(climate_id)
         if not state:
             return False
@@ -208,7 +231,7 @@ class PlantDiagnosticsEngine:
         if anomaly == ANOMALY_SENSOR_TIMEOUT and state.get("fallback_ok"):
             # Degraded: a valid TRV fallback measurement exists, keep heating.
             return False
-        return anomaly in (ANOMALY_LOW_BATTERY, ANOMALY_SENSOR_FAULT, ANOMALY_SENSOR_TIMEOUT)
+        return anomaly in (ANOMALY_SENSOR_FAULT, ANOMALY_SENSOR_TIMEOUT)
 
     def get_plant_health_summary(self) -> dict[str, Any]:
         """

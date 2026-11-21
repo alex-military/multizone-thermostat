@@ -1,5 +1,6 @@
 """Constants for Multizone Thermostat integration."""
 from __future__ import annotations
+from collections.abc import Mapping
 from typing import Any
 
 try:
@@ -47,6 +48,30 @@ CONF_ZONE_TRV_SYNC = "trv_preset_sync"
 CONF_ZONE_WINDOW_SENSOR = "window_sensor"
 CONF_ZONE_ANTI_SEIZE = "anti_seize_zone_enable"
 CONF_ZONE_CALIBRATIONS = "calibrations"
+CONF_ZONE_TRV_CALIBRATION_MODE = "trv_calibration_mode"
+TRV_CALIB_MODE_AUTO = "auto"
+TRV_CALIB_MODE_OFFSET = "offset"
+TRV_CALIB_MODE_EXTERNAL = "external_temperature"
+TRV_CALIB_MODES = (
+    TRV_CALIB_MODE_AUTO,
+    TRV_CALIB_MODE_OFFSET,
+    TRV_CALIB_MODE_EXTERNAL,
+)
+DEFAULT_TRV_CALIB_MODE = TRV_CALIB_MODE_AUTO
+CONF_ZONE_TRV_SENSOR_SELECTS = "trv_sensor_selects"
+DEFAULT_EXTERNAL_TEMP_HEARTBEAT_S = 1200.0  # 20 min anti-offline keep-alive
+DEFAULT_EXTERNAL_TEMP_MIN_INTERVAL_S = 60.0  # 60 s min interval for small jitter
+CONF_ZONE_TRV_CONTROL_MODE = "trv_control_mode"
+TRV_CONTROL_MODE_STANDARD = "standard"
+TRV_CONTROL_MODE_DEMAND_DRIVEN = "demand_driven"
+TRV_CONTROL_MODES = [TRV_CONTROL_MODE_STANDARD, TRV_CONTROL_MODE_DEMAND_DRIVEN]
+DEFAULT_TRV_CONTROL_MODE = TRV_CONTROL_MODE_STANDARD
+CONF_ZONE_TRV_OPEN_BOOST = "trv_open_boost"
+DEFAULT_TRV_OPEN_BOOST = 1.5
+CONF_ZONE_TRV_CLOSE_OFFSET = "trv_close_offset"
+DEFAULT_TRV_CLOSE_OFFSET = 1.0
+DEFAULT_TRV_DEMAND_OPEN_THRESHOLD = 5.0
+DEFAULT_TRV_DEMAND_DEBOUNCE_S = 60.0
 CONF_ZONE_VALVES = "valve_entities"
 CONF_VALVE_SCALE = "valve_scale"
 VALVE_SCALE_PERCENT = "percent"
@@ -358,3 +383,24 @@ def from_celsius(value: float, hass: Any = None, unit: str | None = None) -> flo
         if u in ("k", "kelvin"):
             return value + 273.15
     return value
+
+
+def get_state_temp_unit(state: Any) -> str | None:
+    """Extract temperature unit attribute from a Home Assistant State object safely."""
+    attrs = getattr(state, "attributes", None)
+    if isinstance(attrs, Mapping):
+        unit = attrs.get("temperature_unit") or attrs.get("unit_of_measurement")
+        return str(unit) if unit is not None else None
+    return None
+
+
+def resolve_zone_id_safe(coordinator: Any, climate_id: str) -> str:
+    """Resolve an aliased or localized entity_id to canonical zone id safely (MagicMock-safe)."""
+    if not isinstance(climate_id, str) or coordinator is None:
+        return climate_id
+    resolve_fn = getattr(coordinator, "resolve_zone_id", None)
+    if callable(resolve_fn):
+        resolved = resolve_fn(climate_id)
+        if isinstance(resolved, str) and resolved:
+            return resolved
+    return climate_id

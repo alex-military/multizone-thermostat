@@ -12,12 +12,18 @@ import inspect
 import logging
 from typing import Any
 
+try:
+    from homeassistant.const import UnitOfTemperature
+except ImportError:
+    UnitOfTemperature = None  # type: ignore[assignment]
+
 from ..const import (
     CONF_ZONE_NAME,
     make_zone_entity_id,
     HVAC_MODE_HEAT,
     HVAC_MODE_COOL,
     ZONE_MODE_BYPASS,
+    ZONE_MODE_SECONDARY,
     SOURCE_PRIORITY_GAS_ONLY,
     SOURCE_PRIORITY_ELECTRIC_ONLY,
     SOURCE_PRIORITY_ELECTRIC,
@@ -219,6 +225,10 @@ class PlantOrchestrator:
                         val = None
                     if val is not None:
                         attrs.setdefault(key, val)
+                raw_tu = getattr(ent, "temperature_unit", None) or getattr(ent, "_attr_temperature_unit", None)
+                ha_c = getattr(UnitOfTemperature, "CELSIUS", "°C") if UnitOfTemperature is not None else "°C"
+                temp_unit = raw_tu if isinstance(raw_tu, str) and raw_tu else (ha_c if isinstance(ha_c, str) else "°C")
+                attrs.setdefault("temperature_unit", temp_unit)
                 state_obj = SimpleNamespace(state=mode_str, attributes=attrs)
 
             if state_obj is None:
@@ -268,8 +278,11 @@ class PlantOrchestrator:
         mode_fn = getattr(self.coordinator, "get_zone_mode", None)
         dem_fn = getattr(self.demand_aggregator, "get_zone_demand", None)
 
+        diag = getattr(self.coordinator, "plant_diagnostics", None)
         for cid, ent in list(climate_entities.items()):
             if callable(mode_fn) and mode_fn(cid) == ZONE_MODE_BYPASS:
+                continue
+            if diag is not None and diag.has_critical_sensor_fault(cid) is True:
                 continue
 
             if _get_hvac_mode_str(ent) != HVAC_MODE_COOL:
@@ -303,12 +316,55 @@ class PlantOrchestrator:
 
         return (max_cool_demand, peak_zone)
 
+    def _is_gas_boiler_confirmed_on(self) -> bool:
+        """Return True if the gas boiler backend entity is still confirmed ON/heating."""
+        if self.boiler_backend is None or not hasattr(self.hass, "states") or not self.hass.states:
+            return False
+        b_switch = getattr(self.boiler_backend, "boiler_switch", None)
+        if isinstance(b_switch, str) and b_switch:
+            st = self.hass.states.get(b_switch)
+            if st is not None and getattr(st, "state", None) == "on":
+                return True
+        ch_sw = getattr(self.boiler_backend, "ch_switch", None)
+        if isinstance(ch_sw, str) and ch_sw:
+            st = self.hass.states.get(ch_sw)
+            if st is not None and getattr(st, "state", None) == "on":
+                return True
+        ot_ent = getattr(self.boiler_backend, "opentherm_entity", None)
+        if isinstance(ot_ent, str) and ot_ent:
+            st = self.hass.states.get(ot_ent)
+            if st is not None and getattr(st, "state", None) == "heat":
+                return True
+        return False
+
+    async def _check_frost_emergency_active(self) -> bool:
+        """Evaluate frost manager and zone frost flags cleanly."""
+        coord = self.coordinator
+        frost_mgr = getattr(coord, "frost_manager", None)
+        if frost_mgr is not None:
+            try:
+                res_frost = frost_mgr.async_handle_frost_emergencies()
+                if inspect.isawaitable(res_frost) and bool(await res_frost):
+                    return True
+            except AttributeError:
+                pass
+        frost_check_fn = getattr(coord, "is_zone_in_frost_emergency", None)
+        if callable(frost_check_fn):
+            for climate_id in list(getattr(coord, "_climate_callbacks", {}).keys()):
+                if frost_check_fn(climate_id) is True:
+                    return True
+        return False
+
     async def async_tick(self, now: datetime) -> None:
         """Periodic PWM tick for boiler and central heat pump."""
         try:
             anti_seize = getattr(self.coordinator, "anti_seize_manager", None)
             if anti_seize is not None and anti_seize.is_running is True:
-                return
+                if not await self._check_frost_emergency_active():
+                    return
+                stop_fn = getattr(anti_seize, "stop", None)
+                if callable(stop_fn):
+                    stop_fn()
 
             await self._async_update_boiler()
         except Exception as err:
@@ -363,12 +419,30 @@ class PlantOrchestrator:
 
         await self._async_refresh_zones_proactively(force=force_refresh_zones)
 
+        diag = getattr(coord, "plant_diagnostics", None)
+        if diag is not None and callable(getattr(diag, "evaluate_zone_anomalies", None)):
+            for z in getattr(coord, "zones", []) or []:
+                z_cid = z.get("climate_id") or (make_zone_entity_id(z[CONF_ZONE_NAME]) if z.get(CONF_ZONE_NAME) else None)
+                if z_cid:
+                    try:
+                        diag.evaluate_zone_anomalies(z_cid)
+                    except (AttributeError, TypeError, ValueError):
+                        pass
+
         master_mode = getattr(coord, "master_hvac_mode", HVAC_MODE_HEAT)
         energy_mgr = getattr(coord, "energy_manager", None)
         if master_mode == HVAC_MODE_COOL and not frost_emergency:
-            # In cooling mode, gas boiler is strictly OFF (0.0% demand)
+            # In cooling mode, command gas boiler OFF (0.0%) and escalate to emergency off if still firing
             if self.boiler_backend is not None:
-                await self.boiler_backend.async_update(0.0, None, False)
+                res_upd = self.boiler_backend.async_update(0.0, None, False)
+                if inspect.isawaitable(res_upd):
+                    await res_upd
+                if self._is_gas_boiler_confirmed_on():
+                    off_fn = getattr(self.boiler_backend, "async_emergency_off", None)
+                    if callable(off_fn):
+                        res_off = off_fn()
+                        if inspect.isawaitable(res_off):
+                            await res_off
             if (
                 hp_backend is not None
                 and getattr(coord, "enable_heat_pump", False) is True
@@ -380,6 +454,12 @@ class PlantOrchestrator:
                 cool_demand, cool_peak = self._calculate_cooling_demand()
                 if (solar_surplus or solar_boost) and cool_demand > 0.0:
                     cool_demand = max(cool_demand, 100.0)
+                if cool_demand > 0.0 and self._is_gas_boiler_confirmed_on():
+                    _LOGGER.warning(
+                        "Heat pump cooling blocked while gas boiler is still confirmed ON; forcing cool demand to 0%%"
+                    )
+                    cool_demand = 0.0
+                    cool_peak = None
 
                 self.last_aggregate = AggregatedDemand(
                     demand=cool_demand,
@@ -469,16 +549,29 @@ class PlantOrchestrator:
             if st and st.state in ("unavailable", "unknown"):
                 hp_available = False
 
-        # Calculate max zone delta (for COMBINED boost mode) across active heating zones only
+        # Calculate max zone delta (for COMBINED boost mode) across active primary heating zones only
         max_delta = 0.0
         if isinstance(climate_entities, dict):
             mode_fn = getattr(coord, "get_zone_mode", None)
+            split_mgr = getattr(coord, "split_manager", None)
             for cid, ent in climate_entities.items():
                 try:
-                    if callable(mode_fn) and mode_fn(cid) == ZONE_MODE_BYPASS:
+                    if callable(mode_fn) and mode_fn(cid) in (ZONE_MODE_BYPASS, ZONE_MODE_SECONDARY):
                         continue
                 except AttributeError:
                     pass
+                if plant_diag is not None:
+                    try:
+                        if plant_diag.has_critical_sensor_fault(cid) is True:
+                            continue
+                    except AttributeError:
+                        pass
+                if split_mgr is not None:
+                    try:
+                        if split_mgr.should_suppress_hydronic_demand(cid) is True:
+                            continue
+                    except AttributeError:
+                        pass
                 if _get_hvac_mode_str(ent).lower() in ("off", "cool"):
                     continue
                 try:
@@ -517,7 +610,14 @@ class PlantOrchestrator:
             if inspect.isawaitable(res_gas):
                 await res_gas
 
-        if hp_backend is not None and hp_enabled:
-            res_hp = hp_backend.async_update(cmd.hp_demand, agg.peak_zone, frost_emergency, hvac_mode=HVAC_MODE_HEAT)
-            if inspect.isawaitable(res_hp):
-                await res_hp
+        if hp_backend is not None:
+            if hp_enabled:
+                res_hp = hp_backend.async_update(cmd.hp_demand, agg.peak_zone, frost_emergency, hvac_mode=HVAC_MODE_HEAT)
+                if inspect.isawaitable(res_hp):
+                    await res_hp
+            elif getattr(hp_backend, "_current_running_state", False) is True and callable(
+                getattr(hp_backend, "async_emergency_off", None)
+            ):
+                res_hp_off = hp_backend.async_emergency_off()
+                if inspect.isawaitable(res_hp_off):
+                    await res_hp_off

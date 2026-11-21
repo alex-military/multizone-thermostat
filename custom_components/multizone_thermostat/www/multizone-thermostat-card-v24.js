@@ -220,6 +220,11 @@ sched_nav_title: "Programmazione",
     pid_restore_backup_confirm_msg: "Ripristinare i parametri PID calcolati dall'autotuner prima dell'ultimo reset?",
     pid_restore_backup_confirm_btn: "Ripristina PID",
     pid_learning_status: "Apprendimento",
+    pid_mode_manual: "Override Manuale",
+    pid_mode_seed: "Baseline Auto EMA",
+    pid_modal_seed_info: "Imposta Kp, Ki e Kd come baseline appresa di partenza: l'autotuner continua ad ottimizzare settimanalmente via Auto EMA. Usa Kd = 0 per controllo PI puro.",
+    pid_modal_scale_note: "Scala uscita 0–100% con dt in secondi (es. Kp = 100 → 100% di richiesta con 1 °C di errore; Kd = 0 per solo PI).",
+    pid_modal_seed_save: "Imposta Baseline",
     sched_all_zones_row: "Tutte le Zone (Generale)",
     sched_base_tag: "Base",
     prio_hybrid: "Ibrido",
@@ -273,6 +278,7 @@ sched_nav_title: "Programmazione",
   },
   en: {
     heat_source_gas: "Gas",
+    heat_priority: "Heat Priority",
     heat_source_electric: "Electric",
     heat_source_dual: "Gas + Electric",
     enabled: "Enabled",
@@ -414,6 +420,11 @@ sched_nav_title: "Schedule",
     pid_restore_backup_confirm_msg: "Restore the PID parameters learned by the autotuner before the last reset?",
     pid_restore_backup_confirm_btn: "Restore PID",
     pid_learning_status: "Learning",
+    pid_mode_manual: "Manual Override",
+    pid_mode_seed: "Auto EMA Baseline",
+    pid_modal_seed_info: "Sets Kp, Ki, and Kd as the learned starting baseline so weekly Auto EMA optimization keeps refining from these values. Use Kd = 0 for pure PI control.",
+    pid_modal_scale_note: "0–100% demand scale with dt in seconds (e.g. Kp = 100 → 100% demand per 1 °C error; Kd = 0 for PI-only).",
+    pid_modal_seed_save: "Seed Baseline",
     sched_all_zones_row: "All Zones (General)",
     sched_base_tag: "Base",
     prio_hybrid: "Hybrid",
@@ -467,6 +478,7 @@ sched_nav_title: "Schedule",
   },
   ru: {
     heat_source_gas: "Газ",
+    heat_priority: "Приоритет тепла",
     heat_source_electric: "Электро",
     heat_source_dual: "Газ + Электро",
     enabled: "Включено",
@@ -608,6 +620,11 @@ sched_nav_title: "Расписание",
     pid_restore_backup_confirm_msg: "Восстановить параметры PID, вычисленные автонастройкой до последнего сброса?",
     pid_restore_backup_confirm_btn: "Восстановить PID",
     pid_learning_status: "Обучение",
+    pid_mode_manual: "Ручной режим",
+    pid_mode_seed: "База Авто EMA",
+    pid_modal_seed_info: "Задает Kp, Ki и Kd как обученную стартовую базу: еженедельный Auto EMA продолжит адаптацию от этих значений. Укажите Kd = 0 для чистого PI.",
+    pid_modal_scale_note: "Шкала 0–100% запроса, dt в секундах (напр. Kp = 100 → 100% при ошибке 1 °C; Kd = 0 для PI).",
+    pid_modal_seed_save: "Задать базу",
     sched_all_zones_row: "Все зоны (Общее)",
     sched_base_tag: "База",
     prio_hybrid: "Гибрид",
@@ -661,6 +678,7 @@ sched_nav_title: "Расписание",
   },
   fr: {
     heat_source_gas: "Gaz",
+    heat_priority: "Priorité Chaleur",
     heat_source_electric: "Électrique",
     heat_source_dual: "Gaz + Électrique",
     enabled: "Activé",
@@ -801,6 +819,11 @@ sched_nav_title: "Programmation",
     pid_restore_backup_confirm_msg: "Restaurer les paramètres PID calculés par l'autotuner avant la dernière réinitialisation ?",
     pid_restore_backup_confirm_btn: "Restaurer PID",
     pid_learning_status: "Apprentissage",
+    pid_mode_manual: "Forçage Manuel",
+    pid_mode_seed: "Base Auto EMA",
+    pid_modal_seed_info: "Définit Kp, Ki et Kd comme base apprise initiale : l'Auto EMA hebdomadaire continue d'optimiser depuis ces valeurs. Mettez Kd = 0 pour un mode PI pur.",
+    pid_modal_scale_note: "Échelle de demande 0–100% avec dt en secondes (ex. Kp = 100 → 100% par 1 °C d'erreur ; Kd = 0 pour PI seul).",
+    pid_modal_seed_save: "Définir la base",
     sched_all_zones_row: "Toutes les Zones (Général)",
     sched_base_tag: "Base",
     prio_hybrid: "Hybride",
@@ -854,6 +877,7 @@ sched_nav_title: "Programmation",
   },
   de: {
     heat_source_gas: "Gas",
+    heat_priority: "Wärmepriorität",
     heat_source_electric: "Elektrisch",
     heat_source_dual: "Gas + Elektrisch",
     enabled: "Aktiviert",
@@ -957,6 +981,7 @@ sched_nav_title: "Zeitplan",
     sched_explicit_off: "Explizit AUS",
     sched_turn_on: "Einschalten",
     sched_editor_profile: "Profil bearbeiten",
+    sched_duplicate: "Profil duplizieren",
     sched_bg_edit_notice: "Hintergrundbearbeitung (beeinflusst aktives Profil nicht)",
     sched_new_block: "+ Neuer Zeitblock",
     sched_brush: "24h Pinsel",
@@ -993,6 +1018,11 @@ sched_nav_title: "Zeitplan",
     pid_restore_backup_confirm_msg: "Die vor dem letzten Zurücksetzen vom Autotuner gelernten PID-Parameter wiederherstellen?",
     pid_restore_backup_confirm_btn: "PID Wiederherstellen",
     pid_learning_status: "Lernen",
+    pid_mode_manual: "Manueller Override",
+    pid_mode_seed: "Auto-EMA-Basis",
+    pid_modal_seed_info: "Setzt Kp, Ki und Kd als gelernte Startbasis, sodass die wöchentliche Auto-EMA-Optimierung darauf aufbaut. Kd = 0 für reinen PI-Betrieb.",
+    pid_modal_scale_note: "0–100% Bedarfsskala mit dt in Sekunden (z. B. Kp = 100 → 100% pro 1 °C Fehler; Kd = 0 für reinen PI).",
+    pid_modal_seed_save: "Basis setzen",
     sched_all_zones_row: "Alle Zonen (Allgemein)",
     sched_base_tag: "Basis",
     prio_hybrid: "Hybrid",
@@ -1046,6 +1076,7 @@ sched_nav_title: "Zeitplan",
   },
   es: {
     heat_source_gas: "Gas",
+    heat_priority: "Prioridad de Calor",
     heat_source_electric: "Eléctrico",
     heat_source_dual: "Gas + Eléctrico",
     enabled: "Activado",
@@ -1186,6 +1217,11 @@ sched_nav_title: "Programación",
     pid_restore_backup_confirm_msg: "¿Restaurar los parámetros PID calculados por el autotuner antes del último reinicio?",
     pid_restore_backup_confirm_btn: "Restaurar PID",
     pid_learning_status: "Aprendiendo",
+    pid_mode_manual: "Anulación Manual",
+    pid_mode_seed: "Base Auto EMA",
+    pid_modal_seed_info: "Establece Kp, Ki y Kd como base aprendida inicial para que Auto EMA semanal siga optimizando desde estos valores. Usa Kd = 0 para PI puro.",
+    pid_modal_scale_note: "Escala 0–100% de demanda con dt en segundos (ej. Kp = 100 → 100% por 1 °C de error; Kd = 0 para solo PI).",
+    pid_modal_seed_save: "Fijar Base",
     sched_all_zones_row: "Todas las Zonas (General)",
     sched_base_tag: "Base",
     prio_hybrid: "Híbrido",
@@ -1240,12 +1276,31 @@ sched_nav_title: "Programación",
 };
 
 function getTranslation(hass, key) {
-  const lang = hass && hass.language ? hass.language.split('-')[0] : 'en';
+  const rawLang = (hass && (hass.language || (hass.locale && hass.locale.language))) || 'en';
+  const lang = String(rawLang).split('-')[0].toLowerCase();
   const translations = TRANSLATIONS[lang] || TRANSLATIONS['en'];
   return translations[key] || TRANSLATIONS['en'][key] || key;
 }
 
 function getTempUnit(hass) { return (hass && hass.config && hass.config.unit_system && hass.config.unit_system.temperature) || '°C'; }
+function isFahrenheit(hass) { return getTempUnit(hass) === '°F'; }
+function celsiusToDisplay(val, hass) {
+  if (typeof val !== 'number' || isNaN(val)) return val;
+  return isFahrenheit(hass) ? (val * 9 / 5 + 32) : val;
+}
+function celsiusDeltaToDisplay(val, hass) {
+  if (typeof val !== 'number' || isNaN(val)) return val;
+  return isFahrenheit(hass) ? (val * 1.8) : val;
+}
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 // Helper function to match entity_id to zone slug accurately without false positives
 function isZoneEntityMatch(id, slug) {
   if (!id || !slug) return false;
@@ -1627,7 +1682,7 @@ class MultizoneThermostatButtonCard extends HTMLElement {
     // Update temperatures
     const tempCurrentEl = this.shadowRoot.querySelector('.temp-current');
     if (tempCurrentEl) {
-      const curStr = currentTemp !== undefined ? `${currentTemp}${getTempUnit(this._hass)}` : '--' + getTempUnit(this._hass);
+      const curStr = (currentTemp !== undefined && currentTemp !== null) ? `${currentTemp}${getTempUnit(this._hass)}` : '--' + getTempUnit(this._hass);
       tempCurrentEl.innerHTML = `<span class="temp-current-val">${curStr}</span>`;
     }
     const step = this.getStep(climateState);
@@ -1709,6 +1764,7 @@ class MultizoneThermostatButtonCard extends HTMLElement {
 
     style.textContent = `
       ha-card {
+        display: block;
         padding: 16px;
         position: relative;
         overflow: hidden;
@@ -2100,7 +2156,7 @@ class MultizoneThermostatButtonCard extends HTMLElement {
   }
 
   renderMinimized(title, currentTemp) {
-    const curStr = currentTemp !== undefined ? `${currentTemp}${getTempUnit(this._hass)}` : '--' + getTempUnit(this._hass);
+    const curStr = (currentTemp !== undefined && currentTemp !== null) ? `${currentTemp}${getTempUnit(this._hass)}` : '--' + getTempUnit(this._hass);
     this.shadowRoot.innerHTML = `
       <style>
         ha-card {
@@ -2130,7 +2186,7 @@ class MultizoneThermostatButtonCard extends HTMLElement {
       <ha-card>
         <div class="min-left">
           <ha-icon icon="mdi:snowflake-off" style="--mdc-icon-size: 18px; color: #64748b;"></ha-icon>
-          <span style="font-weight: 600;">${title}</span>
+          <span style="font-weight: 600;">${escapeHtml(title)}</span>
           <span class="min-tag">${getTranslation(this._hass, 'winter_only') || 'Solo Inverno'}</span>
         </div>
         <div class="min-temp">${curStr}</div>
@@ -3314,7 +3370,7 @@ class MultizoneThermostatDialCard extends HTMLElement {
       <ha-card>
         <div class="min-left">
           <ha-icon icon="mdi:snowflake-off" style="--mdc-icon-size: 18px; color: #64748b;"></ha-icon>
-          <span style="font-weight: 600;">${title}</span>
+          <span style="font-weight: 600;">${escapeHtml(title)}</span>
           <span class="min-tag">${getTranslation(this._hass, 'winter_only') || 'Solo Inverno'}</span>
         </div>
         <div class="min-temp">${curStr}</div>
@@ -5300,6 +5356,13 @@ class MultizoneThermostatPresetCardEditor extends HTMLElement {
     }
   }
 
+  disconnectedCallback() {
+    if (this._discoverTimer) {
+      clearTimeout(this._discoverTimer);
+      this._discoverTimer = null;
+    }
+  }
+
   configChanged(newConfig) {
     const event = new Event("config-changed", {
       bubbles: true,
@@ -5331,7 +5394,9 @@ class MultizoneThermostatPresetCardEditor extends HTMLElement {
       currentEntity = findPresetEntity(this._hass) || '';
       if (currentEntity) {
         // Defer the config change slightly to let the editor finish rendering
-        setTimeout(() => {
+        if (this._discoverTimer) clearTimeout(this._discoverTimer);
+        this._discoverTimer = setTimeout(() => {
+          this._discoverTimer = null;
           this._config = { ...this._config, entity: currentEntity };
           this.configChanged(this._config);
         }, 100);
@@ -5425,10 +5490,16 @@ if (!customElements.get("multizone-thermostat-spacer")) {
 /* ==================== HEALTH SUMMARY CARD ==================== */
 /* ==================== SCHEDULE SUMMARY NAVIGATION BUTTON CARD ==================== */
 
+let _mzStandaloneKeyHandler = null;
+
 function closeMzStandaloneModal() {
   const existing = document.getElementById('mz-standalone-nav-overlay');
   if (existing) {
     existing.remove();
+  }
+  if (_mzStandaloneKeyHandler) {
+    window.removeEventListener('keydown', _mzStandaloneKeyHandler);
+    _mzStandaloneKeyHandler = null;
   }
 }
 
@@ -5496,13 +5567,12 @@ function openMzStandaloneModal(type, hass) {
 
   const dismissModal = () => {
     closeMzStandaloneModal();
-    window.removeEventListener('keydown', keyHandler);
   };
 
-  const keyHandler = (e) => {
+  _mzStandaloneKeyHandler = (e) => {
     if (e.key === 'Escape') dismissModal();
   };
-  window.addEventListener('keydown', keyHandler);
+  window.addEventListener('keydown', _mzStandaloneKeyHandler);
   closeBtn.addEventListener('click', dismissModal);
 
   topBar.appendChild(titleEl);
@@ -6457,7 +6527,11 @@ class MultizoneThermostatPlantCard extends HTMLElement {
   render() {
     const style = document.createElement('style');
     style.textContent = `
+      :host {
+        display: block;
+      }
       ha-card {
+        display: block;
         background: var(--ha-card-background, var(--card-background-color, rgba(30, 41, 59, 0.7)));
         backdrop-filter: blur(12px);
         -webkit-backdrop-filter: blur(12px);
@@ -6685,24 +6759,24 @@ class MultizoneThermostatPlantCard extends HTMLElement {
         </div>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(75px, 1fr)); gap: 10px;">
           <div>
-            <div style="font-size: 11px; color: var(--secondary-text-color, #94a3b8);">${t('ot_pressure')}</div>
+            <div style="font-size: 11px; color: var(--secondary-text-color, #94a3b8);" id="ot-pressure-label">${t('ot_pressure')}</div>
             <div style="font-size: 16px; font-weight: 800;" id="ot-pressure-val">-- bar</div>
           </div>
           <div>
-            <div style="font-size: 11px; color: var(--secondary-text-color, #94a3b8);">${t('ot_flow_temp')}</div>
+            <div style="font-size: 11px; color: var(--secondary-text-color, #94a3b8);" id="ot-flow-label">${t('ot_flow_temp')}</div>
             <div style="font-size: 16px; font-weight: 800;" id="ot-flow-val">--°C</div>
           </div>
           <div>
-            <div style="font-size: 11px; color: var(--secondary-text-color, #94a3b8);">${t('ot_return_temp')}</div>
+            <div style="font-size: 11px; color: var(--secondary-text-color, #94a3b8);" id="ot-return-label">${t('ot_return_temp')}</div>
             <div style="font-size: 16px; font-weight: 800;" id="ot-return-val">--°C</div>
             <div style="font-size: 10px; font-weight: 600;" id="ot-condense-eval"></div>
           </div>
           <div>
-            <div style="font-size: 11px; color: var(--secondary-text-color, #94a3b8);">${t('ot_modulation')}</div>
+            <div style="font-size: 11px; color: var(--secondary-text-color, #94a3b8);" id="ot-mod-label">${t('ot_modulation')}</div>
             <div style="font-size: 16px; font-weight: 800;" id="ot-mod-val">--%</div>
           </div>
           <div>
-            <div style="font-size: 11px; color: var(--secondary-text-color, #94a3b8);">${t('ot_flame_status')}</div>
+            <div style="font-size: 11px; color: var(--secondary-text-color, #94a3b8);" id="ot-flame-label">${t('ot_flame_status')}</div>
             <div style="font-size: 14px; font-weight: 700;" id="ot-flame-val">${t('ot_flame_off')}</div>
           </div>
         </div>
@@ -6728,6 +6802,26 @@ class MultizoneThermostatPlantCard extends HTMLElement {
 
     try {
       const t = (k) => getTranslation(this._hass, k);
+      const labelMap = {
+        'plant-title': 'plant_health_title',
+        'plant-sub': 'plant_health_sub',
+        'cycles-label': 'cycles_label',
+        'cycles-unit': 'cycles_unit',
+        'runtime-label': 'runtime_24h',
+        'runtime-unit': 'hours',
+        'runtime-sub': 'runtime_sub',
+        'ot-telemetry-title': 'ot_telemetry',
+        'ot-pressure-label': 'ot_pressure',
+        'ot-flow-label': 'ot_flow_temp',
+        'ot-return-label': 'ot_return_temp',
+        'ot-mod-label': 'ot_modulation',
+        'ot-flame-label': 'ot_flame_status',
+        'alert-title-text': 'all_circuits_ok',
+      };
+      for (const [elId, tKey] of Object.entries(labelMap)) {
+        const lblEl = this.shadowRoot.getElementById(elId);
+        if (lblEl) lblEl.innerText = t(tKey);
+      }
       let healthEntity = this._config.health_entity;
       let cyclesEntity = this._config.cycles_entity;
       let runtimeEntity = this._config.runtime_entity;
@@ -6835,7 +6929,7 @@ class MultizoneThermostatPlantCard extends HTMLElement {
         const hasAnomaly = anomalyState ? anomalyState.state === "on" : (!isHealthUnavailable && !isOptimal);
         if (hasAnomaly && healthState && healthState.attributes && healthState.attributes.anomalies && healthState.attributes.anomalies.length > 0) {
           alertBox.className = "alert-box alert-err";
-          const items = healthState.attributes.anomalies.map(a => `• <b>${a.zone}</b>: ${a.description}`).join('<br>');
+          const items = healthState.attributes.anomalies.map(a => `• <b>${escapeHtml(a.zone)}</b>: ${escapeHtml(a.description)}`).join('<br>');
           alertDesc.innerHTML = items;
         } else if (isWarning) {
           alertBox.className = "alert-box alert-err";
@@ -6875,7 +6969,8 @@ class MultizoneThermostatPlantCard extends HTMLElement {
                           (ot.flow_temp !== undefined && ot.flow_temp !== null ? ot.flow_temp : ot.water_flow_temperature);
           if (flowVal !== null && flowVal !== undefined && flowVal !== "") {
             const num = parseFloat(flowVal);
-            const displayVal = !isNaN(num) ? (Number.isInteger(num) ? num : num.toFixed(1)) : flowVal;
+            const conv = !isNaN(num) ? celsiusToDisplay(num, this._hass) : NaN;
+            const displayVal = !isNaN(conv) ? (Number.isInteger(conv) ? conv : conv.toFixed(1)) : escapeHtml(flowVal);
             otFlow.innerText = `${displayVal}${getTempUnit(this._hass)}`;
           } else {
             otFlow.innerText = '--' + getTempUnit(this._hass);
@@ -6884,7 +6979,10 @@ class MultizoneThermostatPlantCard extends HTMLElement {
 
         if (otReturn) {
           if (ot.return_temperature !== null && ot.return_temperature !== undefined) {
-            otReturn.innerText = `${ot.return_temperature}${getTempUnit(this._hass)}`;
+            const rNum = parseFloat(ot.return_temperature);
+            const rConv = !isNaN(rNum) ? celsiusToDisplay(rNum, this._hass) : NaN;
+            const rDisplay = !isNaN(rConv) ? (Number.isInteger(rConv) ? rConv : rConv.toFixed(1)) : ot.return_temperature;
+            otReturn.innerText = `${rDisplay}${getTempUnit(this._hass)}`;
             if (otCondense) {
               if (ot.condensing_optimal) {
                 otCondense.innerText = t('ot_condensing_ok');
@@ -7310,6 +7408,47 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
         font-size: 1em;
         font-weight: 600;
       }
+      .pid-modal-mode-tabs {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 10px;
+      }
+      .pid-mode-tab {
+        flex: 1;
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        background: rgba(15, 23, 42, 0.45);
+        color: var(--secondary-text-color, #94a3b8);
+        border-radius: 8px;
+        padding: 6px 8px;
+        font-size: 0.78em;
+        font-weight: 600;
+        cursor: pointer;
+        text-align: center;
+      }
+      .pid-mode-tab.active {
+        background: rgba(245, 158, 11, 0.16);
+        border-color: rgba(245, 158, 11, 0.55);
+        color: #fbbf24;
+      }
+      .pid-modal-scale-note {
+        font-size: 0.76em;
+        line-height: 1.4;
+        color: var(--secondary-text-color, #94a3b8);
+        background: rgba(56, 189, 248, 0.08);
+        border: 1px solid rgba(56, 189, 248, 0.22);
+        border-radius: 8px;
+        padding: 8px 10px;
+        margin-bottom: 10px;
+      }
+      .pid-modal-seed-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        margin-bottom: 14px;
+      }
+      .pid-modal-seed-grid .pid-modal-input-wrap {
+        margin-bottom: 0;
+      }
       .pid-modal-actions {
         display: flex;
         justify-content: flex-end;
@@ -7434,10 +7573,29 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
       <div class="pid-modal-backdrop" id="pid-modal-backdrop">
         <div class="pid-modal">
           <div class="pid-modal-title" id="pid-modal-title"></div>
+          <div class="pid-modal-mode-tabs" id="pid-modal-mode-tabs" style="display:none;">
+            <button type="button" class="pid-mode-tab active" id="pid-tab-manual" data-mode="manual"></button>
+            <button type="button" class="pid-mode-tab" id="pid-tab-seed" data-mode="seed"></button>
+          </div>
           <div class="pid-modal-warn" id="pid-modal-warn"></div>
+          <div class="pid-modal-scale-note" id="pid-modal-scale-note" style="display:none;"></div>
           <div class="pid-modal-input-wrap" id="pid-modal-input-wrap">
             <label for="pid-modal-input" id="pid-modal-input-label"></label>
             <input type="number" id="pid-modal-input" />
+          </div>
+          <div class="pid-modal-seed-grid" id="pid-modal-seed-wrap" style="display:none;">
+            <div class="pid-modal-input-wrap">
+              <label for="pid-seed-kp">Kp</label>
+              <input type="number" id="pid-seed-kp" min="0.1" max="500" step="0.1" />
+            </div>
+            <div class="pid-modal-input-wrap">
+              <label for="pid-seed-ki">Ki</label>
+              <input type="number" id="pid-seed-ki" min="0" max="10" step="0.0001" />
+            </div>
+            <div class="pid-modal-input-wrap">
+              <label for="pid-seed-kd">Kd</label>
+              <input type="number" id="pid-seed-kd" min="0" max="50000" step="1" />
+            </div>
           </div>
           <div class="pid-modal-actions">
             <button type="button" class="pid-btn pid-btn-cancel" id="pid-modal-cancel">${t('pid_modal_cancel')}</button>
@@ -7457,6 +7615,7 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
   _bindPidEvents() {
     this._activePidParam = null;
     this._modalMode = null;
+    this._pidEditAction = 'manual';
 
     const closeModal = () => {
       const backdrop = this.shadowRoot.getElementById('pid-modal-backdrop');
@@ -7514,6 +7673,16 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
       });
     }
 
+    const manualTab = this.shadowRoot.getElementById('pid-tab-manual');
+    const seedTab = this.shadowRoot.getElementById('pid-tab-seed');
+    [manualTab, seedTab].forEach((tab) => {
+      if (!tab) return;
+      tab.addEventListener('click', () => {
+        if (this._modalMode !== 'edit') return;
+        this._setPidEditAction(tab.dataset.mode);
+      });
+    });
+
     const confirmBtn = this.shadowRoot.getElementById('pid-modal-confirm');
     if (confirmBtn) {
       confirmBtn.addEventListener('click', async () => {
@@ -7533,6 +7702,25 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
           return;
         }
         if (this._modalMode === 'edit' && this._activePidParam) {
+          if (this._pidEditAction === 'seed') {
+            const kpEl = this.shadowRoot.getElementById('pid-seed-kp');
+            const kiEl = this.shadowRoot.getElementById('pid-seed-ki');
+            const kdEl = this.shadowRoot.getElementById('pid-seed-kd');
+            const kp = kpEl ? parseFloat(kpEl.value) : NaN;
+            const ki = kiEl ? parseFloat(kiEl.value) : NaN;
+            const kd = kdEl ? parseFloat(kdEl.value) : NaN;
+            if (!isNaN(kp) && kp >= 0.1 && !isNaN(ki) && ki >= 0 && !isNaN(kd) && kd >= 0) {
+              await this._hass.callService('multizone_thermostat', 'set_pid_parameters', {
+                climate_entity: this._config.entity,
+                kp,
+                ki,
+                kd,
+                seed_autotuner: true,
+              });
+            }
+            closeModal();
+            return;
+          }
           const inputEl = this.shadowRoot.getElementById('pid-modal-input');
           const parsed = inputEl ? parseFloat(inputEl.value) : NaN;
           if (!isNaN(parsed)) {
@@ -7548,6 +7736,37 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
     }
   }
 
+  _setPidEditAction(action) {
+    const t = (k) => getTranslation(this._hass, k);
+    this._pidEditAction = action === 'seed' ? 'seed' : 'manual';
+    const manualTab = this.shadowRoot.getElementById('pid-tab-manual');
+    const seedTab = this.shadowRoot.getElementById('pid-tab-seed');
+    const warnEl = this.shadowRoot.getElementById('pid-modal-warn');
+    const inputWrap = this.shadowRoot.getElementById('pid-modal-input-wrap');
+    const seedWrap = this.shadowRoot.getElementById('pid-modal-seed-wrap');
+    const restoreBtn = this.shadowRoot.getElementById('pid-modal-restore');
+    const confirmBtn = this.shadowRoot.getElementById('pid-modal-confirm');
+
+    if (manualTab) manualTab.classList.toggle('active', this._pidEditAction === 'manual');
+    if (seedTab) seedTab.classList.toggle('active', this._pidEditAction === 'seed');
+    if (warnEl) {
+      warnEl.innerText = this._pidEditAction === 'seed' ? t('pid_modal_seed_info') : t('pid_modal_warn');
+    }
+    if (inputWrap) inputWrap.style.display = this._pidEditAction === 'manual' ? 'block' : 'none';
+    if (seedWrap) seedWrap.style.display = this._pidEditAction === 'seed' ? 'grid' : 'none';
+    if (restoreBtn) {
+      const overrides = (this._latestPidInfo && this._latestPidInfo.overrides) || [];
+      restoreBtn.style.display = (this._pidEditAction === 'manual' && overrides.includes(this._activePidParam))
+        ? 'inline-block'
+        : 'none';
+      restoreBtn.innerText = t('pid_modal_restore');
+    }
+    if (confirmBtn) {
+      confirmBtn.className = 'pid-btn pid-btn-save';
+      confirmBtn.innerText = this._pidEditAction === 'seed' ? t('pid_modal_seed_save') : t('pid_modal_save');
+    }
+  }
+
   _openPidEditModal(param) {
     const t = (k) => getTranslation(this._hass, k);
     this._modalMode = 'edit';
@@ -7555,23 +7774,32 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
 
     const specs = {
       Kp: { min: 0.1, max: 500, step: 0.1 },
-      Ki: { min: 0, max: 1, step: 0.0001 },
+      Ki: { min: 0, max: 10, step: 0.0001 },
       Kd: { min: 0, max: 50000, step: 1 },
     }[param];
 
     const titleEl = this.shadowRoot.getElementById('pid-modal-title');
-    const warnEl = this.shadowRoot.getElementById('pid-modal-warn');
-    const inputWrap = this.shadowRoot.getElementById('pid-modal-input-wrap');
+    const modeTabs = this.shadowRoot.getElementById('pid-modal-mode-tabs');
+    const manualTab = this.shadowRoot.getElementById('pid-tab-manual');
+    const seedTab = this.shadowRoot.getElementById('pid-tab-seed');
+    const scaleNoteEl = this.shadowRoot.getElementById('pid-modal-scale-note');
     const labelEl = this.shadowRoot.getElementById('pid-modal-input-label');
     const inputEl = this.shadowRoot.getElementById('pid-modal-input');
-    const restoreBtn = this.shadowRoot.getElementById('pid-modal-restore');
-    const confirmBtn = this.shadowRoot.getElementById('pid-modal-confirm');
+    const seedKpEl = this.shadowRoot.getElementById('pid-seed-kp');
+    const seedKiEl = this.shadowRoot.getElementById('pid-seed-ki');
+    const seedKdEl = this.shadowRoot.getElementById('pid-seed-kd');
+    const cancelBtn = this.shadowRoot.getElementById('pid-modal-cancel');
     const valEl = this.shadowRoot.getElementById(`pid-val-${param.toLowerCase()}`);
     const backdrop = this.shadowRoot.getElementById('pid-modal-backdrop');
 
     if (titleEl) titleEl.innerText = `⚠️ ${t('pid_modal_title')} (${param})`;
-    if (warnEl) warnEl.innerText = t('pid_modal_warn');
-    if (inputWrap) inputWrap.style.display = 'block';
+    if (modeTabs) modeTabs.style.display = 'flex';
+    if (manualTab) manualTab.innerText = t('pid_mode_manual');
+    if (seedTab) seedTab.innerText = t('pid_mode_seed');
+    if (scaleNoteEl) {
+      scaleNoteEl.style.display = 'block';
+      scaleNoteEl.innerText = t('pid_modal_scale_note');
+    }
     if (labelEl) labelEl.innerText = `${t('pid_modal_value')} (${param})`;
     if (inputEl && specs) {
       inputEl.min = String(specs.min);
@@ -7580,15 +7808,12 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
       const curNum = valEl ? parseFloat(valEl.innerText) : NaN;
       inputEl.value = isNaN(curNum) ? '0' : String(curNum);
     }
-    if (restoreBtn) {
-      const overrides = (this._latestPidInfo && this._latestPidInfo.overrides) || [];
-      restoreBtn.style.display = overrides.includes(param) ? 'inline-block' : 'none';
-      restoreBtn.innerText = t('pid_modal_restore');
-    }
-    if (confirmBtn) {
-      confirmBtn.className = 'pid-btn pid-btn-save';
-      confirmBtn.innerText = t('pid_modal_save');
-    }
+    const latest = this._latestPidInfo || {};
+    if (seedKpEl) seedKpEl.value = (latest.kp !== null && latest.kp !== undefined && Number(latest.kp) > 0) ? String(latest.kp) : '100';
+    if (seedKiEl) seedKiEl.value = (latest.ki !== null && latest.ki !== undefined) ? String(latest.ki) : '0.1';
+    if (seedKdEl) seedKdEl.value = (latest.kd !== null && latest.kd !== undefined) ? String(latest.kd) : '0';
+    if (cancelBtn) cancelBtn.innerText = t('pid_modal_cancel');
+    this._setPidEditAction('manual');
     if (backdrop) backdrop.classList.add('open');
   }
 
@@ -7598,15 +7823,23 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
     this._activePidParam = null;
 
     const titleEl = this.shadowRoot.getElementById('pid-modal-title');
+    const modeTabs = this.shadowRoot.getElementById('pid-modal-mode-tabs');
     const warnEl = this.shadowRoot.getElementById('pid-modal-warn');
+    const scaleNoteEl = this.shadowRoot.getElementById('pid-modal-scale-note');
     const inputWrap = this.shadowRoot.getElementById('pid-modal-input-wrap');
+    const seedWrap = this.shadowRoot.getElementById('pid-modal-seed-wrap');
+    const cancelBtn = this.shadowRoot.getElementById('pid-modal-cancel');
     const restoreBtn = this.shadowRoot.getElementById('pid-modal-restore');
     const confirmBtn = this.shadowRoot.getElementById('pid-modal-confirm');
     const backdrop = this.shadowRoot.getElementById('pid-modal-backdrop');
 
     if (titleEl) titleEl.innerText = `🔄 ${t('pid_reset_title')}`;
+    if (modeTabs) modeTabs.style.display = 'none';
     if (warnEl) warnEl.innerText = t('pid_reset_confirm_msg');
+    if (scaleNoteEl) scaleNoteEl.style.display = 'none';
     if (inputWrap) inputWrap.style.display = 'none';
+    if (seedWrap) seedWrap.style.display = 'none';
+    if (cancelBtn) cancelBtn.innerText = t('pid_modal_cancel');
     if (restoreBtn) restoreBtn.style.display = 'none';
     if (confirmBtn) {
       confirmBtn.className = 'pid-btn pid-btn-danger';
@@ -7621,8 +7854,12 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
     this._activePidParam = null;
 
     const titleEl = this.shadowRoot.getElementById('pid-modal-title');
+    const modeTabs = this.shadowRoot.getElementById('pid-modal-mode-tabs');
     const warnEl = this.shadowRoot.getElementById('pid-modal-warn');
+    const scaleNoteEl = this.shadowRoot.getElementById('pid-modal-scale-note');
     const inputWrap = this.shadowRoot.getElementById('pid-modal-input-wrap');
+    const seedWrap = this.shadowRoot.getElementById('pid-modal-seed-wrap');
+    const cancelBtn = this.shadowRoot.getElementById('pid-modal-cancel');
     const restoreBtn = this.shadowRoot.getElementById('pid-modal-restore');
     const confirmBtn = this.shadowRoot.getElementById('pid-modal-confirm');
     const backdrop = this.shadowRoot.getElementById('pid-modal-backdrop');
@@ -7633,8 +7870,12 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
       : '';
 
     if (titleEl) titleEl.innerText = `↩️ ${t('pid_restore_backup_title')}`;
+    if (modeTabs) modeTabs.style.display = 'none';
     if (warnEl) warnEl.innerText = `${t('pid_restore_backup_confirm_msg')}${bpText}`;
+    if (scaleNoteEl) scaleNoteEl.style.display = 'none';
     if (inputWrap) inputWrap.style.display = 'none';
+    if (seedWrap) seedWrap.style.display = 'none';
+    if (cancelBtn) cancelBtn.innerText = t('pid_modal_cancel');
     if (restoreBtn) restoreBtn.style.display = 'none';
     if (confirmBtn) {
       confirmBtn.className = 'pid-btn pid-btn-save';
@@ -7685,14 +7926,23 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
       const tempSubEl = this.shadowRoot.getElementById('temp-sub');
       const badgeEl = this.shadowRoot.getElementById('energy-badge');
       const modeBadge = this.shadowRoot.getElementById('zone-mode-badge');
+      const retentionLabel = this.shadowRoot.getElementById('retention-label');
+      const retentionUnit = this.shadowRoot.getElementById('retention-unit');
       const retentionVal = this.shadowRoot.getElementById('retention-val');
       const retentionEval = this.shadowRoot.getElementById('retention-eval');
+      const sizingLabel = this.shadowRoot.getElementById('sizing-label');
       const sizingVal = this.shadowRoot.getElementById('sizing-val');
       const sizingEval = this.shadowRoot.getElementById('sizing-eval');
+      const valveStatusLabel = this.shadowRoot.getElementById('valve-status-label');
       const valveDot = this.shadowRoot.getElementById('valve-dot');
       const valveText = this.shadowRoot.getElementById('valve-text');
       const batteryText = this.shadowRoot.getElementById('battery-text');
       const batteryIcon = this.shadowRoot.getElementById('battery-icon');
+
+      if (retentionLabel) retentionLabel.innerText = t('retention_label');
+      if (retentionUnit) retentionUnit.innerText = t('hours');
+      if (sizingLabel) sizingLabel.innerText = t('sizing_label');
+      if (valveStatusLabel) valveStatusLabel.innerText = t('valve_status');
 
       // Robust determination of zone mode (primary, secondary, bypass)
       let zoneMode = "primary";
@@ -7723,10 +7973,12 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
       if (tempSubEl) {
         const cur = climateState.attributes.current_temperature;
         const tgt = climateState.attributes.temperature;
+        const curText = (cur !== undefined && cur !== null) ? cur : '--';
+        const tgtText = (tgt !== undefined && tgt !== null) ? tgt : '--';
         if (zoneMode === "bypass") {
-          tempSubEl.innerText = `${cur !== undefined ? cur : '--'}${getTempUnit(this._hass)} / (${t('bypassed_tag')})`;
+          tempSubEl.innerText = `${curText}${getTempUnit(this._hass)} / (${t('bypassed_tag')})`;
         } else {
-          tempSubEl.innerText = `${cur !== undefined ? cur : '--'}${getTempUnit(this._hass)} / ${t('target')} ${tgt !== undefined ? tgt : '--'}${getTempUnit(this._hass)}`;
+          tempSubEl.innerText = `${curText}${getTempUnit(this._hass)} / ${t('target')} ${tgtText}${getTempUnit(this._hass)}`;
         }
       }
 
@@ -8080,6 +8332,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
     this._lastHaScheduleJson = "";
     this._rendered = false;
     this._refreshTimer = null;
+    this._presetRefreshTimer = null;
   }
 
   setConfig(config) {
@@ -8131,6 +8384,10 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
     if (this._refreshTimer) {
       clearInterval(this._refreshTimer);
       this._refreshTimer = null;
+    }
+    if (this._presetRefreshTimer) {
+      clearTimeout(this._presetRefreshTimer);
+      this._presetRefreshTimer = null;
     }
   }
 
@@ -8211,8 +8468,12 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
     const seenClimates = new Set();
 
     const getRates = (climateId, cState) => {
-      let heatingRate = (cState.attributes && typeof cState.attributes.heating_rate === 'number') ? cState.attributes.heating_rate : null;
-      let coolingRate = (cState.attributes && typeof cState.attributes.cooling_rate === 'number') ? cState.attributes.cooling_rate : null;
+      let heatingRate = (cState.attributes && typeof cState.attributes.heating_rate === 'number')
+        ? celsiusDeltaToDisplay(cState.attributes.heating_rate, this._hass)
+        : null;
+      let coolingRate = (cState.attributes && typeof cState.attributes.cooling_rate === 'number')
+        ? celsiusDeltaToDisplay(cState.attributes.cooling_rate, this._hass)
+        : null;
 
       if ((heatingRate === null || coolingRate === null) && this._hass && this._hass.states) {
         const slug = climateId.replace("climate.multizone_thermostat_", "").replace("climate.", "");
@@ -8236,8 +8497,12 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
             !['unavailable', 'unknown'].includes(this._hass.states[k].state)
           );
           if (cRateEntity) {
-            const parsed = parseFloat(this._hass.states[cRateEntity].state);
-            if (!isNaN(parsed)) coolingRate = parsed;
+            const stObj = this._hass.states[cRateEntity];
+            const parsed = parseFloat(stObj.state);
+            const uom = String((stObj.attributes && stObj.attributes.unit_of_measurement) || '');
+            if (!isNaN(parsed)) {
+              coolingRate = uom.includes('°F') ? parsed : celsiusDeltaToDisplay(parsed, this._hass);
+            }
           }
         }
 
@@ -8247,14 +8512,18 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
             !['unavailable', 'unknown'].includes(this._hass.states[k].state)
           );
           if (hRateEntity) {
-            const parsed = parseFloat(this._hass.states[hRateEntity].state);
-            if (!isNaN(parsed)) heatingRate = parsed;
+            const stObj = this._hass.states[hRateEntity];
+            const parsed = parseFloat(stObj.state);
+            const uom = String((stObj.attributes && stObj.attributes.unit_of_measurement) || '');
+            if (!isNaN(parsed)) {
+              heatingRate = uom.includes('°F') ? parsed : celsiusDeltaToDisplay(parsed, this._hass);
+            }
           }
         }
       }
 
       return {
-        heatingRate: heatingRate !== null ? heatingRate : 1.0,
+        heatingRate: heatingRate !== null ? heatingRate : (isFahrenheit(this._hass) ? 1.8 : 1.0),
         coolingRate: coolingRate
       };
     };
@@ -8322,24 +8591,27 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
   _resolvePresetTemp(zoneId, preset) {
     const isCoolMode = (typeof getMasterHVACMode === 'function' && getMasterHVACMode(this._hass) === 'cool');
     const sched = this._getScheduleStatus();
+    let rawC = null;
     if (sched.preset_matrix && sched.preset_matrix[preset]) {
       if (typeof sched.preset_matrix[preset][zoneId] === 'number') {
-        return sched.preset_matrix[preset][zoneId];
+        rawC = sched.preset_matrix[preset][zoneId];
       }
     }
-    if (this._hass && zoneId && this._hass.states[zoneId]) {
+    if (rawC === null && this._hass && zoneId && this._hass.states[zoneId]) {
       const zState = this._hass.states[zoneId];
       if (isCoolMode && zState.attributes && zState.attributes.presets_cool && typeof zState.attributes.presets_cool[preset] === 'number') {
-        return zState.attributes.presets_cool[preset];
-      }
-      if (zState.attributes && zState.attributes.presets && typeof zState.attributes.presets[preset] === 'number') {
-        return zState.attributes.presets[preset];
+        rawC = zState.attributes.presets_cool[preset];
+      } else if (zState.attributes && zState.attributes.presets && typeof zState.attributes.presets[preset] === 'number') {
+        rawC = zState.attributes.presets[preset];
       }
     }
-    const defaults = isCoolMode
-      ? { comfort: 24.5, eco: 26.5, sleep: 25.5, away: 28.0 }
-      : { comfort: 21.0, eco: 19.0, sleep: 17.0, away: 15.0 };
-    return defaults[preset] || (isCoolMode ? 25.0 : 20.0);
+    if (rawC === null) {
+      const defaults = isCoolMode
+        ? { comfort: 24.5, eco: 26.5, sleep: 25.5, away: 28.0 }
+        : { comfort: 21.0, eco: 19.0, sleep: 17.0, away: 15.0 };
+      rawC = defaults[preset] || (isCoolMode ? 25.0 : 20.0);
+    }
+    return celsiusToDisplay(rawC, this._hass);
   }
 
   render() {
@@ -8351,6 +8623,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
           font-family: var(--paper-font-body1_-_font-family, sans-serif);
         }
         ha-card {
+          display: block;
           padding: 20px;
           border-radius: var(--card-border-radius);
           background-color: var(--card-background-color, #1e293b);
@@ -9261,8 +9534,8 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
       const expDate = new Date(sched.profile_expires_at);
       const expStr = isNaN(expDate.getTime()) ? String(sched.profile_expires_at) : expDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       expiryHtml = `
-        <span class="badge badge-amber badge-btn" id="btn-cancel-expiry" title="${getTranslation(this._hass, 'sched_cancel_expiry') || 'Cancel expiration'}">
-          ⏳ ${expStr} ✕
+        <span class="badge badge-amber badge-btn" id="btn-cancel-expiry" title="${escapeHtml(getTranslation(this._hass, 'sched_cancel_expiry') || 'Cancel expiration')}">
+          ⏳ ${escapeHtml(expStr)} ✕
         </span>
       `;
     }
@@ -9272,8 +9545,8 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
     if (sr && sr.active) {
       const arr = sr.arrival_time ? sr.arrival_time.substring(0, 5) : '';
       srHtml = `
-        <span class="badge badge-orange badge-btn" id="btn-cancel-sr" title="${getTranslation(this._hass, 'sched_cancel_sr') || 'Cancel Smart Return'}">
-          🚗 ${getTranslation(this._hass, 'sched_return_at') || 'Return at'} ${arr} ✕
+        <span class="badge badge-orange badge-btn" id="btn-cancel-sr" title="${escapeHtml(getTranslation(this._hass, 'sched_cancel_sr') || 'Cancel Smart Return')}">
+          🚗 ${escapeHtml(getTranslation(this._hass, 'sched_return_at') || 'Return at')} ${escapeHtml(arr)} ✕
         </span>
       `;
     }
@@ -9282,13 +9555,13 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
       <div class="header-bar">
         <div class="header-title-box">
           <ha-icon icon="mdi:calendar-clock"></ha-icon>
-          <div class="header-title">${this._t('sched_title')}</div>
+          <div class="header-title">${escapeHtml(this._t('sched_title'))}</div>
           <div class="header-badges">
             <button class="badge ${enabled ? 'badge-green' : 'badge-gray'} badge-btn" id="btn-toggle-sched">
-              ${enabled ? '🟢 ' + this._t('sched_active') : '⚪ ' + this._t('sched_paused')}
+              ${enabled ? '🟢 ' + escapeHtml(this._t('sched_active')) : '⚪ ' + escapeHtml(this._t('sched_paused'))}
             </button>
             <span class="badge badge-blue">
-              ${profPrefix} ${profName}
+              ${profPrefix} ${escapeHtml(profName)}
             </span>
             ${expiryHtml}
             ${srHtml}
@@ -9379,9 +9652,12 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
     container.innerHTML = `
       <div class="live-zones-grid">
         ${zones.map(z => {
+          const safeClimate = escapeHtml(z.climate);
+          const safeName = escapeHtml(z.name);
+          const unit = getTempUnit(this._hass);
           let badgeHtml = '';
           if (z.hvac_mode === 'off') {
-            badgeHtml = `<span class="badge badge-gray" style="color: #f87171;">⛔ ${this._t('sched_explicit_off')}</span>`;
+            badgeHtml = `<span class="badge badge-gray" style="color: #f87171;">⛔ ${escapeHtml(this._t('sched_explicit_off'))}</span>`;
           } else if (z.manual_override) {
             let untilStr = '';
             if (z.override_until) {
@@ -9389,41 +9665,41 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
               untilStr = isNaN(d.getTime()) ? String(z.override_until) : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             }
             badgeHtml = `
-              <span class="badge badge-amber badge-btn btn-clear-zone-override" data-zone="${z.climate}" title="${this._t('sched_restore')}">
-                ✋ ${z.target_temp.toFixed(1)}${getTempUnit(this._hass)} ${untilStr ? this._t('sched_override_until') + ' ' + untilStr : ''} ✕
+              <span class="badge badge-amber badge-btn btn-clear-zone-override" data-zone="${safeClimate}" title="${escapeHtml(this._t('sched_restore'))}">
+                ✋ ${z.target_temp.toFixed(1)}${unit} ${untilStr ? escapeHtml(this._t('sched_override_until')) + ' ' + escapeHtml(untilStr) : ''} ✕
               </span>
             `;
           } else if (z.smart_start) {
-            badgeHtml = `<span class="badge badge-orange">${isCoolMode ? '❄️' : '🔥'} Smart Start ${z.smart_start_detail || ''}</span>`;
+            badgeHtml = `<span class="badge badge-orange">${isCoolMode ? '❄️' : '🔥'} Smart Start ${escapeHtml(z.smart_start_detail || '')}</span>`;
           } else {
-            badgeHtml = `<span class="badge badge-green">🌿 ${z.target_temp.toFixed(1)}${getTempUnit(this._hass)}</span>`;
+            badgeHtml = `<span class="badge badge-green">🌿 ${z.target_temp.toFixed(1)}${unit}</span>`;
           }
 
           const isOff = z.hvac_mode === 'off';
           const zoneRate = (isCoolMode && typeof z.cooling_rate === 'number') ? z.cooling_rate : z.heating_rate;
           return `
-            <div class="zone-card" data-zone="${z.climate}">
+            <div class="zone-card" data-zone="${safeClimate}">
               <div class="zone-card-top">
-                <span class="zone-card-title">${z.name}</span>
+                <span class="zone-card-title">${safeName}</span>
                 ${badgeHtml}
               </div>
               <div class="zone-card-mid">
                 <div class="temp-display">
-                  <span class="current-temp">${z.current_temp.toFixed(1)}${getTempUnit(this._hass)}</span>
+                  <span class="current-temp">${z.current_temp.toFixed(1)}${unit}</span>
                   <span style="opacity:0.6;">➔</span>
-                  <span class="target-temp">${z.target_temp.toFixed(1)}${getTempUnit(this._hass)}</span>
+                  <span class="target-temp">${z.target_temp.toFixed(1)}${unit}</span>
                 </div>
                 <div class="temp-controls">
-                  <button class="btn-circle btn-temp-down" data-zone="${z.climate}" data-target="${z.target_temp}">-</button>
-                  <button class="btn-circle btn-temp-up" data-zone="${z.climate}" data-target="${z.target_temp}">+</button>
-                  <button class="btn ${isOff ? 'btn-primary' : 'btn-danger'}" data-zone="${z.climate}" data-action="toggle-power" style="padding: 4px 10px; font-size: 0.75rem;">
-                    ${isOff ? this._t('sched_turn_on') : 'OFF'}
+                  <button class="btn-circle btn-temp-down" data-zone="${safeClimate}" data-target="${z.target_temp}">-</button>
+                  <button class="btn-circle btn-temp-up" data-zone="${safeClimate}" data-target="${z.target_temp}">+</button>
+                  <button class="btn ${isOff ? 'btn-primary' : 'btn-danger'}" data-zone="${safeClimate}" data-action="toggle-power" style="padding: 4px 10px; font-size: 0.75rem;">
+                    ${isOff ? escapeHtml(this._t('sched_turn_on')) : 'OFF'}
                   </button>
                 </div>
               </div>
               <div class="zone-card-bottom">
-                <span>⚡ Inerzia: ${(typeof zoneRate === 'number' && !isNaN(zoneRate)) ? zoneRate.toFixed(1) : '--'} ${getTempUnit(this._hass)}/h</span>
-                <span title="${z.climate}">${z.climate.replace('climate.', '')}</span>
+                <span>⚡ Inerzia: ${(typeof zoneRate === 'number' && !isNaN(zoneRate)) ? zoneRate.toFixed(1) : '--'} ${unit}/h</span>
+                <span title="${safeClimate}">${escapeHtml(z.climate.replace('climate.', ''))}</span>
               </div>
             </div>
           `;
@@ -9539,8 +9815,8 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
               else if (pId === 'holiday') icon = "🎉";
               const isActive = this._editorProfileId === pId;
               return `
-                <button class="profile-tab ${isActive ? 'active' : ''}" data-profile="${pId}">
-                  ${icon} ${pLabel}
+                <button class="profile-tab ${isActive ? 'active' : ''}" data-profile="${escapeHtml(pId)}">
+                  ${icon} ${escapeHtml(pLabel)}
                 </button>
               `;
             }).join('')}
@@ -9812,12 +10088,13 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
         const left = (g.startMin / 1440) * 100;
         const width = ((g.endMin - g.startMin) / 1440) * 100;
         if (width < 2) return '';
-        const presetClass = 'block-' + g.preset;
-        const baseWord = this._t('sched_base_tag');
+        const presetClass = 'block-' + escapeHtml(g.preset);
+        const safePreset = escapeHtml(g.preset);
+        const baseWord = escapeHtml(this._t('sched_base_tag'));
         return `
           <div class="time-block baseline-block ${presetClass}" style="left: ${left}%; width: ${width}%;"
-               title="${g.preset.toUpperCase()} (${baseWord}): ${g.start} - ${g.end}">
-            ${g.preset.substring(0, 3).toUpperCase()} (${baseWord})
+               title="${safePreset.toUpperCase()} (${baseWord}): ${escapeHtml(g.start)} - ${escapeHtml(g.end)}">
+            ${safePreset.substring(0, 3).toUpperCase()} (${baseWord})
           </div>
         `;
       }).join('');
@@ -9827,7 +10104,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
     const generalRowHtml = zones.length > 0 ? `
       <div class="matrix-row general-master-row" data-zone="__all__">
         <div class="room-label-box">
-          <span class="room-title" title="${this._t('sched_all_zones_row')}">🏠 ${this._t('sched_all_zones_row')}</span>
+          <span class="room-title" title="${escapeHtml(this._t('sched_all_zones_row'))}">🏠 ${escapeHtml(this._t('sched_all_zones_row'))}</span>
         </div>
         <div class="timeline-track" data-zone="__all__">
           ${gridAndLine}
@@ -9835,13 +10112,16 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
           ${generalBlocks.map(b => {
             const left = (b.startMin / 1440) * 100;
             const width = Math.max(1.5, ((b.endMin - b.startMin) / 1440) * 100);
-            const presetClass = 'block-' + b.preset;
+            const presetClass = 'block-' + escapeHtml(b.preset);
+            const safePreset = escapeHtml(b.preset);
+            const safeStart = escapeHtml(b.start);
+            const safeEnd = escapeHtml(b.end);
             const prefix = b.mixed ? '⚡ ' : '';
             return `
               <div class="time-block ${presetClass}" style="left: ${left}%; width: ${width}%;"
-                   data-zone="__all__" data-start="${b.start}" data-end="${b.end}" data-preset="${b.preset}"
-                   title="${b.preset.toUpperCase()}: ${b.start} - ${b.end}${b.mixed ? ' (Mixed)' : ''}">
-                ${prefix}${b.preset.substring(0, 3).toUpperCase()} ${b.start}-${b.end}
+                   data-zone="__all__" data-start="${safeStart}" data-end="${safeEnd}" data-preset="${safePreset}"
+                   title="${safePreset.toUpperCase()}: ${safeStart} - ${safeEnd}${b.mixed ? ' (Mixed)' : ''}">
+                ${prefix}${safePreset.substring(0, 3).toUpperCase()} ${safeStart}-${safeEnd}
               </div>
             `;
           }).join('')}
@@ -9850,6 +10130,8 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
     ` : '';
 
     const zonesRowsHtml = zones.map(z => {
+      const safeClimate = escapeHtml(z.climate);
+      const safeName = escapeHtml(z.name);
       const blocks = daySchedule[z.climate] || daySchedule[z.id] || [];
       let overrideBlockHtml = '';
       if (isToday && manualOverrides[z.climate]) {
@@ -9863,25 +10145,27 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
           const ovEnd = Math.min(1440, Math.max(nowMinutes + 15, untilMin));
           const left = (nowMinutes / 1440) * 100;
           const width = Math.max(2.0, ((ovEnd - nowMinutes) / 1440) * 100);
+          const ovVal = celsiusToDisplay(Number(ov.target_temp), this._hass);
+          const ovStr = (!isNaN(ovVal) ? ovVal.toFixed(1) : '--') + getTempUnit(this._hass);
           overrideBlockHtml = `
             <div class="time-block manual-override-block" style="left: ${left}%; width: ${width}%;"
-                 data-zone="${z.climate}" data-override="1"
-                 title="Override manuale attivo: ${Number(ov.target_temp).toFixed(1)}°C">
-              ✋ ${Number(ov.target_temp).toFixed(1)}${getTempUnit(this._hass)}
+                 data-zone="${safeClimate}" data-override="1"
+                 title="Override manuale attivo: ${ovStr}">
+              ✋ ${ovStr}
             </div>
           `;
         }
       }
 
       return `
-        <div class="matrix-row" data-zone="${z.climate}">
+        <div class="matrix-row" data-zone="${safeClimate}">
           <div class="room-label-box">
-            <span class="room-title" title="${z.name}">${z.name}</span>
-            <button class="room-copy-btn btn-copy-room" data-zone="${z.climate}" title="${getTranslation(this._hass, 'sched_copy_room_title') || 'Copy/Paste room schedule'}">
+            <span class="room-title" title="${safeName}">${safeName}</span>
+            <button class="room-copy-btn btn-copy-room" data-zone="${safeClimate}" title="${escapeHtml(getTranslation(this._hass, 'sched_copy_room_title') || 'Copy/Paste room schedule')}">
               📋
             </button>
           </div>
-          <div class="timeline-track" data-zone="${z.climate}">
+          <div class="timeline-track" data-zone="${safeClimate}">
             ${gridAndLine}
             ${renderBaselineGapsHtml(blocks)}
             ${blocks.map((b, idx) => {
@@ -9889,11 +10173,15 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
               const endMin = (b.end === '23:59' || b.end === '24:00') ? 1440 : this._toMinutes(b.end);
               const left = (startMin / 1440) * 100;
               const width = Math.max(1.5, ((endMin - startMin) / 1440) * 100);
-              const presetClass = 'block-' + (b.preset || 'comfort');
+              const rawPreset = b.preset || 'comfort';
+              const presetClass = 'block-' + escapeHtml(rawPreset);
+              const safePreset = escapeHtml(rawPreset);
+              const safeStart = escapeHtml(b.start);
+              const safeEnd = escapeHtml(b.end);
               return `
                 <div class="time-block ${presetClass}" style="left: ${left}%; width: ${width}%;"
-                     data-zone="${z.climate}" data-index="${idx}" title="${(b.preset || 'comfort').toUpperCase()}: ${b.start} - ${b.end}">
-                  ${(b.preset || 'comfort').substring(0, 3).toUpperCase()} ${b.start}-${b.end}
+                     data-zone="${safeClimate}" data-index="${idx}" title="${safePreset.toUpperCase()}: ${safeStart} - ${safeEnd}">
+                  ${safePreset.substring(0, 3).toUpperCase()} ${safeStart}-${safeEnd}
                 </div>
               `;
             }).join('')}
@@ -10150,18 +10438,21 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
         </div>
         <div class="preset-summary-grid">
           ${zones.map(z => {
+            const safeClimate = escapeHtml(z.climate);
+            const safeName = escapeHtml(z.name);
+            const unit = getTempUnit(this._hass);
             const cVal = this._resolvePresetTemp(z.climate, 'comfort');
             const eVal = this._resolvePresetTemp(z.climate, 'eco');
             const sVal = this._resolvePresetTemp(z.climate, 'sleep');
             const aVal = this._resolvePresetTemp(z.climate, 'away');
             return `
               <div class="preset-summary-zone-card">
-                <div class="preset-zone-name">${z.name}</div>
+                <div class="preset-zone-name">${safeName}</div>
                 <div class="preset-badges-row">
-                  <span class="preset-badge badge-comfort ${isCoolMode ? 'cool' : ''}" style="${isCoolMode ? 'background:rgba(56,189,248,0.15); color:#38bdf8; border:1px solid rgba(56,189,248,0.3);' : ''} cursor:pointer;" data-zone="${z.climate}" data-preset="comfort" data-temp="${cVal}" title="Comfort">${isCoolMode ? '❄️' : '🔥'} ${cVal.toFixed(1)}°C</span>
-                  <span class="preset-badge badge-eco" style="cursor:pointer;" data-zone="${z.climate}" data-preset="eco" data-temp="${eVal}" title="Eco">🌿 ${eVal.toFixed(1)}°C</span>
-                  <span class="preset-badge badge-sleep" style="cursor:pointer;" data-zone="${z.climate}" data-preset="sleep" data-temp="${sVal}" title="Notte">🌙 ${sVal.toFixed(1)}°C</span>
-                  <span class="preset-badge badge-away" style="cursor:pointer;" data-zone="${z.climate}" data-preset="away" data-temp="${aVal}" title="Away">🚶 ${aVal.toFixed(1)}°C</span>
+                  <span class="preset-badge badge-comfort ${isCoolMode ? 'cool' : ''}" style="${isCoolMode ? 'background:rgba(56,189,248,0.15); color:#38bdf8; border:1px solid rgba(56,189,248,0.3);' : ''} cursor:pointer;" data-zone="${safeClimate}" data-preset="comfort" data-temp="${cVal}" title="Comfort">${isCoolMode ? '❄️' : '🔥'} ${cVal.toFixed(1)}${unit}</span>
+                  <span class="preset-badge badge-eco" style="cursor:pointer;" data-zone="${safeClimate}" data-preset="eco" data-temp="${eVal}" title="Eco">🌿 ${eVal.toFixed(1)}${unit}</span>
+                  <span class="preset-badge badge-sleep" style="cursor:pointer;" data-zone="${safeClimate}" data-preset="sleep" data-temp="${sVal}" title="Notte">🌙 ${sVal.toFixed(1)}${unit}</span>
+                  <span class="preset-badge badge-away" style="cursor:pointer;" data-zone="${safeClimate}" data-preset="away" data-temp="${aVal}" title="Away">🚶 ${aVal.toFixed(1)}${unit}</span>
                 </div>
               </div>
             `;
@@ -10185,7 +10476,11 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
   openPresetModal(zone, preset, currentTemp) {
     this._activeModal = 'preset';
     const isCoolMode = (typeof getMasterHVACMode === 'function' && getMasterHVACMode(this._hass) === 'cool');
-    const safeTemp = (typeof currentTemp === 'number' && !isNaN(currentTemp)) ? currentTemp : (isCoolMode ? 24.5 : 20.0);
+    const isF = isFahrenheit(this._hass);
+    const unit = getTempUnit(this._hass);
+    const safeTemp = (typeof currentTemp === 'number' && !isNaN(currentTemp))
+      ? currentTemp
+      : celsiusToDisplay(isCoolMode ? 24.5 : 20.0, this._hass);
     const modalContainer = this.shadowRoot.querySelector('#modal-container');
     if (!modalContainer) return;
 
@@ -10203,25 +10498,25 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
           <div class="modal-header">
             <div class="modal-title" style="display:flex; align-items:center; gap:8px;">
               <span>${pInfo.icon}</span>
-              <span>Preset ${pInfo.label} - ${zone.name}</span>
+              <span>Preset ${escapeHtml(pInfo.label)} - ${escapeHtml(zone.name)}</span>
             </div>
             <button class="modal-close" id="btn-close-modal">&times;</button>
           </div>
           <div class="modal-body">
             <div class="form-row">
-              <label class="form-label">${getTranslation(this._hass, 'sched_plant_mode') || 'Plant Mode:'}</label>
+              <label class="form-label">${escapeHtml(getTranslation(this._hass, 'sched_plant_mode') || 'Plant Mode:')}</label>
               <div style="font-weight:600; color: ${isCoolMode ? '#38bdf8' : '#fb923c'}; margin-bottom: 8px;">
-                ${isCoolMode ? (getTranslation(this._hass, 'sched_cool_mode_label') || '❄️ Cooling (Cool)') : (getTranslation(this._hass, 'sched_heat_mode_label') || '🔥 Heating (Heat)')}
+                ${isCoolMode ? escapeHtml(getTranslation(this._hass, 'sched_cool_mode_label') || '❄️ Cooling (Cool)') : escapeHtml(getTranslation(this._hass, 'sched_heat_mode_label') || '🔥 Heating (Heat)')}
               </div>
             </div>
             <div class="form-row">
-              <label class="form-label">${getTranslation(this._hass, 'target_temp') || 'Target Temperature'} (°C):</label>
-              <input type="number" id="input-preset-temp" class="form-control" step="0.5" min="10" max="35" value="${safeTemp.toFixed(1)}" style="font-size:1.2rem; font-weight:700; text-align:center; padding:8px;">
+              <label class="form-label">${escapeHtml(getTranslation(this._hass, 'target_temp') || 'Target Temperature')} (${unit}):</label>
+              <input type="number" id="input-preset-temp" class="form-control" step="${isF ? '1' : '0.5'}" min="${isF ? '41' : '5'}" max="${isF ? '95' : '35'}" value="${safeTemp.toFixed(1)}" style="font-size:1.2rem; font-weight:700; text-align:center; padding:8px;">
             </div>
           </div>
           <div class="modal-actions">
-            <button class="btn" id="btn-cancel-modal">${getTranslation(this._hass, 'btn_cancel') || 'Cancel'}</button>
-            <button class="btn btn-primary" id="btn-save-preset">${getTranslation(this._hass, 'btn_save') || 'Save'}</button>
+            <button class="btn" id="btn-cancel-modal">${escapeHtml(getTranslation(this._hass, 'btn_cancel') || 'Cancel')}</button>
+            <button class="btn btn-primary" id="btn-save-preset">${escapeHtml(getTranslation(this._hass, 'btn_save') || 'Save')}</button>
           </div>
         </div>
       </div>
@@ -10245,7 +10540,11 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
         });
       }
       this.closeModal();
-      setTimeout(() => this.renderPresetMatrixTable(), 300);
+      if (this._presetRefreshTimer) clearTimeout(this._presetRefreshTimer);
+      this._presetRefreshTimer = setTimeout(() => {
+        this._presetRefreshTimer = null;
+        this.renderPresetMatrixTable();
+      }, 300);
     });
   }
   /* ==================== MODALS ==================== */
@@ -10468,18 +10767,20 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
                 const aTemp = this._resolvePresetTemp(z.climate, 'away');
                 const baseTemp = this._resolvePresetTemp(z.climate, currentBaseline);
                 const initialVal = initialZoneChoices[z.climate] || 'inherit';
+                const safeClimate = escapeHtml(z.climate);
+                const safeName = escapeHtml(z.name);
 
                 return `
-                  <div class="zone-exception-row" data-zone="${z.climate}">
-                    <div class="zone-exception-name" title="${z.name}">🏠 ${z.name}</div>
+                  <div class="zone-exception-row" data-zone="${safeClimate}">
+                    <div class="zone-exception-name" title="${safeName}">🏠 ${safeName}</div>
                     <div class="zone-exception-control">
-                      <select class="zone-override-select" data-zone="${z.climate}">
+                      <select class="zone-override-select" data-zone="${safeClimate}">
                         <option value="inherit" ${initialVal === 'inherit' ? 'selected' : ''}>🔗 Segui Preset Generale</option>
                         <option value="comfort" ${initialVal === 'comfort' ? 'selected' : ''}>${isCoolMode ? '❄️' : '🔥'} Comfort (${cTemp.toFixed(1)}${getTempUnit(this._hass)})</option>
                         <option value="eco" ${initialVal === 'eco' ? 'selected' : ''}>🌿 Eco (${eTemp.toFixed(1)}${getTempUnit(this._hass)})</option>
                         <option value="sleep" ${initialVal === 'sleep' ? 'selected' : ''}>🌙 Notte (${sTemp.toFixed(1)}${getTempUnit(this._hass)})</option>
                         <option value="away" ${initialVal === 'away' ? 'selected' : ''}>🚶 Away (${aTemp.toFixed(1)}${getTempUnit(this._hass)})</option>
-                        <option value="none" ${initialVal === 'none' ? 'selected' : ''}>${getTranslation(this._hass, 'sched_no_change_baseline') || '⏸️ No change / Baseline'} (${baseTemp.toFixed(1)}${getTempUnit(this._hass)})</option>
+                        <option value="none" ${initialVal === 'none' ? 'selected' : ''}>${escapeHtml(getTranslation(this._hass, 'sched_no_change_baseline') || '⏸️ No change / Baseline')} (${baseTemp.toFixed(1)}${getTempUnit(this._hass)})</option>
                       </select>
                     </div>
                   </div>
@@ -10682,7 +10983,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
             <select id="activate-profile-select">
               ${profilesList.map(pId => {
                 const p = sched.profiles?.[pId];
-                return `<option value="${pId}" ${currentActive === pId ? 'selected' : ''}>${p?.name || pId.toUpperCase()}</option>`;
+                return `<option value="${escapeHtml(pId)}" ${currentActive === pId ? 'selected' : ''}>${escapeHtml(p?.name || pId.toUpperCase())}</option>`;
               }).join('')}
             </select>
           </div>
@@ -10713,14 +11014,14 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
               <label class="form-label">Profilo di Ripristino (Fallback):</label>
               <select id="activate-fallback-select">
                 ${profilesList.map(pId => {
-                  return `<option value="${pId}" ${pId === 'standard' ? 'selected' : ''}>${pId.toUpperCase()}</option>`;
+                  return `<option value="${escapeHtml(pId)}" ${pId === 'standard' ? 'selected' : ''}>${escapeHtml(pId.toUpperCase())}</option>`;
                 }).join('')}
               </select>
             </div>
           </div>
 
           <div class="modal-actions">
-            <button class="btn" id="btn-cancel-modal">Annulla</button>
+            <button class="btn" id="btn-cancel-modal">${escapeHtml(getTranslation(this._hass, 'btn_cancel') || 'Cancel')}</button>
             <button class="btn btn-primary" id="btn-confirm-activate">Attiva Profilo</button>
           </div>
         </div>
@@ -10885,12 +11186,13 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
 
       previewList.innerHTML = plan.map(item => {
         const isReady = item.reqMin <= 0;
+        const unit = getTempUnit(this._hass);
         return `
           <div class="radar-item">
             <div class="radar-item-left">
-              <strong>${item.zone.name}</strong>
+              <strong>${escapeHtml(item.zone.name)}</strong>
               <span style="font-size:0.8rem; opacity:0.8;">
-                Attuale: ${item.curTemp.toFixed(1)}${getTempUnit(this._hass)} ➔ Target: ${item.targetTemp.toFixed(1)}${getTempUnit(this._hass)} (Δ ${item.delta.toFixed(1)}${getTempUnit(this._hass)}, ${item.rate.toFixed(1)}${getTempUnit(this._hass)}/h)
+                Attuale: ${item.curTemp.toFixed(1)}${unit} ➔ Target: ${item.targetTemp.toFixed(1)}${unit} (Δ ${item.delta.toFixed(1)}${unit}, ${item.rate.toFixed(1)}${unit}/h)
               </span>
             </div>
             <div class="radar-item-right">
@@ -10898,7 +11200,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
                 <span class="badge badge-green" style="font-size:0.75rem;">✅ In temperatura</span>
               ` : `
                 <span class="badge badge-orange" style="font-size:0.75rem;">⏱️ ${item.reqMin} min</span>
-                <span style="font-size:0.75rem; font-weight:700; color:#fcd34d;">Accensione: ${item.ignStr.trim()}</span>
+                <span style="font-size:0.75rem; font-weight:700; color:#fcd34d;">Accensione: ${escapeHtml(item.ignStr.trim())}</span>
               `}
             </div>
           </div>
@@ -10955,7 +11257,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
 
           <div class="form-group">
             <label class="form-label">Profilo Sorgente:</label>
-            <input type="text" value="${this._editorProfileId}" disabled style="opacity:0.7;">
+            <input type="text" value="${escapeHtml(this._editorProfileId)}" disabled style="opacity:0.7;">
           </div>
 
           <div class="form-group">
@@ -10969,7 +11271,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
           </div>
 
           <div class="modal-actions">
-            <button class="btn" id="btn-cancel-modal">Annulla</button>
+            <button class="btn" id="btn-cancel-modal">${escapeHtml(getTranslation(this._hass, 'btn_cancel') || 'Cancel')}</button>
             <button class="btn btn-primary" id="btn-confirm-dup">Duplica</button>
           </div>
         </div>

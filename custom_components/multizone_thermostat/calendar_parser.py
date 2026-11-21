@@ -1,5 +1,6 @@
 """Parser for Calendar events in Multizone Thermostat."""
 import logging
+import math
 from typing import Any, Dict
 
 from .const import GLOBAL_PRESETS, ZONE_MODE_BYPASS, ZONE_MODE_PRIMARY, ZONE_MODES
@@ -46,7 +47,10 @@ def parse_calendar_event(title: str) -> dict[str, Any]:
         try:
             # Maybe it's a global temperature? e.g. "21.5"
             val = float(first_part_lower)
-            result["global_temperature"] = val
+            if math.isfinite(val) and 5.0 <= val <= 35.0:
+                result["global_temperature"] = val
+            else:
+                _LOGGER.warning("Ignoring out-of-range calendar global temperature: %s", first_part)
         except ValueError:
             # Only accept valid global presets so ordinary calendar events are ignored
             if first_part_lower in GLOBAL_PRESETS:
@@ -82,7 +86,11 @@ def parse_calendar_event(title: str) -> dict[str, Any]:
                 override.mode = ZONE_MODE_PRIMARY
             else:
                 try:
-                    override.temperature = float(cmd)
+                    val = float(cmd)
+                    if math.isfinite(val) and 5.0 <= val <= 35.0:
+                        override.temperature = val
+                    else:
+                        _LOGGER.warning("Out-of-range calendar temperature for zone %s: %s", zone_name, cmd)
                 except ValueError:
                     _LOGGER.warning("Unknown calendar command for zone %s: %s", zone_name, cmd)
                     

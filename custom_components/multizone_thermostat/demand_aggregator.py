@@ -162,6 +162,13 @@ class DemandAggregator:
         """Register a general listener called when any zone's demand changes."""
         self._on_demand_changed_listeners.append(callback)
 
+    def unregister_on_demand_changed(
+        self, callback: Callable[[str, float], None]
+    ) -> None:
+        """Unregister a previously registered demand change listener."""
+        if callback in self._on_demand_changed_listeners:
+            self._on_demand_changed_listeners.remove(callback)
+
     # -------------------------------------------------------------
     # Demand Management
     # -------------------------------------------------------------
@@ -302,18 +309,15 @@ class DemandAggregator:
 
         primary_demands: dict[str, float] = {}
         secondary_demands: dict[str, float] = {}
+        faulted_cids: set[str] = set()
 
         for cid, name in zone_entries:
             mode = self.get_zone_mode(cid)
             demand = self.get_zone_demand(cid)
 
-            if self._fault_checker is not None:
-                if self._fault_checker(cid):
-                    demand = 0.0
-            else:
-                coord = getattr(self, "coordinator", None)
-                if coord and hasattr(coord, "plant_diagnostics") and coord.plant_diagnostics.has_critical_sensor_fault(cid):
-                    demand = 0.0
+            if self._is_zone_faulted(cid):
+                demand = 0.0
+                faulted_cids.add(cid)
 
             if mode == ZONE_MODE_BYPASS:
                 continue
@@ -326,7 +330,22 @@ class DemandAggregator:
         active_primary = sum(1 for d in primary_demands.values() if d > 0.0)
         active_secondary = sum(1 for d in secondary_demands.values() if d > 0.0)
 
-        # 1. Domestic Hot Water Priority Interlock
+        # 1. Frost Emergency Priority Override (pipe-freeze protection overrides DHW)
+        if frost_emergency:
+            _LOGGER.debug("Frost emergency active: plant heating demand forced to 100.0%%")
+            return AggregatedDemand(
+                demand=100.0,
+                peak_zone="Frost Emergency",
+                strategy=self._strategy,
+                primary_demands=primary_demands,
+                secondary_demands=secondary_demands,
+                active_primary_count=active_primary,
+                active_secondary_count=active_secondary,
+                frost_emergency=True,
+                dhw_active=bool(is_dhw_active),
+            )
+
+        # 2. Domestic Hot Water Priority Interlock
         if is_dhw_active:
             _LOGGER.debug("DHW is active: plant heating demand suppressed to 0.0%%")
             return AggregatedDemand(
@@ -339,21 +358,6 @@ class DemandAggregator:
                 active_secondary_count=active_secondary,
                 frost_emergency=False,
                 dhw_active=True,
-            )
-
-        # 2. Frost Emergency Priority Override
-        if frost_emergency:
-            _LOGGER.debug("Frost emergency active: plant heating demand forced to 100.0%%")
-            return AggregatedDemand(
-                demand=100.0,
-                peak_zone="Frost Emergency",
-                strategy=self._strategy,
-                primary_demands=primary_demands,
-                secondary_demands=secondary_demands,
-                active_primary_count=active_primary,
-                active_secondary_count=active_secondary,
-                frost_emergency=True,
-                dhw_active=False,
             )
 
         # 3. Normal Aggregation (evaluated over Primary zones)
@@ -387,7 +391,7 @@ class DemandAggregator:
             total_primary_weight = sum(
                 self.get_zone_weight(cid)
                 for cid, name in zone_entries
-                if self.get_zone_mode(cid) == ZONE_MODE_PRIMARY
+                if self.get_zone_mode(cid) == ZONE_MODE_PRIMARY and cid not in faulted_cids
             )
 
             active_items = []
@@ -444,17 +448,26 @@ class DemandAggregator:
             dhw_active=False,
         )
 
+    def _is_zone_faulted(self, cid: str) -> bool:
+        """Return True if a zone currently has a critical sensor fault."""
+        if self._fault_checker is not None:
+            return bool(self._fault_checker(cid))
+        coord = getattr(self, "coordinator", None)
+        if coord and hasattr(coord, "plant_diagnostics") and coord.plant_diagnostics is not None:
+            return bool(coord.plant_diagnostics.has_critical_sensor_fault(cid))
+        return False
+
     def has_active_primary_demand(self) -> bool:
-        """Return True if any primary zone has demand > 0%."""
+        """Return True if any non-faulted primary zone has demand > 0%."""
         for cid, demand in self._zone_demands.items():
-            if self.is_primary(cid) and demand > 0.0:
+            if self.is_primary(cid) and demand > 0.0 and not self._is_zone_faulted(cid):
                 return True
         return False
 
     def has_active_secondary_demand(self) -> bool:
-        """Return True if any secondary zone has demand > 0%."""
+        """Return True if any non-faulted secondary zone has demand > 0%."""
         for cid, demand in self._zone_demands.items():
-            if self.is_secondary(cid) and demand > 0.0:
+            if self.is_secondary(cid) and demand > 0.0 and not self._is_zone_faulted(cid):
                 return True
         return False
 

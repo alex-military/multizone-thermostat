@@ -134,9 +134,11 @@ class RoutineManager:
         
         if is_away and not was_away:
             _LOGGER.info("Geofencing: Everyone left. Setting to Away mode.")
-            self.hass.async_create_task(
-                self._async_set_persistent_data(KEY_PRE_AWAY_PRESET, self._get_current_global_preset())
-            )
+            curr_preset = self._get_current_global_preset()
+            if curr_preset != GLOBAL_PRESET_AWAY:
+                self.hass.async_create_task(
+                    self._async_set_persistent_data(KEY_PRE_AWAY_PRESET, curr_preset)
+                )
             self.hass.async_create_task(self._async_set_global_preset(GLOBAL_PRESET_AWAY))
             
         elif not is_away and was_away:
@@ -164,7 +166,7 @@ class RoutineManager:
             except Exception as ex:
                 _LOGGER.error("Geofencing schedule exception (invalid format): %s", ex, exc_info=True)
                 
-            if is_night:
+            if is_night and bool(self._get_persistent_data(KEY_AUTO_NIGHT_MODE, False)):
                 _LOGGER.info("Geofencing: Returned at night. Setting Sleep mode.")
                 pre_away = self._get_persistent_data(KEY_PRE_AWAY_PRESET, GLOBAL_PRESET_COMFORT)
                 self.hass.async_create_task(self._async_set_persistent_data(KEY_PRE_NIGHT_PRESET, pre_away))
@@ -188,7 +190,13 @@ class RoutineManager:
         try:
             hour, minute = map(int, str(night_time_str).split(":")[:2])
             target_dt = local_now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-            time_diff = (local_now - target_dt).total_seconds()
+            if local_now.tzinfo is not None:
+                time_diff = (
+                    local_now.astimezone(datetime.timezone.utc)
+                    - target_dt.astimezone(datetime.timezone.utc)
+                ).total_seconds()
+            else:
+                time_diff = (local_now - target_dt).total_seconds()
             
             # Bug 10 FIX: Trigger if we are within a 5 minute window of the target (avoids missed minute drift)
             if 0 <= time_diff < 300:
@@ -211,14 +219,20 @@ class RoutineManager:
         try:
             hour, minute = map(int, str(morning_time_str).split(":")[:2])
             target_dt = local_now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-            time_diff = (local_now - target_dt).total_seconds()
+            if local_now.tzinfo is not None:
+                time_diff = (
+                    local_now.astimezone(datetime.timezone.utc)
+                    - target_dt.astimezone(datetime.timezone.utc)
+                ).total_seconds()
+            else:
+                time_diff = (local_now - target_dt).total_seconds()
             
             if 0 <= time_diff < 300:
                 if self._last_morning_trigger_date != current_date:
                     self._last_morning_trigger_date = current_date
                     current_preset = self._get_current_global_preset()
-                    if current_preset in (GLOBAL_PRESET_AWAY, "none"):
-                        _LOGGER.info("Auto Morning Mode skipped because system is in %s mode.", current_preset)
+                    if current_preset != GLOBAL_PRESET_SLEEP:
+                        _LOGGER.info("Auto Morning Mode skipped because system is in %s mode (not sleep).", current_preset)
                     else:
                         pre_night = self._get_persistent_data(KEY_PRE_NIGHT_PRESET, GLOBAL_PRESET_COMFORT)
                         _LOGGER.info("Auto Morning Mode triggered. Restoring mode: %s", pre_night)

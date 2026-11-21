@@ -30,7 +30,8 @@
           "name": "Nome Zona",
           "temp_sensor": "Sensore Temperatura Zona",
           "target_temperature": "Temperatura Target Base",
-          "emitter_type": "Tipo di emettitore"
+          "emitter_type": "Tipo di emettitore",
+          "humidity_sensor": "Sensore di Umidità (Opzionale)"
         },
         "sections": {
           "trv_settings": {
@@ -39,7 +40,11 @@
             "data": {
               "climate_entities": "Entità Climate / TRV",
               "trv_preset_sync": "Abilita Sincronizzazione Preset TRV",
-              "authoritative_climate_sync": "Sincronizzazione Autoritativa Termostato Fisico"
+              "authoritative_climate_sync": "Sincronizzazione Autoritativa Termostato Fisico",
+              "trv_calibration_mode": "Modalità Calibrazione TRV (Offset vs Temp. Esterna)",
+              "trv_control_mode": "Modalità Controllo TRV (Standard vs Valvola a Domanda)",
+              "trv_open_boost": "Boost Apertura a Domanda (°C sopra ambiente/target)",
+              "trv_close_offset": "Offset Chiusura a Domanda (°C sotto ambiente a riposo)"
             }
           },
           "valve_settings": {
@@ -84,12 +89,13 @@
         "data_description": {
           "name": "Un nome amichevole per questa zona",
           "temp_sensor": "Sensore di temperatura ambiente principale per la zona",
-          "target_temperature": "Temperatura di riferimento predefinita per la zona"
+          "target_temperature": "Temperatura di riferimento predefinita per la zona",
+          "humidity_sensor": "Sensore opzionale di umidità della stanza per la protezione dal punto di rugiada in raffrescamento"
         }
       },
       "trv_calibration": {
-        "title": "Configurazione TRV (Sensore Offset/Compensazione)",
-        "description": "Seleziona le entità di offset (calibrazione termostato) per ogni TRV nella zona {zone_name}. Spesso sono entità `number` create dall'integrazione della valvola (es. Z2M, ZHA). Se non selezioni nulla, useremo la 'Compensazione del Target' (ingannando la valvola alzando/abbassando il target). Tutte le tue valvole appariranno qui sotto, ognuna col suo campo opzionale.",
+        "title": "Configurazione TRV (Offset / Temperatura Esterna)",
+        "description": "Per ogni TRV nella zona {zone_name}, seleziona l'entità `number` di offset (`local_temperature_calibration`) oppure di temperatura esterna assoluta (`external_temperature_input`). Opzionalmente puoi selezionare l'entità `select` della sorgente sensore (`...__sensor_select`, es. `temperature_sensor_select`) per il fallback automatico remoto/locale. Se lasciato vuoto, verrà usata la Compensazione del Target.",
         "data": {}
       },
       "another_zone": {
@@ -195,7 +201,8 @@
       "invalid_temp_range": "La temperatura minima deve essere inferiore alla temperatura massima.",
       "no_actuators_selected": "Devi selezionare almeno un'entità climate o switch per la zona.",
       "zone_name_exists": "Esiste già una zona con questo nome.",
-      "no_plants_selected": "Devi selezionare almeno una centrale termica (Caldaia a gas o Pompa di calore)."
+      "no_plants_selected": "Devi selezionare almeno una centrale termica (Caldaia a gas o Pompa di calore).",
+      "hp_temps_invalid": "La temperatura minima di riscaldamento/raffrescamento della PDC deve essere inferiore a quella massima."
     }
   },
   "options": {
@@ -244,7 +251,8 @@
           "temp_sensor": "Zone Temperature Sensor",
           "target_temperature": "Base Target Temperature",
           "sensor_timeout_min": "Timeout Watchdog Sensore (minuti)",
-          "emitter_type": "Tipo di emettitore"
+          "emitter_type": "Tipo di emettitore",
+          "humidity_sensor": "Sensore di Umidità (Opzionale)"
         },
         "sections": {
           "trv_settings": {
@@ -253,7 +261,11 @@
             "data": {
               "climate_entities": "Entità Climate / TRV",
               "trv_preset_sync": "Abilita Sincronizzazione Preset TRV",
-              "authoritative_climate_sync": "Sincronizzazione Autoritativa Termostato Fisico"
+              "authoritative_climate_sync": "Sincronizzazione Autoritativa Termostato Fisico",
+              "trv_calibration_mode": "Modalità Calibrazione TRV (Offset vs Temp. Esterna)",
+              "trv_control_mode": "Modalità Controllo TRV (Standard vs Valvola a Domanda)",
+              "trv_open_boost": "Boost Apertura a Domanda (°C sopra ambiente/target)",
+              "trv_close_offset": "Offset Chiusura a Domanda (°C sotto ambiente a riposo)"
             }
           },
           "valve_settings": {
@@ -301,7 +313,8 @@
           "window_sensor": "Bypassa automaticamente la zona quando questo sensore è aperto",
           "sensor_timeout_min": "Tempo massimo senza ricezione dati prima di passare in modalità di sicurezza/fallback su TRV",
           "name": "Un nome per questa zona (precompilato dal nome dell'entità climate)",
-          "trv_preset_sync": "Sincronizza automaticamente la modalità preset quando cambia la modalità HVAC (per valvole TRV fisiche)"
+          "trv_preset_sync": "Sincronizza automaticamente la modalità preset quando cambia la modalità HVAC (per valvole TRV fisiche)",
+          "humidity_sensor": "Sensore opzionale di umidità della stanza per la protezione dal punto di rugiada in raffrescamento"
         }
       },
       "remove_zone": {
@@ -318,7 +331,8 @@
           "zone_name": "Zona",
           "temp_sensor": "Sensore Temperatura Zona",
           "target_temperature": "Temperatura Target Base",
-          "emitter_type": "Tipo di emettitore"
+          "emitter_type": "Tipo di emettitore",
+          "humidity_sensor": "Sensore di Umidità (Opzionale)"
         },
         "sections": {
           "trv_settings": {
@@ -327,7 +341,11 @@
             "data": {
               "climate_entities": "Zone TRVs / Climates",
               "trv_preset_sync": "Sincronizza modalità Termostato (TRV) -> Centrale",
-              "authoritative_climate_sync": "Sincronizzazione Autoritativa Termostato Fisico"
+              "authoritative_climate_sync": "Sincronizzazione Autoritativa Termostato Fisico",
+              "trv_calibration_mode": "Modalità Calibrazione TRV (Offset vs Temp. Esterna)",
+              "trv_control_mode": "Modalità Controllo TRV (Standard vs Valvola a Domanda)",
+              "trv_open_boost": "Boost Apertura a Domanda (°C sopra ambiente/target)",
+              "trv_close_offset": "Offset Chiusura a Domanda (°C sotto ambiente a riposo)"
             }
           },
           "valve_settings": {
@@ -368,6 +386,9 @@
               "split_sensor_injection": "Iniezione Sensore Reale (Bypass Sonda a Soffitto)"
             }
           }
+        },
+        "data_description": {
+          "humidity_sensor": "Sensore opzionale di umidità della stanza per la protezione dal punto di rugiada in raffrescamento"
         }
       },
       "edit_geofencing": {
@@ -379,13 +400,13 @@
         }
       },
       "trv_calibration_add": {
-        "title": "Configurazione TRV (Sensore Offset/Compensazione) (Aggiungi)",
-        "description": "Seleziona le entità di offset (calibrazione termostato) per ogni TRV nella zona {zone_name}. Spesso sono entità `number` create dall'integrazione della valvola (es. Z2M, ZHA). Se non selezioni nulla, useremo la 'Compensazione del Target' (ingannando la valvola alzando/abbassando il target). Tutte le tue valvole appariranno qui sotto, ognuna col suo campo opzionale.",
+        "title": "Configurazione TRV (Offset / Temperatura Esterna) (Aggiungi)",
+        "description": "Per ogni TRV nella zona {zone_name}, seleziona l'entità `number` di offset (`local_temperature_calibration`) oppure di temperatura esterna assoluta (`external_temperature_input`). Opzionalmente puoi selezionare l'entità `select` della sorgente sensore (`...__sensor_select`, es. `temperature_sensor_select`) per il fallback automatico remoto/locale. Se lasciato vuoto, verrà usata la Compensazione del Target.",
         "data": {}
       },
       "trv_calibration_edit": {
-        "title": "Configurazione TRV (Sensore Offset/Compensazione) (Modifica)",
-        "description": "Seleziona le entità di offset (calibrazione termostato) per ogni TRV nella zona {zone_name}. Spesso sono entità `number` create dall'integrazione della valvola (es. Z2M, ZHA). Se non selezioni nulla, useremo la 'Compensazione del Target' (ingannando la valvola alzando/abbassando il target). Tutte le tue valvole appariranno qui sotto, ognuna col suo campo opzionale.",
+        "title": "Configurazione TRV (Offset / Temperatura Esterna) (Modifica)",
+        "description": "Per ogni TRV nella zona {zone_name}, seleziona l'entità `number` di offset (`local_temperature_calibration`) oppure di temperatura esterna assoluta (`external_temperature_input`). Opzionalmente puoi selezionare l'entità `select` della sorgente sensore (`...__sensor_select`, es. `temperature_sensor_select`) per il fallback automatico remoto/locale. Se lasciato vuoto, verrà usata la Compensazione del Target.",
         "data": {}
       },
       "edit_weather_comp": {
@@ -470,7 +491,8 @@
       "no_climates_available": "Tutte le entità climate disponibili sono già configurate come zone.",
       "no_temp_sensors_found": "Nessun sensore di temperatura trovato in Home Assistant.",
       "no_switches_found": "Nessuna entità switch trovata in Home Assistant.",
-      "no_virtual_thermostats": "Nessun termostato virtuale configurato."
+      "no_virtual_thermostats": "Nessun termostato virtuale configurato.",
+      "zone_not_found": "La zona selezionata non è stata trovata."
     },
     "error": {
       "zone_name_required": "Il nome della zona non può essere vuoto.",

@@ -64,12 +64,13 @@ class MultizonePID:
     def set_pid_param(self, kp=None, ki=None, kd=None):
         self._pid.set_pid_param(kp=kp, ki=ki, kd=kd)
         
-    def clear_samples(self):
-        """Clear samples, dt tracking, integral and refresh sensor timestamp."""
+    def clear_samples(self, reset_sensor_timer: bool = False):
+        """Clear samples, dt tracking and integral; optionally refresh sensor timestamp."""
         self._last_input_time = None
         self._pid.clear_samples()
         self._pid.integral = 0.0
-        self.update_sensor_timestamp()
+        if reset_sensor_timer:
+            self.update_sensor_timestamp()
         
     def update_sensor_timestamp(self):
         """Called externally when the temperature sensor actually reports a new value."""
@@ -83,6 +84,9 @@ class MultizonePID:
         if self.sensor_timeout > 0 and (now - self.last_sensor_update) > self.sensor_timeout:
             zone_desc = f" for zone '{self.zone_id}'" if self.zone_id else ""
             _LOGGER.warning("PID: Dead Sensor Timeout reached (%.1f seconds)%s. Forcing demand to 0%%.", (now - self.last_sensor_update), zone_desc)
+            self._last_input_time = None
+            self._pid.clear_samples()
+            self._pid.integral = 0.0
             self._last_demand = 0.0
             return self._last_demand
             

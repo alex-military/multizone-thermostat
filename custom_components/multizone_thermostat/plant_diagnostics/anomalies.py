@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import time
 from typing import Any
 from homeassistant.core import HomeAssistant
@@ -16,11 +17,31 @@ from .const import (
     ANOMALY_LOW_BATTERY,
     ANOMALY_SENSOR_FAULT,
     ANOMALY_SENSOR_TIMEOUT,
+    ANOMALY_TRV_NOT_OPENING,
     ANOMALY_LABELS,
 )
-from ..const import to_celsius
+from ..boiler.valve_readiness import is_trv_reported_closed
+from ..const import CONF_ZONE_CLIMATES, get_state_temp_unit, to_celsius
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _normalize_pressure_to_bar(value: float, unit: str | None) -> float | None:
+    """Normalize a finite pressure measurement to bar."""
+    if not math.isfinite(value):
+        return None
+    u = str(unit).strip().lower() if unit is not None else "bar"
+    if u in ("", "bar", "bars"):
+        return value
+    if u in ("kpa", "kilopascal"):
+        return value / 100.0
+    if u in ("psi", "lb/in2", "lb/in²"):
+        return value * 0.0689476
+    if u in ("pa", "pascal"):
+        return value / 100000.0
+    if u in ("mbar", "hpa", "hectopascal"):
+        return value / 1000.0
+    return value
 
 def get_battery_level(hass: HomeAssistant, entity_id: str) -> int | None:
     """Find battery level for an entity (attributes, device registry, or related sensor)."""
@@ -199,11 +220,12 @@ def get_opentherm_diagnostics(coordinator: Any, hass: HomeAssistant) -> dict[str
     st = hass.states.get(ot_entity) if ot_entity else None
     if st and st.attributes:
         attrs = st.attributes
+        st_unit = get_state_temp_unit(st)
         # Current / Flow temp
         for k in ("current_temperature", "flow_temperature", "boiler_temperature", "ch_flow_temperature"):
             if k in attrs and attrs[k] is not None:
                 try:
-                    result["flow_temperature"] = float(attrs[k])
+                    result["flow_temperature"] = round(to_celsius(float(attrs[k]), st_unit, hass), 1)
                     break
                 except (ValueError, TypeError):
                     pass
@@ -212,17 +234,20 @@ def get_opentherm_diagnostics(coordinator: Any, hass: HomeAssistant) -> dict[str
         for k in ("return_temperature", "return_water_temperature", "ch_return_temperature", "boiler_return_temperature"):
             if k in attrs and attrs[k] is not None:
                 try:
-                    result["return_temperature"] = float(attrs[k])
+                    result["return_temperature"] = round(to_celsius(float(attrs[k]), st_unit, hass), 1)
                     break
                 except (ValueError, TypeError):
                     pass
 
         # Water Pressure
+        p_unit = attrs.get("pressure_unit") or attrs.get("unit_of_measurement")
         for k in ("pressure", "water_pressure", "ch_water_pressure", "boiler_pressure"):
             if k in attrs and attrs[k] is not None:
                 try:
-                    result["water_pressure"] = round(float(attrs[k]), 2)
-                    break
+                    bar_val = _normalize_pressure_to_bar(float(attrs[k]), p_unit)
+                    if bar_val is not None:
+                        result["water_pressure"] = round(bar_val, 2)
+                        break
                 except (ValueError, TypeError):
                     pass
 
@@ -292,17 +317,29 @@ def get_opentherm_diagnostics(coordinator: Any, hass: HomeAssistant) -> dict[str
                         eid = ent.entity_id.lower()
                         dev_cls = getattr(ent, "original_device_class", None) or getattr(ent, "device_class", None)
                         
-                        # Pressure sensor
+                        # Pressure sensor (exclude weather/barometric/atmospheric sensors)
                         if (dev_cls == "pressure" or "pressure" in eid) and result["water_pressure"] is None:
-                            try:
-                                result["water_pressure"] = round(float(s_st.state), 2)
-                            except (ValueError, TypeError):
-                                pass
+                            is_atmospheric = (
+                                dev_cls == "atmospheric_pressure"
+                                or any(kw in eid for kw in ("barometric", "atmospheric", "outdoor", "weather", "sea_level"))
+                            )
+                            if not is_atmospheric:
+                                try:
+                                    s_attrs = getattr(s_st, "attributes", None)
+                                    s_p_unit = s_attrs.get("unit_of_measurement") if hasattr(s_attrs, "get") else None
+                                    bar_val = _normalize_pressure_to_bar(float(s_st.state), s_p_unit)
+                                    if bar_val is not None:
+                                        result["water_pressure"] = round(bar_val, 2)
+                                except (ValueError, TypeError):
+                                    pass
 
                         # Return temp sensor
                         if ("return" in eid and ("temp" in eid or dev_cls == "temperature")) and result["return_temperature"] is None:
                             try:
-                                result["return_temperature"] = round(float(s_st.state), 1)
+                                result["return_temperature"] = round(
+                                    to_celsius(float(s_st.state), get_state_temp_unit(s_st), hass),
+                                    1,
+                                )
                             except (ValueError, TypeError):
                                 pass
 
@@ -381,16 +418,7 @@ def evaluate_zone_anomalies(
             except (ValueError, TypeError):
                 target_temp = None
 
-        # 0.a Battery Check (Main Sensor)
         zone = coordinator.zone_manager.get_zone(climate_id)
-        if zone:
-            sensor_id = zone.get("temp_sensor")
-            if sensor_id:
-                bat = get_battery_level(hass, sensor_id)
-                if bat is not None and bat <= 10:
-                    state["active_anomaly"] = ANOMALY_LOW_BATTERY
-                    state["anomaly_details"] = f"Sensor {sensor_id} battery low ({bat}%)"
-                    return ANOMALY_LOW_BATTERY, state["anomaly_details"]
 
         # 0.b Sanity Check (Plausibility)
         # Only physically impossible values are flagged: cold rooms (garage,
@@ -402,15 +430,19 @@ def evaluate_zone_anomalies(
             delta_seen = abs(state["last_temp_seen"] - current_temp)
             dt_seen = now_mono - state["last_temp_time"]
             if (delta_seen > 4.0 and dt_seen < 1800) or (delta_seen > 6.0 and dt_seen < 3600):
-                # Spike sanity check: if the new reading is sustained across consecutive readings,
+                # Spike sanity check: if the new reading is sustained across consecutive ticks (>=1s apart),
                 # accept it rather than locking the zone to 0% for 10 full minutes.
                 spike_cand = state.get("spike_cand")
                 spike_count = state.get("spike_count", 0)
+                last_spike_time = state.get("last_spike_time")
                 if spike_cand is not None and abs(spike_cand - current_temp) < 0.5:
-                    spike_count += 1
+                    if last_spike_time is None or (now_mono - last_spike_time) >= 1.0:
+                        spike_count += 1
+                        state["last_spike_time"] = now_mono
                 else:
                     spike_cand = current_temp
                     spike_count = 1
+                    state["last_spike_time"] = now_mono
                 state["spike_cand"] = spike_cand
                 state["spike_count"] = spike_count
 
@@ -420,11 +452,13 @@ def evaluate_zone_anomalies(
                     state["last_temp_time"] = now_mono
                     state["spike_cand"] = None
                     state["spike_count"] = 0
+                    state["last_spike_time"] = None
                 else:
                     is_insane = True
             else:
                 state["spike_cand"] = None
                 state["spike_count"] = 0
+                state["last_spike_time"] = None
 
         if is_insane:
             state["active_anomaly"] = ANOMALY_SENSOR_FAULT
@@ -435,6 +469,8 @@ def evaluate_zone_anomalies(
         state["fallback_ok"] = False
         timeout_min = zone.get("sensor_timeout_min", 240) if zone else 240
         sensor_entity = zone.get("temp_sensor") if zone else None
+        sensor_ts: float | None = None
+        sensor_elapsed_sec: float | None = None
         if sensor_entity and timeout_min > 0:
             s_state = hass.states.get(sensor_entity)
             if s_state:
@@ -442,6 +478,9 @@ def evaluate_zone_anomalies(
                 s_reported = s_state.last_reported if hasattr(s_state, "last_reported") else getattr(s_state, "last_updated", None)
                 ts = s_reported.timestamp() if (s_reported and hasattr(s_reported, "timestamp")) else None
                 elapsed_sec = (now_wall - ts) if isinstance(ts, (int, float)) else 0.0
+                if isinstance(ts, (int, float)):
+                    sensor_ts = float(ts)
+                    sensor_elapsed_sec = float(elapsed_sec)
 
                 # Check for TRV fallback
                 trvs = (zone.get("climates") or zone.get("climate_entities") or [])
@@ -456,7 +495,8 @@ def evaluate_zone_anomalies(
                     try:
                         _ = float(s_state.state)
                         valid_float = True
-                        state["fallback_ok"] = True
+                        if elapsed_sec <= 86400:
+                            state["fallback_ok"] = True
                     except (ValueError, TypeError):
                         valid_float = False
 
@@ -473,18 +513,30 @@ def evaluate_zone_anomalies(
                         state["anomaly_details"] = f"Sensor {sensor_entity} quiet: no updates for {int(elapsed_sec / 60)} min (limit: {timeout_min} min){suffix}"
                     return ANOMALY_SENSOR_TIMEOUT, state["anomaly_details"]
 
+        # Update last_temp_seen BEFORE bypass return so unbypassing does not mistake normal drift for a spike
+        if state.get("last_temp_seen") is None or state.get("last_temp_seen") != current_temp:
+            state["last_temp_seen"] = current_temp
+            state["last_temp_time"] = now_mono
+
+        if (
+            sensor_ts is not None
+            and math.isfinite(sensor_ts)
+            and sensor_elapsed_sec is not None
+            and sensor_elapsed_sec < 3600
+            and sensor_ts > state.get("last_sensor_report_ts", 0.0)
+        ):
+            state["last_sensor_report_ts"] = sensor_ts
+            state["last_temp_time"] = now_mono
+
         # If the zone is Bypassed, it is intentionally excluded from heating
         zone_mode = coordinator.get_zone_mode(climate_id)
         if zone_mode == "bypass":
+            state["trv_closed_start_time"] = None
             state["active_anomaly"] = ANOMALY_NONE
             state["anomaly_details"] = "Zone bypassed (Excluded from heating)"
             return ANOMALY_NONE, state["anomaly_details"]
 
         # 1. Staleness Check: Has the temperature sensor not changed in > 6 hours while heating?
-        if state.get("last_temp_seen") is None or state.get("last_temp_seen") != current_temp:
-            state["last_temp_seen"] = current_temp
-            state["last_temp_time"] = now_mono
-            
         if (
             (boiler_on and demand > 0.0)
             and state.get("last_temp_time") is not None
@@ -530,8 +582,8 @@ def evaluate_zone_anomalies(
                             state["active_anomaly"] = ANOMALY_VALVE_STUCK_CLOSED
                             state["anomaly_details"] = f"Heating active at 100% for >75 min but temperature is not rising ({start_t}°C → {current_temp}°C)"
                             return ANOMALY_VALVE_STUCK_CLOSED, state["anomaly_details"]
-        elif demand < 80.0:
-            # Reset stuck-closed tracker if demand dropped below 80%
+        elif demand < 80.0 or not boiler_on:
+            # Reset stuck-closed tracker if demand dropped below 80% or boiler is off
             state["high_demand_start_time"] = None
             state["high_demand_start_temp"] = None
 
@@ -551,6 +603,52 @@ def evaluate_zone_anomalies(
                 return ANOMALY_GHOST_HEATING, state["anomaly_details"]
         else:
             state["ghost_heat_start_temp"] = None
+
+        # 4b. Active TRV Closed Diagnostic (non-blocking):
+        # Heating demand > 20% with active heat generator for > 5 min while all zone TRVs report closed/idle
+        trv_list = (
+            (zone.get(CONF_ZONE_CLIMATES) or zone.get("climates") or zone.get("climate_entities") or [])
+            if zone
+            else []
+        )
+        all_trvs_closed = False
+        if not is_cool and boiler_on and demand > 20.0 and trv_list:
+            any_telemetry = False
+            all_closed = True
+            for trv_eid in trv_list:
+                trv_st = hass.states.get(trv_eid)
+                closed_flag = is_trv_reported_closed(trv_st)
+                if closed_flag is None:
+                    all_closed = False
+                    break
+                any_telemetry = True
+                if not closed_flag:
+                    all_closed = False
+                    break
+            all_trvs_closed = any_telemetry and all_closed
+
+        if all_trvs_closed:
+            if state.get("trv_closed_start_time") is None:
+                state["trv_closed_start_time"] = now_mono
+            elif (now_mono - state["trv_closed_start_time"]) > 300:
+                state["active_anomaly"] = ANOMALY_TRV_NOT_OPENING
+                state["anomaly_details"] = (
+                    f"Heating demand at {round(demand, 1)}% with central generator ON for >5 min, "
+                    "but all zone TRVs still report closed/idle"
+                )
+                return ANOMALY_TRV_NOT_OPENING, state["anomaly_details"]
+        else:
+            state["trv_closed_start_time"] = None
+
+        # 5. Battery Check (Non-critical warning, evaluated after critical checks)
+        if zone:
+            sensor_id = zone.get("temp_sensor")
+            if sensor_id:
+                bat = get_battery_level(hass, sensor_id)
+                if bat is not None and bat <= 10:
+                    state["active_anomaly"] = ANOMALY_LOW_BATTERY
+                    state["anomaly_details"] = f"Sensor {sensor_id} battery low ({bat}%)"
+                    return ANOMALY_LOW_BATTERY, state["anomaly_details"]
 
         # No active anomaly
         state["active_anomaly"] = ANOMALY_NONE

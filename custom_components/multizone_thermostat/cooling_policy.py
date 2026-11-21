@@ -14,6 +14,7 @@ from .const import (
     SPLIT_ROLE_HEAT_COOL,
     SPLIT_ROLE_COOLING_ONLY,
     make_zone_entity_id,
+    resolve_zone_id_safe,
 )
 from .plant_config import get_zone_name
 
@@ -35,6 +36,7 @@ class CoolingPolicy:
 
     def can_zone_cool(self, climate_id: str) -> bool:
         """Return True if zone has cooling capabilities (Split AC or Central Heat Pump Cooling)."""
+        climate_id = resolve_zone_id_safe(self.coordinator, climate_id)
         if hasattr(self.coordinator, "split_manager") and self.coordinator.split_manager.has_split(climate_id):
             split_info = self.coordinator.split_manager.get_split_info(climate_id)
             if split_info:
@@ -86,16 +88,36 @@ class CoolingPolicy:
 
         return True
 
+    @staticmethod
+    def _resolve(obs: Any) -> float:
+        """Prefer active cooling rate when learned; fall back to passive cooling rate."""
+        active = float(getattr(obs, "active_cooling_rate", 0.0) or 0.0)
+        if active > 0.0:
+            return active
+        return float(getattr(obs, "cooling_rate", 0.0) or 0.0)
+
     def get_zone_cooling_rate(self, climate_id: str) -> float:
-        """Return cooling rate for a zone from schedule_manager or thermal observer."""
-        if hasattr(self.coordinator, "schedule_manager") and hasattr(self.coordinator.schedule_manager, "_get_zone_cooling_rate"):
-            return float(self.coordinator.schedule_manager._get_zone_cooling_rate(climate_id) or 0.0)
-        if hasattr(self.coordinator, "zone_controller") and hasattr(self.coordinator.zone_controller, "thermal_models"):
-            obs = self.coordinator.zone_controller.thermal_models.get(climate_id)
+        """Return cooling rate for a zone preferring active cooling rate over passive rate."""
+        climate_id = resolve_zone_id_safe(self.coordinator, climate_id)
+        for container_name, attr_name in (("zone_controller", "thermal_models"), (None, "_thermal_models")):
+            root = getattr(self.coordinator, container_name, None) if container_name else self.coordinator
+            models = getattr(root, attr_name, None) if root else None
+            obs = models.get(climate_id) if isinstance(models, dict) else None
             if obs:
-                return float(getattr(obs, "cooling_rate", 0.0))
-        if hasattr(self.coordinator, "_thermal_models"):
-            obs = self.coordinator._thermal_models.get(climate_id)
+                active = float(getattr(obs, "active_cooling_rate", 0.0) or 0.0)
+                if active > 0.0:
+                    return active
+        sched = getattr(self.coordinator, "schedule_manager", None)
+        if sched and hasattr(sched, "_get_zone_cooling_rate"):
+            rate = float(sched._get_zone_cooling_rate(climate_id) or 0.0)
+            if rate > 0.0:
+                return rate
+        for container_name, attr_name in (("zone_controller", "thermal_models"), (None, "_thermal_models")):
+            root = getattr(self.coordinator, container_name, None) if container_name else self.coordinator
+            models = getattr(root, attr_name, None) if root else None
+            obs = models.get(climate_id) if isinstance(models, dict) else None
             if obs:
-                return float(getattr(obs, "cooling_rate", 0.0))
+                val = self._resolve(obs)
+                if val > 0.0:
+                    return val
         return 0.0

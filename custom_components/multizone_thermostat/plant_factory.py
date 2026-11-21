@@ -80,6 +80,7 @@ def build_plant_subsystems(coordinator: Any, hass: Any, config: PlantConfig) -> 
             coordinator.opentherm_min_temp,
             coordinator.opentherm_max_temp,
             coordinator.opentherm_ch_switch,
+            int(getattr(coordinator, "_valve_delay", 0)),
         )
     else:
         coordinator.boiler_backend = RelayBoilerBackend(

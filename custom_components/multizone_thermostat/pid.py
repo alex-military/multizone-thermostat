@@ -186,7 +186,7 @@ class PID:
         if not math.isfinite(input_val) or not math.isfinite(set_point):
             return self._output, False
 
-        if self._sampling_period != 0 and self._last_input_time is not None and \
+        if self._sampling_period != 0 and self._input_time is not None and \
                 monotonic() - self._input_time < self._sampling_period:
             return self._output, False  # If last sample is too young, keep last output value
 
@@ -236,17 +236,7 @@ class PID:
         # Compensate losses due to external temperature
         self._external = self._Ke * self._dext
 
-        # Anti-windup: always integrate, but clamp to prevent windup
-        # Reset integral on large setpoint change (>= 1.5°C) to allow faster convergence
-        # without wiping integral on minor thermal-inertia effective_target shifts
-        if self._last_set_point is not None and abs(self._last_set_point - self._set_point) >= 1.5:
-            self._integral = 0.0  # Reset integral if set point has changed significantly
-        else:
-            dt_int = max(0.0, min(self._dt, self._max_dt))
-            self._integral += self._Ki * self._error * dt_int
-            # Clamp integral to output bounds (accounting for external compensation)
-            self._integral = max(min(self._integral, self._out_max - self._external), self._out_min - self._external)
-
+        # Compute P and D before integral update for conditional anti-windup
         self._proportional = self._Kp * self._error
         if self._dt < 1.0 or self._last_input is None:
             self._derivative = 0.0
@@ -255,6 +245,33 @@ class PID:
             alpha = self._dt / (self._dt + 60.0)
             filtered_deriv = alpha * raw_deriv + (1.0 - alpha) * self._derivative
             self._derivative = max(-15.0, min(15.0, filtered_deriv))
+
+        # Anti-windup: conditional integration + back-calculation clamp
+        # Reset integral on large setpoint change (>= 1.5°C) to allow faster convergence
+        # without wiping integral on minor thermal-inertia effective_target shifts
+        if self._last_set_point is not None and abs(self._last_set_point - self._set_point) >= 1.5:
+            self._integral = 0.0  # Reset integral if set point has changed significantly
+        else:
+            dt_int = max(0.0, min(self._dt, self._max_dt))
+            delta_i = self._Ki * self._error * dt_int
+            pre_output = self._proportional + self._integral + self._derivative + self._external
+            if not ((pre_output >= self._out_max and delta_i > 0) or
+                    (pre_output <= self._out_min and delta_i < 0)):
+                self._integral += delta_i
+
+            # Clamp integral to hard output bounds (accounting for external compensation)
+            min_i = self._out_min - self._external
+            max_i = self._out_max - self._external
+            self._integral = max(min(self._integral, max_i), min_i)
+
+            # Back-calculation clamp to prevent residual P+I+D+ext overshoot without inverting sign
+            raw_total = self._proportional + self._integral + self._derivative + self._external
+            if self._integral > 0.0 and raw_total > self._out_max:
+                back_max = max(0.0, self._out_max - self._proportional - self._derivative - self._external)
+                self._integral = max(min(self._integral, back_max), min_i)
+            elif self._integral < 0.0 and raw_total < self._out_min:
+                back_min = min(0.0, self._out_min - self._proportional - self._derivative - self._external)
+                self._integral = min(max(self._integral, back_min), max_i)
 
         # Compute PID Output
         output = self._proportional + self._integral + self._derivative + self._external

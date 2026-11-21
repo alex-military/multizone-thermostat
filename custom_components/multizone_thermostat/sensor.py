@@ -4,12 +4,21 @@ from datetime import timedelta
 import logging
 from typing import Any
 
-from homeassistant.components.sensor import SensorEntity, SensorStateClass
+try:
+    from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
+except ImportError:
+    from homeassistant.components.sensor import SensorEntity, SensorStateClass
+
+    class SensorDeviceClass:  # type: ignore[no-redef]
+        """Fallback SensorDeviceClass for minimal test stubs."""
+
+        DURATION = "duration"
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.const import PERCENTAGE, EntityCategory
+from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfTemperature
 from homeassistant.helpers.event import (
     async_track_state_change_event,
     async_track_time_interval,
@@ -19,6 +28,22 @@ from .const import DOMAIN, CONF_ZONES, CONF_ZONE_NAME, make_zone_entity_id, make
 
 _LOGGER = logging.getLogger(__name__)
 
+
+def _is_fahrenheit_system(hass: Any) -> bool:
+    """Return True if Home Assistant is configured to display Fahrenheit temperatures."""
+    cfg = getattr(hass, "config", None)
+    units = getattr(cfg, "units", None) if cfg is not None else None
+    temp_unit = getattr(units, "temperature_unit", None) if units is not None else None
+    if temp_unit is None:
+        return False
+    return str(temp_unit).strip().lower() in (
+        "°f",
+        "f",
+        "fahrenheit",
+        str(getattr(UnitOfTemperature, "FAHRENHEIT", "°F")).lower(),
+    )
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     config_entry: ConfigEntry,
@@ -26,9 +51,7 @@ async def async_setup_entry(
 ) -> None:
     """Set up demand and diagnostic sensors for each virtual thermostat and plant."""
     coordinator = hass.data[DOMAIN][config_entry.entry_id]["coordinator"]
-    zones = coordinator.zones
-    if not zones:
-        return
+    zones = getattr(coordinator, "zones", None) or []
 
     entities: list[SensorEntity] = []
 
@@ -125,9 +148,12 @@ class AutotuneSensor(SensorEntity):
     @property
     def native_value(self) -> str:
         """Return the current autotuner state for the active season."""
+        zc = getattr(self._coordinator, "zone_controller", None)
+        if not zc:
+            return "unknown"
         season = getattr(self._coordinator, "master_hvac_mode", "heat") or "heat"
         season_mode = "cool" if str(season).lower() == "cool" else "heat"
-        tuner = self._coordinator.zone_controller.get_autotuner(self._climate_entity_id, mode=season_mode)
+        tuner = zc.get_autotuner(self._climate_entity_id, mode=season_mode)
         if not tuner:
             return "unknown"
         season_label = "Freddo" if season_mode == "cool" else "Caldo"
@@ -143,10 +169,13 @@ class AutotuneSensor(SensorEntity):
     @property
     def extra_state_attributes(self):
         """Return detailed dual-track heat and cool PID & autotuner parameters."""
+        zc = getattr(self._coordinator, "zone_controller", None)
+        if not zc:
+            return {}
         season = getattr(self._coordinator, "master_hvac_mode", "heat") or "heat"
         season_mode = "cool" if str(season).lower() == "cool" else "heat"
-        tuner_heat = self._coordinator.zone_controller.get_autotuner(self._climate_entity_id, mode="heat")
-        tuner_cool = self._coordinator.zone_controller.get_autotuner(self._climate_entity_id, mode="cool")
+        tuner_heat = zc.get_autotuner(self._climate_entity_id, mode="heat")
+        tuner_cool = zc.get_autotuner(self._climate_entity_id, mode="cool")
 
         active_tuner = tuner_cool if season_mode == "cool" else tuner_heat
         overrides = (active_tuner.manual_overrides or {}) if active_tuner else {}
@@ -234,7 +263,7 @@ class ThermalSensorBase(SensorEntity):
         self.async_write_ha_state()
 
 class HeatingRateSensor(ThermalSensorBase):
-    """Sensor that reports the Heating Rate (°C/hr)."""
+    """Sensor that reports the Heating Rate (°C/hr or °F/hr)."""
     _attr_icon = "mdi:thermometer-chevron-up"
     
     def __init__(self, hass: HomeAssistant, entry_id: str, name: str, climate_entity_id: str, coordinator) -> None:
@@ -247,15 +276,19 @@ class HeatingRateSensor(ThermalSensorBase):
         
     @property
     def native_value(self) -> float:
-        model = self._coordinator.zone_controller.get_thermal_model(self._climate_entity_id)
-        return round(model.heating_rate, 2) if model else 0.0
+        zc = getattr(self._coordinator, "zone_controller", None)
+        model = zc.get_thermal_model(self._climate_entity_id) if zc else None
+        if not model:
+            return 0.0
+        val = model.heating_rate * (1.8 if _is_fahrenheit_system(self.hass) else 1.0)
+        return round(val, 2)
 
     @property
     def native_unit_of_measurement(self) -> str:
-        return "°C/hr"
+        return "°F/hr" if _is_fahrenheit_system(self.hass) else "°C/hr"
 
 class CoolingRateSensor(ThermalSensorBase):
-    """Sensor that reports the Cooling Rate (°C/hr)."""
+    """Sensor that reports the Cooling Rate (°C/hr or °F/hr)."""
     _attr_icon = "mdi:thermometer-chevron-down"
     
     def __init__(self, hass: HomeAssistant, entry_id: str, name: str, climate_entity_id: str, coordinator) -> None:
@@ -268,15 +301,19 @@ class CoolingRateSensor(ThermalSensorBase):
         
     @property
     def native_value(self) -> float:
-        model = self._coordinator.zone_controller.get_thermal_model(self._climate_entity_id)
-        return round(model.cooling_rate, 2) if model else 0.0
+        zc = getattr(self._coordinator, "zone_controller", None)
+        model = zc.get_thermal_model(self._climate_entity_id) if zc else None
+        if not model:
+            return 0.0
+        val = model.cooling_rate * (1.8 if _is_fahrenheit_system(self.hass) else 1.0)
+        return round(val, 2)
 
     @property
     def native_unit_of_measurement(self) -> str:
-        return "°C/hr"
+        return "°F/hr" if _is_fahrenheit_system(self.hass) else "°C/hr"
 
 class ThermalInertiaSensor(ThermalSensorBase):
-    """Sensor that reports the Thermal Inertia (°C)."""
+    """Sensor that reports the Thermal Inertia (°C or °F delta)."""
     _attr_icon = "mdi:waves"
     
     def __init__(self, hass: HomeAssistant, entry_id: str, name: str, climate_entity_id: str, coordinator) -> None:
@@ -289,12 +326,16 @@ class ThermalInertiaSensor(ThermalSensorBase):
         
     @property
     def native_value(self) -> float:
-        model = self._coordinator.zone_controller.get_thermal_model(self._climate_entity_id)
-        return round(model.thermal_inertia, 2) if model else 0.0
+        zc = getattr(self._coordinator, "zone_controller", None)
+        model = zc.get_thermal_model(self._climate_entity_id) if zc else None
+        if not model:
+            return 0.0
+        val = model.thermal_inertia * (1.8 if _is_fahrenheit_system(self.hass) else 1.0)
+        return round(val, 2)
 
     @property
     def native_unit_of_measurement(self) -> str:
-        return "°C"
+        return "°F" if _is_fahrenheit_system(self.hass) else "°C"
 
 
 class MultizonePlantHealthSensor(SensorEntity):
@@ -486,10 +527,13 @@ class MultizoneBoilerCyclesSensor(SensorEntity):
         )
 
 
+_SENSOR_DURATION_CLASS = getattr(SensorDeviceClass, "DURATION", "duration")
+
 class MultizoneBoilerDailyRuntimeSensor(SensorEntity):
     """Sensor reporting total boiler running hours in the past 24 hours."""
 
     _attr_has_entity_name = True
+    _attr_device_class = _SENSOR_DURATION_CLASS
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_native_unit_of_measurement = "h"
     _attr_icon = "mdi:timer-sand"
@@ -548,7 +592,8 @@ class MultizoneZoneEnergyClassSensor(ThermalSensorBase):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        thermal = self._coordinator.zone_controller.get_thermal_model(self._climate_entity_id)
+        zc = getattr(self._coordinator, "zone_controller", None)
+        thermal = zc.get_thermal_model(self._climate_entity_id) if zc else None
         return {
             "cooling_rate": round(thermal.cooling_rate, 3) if thermal else 0.0,
             "heating_rate": round(thermal.heating_rate, 3) if thermal else 0.0,
@@ -560,6 +605,7 @@ class MultizoneZoneRetentionTimeSensor(ThermalSensorBase):
     """Sensor reporting hours required for the zone to lose 1°C."""
 
     _attr_icon = "mdi:clock-fast"
+    _attr_device_class = _SENSOR_DURATION_CLASS
     _attr_native_unit_of_measurement = "h"
 
     def __init__(self, hass: HomeAssistant, entry_id: str, name: str, climate_entity_id: str, coordinator) -> None:
@@ -601,7 +647,8 @@ class MultizoneZoneRadiatorSizingSensor(ThermalSensorBase):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        thermal = self._coordinator.zone_controller.get_thermal_model(self._climate_entity_id)
+        zc = getattr(self._coordinator, "zone_controller", None)
+        thermal = zc.get_thermal_model(self._climate_entity_id) if zc else None
         if thermal and thermal.cooling_rate > 0.01:
             ratio = round(thermal.heating_rate / thermal.cooling_rate, 2)
         else:

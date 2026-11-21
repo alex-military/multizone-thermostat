@@ -4,6 +4,7 @@ import statistics
 import time
 from collections import deque, namedtuple
 from datetime import datetime
+from typing import Any
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -73,6 +74,7 @@ class PassiveAutotuneObserver:
         self._learned_kd = 0.0
         self.manual_overrides: dict[str, float] = {}
         self._pre_reset_snapshot: dict[str, Any] | None = None
+        self._seeded_pi_only: bool = False
         self.weekly_updated_last_tick = False
         self.needs_save = False
 
@@ -114,7 +116,16 @@ class PassiveAutotuneObserver:
                 self._sync_effective_pid()
             else:
                 self._compute_final_pid()
+            if "seeded_pi_only" in data:
+                self._seeded_pi_only = bool(data["seeded_pi_only"])
+            else:
+                self._seeded_pi_only = bool(
+                    self._learned_kp > 0.0
+                    and self._learned_kd == 0.0
+                    and any(isinstance(c, dict) and c.get("seeded") for c in self.completed_cycles)
+                )
         else:
+            self._seeded_pi_only = False
             self._sync_effective_pid()
 
     def dump_state(self) -> dict:
@@ -125,6 +136,7 @@ class PassiveAutotuneObserver:
             "manual_overrides": dict(self.manual_overrides),
             "weekly_candidates": list(self.weekly_candidates),
             "last_weekly_update": self.last_weekly_update,
+            "seeded_pi_only": self._seeded_pi_only,
             "baseline_pid": {
                 "Kp": self._baseline_kp,
                 "Ki": self._baseline_ki,
@@ -192,11 +204,12 @@ class PassiveAutotuneObserver:
             self.manual_overrides["Kd"] = float(kd)
         self._sync_effective_pid()
 
-    def seed_learned_pid(self, kp: float, ki: float, kd: float) -> None:
+    def seed_learned_pid(self, kp: float, ki: float, kd: float, clear_overrides: bool = True) -> None:
         """Seed learned/baseline PID values and switch tuner to completed Auto EMA mode."""
         self._learned_kp = float(kp)
         self._learned_ki = float(ki)
         self._learned_kd = float(kd)
+        self._seeded_pi_only = (float(kd) == 0.0)
         self._baseline_kp = float(kp)
         self._baseline_ki = float(ki)
         self._baseline_kd = float(kd)
@@ -204,15 +217,16 @@ class PassiveAutotuneObserver:
         while len(self.completed_cycles) < self.required_cycles:
             self.completed_cycles.append(
                 {
-                    "kp": float(kp),
-                    "ki": float(ki),
-                    "kd": float(kd),
+                    "Kp": float(kp),
+                    "Ki": float(ki),
+                    "Kd": float(kd),
                     "seeded": True,
                 }
             )
         if self.last_weekly_update <= 0.0:
             self.last_weekly_update = time.time()
-        self.manual_overrides.clear()
+        if clear_overrides:
+            self.manual_overrides.clear()
         self._sync_effective_pid()
         self.needs_save = True
 
@@ -295,6 +309,7 @@ class PassiveAutotuneObserver:
         self._learned_kp = 0.0
         self._learned_ki = 0.0
         self._learned_kd = 0.0
+        self._seeded_pi_only = False
         if not keep_manual_overrides:
             self.manual_overrides.clear()
         self._sync_effective_pid()
@@ -428,6 +443,7 @@ class PassiveAutotuneObserver:
             t0 = (max_slope_temp - start_temp) / max_slope + max_slope_t
         else:
             t0 = (start_temp - max_slope_temp) / max_slope + max_slope_t
+        t0 = min(t0, max_slope_t)
         L = t0 - start_time
 
         if L < 60.0:
@@ -604,7 +620,9 @@ class PassiveAutotuneObserver:
             ):
                 prev = getattr(self, attr)
                 baseline = getattr(self, baseline_attr, 0.0)
-                if prev > 0.0:
+                if attr == "_learned_kd" and prev == 0.0 and self._seeded_pi_only:
+                    new_val = 0.0
+                elif prev > 0.0:
                     ema = (1.0 - self.WEEKLY_EMA_ALPHA) * prev + self.WEEKLY_EMA_ALPHA * target
                     min_allowed = prev * (1.0 - self.WEEKLY_MAX_STEP_PCT)
                     max_allowed = prev * (1.0 + self.WEEKLY_MAX_STEP_PCT)
@@ -612,7 +630,13 @@ class PassiveAutotuneObserver:
                 else:
                     new_val = target
                 if attr == "_learned_kp":
-                    new_val = min(max(new_val, 10.0), 500.0)
+                    if baseline > 0.0:
+                        kp_floor = max(0.1, min(10.0, 0.5 * baseline))
+                    elif prev > 0.0:
+                        kp_floor = max(0.1, min(10.0, 0.5 * prev))
+                    else:
+                        kp_floor = 10.0
+                    new_val = min(max(new_val, kp_floor), 500.0)
                 if baseline > 0.0:
                     new_val = min(max(new_val, 0.5 * baseline), 2.0 * baseline)
                 setattr(self, attr, new_val)
@@ -636,13 +660,14 @@ class PassiveAutotuneObserver:
         if not self.completed_cycles:
             return
 
-        avg_kp = sum(c["Kp"] for c in self.completed_cycles) / len(self.completed_cycles)
-        avg_ki = sum(c["Ki"] for c in self.completed_cycles) / len(self.completed_cycles)
-        avg_kd = sum(c["Kd"] for c in self.completed_cycles) / len(self.completed_cycles)
+        avg_kp = sum(c.get("Kp", c.get("kp", 0.0)) for c in self.completed_cycles) / len(self.completed_cycles)
+        avg_ki = sum(c.get("Ki", c.get("ki", 0.0)) for c in self.completed_cycles) / len(self.completed_cycles)
+        avg_kd = sum(c.get("Kd", c.get("kd", 0.0)) for c in self.completed_cycles) / len(self.completed_cycles)
 
         self._learned_kp = avg_kp
         self._learned_ki = avg_ki
         self._learned_kd = avg_kd
+        self._seeded_pi_only = False
         if self._baseline_kp == 0.0:
             self._baseline_kp = avg_kp
             self._baseline_ki = avg_ki
@@ -801,14 +826,17 @@ class PIDAutotune:
             self._sampletime = sum(self._sample_time_calc[5::]) / len(self._sample_time_calc[5::])
             if self._sampletime <= 0:
                 return False
+            buf_len = max(3, round(self._lookback / self._sampletime))
             self._setpoint = set_point
-            self._inputs = deque(maxlen=round(self._lookback / self._sampletime))
-            self._inputs_timestamps = deque(maxlen=round(self._lookback / self._sampletime))
+            self._inputs = deque(maxlen=buf_len)
+            self._inputs_timestamps = deque(maxlen=buf_len)
 
         if self._state in [PIDAutotune.STATE_OFF, PIDAutotune.STATE_SUCCEEDED,
                            PIDAutotune.STATE_FAILED]:
             self._initTuner(input_val, now)
-        elif (now - self._last_run_timestamp) < self._sampletime - 0.90:  # keep a 10% margin
+            if self._setpoint is None:
+                self._setpoint = set_point
+        elif (now - self._last_run_timestamp) < self._sampletime * 0.90:  # keep a 10% margin
             return False
 
         # check input and change relay state if necessary
@@ -833,20 +861,12 @@ class PIDAutotune:
         self._output = min(self._output, self._out_max)
         self._output = max(self._output, self._out_min)
 
-        # identify peaks
-        is_max = True
-        is_min = True
-
-        for val in self._inputs:
-            is_max = is_max and (input_val >= val)
-            is_min = is_min and (input_val <= val)
-
         self._inputs.append(input_val)
         self._inputs_timestamps.append(now)
         self._last_run_timestamp = now
 
         # we don't want to trust the maxes or mins until the input array is full
-        if len(self._inputs) < self._inputs.maxlen:
+        if self._inputs.maxlen is not None and len(self._inputs) < self._inputs.maxlen:
             return False
 
         return self.analysis()
@@ -859,94 +879,93 @@ class PIDAutotune:
         self._Ku = 0
         self._Pu = 0
         self._inputs.clear()
+        self._inputs_timestamps.clear()
         self._peaks.clear()
         self._peak_timestamps.clear()
         self._state = PIDAutotune.STATE_RELAY_STEP_UP
 
     def analysis(self):
-        self._peak_count = 0
-        self._peak_type = 0
-        self._peaks.clear()
-        self._peak_timestamps.clear()
-        for index in range(self._inputs.maxlen):
-            input_val = self._inputs[index]
-            now = self._inputs_timestamps[index]
-            # identify peaks
-            is_max = True
-            is_min = True
+        if not self._inputs:
+            return False
 
-            for val in self._inputs:
-                is_max = is_max and (input_val >= val)
-                is_min = is_min and (input_val <= val)
+        input_val = self._inputs[-1]
+        now = self._inputs_timestamps[-1]
 
-            # increment peak count and record peak time for maxima and minima
-            inflection = False
+        # Incrementally classify newest sample against the lookback window
+        is_max = all(input_val >= val for val in self._inputs)
+        is_min = all(input_val <= val for val in self._inputs)
 
-            # peak types:
-            # -1: minimum
-            # +1: maximum
-            if is_max:
-                if self._peak_type == -1:
-                    inflection = True
-                self._peak_type = 1
-            elif is_min:
-                if self._peak_type == 1:
-                    inflection = True
-                self._peak_type = -1
+        inflection = False
+        # peak types: -1 = minimum, +1 = maximum
+        if is_max:
+            if self._peak_type == -1:
+                inflection = True
+            self._peak_type = 1
+        elif is_min:
+            if self._peak_type == 1:
+                inflection = True
+            self._peak_type = -1
 
-            # update peak times and values
-            if inflection:
-                self._peak_count += 1
-                self._peaks.append(input_val)
-                self._peak_timestamps.append(now)
-                _LOGGER.debug('found peak: %.1f', input_val)
-                _LOGGER.debug('peak count: %i', self._peak_count)
+        if inflection:
+            self._peak_count += 1
+            self._peaks.append(input_val)
+            self._peak_timestamps.append(now)
+            _LOGGER.debug('found peak: %.1f', input_val)
+            _LOGGER.debug('peak count: %i', self._peak_count)
+        elif self._peaks:
+            # Refine current crest/trough while still moving in the same extremum direction
+            if self._peak_type == 1 and is_max and input_val >= self._peaks[-1]:
+                self._peaks[-1] = input_val
+                self._peak_timestamps[-1] = now
+            elif self._peak_type == -1 and is_min and input_val <= self._peaks[-1]:
+                self._peaks[-1] = input_val
+                self._peak_timestamps[-1] = now
 
-            # check for convergence of induced oscillation
-            # convergence of amplitude assessed on last 4 peaks (1.5 cycles)
-            self._induced_amplitude = 0
+        # check for convergence of induced oscillation on completed peaks
+        self._induced_amplitude = 0
 
-            if inflection and (self._peak_count > 4):
-                abs_max = self._peaks[-2]
-                abs_min = self._peaks[-2]
-                for i in range(0, len(self._peaks) - 2):
-                    self._induced_amplitude += abs(self._peaks[i] - self._peaks[i+1])
-                    abs_max = max(self._peaks[i], abs_max)
-                    abs_min = min(self._peaks[i], abs_min)
+        if inflection and (self._peak_count > 4) and len(self._peaks) >= 5:
+            abs_max = self._peaks[-2]
+            abs_min = self._peaks[-2]
+            for i in range(0, len(self._peaks) - 2):
+                self._induced_amplitude += abs(self._peaks[i] - self._peaks[i+1])
+                abs_max = max(self._peaks[i], abs_max)
+                abs_min = min(self._peaks[i], abs_min)
 
-                self._induced_amplitude /= 6.0
+            self._induced_amplitude /= 6.0
 
-                # check convergence criterion for amplitude of induced oscillation
-                if self._induced_amplitude < 0.0001:
-                    self._induced_amplitude = 0.0001
-                
-                amplitude_dev = ((0.5 * (abs_max - abs_min) - self._induced_amplitude)
-                                 / self._induced_amplitude)
+            if self._induced_amplitude < 0.0001:
+                self._induced_amplitude = 0.0001
 
-                _LOGGER.debug('amplitude: %.2f', self._induced_amplitude)
-                _LOGGER.debug('amplitude deviation: %.2f', amplitude_dev)
+            amplitude_dev = ((0.5 * (abs_max - abs_min) - self._induced_amplitude)
+                             / self._induced_amplitude)
 
-                if amplitude_dev < PIDAutotune.PEAK_AMPLITUDE_TOLERANCE:
-                    self._state = PIDAutotune.STATE_SUCCEEDED
+            _LOGGER.debug('amplitude: %.2f', self._induced_amplitude)
+            _LOGGER.debug('amplitude deviation: %.2f', amplitude_dev)
 
-            # if the autotune has not already converged
-            # terminate after 10 cycles
-            if self._peak_count >= 20:
-                self._output = 0
-                self._state = PIDAutotune.STATE_FAILED
-                return True
+            if amplitude_dev < PIDAutotune.PEAK_AMPLITUDE_TOLERANCE:
+                self._state = PIDAutotune.STATE_SUCCEEDED
 
-            if self._state == PIDAutotune.STATE_SUCCEEDED:
-                self._output = 0
+        # terminate after 10 cycles if not converged
+        if self._peak_count >= 20:
+            self._output = 0
+            self._state = PIDAutotune.STATE_FAILED
+            return True
 
-                # calculate ultimate gain
-                self._Ku = 4.0 * self._outputstep / (self._induced_amplitude * math.pi)
+        if self._state == PIDAutotune.STATE_SUCCEEDED:
+            self._output = 0
 
-                # calculate ultimate period in seconds
-                period1 = self._peak_timestamps[3] - self._peak_timestamps[1]
-                period2 = self._peak_timestamps[4] - self._peak_timestamps[2]
-                self._Pu = 0.5 * (period1 + period2)
-                return True
+            # Effective half-amplitude of relay output (handles asymmetrical out_min/out_max clamping)
+            step_high = min(self._out_max, max(self._out_min, self._initial_output + self._outputstep))
+            step_low = min(self._out_max, max(self._out_min, self._initial_output - self._outputstep))
+            effective_step = max(1e-6, 0.5 * (step_high - step_low))
+            self._Ku = 4.0 * effective_step / (self._induced_amplitude * math.pi)
+
+            # Calculate ultimate period in seconds across the 4 finalized peaks
+            period1 = self._peak_timestamps[2] - self._peak_timestamps[0]
+            period2 = self._peak_timestamps[3] - self._peak_timestamps[1]
+            self._Pu = 0.5 * (period1 + period2)
+            return True
         return False
 
 

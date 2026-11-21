@@ -46,27 +46,32 @@ class ScheduleSlotEngine:
         self, block: dict[str, Any], ref_date: datetime
     ) -> tuple[datetime, datetime]:
         """Convert block start/end strings to datetime objects relative to ref_date."""
-        start_str = str(block.get("start", "00:00")).strip()
-        end_str = str(block.get("end", "24:00")).strip()
+        day_start = ref_date.replace(hour=0, minute=0, second=0, microsecond=0)
+        try:
+            start_str = str(block.get("start", "00:00")).strip()
+            end_str = str(block.get("end", "24:00")).strip()
 
-        sh, sm = map(int, start_str.split(":"))
-        start_dt = ref_date.replace(hour=sh, minute=sm, second=0, microsecond=0)
+            s_parts = start_str.split(":")
+            sh, sm = int(s_parts[0]), int(s_parts[1])
+            ss = int(s_parts[2]) if len(s_parts) >= 3 else 0
+            start_dt = ref_date.replace(hour=sh, minute=sm, second=ss, microsecond=0)
 
-        if end_str in ("24:00", "00:00") and start_str != "00:00":
-            end_dt = (ref_date + timedelta(days=1)).replace(
-                hour=0, minute=0, second=0, microsecond=0
-            )
-        elif end_str == "24:00":
-            end_dt = (ref_date + timedelta(days=1)).replace(
-                hour=0, minute=0, second=0, microsecond=0
-            )
-        else:
-            eh, em = map(int, end_str.split(":"))
-            end_dt = ref_date.replace(hour=eh, minute=em, second=0, microsecond=0)
-            if end_dt <= start_dt:
-                end_dt += timedelta(days=1)
+            if end_str in ("24:00", "24:00:00") or (end_str in ("00:00", "00:00:00") and start_str not in ("00:00", "00:00:00")):
+                end_dt = (ref_date + timedelta(days=1)).replace(
+                    hour=0, minute=0, second=0, microsecond=0
+                )
+            else:
+                e_parts = end_str.split(":")
+                eh, em = int(e_parts[0]), int(e_parts[1])
+                es = int(e_parts[2]) if len(e_parts) >= 3 else 0
+                end_dt = ref_date.replace(hour=eh, minute=em, second=es, microsecond=0)
+                if end_dt <= start_dt:
+                    end_dt += timedelta(days=1)
 
-        return start_dt, end_dt
+            return start_dt, end_dt
+        except (ValueError, TypeError, IndexError, AttributeError) as err:
+            _LOGGER.warning("Ignoring malformed schedule block %s: %s", block, err)
+            return day_start, day_start
 
     def evaluate_zone_slot(
         self, profile: dict[str, Any], climate_id: str, now: datetime

@@ -1071,7 +1071,7 @@ class MultizoneThermostatDialCard extends HTMLElement {
       <ha-card>
         <div class="min-left">
           <ha-icon icon="mdi:snowflake-off" style="--mdc-icon-size: 18px; color: #64748b;"></ha-icon>
-          <span style="font-weight: 600;">${title}</span>
+          <span style="font-weight: 600;">${escapeHtml(title)}</span>
           <span class="min-tag">${getTranslation(this._hass, 'winter_only') || 'Solo Inverno'}</span>
         </div>
         <div class="min-temp">${curStr}</div>

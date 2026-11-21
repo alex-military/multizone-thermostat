@@ -86,8 +86,9 @@ class MultizoneResetAutotuneButton(ButtonEntity):
 
     async def async_press(self) -> None:
         """Reset autotuner cycles and learned gains for this zone."""
-        if hasattr(self._coordinator, "zone_controller"):
-            await self._coordinator.zone_controller.async_reset_zone_autotuner(self._climate_id)
+        zc = getattr(self._coordinator, "zone_controller", None)
+        if zc is not None:
+            await zc.async_reset_zone_autotuner(self._climate_id)
         if hasattr(self._coordinator, "async_set_pid_manual_unlock"):
             await self._coordinator.async_set_pid_manual_unlock(self._zone_name, False)
         if hasattr(self._coordinator, "async_notify_pid_entities"):

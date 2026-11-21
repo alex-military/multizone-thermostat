@@ -28,7 +28,11 @@ class MultizoneThermostatPlantCard extends HTMLElement {
   render() {
     const style = document.createElement('style');
     style.textContent = `
+      :host {
+        display: block;
+      }
       ha-card {
+        display: block;
         background: var(--ha-card-background, var(--card-background-color, rgba(30, 41, 59, 0.7)));
         backdrop-filter: blur(12px);
         -webkit-backdrop-filter: blur(12px);
@@ -256,24 +260,24 @@ class MultizoneThermostatPlantCard extends HTMLElement {
         </div>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(75px, 1fr)); gap: 10px;">
           <div>
-            <div style="font-size: 11px; color: var(--secondary-text-color, #94a3b8);">${t('ot_pressure')}</div>
+            <div style="font-size: 11px; color: var(--secondary-text-color, #94a3b8);" id="ot-pressure-label">${t('ot_pressure')}</div>
             <div style="font-size: 16px; font-weight: 800;" id="ot-pressure-val">-- bar</div>
           </div>
           <div>
-            <div style="font-size: 11px; color: var(--secondary-text-color, #94a3b8);">${t('ot_flow_temp')}</div>
+            <div style="font-size: 11px; color: var(--secondary-text-color, #94a3b8);" id="ot-flow-label">${t('ot_flow_temp')}</div>
             <div style="font-size: 16px; font-weight: 800;" id="ot-flow-val">--°C</div>
           </div>
           <div>
-            <div style="font-size: 11px; color: var(--secondary-text-color, #94a3b8);">${t('ot_return_temp')}</div>
+            <div style="font-size: 11px; color: var(--secondary-text-color, #94a3b8);" id="ot-return-label">${t('ot_return_temp')}</div>
             <div style="font-size: 16px; font-weight: 800;" id="ot-return-val">--°C</div>
             <div style="font-size: 10px; font-weight: 600;" id="ot-condense-eval"></div>
           </div>
           <div>
-            <div style="font-size: 11px; color: var(--secondary-text-color, #94a3b8);">${t('ot_modulation')}</div>
+            <div style="font-size: 11px; color: var(--secondary-text-color, #94a3b8);" id="ot-mod-label">${t('ot_modulation')}</div>
             <div style="font-size: 16px; font-weight: 800;" id="ot-mod-val">--%</div>
           </div>
           <div>
-            <div style="font-size: 11px; color: var(--secondary-text-color, #94a3b8);">${t('ot_flame_status')}</div>
+            <div style="font-size: 11px; color: var(--secondary-text-color, #94a3b8);" id="ot-flame-label">${t('ot_flame_status')}</div>
             <div style="font-size: 14px; font-weight: 700;" id="ot-flame-val">${t('ot_flame_off')}</div>
           </div>
         </div>
@@ -299,6 +303,26 @@ class MultizoneThermostatPlantCard extends HTMLElement {
 
     try {
       const t = (k) => getTranslation(this._hass, k);
+      const labelMap = {
+        'plant-title': 'plant_health_title',
+        'plant-sub': 'plant_health_sub',
+        'cycles-label': 'cycles_label',
+        'cycles-unit': 'cycles_unit',
+        'runtime-label': 'runtime_24h',
+        'runtime-unit': 'hours',
+        'runtime-sub': 'runtime_sub',
+        'ot-telemetry-title': 'ot_telemetry',
+        'ot-pressure-label': 'ot_pressure',
+        'ot-flow-label': 'ot_flow_temp',
+        'ot-return-label': 'ot_return_temp',
+        'ot-mod-label': 'ot_modulation',
+        'ot-flame-label': 'ot_flame_status',
+        'alert-title-text': 'all_circuits_ok',
+      };
+      for (const [elId, tKey] of Object.entries(labelMap)) {
+        const lblEl = this.shadowRoot.getElementById(elId);
+        if (lblEl) lblEl.innerText = t(tKey);
+      }
       let healthEntity = this._config.health_entity;
       let cyclesEntity = this._config.cycles_entity;
       let runtimeEntity = this._config.runtime_entity;
@@ -406,7 +430,7 @@ class MultizoneThermostatPlantCard extends HTMLElement {
         const hasAnomaly = anomalyState ? anomalyState.state === "on" : (!isHealthUnavailable && !isOptimal);
         if (hasAnomaly && healthState && healthState.attributes && healthState.attributes.anomalies && healthState.attributes.anomalies.length > 0) {
           alertBox.className = "alert-box alert-err";
-          const items = healthState.attributes.anomalies.map(a => `• <b>${a.zone}</b>: ${a.description}`).join('<br>');
+          const items = healthState.attributes.anomalies.map(a => `• <b>${escapeHtml(a.zone)}</b>: ${escapeHtml(a.description)}`).join('<br>');
           alertDesc.innerHTML = items;
         } else if (isWarning) {
           alertBox.className = "alert-box alert-err";
@@ -446,7 +470,8 @@ class MultizoneThermostatPlantCard extends HTMLElement {
                           (ot.flow_temp !== undefined && ot.flow_temp !== null ? ot.flow_temp : ot.water_flow_temperature);
           if (flowVal !== null && flowVal !== undefined && flowVal !== "") {
             const num = parseFloat(flowVal);
-            const displayVal = !isNaN(num) ? (Number.isInteger(num) ? num : num.toFixed(1)) : flowVal;
+            const conv = !isNaN(num) ? celsiusToDisplay(num, this._hass) : NaN;
+            const displayVal = !isNaN(conv) ? (Number.isInteger(conv) ? conv : conv.toFixed(1)) : escapeHtml(flowVal);
             otFlow.innerText = `${displayVal}${getTempUnit(this._hass)}`;
           } else {
             otFlow.innerText = '--' + getTempUnit(this._hass);
@@ -455,7 +480,10 @@ class MultizoneThermostatPlantCard extends HTMLElement {
 
         if (otReturn) {
           if (ot.return_temperature !== null && ot.return_temperature !== undefined) {
-            otReturn.innerText = `${ot.return_temperature}${getTempUnit(this._hass)}`;
+            const rNum = parseFloat(ot.return_temperature);
+            const rConv = !isNaN(rNum) ? celsiusToDisplay(rNum, this._hass) : NaN;
+            const rDisplay = !isNaN(rConv) ? (Number.isInteger(rConv) ? rConv : rConv.toFixed(1)) : ot.return_temperature;
+            otReturn.innerText = `${rDisplay}${getTempUnit(this._hass)}`;
             if (otCondense) {
               if (ot.condensing_optimal) {
                 otCondense.innerText = t('ot_condensing_ok');

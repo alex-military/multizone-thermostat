@@ -1,5 +1,19 @@
 # Changelog
 
+## [6.1.0-beta.17] - 2026-11-21
+### TRV Architecture, PID Baseline Seeding, 360° Audit Hardening & UI Fixes
+- **TRV Architecture (Phases 1–3, GitHub Discussion #13):**
+  - Native `external_temperature_input` feed (`auto` / `offset` / `external` calibration modes), 20-minute anti-offline heartbeat + 60s rate limit, and automatic `temperature_sensor_select` fallback (`remote` <-> `local`).
+  - `demand_driven` TRV Control Mode with Smart Bounded Overdrive (`trv_open_boost`), limited idle closing (`trv_close_offset`), idle anti-chatter guard, and automatic revert to `standard` mode under `safety_fallback_active`.
+  - Unified cold-start hydraulic valve readiness guard (`HOLD_TRV_CLOSED`, 120s max wait across Relay, OpenTherm, and Heat Pump backends) plus `trv_not_opening` active anomaly detection and updated EN/IT documentation.
+- **PID Autotuner & Seed Baseline (`@serv2002` Post #54):** Added a `"Baseline Auto EMA"` tab with scaling notes (`0–100%`, `dt` in seconds) in the Diagnostics card PID modal, pure-PI (`Kd = 0.0`) preservation across weekly EMA updates (`_seeded_pi_only`), low-`Kp` clamp floor fix, and partial-seed override handling.
+- **360° Audit Sprints 1–3 Hardening:**
+  - Plant & generator safety, anti-seize, PID/autotune, calendar, startup select restore, energy/solar, scheduler, PWM, frost protection (`to_celsius`), and watchdog (`datetime` naive/`1e9`) fixes.
+  - Full Fahrenheit (`°C <-> °F`) end-to-end conversions across orchestrator proactive refresh, OpenTherm diagnostics (plus `kPa`/`psi` -> `bar` pressure normalization and atmospheric pressure filtering), services, thermal rate/inertia sensors, and Lovelace cards.
+  - Alias-safe `resolve_zone_id()` lookups, `TURN_ON`/`TURN_OFF` climate entity features, `COOL` `hvac_action` accuracy, `window_close` restore keeping zones `OFF` when `was_off=True`, non-blocking file checks & listener teardown, `CONF_ZONE_HUMIDITY_SENSOR` config/options persistence with `_save_options` clearing stale `options={}`, Voluptuous validation schemas on all 11 services (including `lock_parameter: "all"`), and 100% key parity (338 keys) across all 6 translations.
+- **Frontend Security & UI Polish (`@serv2002` Post #52):** Added `escapeHtml()` DOM XSS sanitization, °F preset/rate/override conversions, `"null°C"` guard, timer/`keydown` cleanup, `ha-card { display: block; }` removing left-side pill CSS artifacts in Diagnostics, dynamic Home Assistant language re-localization (including Russian `"Отмена"`), and synchronized Lovelace + simulator bundles.
+- **Simulation & Chaos Verification (Sprint 4):** Hardened `tests/sim/` (`OpenThermBoilerBackend` closed-loop actuation, frozen sensor dropouts, mid-cycle HA restart PID/state assertion, residual radiator inertia, entity-specific °F and overheating oracles), verified across 485 tests locally & remotely and a 140-day / 201,600-step chaos campaign (0 violations, 4/4 mutation checks).
+
 ## [6.1.0-beta.9] - 2026-11-16
 ### Bug Fixes & Full Pre-Release Hardening
 - **Anti-Seize (`safety/anti_seize.py`):** Fixed `AttributeError` when `anti_seize_boiler=True` by invoking `boiler_backend` / `heat_pump_backend` directly instead of non-existent `PlantOrchestrator.async_update()` / `async_emergency_off()`.

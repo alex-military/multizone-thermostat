@@ -25,7 +25,7 @@ Queste entità coordinano lo stato globale dell'abitazione, i parametri di sicur
 | `number.master_control_min_cycle_off` | Number | 1 – 30 min (default: 5) | Durata minima di riposo della caldaia prima di una riaccensione. |
 | `number.master_control_hp_min_cycle_on` | Number | 1 – 30 min | <span class="badge-beta">BETA</span> Durata minima di marcia continua del compressore della Pompa di Calore. |
 | `number.master_control_hp_min_cycle_off` | Number | 1 – 30 min | <span class="badge-beta">BETA</span> Durata minima di riposo del compressore della Pompa di Calore. |
-| `number.master_control_valve_delay` | Number | 0 – 300 sec (default: 0) | Ritardo avvio circolatore per attendere la completa apertura meccanica delle valvole. |
+| `number.master_control_valve_delay` | Number | 0 – 300 sec (default: 0) | Ritardo avvio circolatore per attendere la completa apertura meccanica delle valvole (eseguito dopo la guardia automatica TRV `HOLD_TRV_CLOSED` fino a 120 s). |
 | `number.master_control_anti_seize_idle_days` | Number | 1 – 60 giorni (default: 15) | Giorni di inattività prima di avviare il ciclo anti-bloccaggio estivo. |
 | `number.master_control_anti_seize_duration` | Number | 1 – 15 min (default: 2) | Durata in minuti dell'apertura completa delle valvole durante l'anti-seize. |
 | `number.master_control_weather_curve` | Number | 0.0 – 3.0 (default: 0.0) | Coefficiente moltiplicatore della curva climatica esterna (feed-forward). |
@@ -45,7 +45,7 @@ Tutte le entità di stanza sono raggruppate sotto il dispositivo Home Assistant 
 
 | Entity ID (Esempio per "Salone") | Dominio / Categoria | Tipo / Valori | Descrizione |
 |---|---|---|---|
-| `climate.multizone_thermostat_salone` | Climate (Controllo) | hvac_modes, setpoint, presets | **Termostato Principale di Stanza**: regola temperatura, modalità HVAC e visualizza lo stato. |
+| `climate.multizone_thermostat_salone` | Climate (Controllo) | hvac_modes, setpoint, presets | **Termostato Principale di Stanza**: regola temperatura, modalità HVAC ed espone gli attributi TRV (`trv_calibration_mode`, `trv_sensor_selects`, `trv_control_mode`, `trv_open_boost`, `trv_close_offset`, `trv_demand_valve_open`). |
 | `select.zone_modes_salone_mode` | Select (Controllo) | `primary`, `secondary`, `bypass` | **Ruolo Termico della Stanza**: determina se la stanza comanda l'accensione della caldaia. |
 | `switch.salone_pid_manual_unlock` | Switch (Config) | `on` / `off` | Sblocca la modifica manuale dei parametri PID stagionali (`Kp`, `Ki`, `Kd`). Bloccato di default. |
 | `number.salone_pid_kp` / `ki` / `kd` | Number (Config) | float | Guadagni PID stagionali della stanza per la stagione attiva (`heat` o `cool`). |
@@ -60,7 +60,7 @@ Tutte le entità di stanza sono raggruppate sotto il dispositivo Home Assistant 
 | `sensor.multizone_brain_salone_classe_energetica` | Sensor (Diagnostica) | A4, A, B, C, D, E, F, G | Classe energetica stimata dell'involucro edilizio della stanza. |
 | `sensor.multizone_brain_salone_tempo_ritenzione_termica` | Sensor (Diagnostica) | ore | Ore necessarie all'ambiente per perdere $1.0^\circ\text{C}$ in assenza di riscaldamento. |
 | `sensor.multizone_brain_salone_dimensionamento_radiatore`| Sensor (Diagnostica) | Sottodimensionato, Ottimale, Sovradimensionato | Valutazione quantitativa della potenza dei corpi scaldanti rispetto al volume della stanza. |
-| `binary_sensor.heating_zones_salone_anomaly` | Binary Sensor (Diagnostica) | `on` / `off` | Segnala anomalie idrauliche locali (valvola bloccata, trafilamento di calore o perdita sensore). |
+| `binary_sensor.heating_zones_salone_anomaly` | Binary Sensor (Diagnostica) | `on` / `off` | Segnala anomalie idrauliche locali (`valve_stuck_closed`, avviso non bloccante `trv_not_opening`, trafilamento di calore o perdita sensore). |
 
 ---
 
@@ -166,6 +166,8 @@ data:
 
 ### `multizone_thermostat.set_pid_parameters`
 Imposta manualmente i guadagni PID stagionali (`kp`, `ki`, `kd`) per una o più zone, specificando opzionalmente la stagione (`heat` o `cool`) o il seeding della baseline Auto EMA (`seed_autotuner`):
+
+> **Scala PID:** I guadagni lavorano su uscita `0–100%` e `dt` in secondi (es. `kp: 100.0` equivale al `100%` di domanda per `1 °C` di errore). Impostando `kd: 0.0` con `seed_autotuner: true` si mantiene il controllo PI puro: il raffinamento settimanale EMA preserva `Kd = 0.0`.
 
 ```yaml
 service: multizone_thermostat.set_pid_parameters

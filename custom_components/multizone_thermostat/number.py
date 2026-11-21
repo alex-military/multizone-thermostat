@@ -6,9 +6,14 @@ import logging
 from typing import Any
 
 try:
-    from homeassistant.components.number import NumberEntity, NumberMode, RestoreNumber
+    from homeassistant.components.number import NumberDeviceClass, NumberEntity, NumberMode, RestoreNumber
 except ImportError:
     from homeassistant.components.number import NumberEntity
+
+    class NumberDeviceClass:  # type: ignore[no-redef]
+        """Fallback NumberDeviceClass for minimal test stubs."""
+
+        TEMPERATURE = "temperature"
 
     class NumberMode:  # type: ignore[no-redef]
         """Fallback NumberMode for minimal test stubs."""
@@ -21,7 +26,7 @@ except ImportError:
         pass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory, UnitOfTemperature
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -53,6 +58,7 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+_NUMBER_TEMP_CLASS = getattr(NumberDeviceClass, "TEMPERATURE", "temperature")
 
 
 async def async_setup_entry(
@@ -73,6 +79,15 @@ async def async_setup_entry(
 
     device_info = _make_device_info()
 
+    def _num_or_default(val: Any, default_val: float) -> float:
+        if isinstance(val, (int, float)) and not isinstance(val, bool):
+            return float(val)
+        return float(default_val)
+
+    init_min_on = _num_or_default(getattr(coordinator, "_min_cycle_on", None), DEFAULT_MIN_CYCLE_ON)
+    init_min_off = _num_or_default(getattr(coordinator, "_min_cycle_off", None), DEFAULT_MIN_CYCLE_OFF)
+    init_valve_delay = _num_or_default(getattr(coordinator, "_valve_delay", None), DEFAULT_VALVE_DELAY)
+
     entities = [
         MultizoneProtectionNumber(
             coordinator=coordinator,
@@ -84,7 +99,7 @@ async def async_setup_entry(
             step=1,
             unit_of_measurement="min",
             icon="mdi:timer-sand",
-            default_val=DEFAULT_MIN_CYCLE_ON,
+            default_val=init_min_on,
             device_info=device_info,
         ),
         MultizoneProtectionNumber(
@@ -97,7 +112,7 @@ async def async_setup_entry(
             step=1,
             unit_of_measurement="min",
             icon="mdi:timer-sand-empty",
-            default_val=DEFAULT_MIN_CYCLE_OFF,
+            default_val=init_min_off,
             device_info=device_info,
         ),
         MultizoneProtectionNumber(
@@ -110,7 +125,7 @@ async def async_setup_entry(
             step=1,
             unit_of_measurement="s",
             icon="mdi:valve",
-            default_val=DEFAULT_VALVE_DELAY,
+            default_val=init_valve_delay,
             device_info=device_info,
         ),
         MultizonePersistentNumber(
@@ -164,6 +179,7 @@ async def async_setup_entry(
             icon="mdi:snowflake-thermometer",
             default_val=DEFAULT_FROST_PROTECTION_TEMP,
             device_info=device_info,
+            device_class=_NUMBER_TEMP_CLASS,
         ),
     ]
 
@@ -182,6 +198,7 @@ async def async_setup_entry(
                 icon="mdi:snowflake-thermometer",
                 default_val=DEFAULT_FROST_FLOW_TEMP,
                 device_info=device_info,
+                device_class=_NUMBER_TEMP_CLASS,
             )
         )
 
@@ -261,6 +278,7 @@ class MultizoneProtectionNumber(RestoreNumber):
         icon: str,
         default_val: float,
         device_info: DeviceInfo,
+        device_class: Any = None,
     ) -> None:
         """Initialize the number entity."""
         self._coordinator = coordinator
@@ -273,6 +291,8 @@ class MultizoneProtectionNumber(RestoreNumber):
         self._attr_native_max_value = max_value
         self._attr_native_step = step
         self._attr_native_unit_of_measurement = unit_of_measurement
+        if device_class is not None:
+            self._attr_device_class = device_class
         self._attr_icon = icon
         self._attr_device_info = device_info
 
@@ -331,6 +351,7 @@ class MultizonePersistentNumber(NumberEntity):
         icon: str,
         default_val: float,
         device_info: DeviceInfo,
+        device_class: Any = None,
     ) -> None:
         """Initialize the number entity."""
         self._coordinator = coordinator
@@ -343,6 +364,8 @@ class MultizonePersistentNumber(NumberEntity):
         self._attr_native_max_value = max_value
         self._attr_native_step = step
         self._attr_native_unit_of_measurement = unit_of_measurement
+        if device_class is not None:
+            self._attr_device_class = device_class
         self._attr_icon = icon
         self._attr_device_info = device_info
 
@@ -403,7 +426,7 @@ MultizoneParameterNumber = MultizonePersistentNumber
 
 PID_PARAM_SPECS: tuple[tuple[str, float, float, float, int], ...] = (
     ("Kp", 0.1, 500.0, 0.1, 2),
-    ("Ki", 0.0, 1.0, 0.0001, 4),
+    ("Ki", 0.0, 10.0, 0.0001, 4),
     ("Kd", 0.0, 50000.0, 1.0, 2),
 )
 
@@ -469,11 +492,17 @@ class MultizoneZonePIDNumber(NumberEntity):
         return "mdi:pencil-lock"
 
     @property
-    def native_value(self) -> float:
+    def native_value(self) -> float | None:
         tuner = self._get_active_tuner()
         if not tuner:
-            return 0.0
-        return round(float(getattr(tuner, self._attr_lower, 0.0)), self._precision)
+            return None
+        raw_val = getattr(tuner, self._attr_lower, None)
+        if not isinstance(raw_val, (int, float)) or isinstance(raw_val, bool):
+            return None
+        val = float(raw_val)
+        if self._attr_native_min_value is not None and val < float(self._attr_native_min_value):
+            return None
+        return round(val, self._precision)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -481,7 +510,12 @@ class MultizoneZonePIDNumber(NumberEntity):
         unlocked = bool(self._coordinator.get_pid_manual_unlock(self._zone_name))
         overrides = getattr(tuner, "manual_overrides", {}) or {} if tuner else {}
         learned_attr = f"_learned_{self._attr_lower}"
-        learned_val = round(float(getattr(tuner, learned_attr, 0.0)), self._precision) if tuner else 0.0
+        raw_learned = getattr(tuner, learned_attr, None) if tuner else None
+        learned_val = (
+            round(float(raw_learned), self._precision)
+            if isinstance(raw_learned, (int, float)) and not isinstance(raw_learned, bool)
+            else 0.0
+        )
         return {
             "target_climate_entity": self._climate_id,
             "multizone_type": "pid_parameter",
@@ -502,6 +536,7 @@ class MultizoneZonePIDNumber(NumberEntity):
                 lambda: self._coordinator.unregister_pid_listener(self._on_pid_change)
             )
 
+    @callback
     def _on_pid_change(self) -> None:
         self.async_write_ha_state()
 

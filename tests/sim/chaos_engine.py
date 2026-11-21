@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
 import math
 import pathlib
 import random
@@ -87,10 +88,15 @@ class ChaosReport:
     setpoint_changes: int = 0
     frost_activations: int = 0
     restart_events: int = 0
+    restart_verified: bool = False
     outbound_temp_commands: int = 0
+    ot_boiler_commands: int = 0
+    distinct_boiler_flow_targets: int = 0
+    frozen_dropout_steps: int = 0
     violations: list[str] = field(default_factory=list)
     energy_delivered_wh: float = 0.0
     discomfort_degree_hours: float = 0.0
+    overshoot_degree_hours: float = 0.0
 
 
 async def async_run_chaos_simulation(cfg: ChaosConfig | None = None) -> ChaosReport:
@@ -161,43 +167,51 @@ async def async_run_chaos_simulation(cfg: ChaosConfig | None = None) -> ChaosRep
     coord.storage.async_save_autotuner_states = AsyncMock()
     coord.storage.async_save_thermal_states = AsyncMock()
 
-    zc = ZoneController(hass, coord)
-    if cfg.high_inertia_hysteresis:
-        zc.get_thermal_model(cid_salotto).thermal_inertia = 0.8
-    else:
-        tuner_c = zc.get_autotuner(cid_cucina)
-        tuner_c.state = tuner_c.STATE_COMPLETED
-        zc.get_pid(cid_cucina).set_pid_param(kp=25.0, ki=0.04, kd=0.0)
-        zc.get_thermal_model(cid_cucina).thermal_inertia = 0.3
-
-    ot = OpenThermBoilerBackend(hass, coord, "climate.ot_boiler", 35.0, 75.0)
-    trv_sync = ZoneSyncManager(hass, coord, "Salotto", cid_salotto, ["climate.trv_salotto"], [], {})
-
-    sim = PlantSimulator(
-        rooms=[
-            SimulatedRoom(name="Salotto", current_temp=18.8, target_temp=20.0, thermal_capacity=900.0, heat_loss_coeff=45.0),
-            SimulatedRoom(name="Cucina", current_temp=19.0, target_temp=19.5, thermal_capacity=800.0, heat_loss_coeff=40.0),
-        ],
-        t_out=cfg.weather.outdoor_temp(0.0),
-    )
-
-    targets = {cid_salotto: 20.0, cid_cucina: 19.5}
-    dhw_remaining_s = 0.0
-    dropout_remaining_s = {cid_salotto: 0.0, cid_cucina: 0.0}
-    total_steps = int((cfg.days * 86400.0) / cfg.dt_sec)
-    report = ChaosReport(seed=cfg.seed, steps=total_steps, simulated_hours=(total_steps * cfg.dt_sec) / 3600.0)
-
-    p_dhw = cfg.dhw_prob_per_hour * (cfg.dt_sec / 3600.0)
-    p_drop = cfg.dropout_prob_per_hour * (cfg.dt_sec / 3600.0)
-    p_sp = cfg.setpoint_change_prob_per_hour * (cfg.dt_sec / 3600.0)
-
-    prev_salotto_demand = 0.0
     mono_t = 1000.0
+    sim_start_utc = datetime(2026, 1, 15, 0, 0, 0, tzinfo=timezone.utc)
 
     with patch("time.monotonic", side_effect=lambda: mono_t):
+        zc = ZoneController(hass, coord)
+        if cfg.high_inertia_hysteresis:
+            zc.get_thermal_model(cid_salotto).thermal_inertia = 0.8
+        else:
+            tuner_c = zc.get_autotuner(cid_cucina)
+            tuner_c.seed_learned_pid(25.0, 0.04, 0.0)
+            zc._apply_tuner_pid_to_controller(cid_cucina, mode="heat")
+            zc.get_thermal_model(cid_cucina).thermal_inertia = 0.3
+
+        ot = OpenThermBoilerBackend(hass, coord, "climate.ot_boiler", 35.0, 75.0)
+        trv_sync = ZoneSyncManager(hass, coord, "Salotto", cid_salotto, ["climate.trv_salotto"], [], {})
+
+        sim = PlantSimulator(
+            rooms=[
+                SimulatedRoom(name="Salotto", current_temp=18.8, target_temp=20.0, thermal_capacity=900.0, heat_loss_coeff=45.0),
+                SimulatedRoom(name="Cucina", current_temp=19.0, target_temp=19.5, thermal_capacity=800.0, heat_loss_coeff=40.0),
+            ],
+            t_out=cfg.weather.outdoor_temp(0.0),
+        )
+
+        targets = {cid_salotto: 20.0, cid_cucina: 19.5}
+        last_sensed_c = {
+            cid_salotto: sim.rooms["Salotto"].current_temp,
+            cid_cucina: sim.rooms["Cucina"].current_temp,
+        }
+        dhw_remaining_s = 0.0
+        dropout_remaining_s = {cid_salotto: 0.0, cid_cucina: 0.0}
+        total_steps = int((cfg.days * 86400.0) / cfg.dt_sec)
+        report = ChaosReport(seed=cfg.seed, steps=total_steps, simulated_hours=(total_steps * cfg.dt_sec) / 3600.0)
+
+        p_dhw = cfg.dhw_prob_per_hour * (cfg.dt_sec / 3600.0)
+        p_drop = cfg.dropout_prob_per_hour * (cfg.dt_sec / 3600.0)
+        p_sp = cfg.setpoint_change_prob_per_hour * (cfg.dt_sec / 3600.0)
+
+        prev_salotto_demand = 0.0
+        seen_boiler_flows: set[float] = set()
+
         for step in range(total_steps):
             t_sec = step * cfg.dt_sec
             mono_t = 1000.0 + t_sec
+            step_utc = sim_start_utc + timedelta(seconds=t_sec)
             t_out = cfg.weather.outdoor_temp(t_sec)
             sim.t_out = t_out
 
@@ -228,6 +242,9 @@ async def async_run_chaos_simulation(cfg: ChaosConfig | None = None) -> ChaosRep
 
             # Simulated Home Assistant mid-cycle restart
             if cfg.mid_cycle_restart_step is not None and step == cfg.mid_cycle_restart_step:
+                pre_tuner_c = zc.get_autotuner(cid_cucina, "heat")
+                pre_c_state = pre_tuner_c.state
+                pre_c_gains = (pre_tuner_c.kp, pre_tuner_c.ki, pre_tuner_c.kd)
                 at_dump = {
                     "heat": {cid: zc.get_autotuner(cid, "heat").dump_state() for cid in zone_ids},
                     "cool": {cid: zc.get_autotuner(cid, "cool").dump_state() for cid in zone_ids},
@@ -235,6 +252,28 @@ async def async_run_chaos_simulation(cfg: ChaosConfig | None = None) -> ChaosRep
                 tm_dump = {cid: zc.get_thermal_model(cid).dump_state() for cid in zone_ids}
                 zc = ZoneController(hass, coord)
                 zc.load_state(at_dump, tm_dump)
+                post_tuner_c = zc.get_autotuner(cid_cucina, "heat")
+                post_pid_c = zc.get_pid(cid_cucina, "heat")
+                if not cfg.high_inertia_hysteresis:
+                    gains_ok = (
+                        pre_c_state == post_tuner_c.STATE_COMPLETED
+                        and post_tuner_c.state == post_tuner_c.STATE_COMPLETED
+                        and post_tuner_c.kp > 0.0
+                        and math.isclose(post_tuner_c.kp, pre_c_gains[0], abs_tol=1e-6)
+                        and math.isclose(post_tuner_c.ki, pre_c_gains[1], abs_tol=1e-6)
+                        and math.isclose(post_tuner_c.kd, pre_c_gains[2], abs_tol=1e-6)
+                        and math.isclose(post_pid_c._pid._Kp, post_tuner_c.kp, abs_tol=1e-6)
+                    )
+                    if not gains_ok:
+                        report.violations.append(
+                            f"step={step}: mid-cycle restart altered Cucina PID/state "
+                            f"(pre={pre_c_state}/{pre_c_gains}, post={post_tuner_c.state}/"
+                            f"{(post_tuner_c.kp, post_tuner_c.ki, post_tuner_c.kd)})"
+                        )
+                    else:
+                        report.restart_verified = True
+                else:
+                    report.restart_verified = True
                 report.restart_events += 1
 
             # Random DHW burst
@@ -268,20 +307,28 @@ async def async_run_chaos_simulation(cfg: ChaosConfig | None = None) -> ChaosRep
                 if dropout_remaining_s[cid] > 0.0:
                     dropout_remaining_s[cid] -= cfg.dt_sec
                     states_map[sensor_id] = SimpleNamespace(state="unavailable", attributes={})
-                    sensed_c = room.current_temp
+                    sensed_c = last_sensed_c[cid]
+                    report.frozen_dropout_steps += 1
                 else:
                     noisy = round(room.current_temp + rng.gauss(0.0, cfg.noise_std_c), 2)
                     if cfg.fahrenheit_mode:
                         f_val = from_celsius(noisy, hass)
                         states_map[sensor_id] = SimpleNamespace(
-                            state=f"{f_val:.2f}", attributes={"unit_of_measurement": "°F"}
+                            state=f"{f_val:.2f}",
+                            attributes={"unit_of_measurement": "°F"},
+                            last_reported=step_utc,
+                            last_updated=step_utc,
                         )
                         sensed_c = to_celsius(f_val, "°F", hass)
                     else:
                         states_map[sensor_id] = SimpleNamespace(
-                            state=f"{noisy:.2f}", attributes={"unit_of_measurement": "°C"}
+                            state=f"{noisy:.2f}",
+                            attributes={"unit_of_measurement": "°C"},
+                            last_reported=step_utc,
+                            last_updated=step_utc,
                         )
                         sensed_c = noisy
+                    last_sensed_c[cid] = sensed_c
 
                 if cfg.fahrenheit_mode:
                     z_attrs = {
@@ -291,7 +338,12 @@ async def async_run_chaos_simulation(cfg: ChaosConfig | None = None) -> ChaosRep
                 else:
                     z_attrs = {"current_temperature": sensed_c, "temperature": targets[cid]}
 
-                z_state = SimpleNamespace(state=HVAC_MODE_HEAT, attributes=z_attrs)
+                z_state = SimpleNamespace(
+                    state=HVAC_MODE_HEAT,
+                    attributes=z_attrs,
+                    last_reported=step_utc,
+                    last_updated=step_utc,
+                )
                 states_map[cid] = z_state
                 dem = await zc.async_update_zone(cid, z_state)
 
@@ -329,38 +381,63 @@ async def async_run_chaos_simulation(cfg: ChaosConfig | None = None) -> ChaosRep
             if coord.is_dhw_active and not frost_active and agg_res.demand != 0.0:
                 report.violations.append(f"step={step}: DHW active but plant demand={agg_res.demand}")
 
-            # Exercise OpenTherm + TRV Sync every 5 steps (or on step 10 for mutation tests)
+            # Drive real OpenThermBoilerBackend every step; exercise TRV Sync every 5 steps
+            await ot.async_update(agg_res.demand, agg_res.peak_zone, frost_active)
             if step % 5 == 0 or (cfg.inject_fault_mode == "raw_celsius_in_f" and step == 10):
-                await ot.async_update(agg_res.demand, agg_res.peak_zone, frost_active)
                 await trv_sync.async_sync_trvs(
-                    HVAC_MODE_HEAT, targets[cid_salotto], sim.rooms["Salotto"].current_temp, False, True
+                    HVAC_MODE_HEAT, targets[cid_salotto], last_sensed_c[cid_salotto], False, True
                 )
                 if cfg.inject_fault_mode == "raw_celsius_in_f" and step == 10:
                     await hass.services.async_call("climate", "set_temperature", {"entity_id": "climate.test", "temperature": 11.0})
+            if cfg.inject_fault_mode == "raw_celsius_boiler_in_f" and step == 10:
+                await hass.services.async_call("climate", "set_temperature", {"entity_id": "climate.ot_boiler", "temperature": 55.0})
 
-            # Outbound Fahrenheit Oracle: every set_temperature in °F mode must be >= 41.0 °F (5.0 °C)
+            # Outbound Fahrenheit Oracle + route real OpenTherm service commands into simulated boiler
             for call in hass.services.async_call.call_args_list:
-                if len(call.args) >= 3 and call.args[1] == "set_temperature":
+                if len(call.args) < 3:
+                    continue
+                svc = call.args[1]
+                data = call.args[2] if isinstance(call.args[2], dict) else {}
+                if svc == "set_temperature":
                     report.outbound_temp_commands += 1
-                    sent_t = call.args[2].get("temperature")
-                    if cfg.fahrenheit_mode and isinstance(sent_t, (int, float)) and sent_t < 41.0:
-                        report.violations.append(
-                            f"step={step}: raw Celsius value {sent_t} sent to set_temperature in Fahrenheit mode"
-                        )
+                    sent_eid = data.get("entity_id")
+                    sent_t = data.get("temperature")
+                    if cfg.fahrenheit_mode and isinstance(sent_t, (int, float)):
+                        if sent_eid == "climate.ot_boiler":
+                            if sent_t < 95.0 or sent_t > 175.0:
+                                report.violations.append(
+                                    f"step={step}: raw Celsius or out-of-range boiler value {sent_t} sent to {sent_eid} in Fahrenheit mode"
+                                )
+                        elif sent_t < 41.0:
+                            report.violations.append(
+                                f"step={step}: raw Celsius value {sent_t} sent to set_temperature in Fahrenheit mode"
+                            )
+                    if sent_eid == "climate.ot_boiler" and isinstance(sent_t, (int, float)):
+                        if not (cfg.inject_fault_mode == "raw_celsius_boiler_in_f" and step == 10):
+                            flow_c = to_celsius(float(sent_t), None, hass)
+                            sim.boiler.target_flow_temp = flow_c
+                            seen_boiler_flows.add(round(flow_c, 1))
+                            report.ot_boiler_commands += 1
+                elif svc == "set_hvac_mode" and data.get("entity_id") == "climate.ot_boiler":
+                    sim.boiler.ch_enabled = data.get("hvac_mode") == "heat"
+                    report.ot_boiler_commands += 1
 
-            # Drive simulated boiler
+            # Step physical thermal model driven solely by OpenTherm commands & DHW state
             sim.boiler.dhw_active = coord.is_dhw_active
-            sim.boiler.ch_enabled = (not coord.is_dhw_active) and (agg_res.demand > 0.0 or frost_active)
-            sim.boiler.target_flow_temp = 55.0 if sim.boiler.ch_enabled else 20.0
             sim.step(cfg.dt_sec)
 
-            # Check room temperature physical sanity
+            if cfg.inject_fault_mode == "overheat_runaway" and step == 10:
+                sim.rooms["Salotto"].current_temp = 29.5
+
+            # Check room temperature physical sanity & overheating guard
             for rname, room in sim.rooms.items():
-                if room.current_temp < 5.0 or room.current_temp > 35.0:
-                    report.violations.append(f"step={step} {rname}: implausible room temp {room.current_temp:.2f}°C")
+                if room.current_temp < 5.0 or room.current_temp > 28.0:
+                    report.violations.append(f"step={step} {rname}: implausible/overheated room temp {room.current_temp:.2f}°C")
 
     report.energy_delivered_wh = sum(r.energy_delivered_wh for r in sim.rooms.values())
     report.discomfort_degree_hours = sum(r.discomfort_degree_hours for r in sim.rooms.values())
+    report.overshoot_degree_hours = sum(r.overshoot_degree_hours for r in sim.rooms.values())
+    report.distinct_boiler_flow_targets = len(seen_boiler_flows)
     return report
 
 

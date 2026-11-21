@@ -1,7 +1,9 @@
 """Select platform for Multizone Thermostat: Global Preset."""
 from __future__ import annotations
 
+import inspect
 import logging
+from typing import Any
 
 from homeassistant.components.climate import HVACMode
 from homeassistant.components.select import SelectEntity
@@ -26,8 +28,10 @@ from .const import (
     make_zone_device_info,
     HEAT_SOURCE_PRIORITIES,
     DEFAULT_HEAT_SOURCE_PRIORITY,
+    KEY_HEAT_SOURCE_PRIORITY,
     MASTER_OPERATION_MODES,
     DEFAULT_MASTER_OPERATION_MODE,
+    CONF_MASTER_HVAC_MODE,
     HVAC_MODE_HEAT,
     HVAC_MODE_COOL,
 )
@@ -163,6 +167,9 @@ class MultizoneDemandStrategySelect(RestoreEntity, SelectEntity):
             last_state = await self.async_get_last_state()
             if last_state is not None and last_state.state in self.options:
                 self._coordinator.demand_aggregator.strategy = last_state.state
+                res = self._coordinator.async_set_persistent_data(KEY_DEMAND_STRATEGY, last_state.state)
+                if inspect.isawaitable(res):
+                    await res
 
         self._coordinator.register_select("demand_strategy", self)
 
@@ -233,14 +240,11 @@ class MultizoneZoneSelect(RestoreEntity, SelectEntity):
         return self._coordinator.get_zone_mode(self._climate_id)
 
     async def async_added_to_hass(self) -> None:
-        """Restore previous state."""
+        """Restore previous state without clobbering coordinator-restored zone mode."""
         await super().async_added_to_hass()
         last_state = await self.async_get_last_state()
         if last_state is not None and last_state.state in self.options:
             self._coordinator.set_zone_mode(self._climate_id, last_state.state, save_to_preset=False)
-        else:
-            self._coordinator.set_zone_mode(self._climate_id, ZONE_MODE_PRIMARY, save_to_preset=False)
-            
         self._coordinator.register_select(f"zone_mode_{self._climate_id}", self)
 
     async def async_select_option(self, option: str) -> None:
@@ -336,6 +340,9 @@ class MultizoneScheduleProfileSelect(RestoreEntity, SelectEntity):
 
     async def async_select_option(self, option: str) -> None:
         """Select a schedule profile."""
+        if option not in self.options:
+            _LOGGER.warning("Invalid schedule profile: %s", option)
+            return
         if hasattr(self._coordinator, "schedule_manager"):
             await self._coordinator.schedule_manager.async_activate_profile(option)
         self.async_write_ha_state()
@@ -385,13 +392,15 @@ class MultizoneHeatSourcePrioritySelect(RestoreEntity, SelectEntity):
         return DEFAULT_HEAT_SOURCE_PRIORITY
 
     async def async_added_to_hass(self) -> None:
-        """Restore previous state."""
+        """Restore previous state passively when persistent storage has no value yet."""
         await super().async_added_to_hass()
-        last_state = await self.async_get_last_state()
-        if last_state is not None and last_state.state in self.options:
-            energy_mgr = getattr(self._coordinator, "energy_manager", None)
-            if energy_mgr is not None:
-                await energy_mgr.async_set_heat_source_priority(last_state.state)
+        saved = self._coordinator.get_persistent_data(KEY_HEAT_SOURCE_PRIORITY) if hasattr(self._coordinator, "get_persistent_data") else None
+        if saved not in self.options:
+            last_state = await self.async_get_last_state()
+            if last_state is not None and last_state.state in self.options and hasattr(self._coordinator, "async_set_persistent_data"):
+                res = self._coordinator.async_set_persistent_data(KEY_HEAT_SOURCE_PRIORITY, last_state.state)
+                if inspect.isawaitable(res):
+                    await res
 
     async def async_select_option(self, option: str) -> None:
         """Change heat source priority option."""
@@ -440,11 +449,17 @@ class MultizoneMasterOperationModeSelect(RestoreEntity, SelectEntity):
         return getattr(self._coordinator, "master_hvac_mode", DEFAULT_MASTER_OPERATION_MODE)
 
     async def async_added_to_hass(self) -> None:
-        """Restore previous state."""
+        """Restore previous state passively without firing startup plant side effects."""
         await super().async_added_to_hass()
-        last_state = await self.async_get_last_state()
-        if last_state is not None and last_state.state in self.options:
-            await self._coordinator.async_set_master_hvac_mode(last_state.state)
+        saved = self._coordinator.get_persistent_data(CONF_MASTER_HVAC_MODE) if hasattr(self._coordinator, "get_persistent_data") else None
+        if saved not in self.options:
+            last_state = await self.async_get_last_state()
+            if last_state is not None and last_state.state in self.options:
+                self._coordinator.master_hvac_mode = last_state.state
+                if hasattr(self._coordinator, "async_set_persistent_data"):
+                    res = self._coordinator.async_set_persistent_data(CONF_MASTER_HVAC_MODE, last_state.state)
+                    if inspect.isawaitable(res):
+                        await res
         self._coordinator.register_select("master_operation_mode", self)
 
     async def async_select_option(self, option: str) -> None:

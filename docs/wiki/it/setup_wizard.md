@@ -21,7 +21,7 @@ flowchart TD
     S1b -->|No| Zone1["Passo 2: Creazione Prima Zona"]
     C_PDC --> Zone1
     Zone1 --> CalibCheck{"Assegnati TRV + Sonda Esterna?"}
-    CalibCheck -->|Si| S3["Passo 3: Mappatura Offset Calibrazione TRV"]
+    CalibCheck -->|Si| S3["Passo 3: Calibrazione TRV & Mappatura Sensori"]
     CalibCheck -->|No| S4{"Aggiungere Altra Zona?"}
     S3 --> S4
     S4 -->|Si| Zone1
@@ -78,8 +78,10 @@ La schermata di creazione della stanza raccoglie tutti i componenti tramite sezi
   * **Sensore Umidità (`humidity_sensor`)** *(Opzionale)*: Usato per il calcolo del punto di rugiada e protezione anti-condensa in raffrescamento idronico.
   * **Tipo Terminale (`emitter_type`)**: Seleziona `radiator` (radiatori), `underfloor` (pavimento radiante) o `fancoil` per calibrare curve di mandata e limiti di sicurezza.
   * **Temperatura Target di Base**: Setpoint iniziale (es. 20.5°C).
-* **▶ Teste Termostatiche TRV (Standard)** <span class="badge-stable">STABILE</span>:
+* **▶ Teste Termostatiche TRV (Standard & Demand-Driven)** <span class="badge-stable">STABILE</span>:
   * Seleziona una o più valvole termostatiche (`climate.*`). Il sistema calcolerà la media e manterrà sincronizzati i setpoint.
+  * **Modalità Controllo TRV (`trv_control_mode`)**: Scegli tra `"standard"` (default; invia il setpoint diretto della zona) oppure `"demand_driven"` (**Smart Bounded Overdrive**) per TRV il cui algoritmo proporzionale interno strozza o chiude la valvola troppo presto prima che la stanza raggiunga il target.
+  * **Parametri Demand-Driven**: Configura `trv_open_boost` (default `+1.5 °C`, intervallo `0.0–5.0 °C`) e `trv_close_offset` (default `1.0 °C`, intervallo `0.0–5.0 °C`). Usa l'isteresi sulla domanda PID (`>= 5.0%` apre, `<= 0.0%` chiude), debounce anti-oscillazione di `60 s`, tick di valutazione periodico ogni `10 s` e guardia idle anti-chatter. Compatibile con i delta relativi di `physical_sync`, con ripristino automatico a `"standard"` se si attiva `safety_fallback_active`.
 * **▶ Valvole Proporzionali & 0-10V** <span class="badge-stable">STABILE</span>:
   * Per attuatori motorizzati graduali o dimmer 0-10V (`valve.*` o `number.*`).
   * **Scala Valvola**: Seleziona tra **Percentuale (0–100%)** o **Volt (0.0–10.0 V)**.
@@ -94,6 +96,20 @@ La schermata di creazione della stanza raccoglie tutti i componenti tramite sezi
   * **Sensori Finestre**: Spegne automaticamente il riscaldamento/raffrescamento se l'infisso rimane aperto.
   * **Timeout Watchdog Sonde**: Minuti massimi prima di dichiarare la sonda wireless offline e passare in sicurezza su sonda locale TRV.
   * **Anti-Bloccaggio Estivo & Apporto Passivo**.
+
+---
+
+#### Passo 3: Calibrazione TRV, Invio Temperatura Esterna & Selettore Sorgente
+<span class="badge-stable">STABILE</span>
+
+Quando una zona utilizza valvole TRV insieme a una sonda ambiente principale:
+* **Modalità Calibrazione (`trv_calibration_mode`)**:
+  * `"auto"` *(default)*: Rileva automaticamente `external_temperature_input` nell'ID dell'entità di calibrazione; altrimenti utilizza la modalità offset.
+  * `"offset"`: Inietta dinamicamente la correzione offset sulla temperatura locale (`number.*`).
+  * `"external"`: Per TRV dotate di `number.*external_temperature_input` (es. Sonoff TRVZB, Aqara, Tuya/Zigbee2MQTT), scrive direttamente la temperatura della sonda ambiente in °C (arrotondata allo step, limitata a min/max) con heartbeat anti-offline ogni `1200 s` (20 min) e rate-limit jitter di `60 s` su variazioni `<= 0.1 °C`.
+* **Selettore Sorgente Sensore TRV (`trv_sensor_selects`)** *(Opzionale)*:
+  * Associa ogni entità `climate.*` della TRV alla sua entità `select.*` direttamente nella schermata **Calibrazione TRV** (Setup/Opzioni).
+  * Commuta automaticamente sul sensore esterno/remoto quando attivo (escludendo opzioni `"offline"` come `remote_source_offline`) e ripristina in sicurezza il sensore interno/locale se si attiva `safety_fallback_active` (sonda stanza scaduta o non disponibile).
 
 ---
 
@@ -150,11 +166,12 @@ Per aiutarti a individuare istantaneamente dove attivare e tarare ciascuna funzi
 | **Accumulo Termico Muri (Overheat)** | *Configura → Configura Gestione Solare & Batterie* | `solar_overheat_offset` (da 0.0 °C a +3.0 °C) |
 | **Bridge AI EMHASS / Predbat** | *Configura → Configura Gestione Solare & Batterie* | `external_solar_override_entity` (sensore Watt o booleano) |
 | **Protezione Anti-Short-Cycle Caldaia** | *Impostazioni → Dispositivi e Servizi → Entità Master* | `number.master_control_min_cycle_on` e `min_cycle_off` (default: 5 min) |
-| **Ritardo Apertura Valvole Motorizzate** | *Impostazioni → Dispositivi e Servizi → Entità Master* | `number.master_control_valve_delay` (default: 0 sec, consigliato 90-120s per elettrotermiche) |
+| **Ritardo Apertura Valvole Motorizzate & Guardia TRV** | *Impostazioni → Dispositivi e Servizi → Entità Master* | `number.master_control_valve_delay` (default: 0 sec, consigliato 90-120s; eseguito dopo la guardia automatica `HOLD_TRV_CLOSED` fino a max 120 s) |
 | **Esercizio Anti-Bloccaggio Estivo** | *Impostazioni → Dispositivi e Servizi → Entità Master* | `number.master_control_anti_seize_idle_days` (15 gg) e `duration` (2 min) |
 | **Protezione Antigelo di Emergenza** | *Impostazioni → Dispositivi e Servizi → Entità Master* | `number.master_control_anti_frost_temperature` (default: 7.0 °C) |
 | **Sensore Apertura Finestre** | *Configura → Modifica Zona → [Stanza] → Protezioni* | `window_sensor` (`binary_sensor.*`) |
-| **Calibrazione Offset TRV Radiatori** | *Configura → Modifica Zona → [Stanza] → Calibrazione TRV* | Entità di calibrazione TRV (es. `number.trv_calibration_offset`) |
+| **Calibrazione TRV & Invio Temp. Esterna** | *Configura → Modifica Zona → [Stanza] → Calibrazione TRV* | `trv_calibration_mode` (`auto`, `offset`, `external`), `number.*external_temperature_input` / offset, `trv_sensor_selects` (`select.*`) |
+| **Modalità TRV Demand-Driven** | *Configura → Modifica Zona → [Stanza] → Teste Termostatiche TRV* | `trv_control_mode` (`standard`, `demand_driven`), `trv_open_boost` (`0.0–5.0 °C`, default `1.5 °C`), `trv_close_offset` (`0.0–5.0 °C`, default `1.0 °C`) |
 | **Valvole Proporzionali 0–100% o 0–10V** | *Configura → Modifica Zona → [Stanza] → Valvole Proporzionali* | `valve_entities`, scala `percent` (0-100%) o `volt` (0-10.0 V) |
 | **Programmazione Oraria Settimanale** | *Lovelace Scheduler Card* | Matrice visuale 24h con profili (Standard, Weekend, Smart Working, Custom) |
 | **Smart Return (Pianifica Rientro)** | *Lovelace Scheduler Card* o servizio HA | `multizone_thermostat.set_smart_return` |

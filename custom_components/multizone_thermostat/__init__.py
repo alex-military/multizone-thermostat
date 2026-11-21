@@ -33,7 +33,10 @@ from .const import (
     CONF_ZONE_ANTI_SEIZE,
     CONF_ZONE_EMITTER_TYPE,
     DEFAULT_ZONE_EMITTER_TYPE,
+    HVAC_MODE_COOL,
+    HVAC_MODE_HEAT,
     make_zone_entity_id,
+    to_celsius,
 )
 from .coordinator import MultizoneCoordinator
 
@@ -52,15 +55,25 @@ def _migrate_config_data(
     config = {**new_data, **new_options}
     zones = [dict(z) for z in list(config.get(CONF_ZONES, []))]
 
-    # 1. Migrate old virtual thermostats to new zones
+    # 1. Migrate old virtual thermostats to new zones (deduplicated by canonical slug)
     old_vts = new_data.pop("virtual_thermostats", [])
     if not old_vts and "virtual_thermostats" in new_options:
         old_vts = new_options.pop("virtual_thermostats", [])
     if old_vts:
         migrated = True
+        existing_zone_ids = {
+            make_zone_entity_id(z.get(CONF_ZONE_NAME, ""))
+            for z in zones
+            if isinstance(z, Mapping) and z.get(CONF_ZONE_NAME)
+        }
         for vt in old_vts:
+            vt_name = vt.get("name", "Unknown VT")
+            vt_cid = make_zone_entity_id(vt_name)
+            if vt_cid in existing_zone_ids:
+                continue
+            existing_zone_ids.add(vt_cid)
             vt_zone = {
-                "name": vt.get("name", "Unknown VT"),
+                "name": vt_name,
                 "climate_entities": [],
                 "switch_entities": [vt.get("heater_switch")] if vt.get("heater_switch") else [],
                 "temp_sensor": vt.get("temperature_sensor"),
@@ -173,7 +186,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                                 "control may not work until the entity is available.",
                                 boiler_switch,
                             )
-                    hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, _check_boiler_started)
+                    unsub = hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, _check_boiler_started)
+                    if callable(unsub) and callable(getattr(entry, "async_on_unload", None)):
+                        entry.async_on_unload(unsub)
     elif enable_gas and boiler_mode == MODE_OPENTHERM and opentherm_entity:
         ot_state = hass.states.get(opentherm_entity)
         if ot_state is None:
@@ -197,7 +212,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                                 "control may not work until the entity is available.",
                                 opentherm_entity,
                             )
-                    hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, _check_ot_started)
+                    unsub = hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, _check_ot_started)
+                    if callable(unsub) and callable(getattr(entry, "async_on_unload", None)):
+                        entry.async_on_unload(unsub)
     if enable_hp and hp_entity:
         hp_state = hass.states.get(hp_entity)
         if hp_state is None:
@@ -292,7 +309,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 version = integration.version if integration else "unknown"
                 
                 js_path = os.path.join(www_path, "multizone-thermostat-card-v24.js")
-                mtime = int(os.path.getmtime(js_path)) if os.path.exists(js_path) else 0
+                def _get_js_mtime(path: str) -> int:
+                    return int(os.path.getmtime(path)) if os.path.exists(path) else 0
+                mtime = await hass.async_add_executor_job(_get_js_mtime, js_path)
                 base_url = "/multizone_thermostat_card/multizone-thermostat-card-v24.js"
                 url = f"{base_url}?v={version}.{mtime}"
                 
@@ -372,6 +391,23 @@ def _validate_has_target_entity(data: Mapping[str, Any]) -> Mapping[str, Any]:
     return data
 
 
+def _validate_has_profile_id(data: Mapping[str, Any]) -> Mapping[str, Any]:
+    """Validate that profile_id is supplied either directly or inside a nested profile dict."""
+    if data.get("profile_id"):
+        return data
+    profile = data.get("profile")
+    if isinstance(profile, Mapping) and (profile.get("profile_id") or profile.get("id")):
+        return data
+    raise vol.Invalid("Must specify 'profile_id' directly or inside 'profile'")
+
+
+def _validate_has_operation_mode(data: Mapping[str, Any]) -> Mapping[str, Any]:
+    """Validate that at least one of operation_mode or hvac_mode is specified."""
+    if not data.get("operation_mode") and not data.get("hvac_mode"):
+        raise vol.Invalid("Must specify either 'operation_mode' or 'hvac_mode'")
+    return data
+
+
 def _finite_float(val: Any) -> float:
     """Validate that a value can be coerced to a finite float."""
     try:
@@ -383,6 +419,70 @@ def _finite_float(val: Any) -> float:
     return f
 
 
+SERVICE_SAVE_SCHEDULE_PROFILE_SCHEMA = vol.All(
+    vol.Schema(
+        {
+            vol.Optional("profile_id"): str,
+            vol.Optional("name"): str,
+            vol.Optional("baseline_preset"): vol.In(["comfort", "eco", "sleep", "away"]),
+            vol.Optional("days"): dict,
+            vol.Optional("profile"): dict,
+        }
+    ),
+    _validate_has_profile_id,
+)
+
+SERVICE_ACTIVATE_SCHEDULE_PROFILE_SCHEMA = vol.Schema(
+    {
+        vol.Required("profile_id"): str,
+        vol.Optional("expires_at"): vol.Any(None, str),
+        vol.Optional("fallback_profile", default="standard"): str,
+    }
+)
+
+SERVICE_DUPLICATE_SCHEDULE_PROFILE_SCHEMA = vol.Schema(
+    {
+        vol.Required("source_profile_id"): str,
+        vol.Required("target_profile_id"): str,
+        vol.Optional("target_name"): vol.Any(None, str),
+    }
+)
+
+SERVICE_SET_SMART_RETURN_SCHEMA = vol.Schema(
+    {
+        vol.Required("arrival_time"): str,
+        vol.Optional("preset", default="comfort"): vol.In(["comfort", "eco", "sleep", "away"]),
+        vol.Optional("zones"): vol.Any(None, [str]),
+    }
+)
+
+SERVICE_CANCEL_SMART_RETURN_SCHEMA = vol.Schema({})
+
+SERVICE_CLEAR_ZONE_OVERRIDE_SCHEMA = vol.Schema(
+    {
+        vol.Optional("entity_id"): vol.Any(None, str),
+    }
+)
+
+SERVICE_SET_PRESET_TEMPERATURE_SCHEMA = vol.Schema(
+    {
+        vol.Required("preset"): vol.In(["comfort", "eco", "sleep", "away", "manual"]),
+        vol.Required("entity_id"): str,
+        vol.Required("temperature"): vol.All(_finite_float, vol.Range(min=5.0, max=95.0)),
+        vol.Optional("hvac_mode"): vol.Any(None, vol.In(["heat", "cool"])),
+    }
+)
+
+SERVICE_SET_MASTER_OPERATION_MODE_SCHEMA = vol.All(
+    vol.Schema(
+        {
+            vol.Optional("operation_mode"): vol.In([HVAC_MODE_HEAT, HVAC_MODE_COOL]),
+            vol.Optional("hvac_mode"): vol.In([HVAC_MODE_HEAT, HVAC_MODE_COOL]),
+        }
+    ),
+    _validate_has_operation_mode,
+)
+
 SERVICE_SET_PID_SCHEMA = vol.All(
     vol.Schema(
         {
@@ -391,7 +491,7 @@ SERVICE_SET_PID_SCHEMA = vol.All(
             vol.Optional("kp"): vol.All(_finite_float, vol.Range(min=0.1, max=500.0)),
             vol.Optional("ki"): vol.All(_finite_float, vol.Range(min=0.0, max=10.0)),
             vol.Optional("kd"): vol.All(_finite_float, vol.Range(min=0.0, max=50000.0)),
-            vol.Optional("lock_parameter"): vol.In(["Kp", "Ki", "Kd", "kp", "ki", "kd"]),
+            vol.Optional("lock_parameter"): vol.In(["Kp", "Ki", "Kd", "kp", "ki", "kd", "all", "ALL"]),
             vol.Optional("unlock"): bool,
             vol.Optional("seed_autotuner"): bool,
             vol.Optional("mode"): vol.In(["heat", "cool"]),
@@ -487,7 +587,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
     async def handle_set_preset_temperature(call: ServiceCall) -> None:
         preset = call.data["preset"]
         entity_id = call.data["entity_id"]
-        temperature = float(call.data["temperature"])
+        temperature = to_celsius(float(call.data["temperature"]), None, hass)
         hvac_mode = call.data.get("hvac_mode")
         for coord in _get_active_coordinators(hass):
             if hasattr(coord, "zone_manager"):
@@ -534,7 +634,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
         kd = _val_finite_range(data.get("kd"), "kd", 0.0, 50000.0)
 
         lock_param = data.get("lock_parameter")
-        if lock_param is not None and lock_param not in ("Kp", "Ki", "Kd", "kp", "ki", "kd"):
+        if lock_param is not None and lock_param not in ("Kp", "Ki", "Kd", "kp", "ki", "kd", "all", "ALL"):
             raise vol.Invalid(f"Invalid lock_parameter: {lock_param}")
 
         unlock_arg = data.get("unlock")
@@ -556,9 +656,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
                 continue
             for climate_entity in entity_ids:
                 zname = _find_zone_name_for_entity(coord, climate_entity)
-                if seed_autotuner and zname and hasattr(coord, "async_set_pid_manual_unlock"):
-                    await coord.async_set_pid_manual_unlock(zname, False)
-                elif unlock_arg is not None and zname and hasattr(coord, "async_set_pid_manual_unlock"):
+                if not seed_autotuner and unlock_arg is not None and zname and hasattr(coord, "async_set_pid_manual_unlock"):
                     await coord.async_set_pid_manual_unlock(zname, bool(unlock_arg))
                 kwargs: dict[str, object] = {
                     "kp": kp,
@@ -572,6 +670,27 @@ async def _async_register_services(hass: HomeAssistant) -> None:
                     kwargs["mode"] = mode_arg
                 updated = await zc.async_set_zone_pid(climate_entity, **kwargs)
                 if updated:
+                    if seed_autotuner and zname and hasattr(coord, "async_set_pid_manual_unlock"):
+                        eff_track = mode_arg or (
+                            "cool"
+                            if str(getattr(coord, "master_hvac_mode", "heat")).lower() == "cool"
+                            else "heat"
+                        )
+                        resolved_id = (
+                            zc._resolve_zone_id(climate_entity)
+                            if hasattr(zc, "_resolve_zone_id")
+                            else climate_entity
+                        )
+                        if eff_track == "cool" and hasattr(zc, "_autotuners_cool"):
+                            tuner = zc._autotuners_cool.get(resolved_id)
+                        elif hasattr(zc, "_autotuners_heat"):
+                            tuner = zc._autotuners_heat.get(resolved_id)
+                        elif hasattr(zc, "get_autotuner"):
+                            tuner = zc.get_autotuner(climate_entity)
+                        else:
+                            tuner = None
+                        if not getattr(tuner, "manual_overrides", None):
+                            await coord.async_set_pid_manual_unlock(zname, False)
                     if hasattr(coord, "async_notify_pid_entities"):
                         coord.async_notify_pid_entities()
                     await _async_refresh_orchestrator(getattr(coord, "plant_orchestrator", None))
@@ -635,14 +754,14 @@ async def _async_register_services(hass: HomeAssistant) -> None:
                     await _async_refresh_orchestrator(getattr(coord, "plant_orchestrator", None))
 
     services = {
-        "save_schedule_profile": (handle_save_schedule_profile, None),
-        "activate_schedule_profile": (handle_activate_schedule_profile, None),
-        "duplicate_schedule_profile": (handle_duplicate_schedule_profile, None),
-        "set_smart_return": (handle_set_smart_return, None),
-        "cancel_smart_return": (handle_cancel_smart_return, None),
-        "clear_zone_override": (handle_clear_zone_override, None),
-        "set_preset_temperature": (handle_set_preset_temperature, None),
-        "set_master_operation_mode": (handle_set_master_operation_mode, None),
+        "save_schedule_profile": (handle_save_schedule_profile, SERVICE_SAVE_SCHEDULE_PROFILE_SCHEMA),
+        "activate_schedule_profile": (handle_activate_schedule_profile, SERVICE_ACTIVATE_SCHEDULE_PROFILE_SCHEMA),
+        "duplicate_schedule_profile": (handle_duplicate_schedule_profile, SERVICE_DUPLICATE_SCHEDULE_PROFILE_SCHEMA),
+        "set_smart_return": (handle_set_smart_return, SERVICE_SET_SMART_RETURN_SCHEMA),
+        "cancel_smart_return": (handle_cancel_smart_return, SERVICE_CANCEL_SMART_RETURN_SCHEMA),
+        "clear_zone_override": (handle_clear_zone_override, SERVICE_CLEAR_ZONE_OVERRIDE_SCHEMA),
+        "set_preset_temperature": (handle_set_preset_temperature, SERVICE_SET_PRESET_TEMPERATURE_SCHEMA),
+        "set_master_operation_mode": (handle_set_master_operation_mode, SERVICE_SET_MASTER_OPERATION_MODE_SCHEMA),
         "set_pid_parameters": (handle_set_pid_parameters, SERVICE_SET_PID_SCHEMA),
         "reset_autotune": (handle_reset_autotune, SERVICE_RESET_AUTOTUNE_SCHEMA),
         "restore_autotune": (handle_restore_autotune, SERVICE_RESET_AUTOTUNE_SCHEMA),

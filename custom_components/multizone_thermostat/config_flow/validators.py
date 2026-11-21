@@ -28,7 +28,7 @@ def validate_heat_pump_cool_temps(min_temp: float, max_temp: float) -> dict[str,
         errors["base"] = "hp_temps_invalid"
     return errors
 
-from ..const import CONF_ZONE_NAME
+from ..const import CONF_ZONE_NAME, make_zone_entity_id
 
 def validate_zone_input(
     zone_name: str,
@@ -40,9 +40,10 @@ def validate_zone_input(
 ) -> dict[str, str]:
     """Validate user input when adding or editing a zone."""
     errors = {}
+    existing_slugs = {make_zone_entity_id(name) for name in already_added if name}
     if not zone_name:
         errors[CONF_ZONE_NAME] = "zone_name_required"
-    elif zone_name in already_added:
+    elif zone_name in already_added or make_zone_entity_id(zone_name) in existing_slugs:
         errors[CONF_ZONE_NAME] = "zone_name_exists"
     elif not climates and not switches and not (valves or []) and not split_climate:
         errors["base"] = "no_actuators_selected"

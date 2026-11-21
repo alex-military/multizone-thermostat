@@ -16,7 +16,9 @@ class BoilerBackendProtocol(Protocol):
         """Return current human-readable status reason."""
         ...
 
-    async def async_update(self, demand: float, peak_zone: str | None, frost_emergency: bool) -> None:
+    async def async_update(
+        self, demand: float, peak_zone: str | None, frost_emergency: bool, *args: Any, **kwargs: Any
+    ) -> None:
         """Apply aggregated plant demand to the generator."""
         ...
 
@@ -69,6 +71,10 @@ class ZoneControllerProtocol(Protocol):
         """Return autotuner for a zone and mode."""
         ...
 
+    def get_thermal_model(self, climate_id: str) -> Any | None:
+        """Return thermal observer model for a zone."""
+        ...
+
     async def async_update_zone(self, entity_id: str, new_state: Any) -> float:
         """Recalculate zone demand."""
         ...
@@ -81,6 +87,8 @@ class CoordinatorProtocol(Protocol):
     hass: Any
     entry_id: str
     zones: list[Any]
+    boiler_mode: str
+    master_hvac_mode: str
     enable_heat_pump: bool
     heat_pump_cooling: bool
     weather_sensor_id: str | None
@@ -105,6 +113,14 @@ class CoordinatorProtocol(Protocol):
 
     def get_zone_mode(self, climate_id: str) -> str:
         """Return current mode (primary/secondary/bypass) for a zone."""
+        ...
+
+    def get_zone_demand(self, climate_id: str) -> float:
+        """Return current demand (0-100%) for a zone."""
+        ...
+
+    def set_zone_demand(self, climate_id: str, demand: float) -> None:
+        """Update current demand (0-100%) for a zone."""
         ...
 
     def resolve_zone_id(self, entity_id: str) -> str:

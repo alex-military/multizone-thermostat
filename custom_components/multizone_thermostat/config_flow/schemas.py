@@ -9,6 +9,8 @@ from homeassistant.helpers import selector
 
 from homeassistant import data_entry_flow
 
+from .helpers import TRV_SENSOR_SELECT_SUFFIX
+
 from ..const import (
     CONF_BOILER_MODE,
     CONF_ZONE_EMITTER_TYPE,
@@ -51,6 +53,20 @@ from ..const import (
     MODE_CENTRAL,
     MODE_NONE,
     CONF_ZONE_CALIBRATIONS,
+    CONF_ZONE_TRV_CALIBRATION_MODE,
+    CONF_ZONE_TRV_SENSOR_SELECTS,
+    TRV_CALIB_MODE_AUTO,
+    TRV_CALIB_MODE_OFFSET,
+    TRV_CALIB_MODE_EXTERNAL,
+    DEFAULT_TRV_CALIB_MODE,
+    CONF_ZONE_TRV_CONTROL_MODE,
+    TRV_CONTROL_MODE_STANDARD,
+    TRV_CONTROL_MODE_DEMAND_DRIVEN,
+    DEFAULT_TRV_CONTROL_MODE,
+    CONF_ZONE_TRV_OPEN_BOOST,
+    DEFAULT_TRV_OPEN_BOOST,
+    CONF_ZONE_TRV_CLOSE_OFFSET,
+    DEFAULT_TRV_CLOSE_OFFSET,
     CONF_ZONE_WEIGHT,
     DEFAULT_ZONE_WEIGHT,
     CONF_ZONE_AUTHORITATIVE_SYNC,
@@ -340,7 +356,10 @@ def get_boiler_mode_schema() -> vol.Schema:
     })
 
 
-def get_boiler_relay_schema(dhw_active_sensor: str | None = None) -> vol.Schema:
+def get_boiler_relay_schema(
+    dhw_active_sensor: str | None = None,
+    has_mixing_valve: bool = DEFAULT_HAS_MIXING_VALVE,
+) -> vol.Schema:
     schema_dict: dict[Any, Any] = {
         vol.Required(CONF_BOILER_SWITCH): selector.EntitySelector(selector.EntitySelectorConfig(domain=SWITCH_DOMAIN)),
     }
@@ -403,6 +422,31 @@ def get_add_zone_schema() -> vol.Schema:
                 vol.Optional(CONF_ZONE_CLIMATES, default=[]): selector.EntitySelector(selector.EntitySelectorConfig(domain=CLIMATE_DOMAIN, multiple=True)),
                 vol.Optional(CONF_ZONE_TRV_SYNC, default=DEFAULT_TRV_SYNC): bool,
                 vol.Optional(CONF_ZONE_AUTHORITATIVE_SYNC, default=DEFAULT_AUTHORITATIVE_SYNC): bool,
+                vol.Optional(CONF_ZONE_TRV_CALIBRATION_MODE, default=DEFAULT_TRV_CALIB_MODE): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[
+                            selector.SelectOptionDict(value=TRV_CALIB_MODE_AUTO, label="Auto-Detect (Offset vs External Temp)"),
+                            selector.SelectOptionDict(value=TRV_CALIB_MODE_OFFSET, label="Offset Calibration (local_temperature_calibration)"),
+                            selector.SelectOptionDict(value=TRV_CALIB_MODE_EXTERNAL, label="External Temperature Feed (external_temperature_input)"),
+                        ],
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+                vol.Optional(CONF_ZONE_TRV_CONTROL_MODE, default=DEFAULT_TRV_CONTROL_MODE): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[
+                            selector.SelectOptionDict(value=TRV_CONTROL_MODE_STANDARD, label="Standard (Direct Setpoint)"),
+                            selector.SelectOptionDict(value=TRV_CONTROL_MODE_DEMAND_DRIVEN, label="Demand-Driven Valve (Bounded Overdrive)"),
+                        ],
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+                vol.Optional(CONF_ZONE_TRV_OPEN_BOOST, default=DEFAULT_TRV_OPEN_BOOST): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=0.0, max=5.0, step=0.5, unit_of_measurement="°C", mode=selector.NumberSelectorMode.BOX)
+                ),
+                vol.Optional(CONF_ZONE_TRV_CLOSE_OFFSET, default=DEFAULT_TRV_CLOSE_OFFSET): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=0.0, max=5.0, step=0.5, unit_of_measurement="°C", mode=selector.NumberSelectorMode.BOX)
+                ),
             }),
             {"collapsed": True},
         ),
@@ -479,6 +523,7 @@ def get_trv_calibration_schema(current_zone_data: dict[str, Any] | None) -> vol.
     climates = current_zone_data.get(CONF_ZONE_CLIMATES, []) if current_zone_data else []
     for climate_id in climates:
         schema_dict[vol.Optional(climate_id)] = selector.EntitySelector(selector.EntitySelectorConfig(domain=["number", "input_number"]))
+        schema_dict[vol.Optional(f"{climate_id}{TRV_SENSOR_SELECT_SUFFIX}")] = selector.EntitySelector(selector.EntitySelectorConfig(domain=["select"]))
     return vol.Schema(schema_dict)
 
 
@@ -534,7 +579,11 @@ def get_options_change_boiler_schema(boiler_mode: str) -> vol.Schema:
     })
 
 
-def get_options_boiler_relay_schema(boiler_switch: str, dhw_active_sensor: str | None = None) -> vol.Schema:
+def get_options_boiler_relay_schema(
+    boiler_switch: str,
+    dhw_active_sensor: str | None = None,
+    has_mixing_valve: bool = DEFAULT_HAS_MIXING_VALVE,
+) -> vol.Schema:
     schema_dict: dict[Any, Any] = {}
     if boiler_switch:
         schema_dict[vol.Required(CONF_BOILER_SWITCH, default=boiler_switch)] = selector.EntitySelector(
@@ -611,7 +660,11 @@ def get_options_edit_zone_schema(zone_data: dict[str, Any], temp_desc: dict[str,
     split_delta = zone_data.get(CONF_ZONE_SPLIT_BOOST_DELTA, DEFAULT_SPLIT_BOOST_DELTA)
     split_injection = zone_data.get(CONF_ZONE_SPLIT_SENSOR_INJECTION, DEFAULT_SPLIT_SENSOR_INJECTION)
 
-    humidity_desc = {"suggested_value": zone_data.get(CONF_ZONE_HUMIDITY_SENSOR)} if zone_data.get(CONF_ZONE_HUMIDITY_SENSOR) else {}
+    humidity_desc = (
+        {"description": {"suggested_value": zone_data[CONF_ZONE_HUMIDITY_SENSOR]}}
+        if zone_data.get(CONF_ZONE_HUMIDITY_SENSOR)
+        else {}
+    )
 
     return vol.Schema({
         vol.Optional(CONF_ZONE_TEMP_SENSOR, **temp_desc): selector.EntitySelector(selector.EntitySelectorConfig(domain=SENSOR_DOMAIN, device_class="temperature")),
@@ -635,6 +688,31 @@ def get_options_edit_zone_schema(zone_data: dict[str, Any], temp_desc: dict[str,
                 vol.Optional(CONF_ZONE_CLIMATES, default=zone_data.get(CONF_ZONE_CLIMATES, [])): selector.EntitySelector(selector.EntitySelectorConfig(domain=CLIMATE_DOMAIN, multiple=True)),
                 vol.Optional(CONF_ZONE_TRV_SYNC, default=zone_data.get(CONF_ZONE_TRV_SYNC, DEFAULT_TRV_SYNC)): bool,
                 vol.Optional(CONF_ZONE_AUTHORITATIVE_SYNC, default=zone_data.get(CONF_ZONE_AUTHORITATIVE_SYNC, DEFAULT_AUTHORITATIVE_SYNC)): bool,
+                vol.Optional(CONF_ZONE_TRV_CALIBRATION_MODE, default=zone_data.get(CONF_ZONE_TRV_CALIBRATION_MODE, DEFAULT_TRV_CALIB_MODE)): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[
+                            selector.SelectOptionDict(value=TRV_CALIB_MODE_AUTO, label="Auto-Detect (Offset vs External Temp)"),
+                            selector.SelectOptionDict(value=TRV_CALIB_MODE_OFFSET, label="Offset Calibration (local_temperature_calibration)"),
+                            selector.SelectOptionDict(value=TRV_CALIB_MODE_EXTERNAL, label="External Temperature Feed (external_temperature_input)"),
+                        ],
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+                vol.Optional(CONF_ZONE_TRV_CONTROL_MODE, default=zone_data.get(CONF_ZONE_TRV_CONTROL_MODE, DEFAULT_TRV_CONTROL_MODE)): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[
+                            selector.SelectOptionDict(value=TRV_CONTROL_MODE_STANDARD, label="Standard (Direct Setpoint)"),
+                            selector.SelectOptionDict(value=TRV_CONTROL_MODE_DEMAND_DRIVEN, label="Demand-Driven Valve (Bounded Overdrive)"),
+                        ],
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+                vol.Optional(CONF_ZONE_TRV_OPEN_BOOST, default=zone_data.get(CONF_ZONE_TRV_OPEN_BOOST, DEFAULT_TRV_OPEN_BOOST)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=0.0, max=5.0, step=0.5, unit_of_measurement="°C", mode=selector.NumberSelectorMode.BOX)
+                ),
+                vol.Optional(CONF_ZONE_TRV_CLOSE_OFFSET, default=zone_data.get(CONF_ZONE_TRV_CLOSE_OFFSET, DEFAULT_TRV_CLOSE_OFFSET)): selector.NumberSelector(
+                    selector.NumberSelectorConfig(min=0.0, max=5.0, step=0.5, unit_of_measurement="°C", mode=selector.NumberSelectorMode.BOX)
+                ),
             }),
             {"collapsed": True},
         ),
@@ -714,12 +792,19 @@ def get_options_trv_calibration_edit_schema(current_zone_data: dict[str, Any] | 
     schema_dict = {}
     climates = current_zone_data.get(CONF_ZONE_CLIMATES, []) if current_zone_data else []
     current_calibrations = current_zone_data.get(CONF_ZONE_CALIBRATIONS, {}) if current_zone_data else {}
+    current_selects = current_zone_data.get(CONF_ZONE_TRV_SENSOR_SELECTS, {}) if current_zone_data else {}
     for climate_id in climates:
         default_val = current_calibrations.get(climate_id)
         if default_val:
             schema_dict[vol.Optional(climate_id, description={"suggested_value": default_val})] = selector.EntitySelector(selector.EntitySelectorConfig(domain=["number", "input_number"]))
         else:
             schema_dict[vol.Optional(climate_id)] = selector.EntitySelector(selector.EntitySelectorConfig(domain=["number", "input_number"]))
+        sel_key = f"{climate_id}{TRV_SENSOR_SELECT_SUFFIX}"
+        default_sel = current_selects.get(climate_id)
+        if default_sel:
+            schema_dict[vol.Optional(sel_key, description={"suggested_value": default_sel})] = selector.EntitySelector(selector.EntitySelectorConfig(domain=["select"]))
+        else:
+            schema_dict[vol.Optional(sel_key)] = selector.EntitySelector(selector.EntitySelectorConfig(domain=["select"]))
         
     return vol.Schema(schema_dict)
 

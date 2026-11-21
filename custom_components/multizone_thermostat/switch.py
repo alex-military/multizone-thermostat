@@ -1,6 +1,7 @@
 """Switch platform for Multizone Thermostat: master switch + per-zone switches."""
 from __future__ import annotations
 
+import inspect
 import logging
 from typing import Any
 
@@ -16,7 +17,7 @@ except ImportError:
         class EntityCategory(StrEnum):
             CONFIG = "config"
             DIAGNOSTIC = "diagnostic"
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
@@ -293,11 +294,21 @@ class MultizoneAntiFrostSwitch(SwitchEntity):
         """Enable anti-frost."""
         await self._coordinator.async_set_persistent_data(KEY_ANTI_FROST_ENABLED, True)
         self.async_write_ha_state()
+        orch = getattr(self._coordinator, "plant_orchestrator", None)
+        if orch is not None and callable(getattr(orch, "async_refresh", None)):
+            res = orch.async_refresh()
+            if inspect.isawaitable(res):
+                await res
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Disable anti-frost."""
         await self._coordinator.async_set_persistent_data(KEY_ANTI_FROST_ENABLED, False)
         self.async_write_ha_state()
+        orch = getattr(self._coordinator, "plant_orchestrator", None)
+        if orch is not None and callable(getattr(orch, "async_refresh", None)):
+            res = orch.async_refresh()
+            if inspect.isawaitable(res):
+                await res
 
 
 class MultizonePhysicalSyncSwitch(SwitchEntity):
@@ -372,12 +383,18 @@ class MultizonePassiveHeatSwitch(SwitchEntity):
         key = f"{KEY_PASSIVE_HEAT_PREFIX}{self._safe_name}"
         await self._coordinator.async_set_persistent_data(key, True)
         self.async_write_ha_state()
+        notify = getattr(self._coordinator, "notify_climate", None)
+        if callable(notify):
+            notify(self._climate_id)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Disable passive heat allowance."""
         key = f"{KEY_PASSIVE_HEAT_PREFIX}{self._safe_name}"
         await self._coordinator.async_set_persistent_data(key, False)
         self.async_write_ha_state()
+        notify = getattr(self._coordinator, "notify_climate", None)
+        if callable(notify):
+            notify(self._climate_id)
 
 
 
@@ -426,6 +443,12 @@ class MultizoneSchedulerSwitch(RestoreEntity, SwitchEntity):
         if hasattr(self._coordinator, "schedule_manager"):
             await self._coordinator.schedule_manager.async_set_scheduler_enabled(False)
         self.async_write_ha_state()
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Clear coordinator reference on entity removal."""
+        await super().async_will_remove_from_hass()
+        if getattr(self._coordinator, "_scheduler_switch", None) is self:
+            self._coordinator._scheduler_switch = None
 
 
 
@@ -548,6 +571,7 @@ class MultizonePIDManualUnlockSwitch(SwitchEntity):
                 lambda: self._coordinator.unregister_pid_listener(self._on_pid_change)
             )
 
+    @callback
     def _on_pid_change(self) -> None:
         self.async_write_ha_state()
 

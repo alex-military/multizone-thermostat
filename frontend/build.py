@@ -22,6 +22,8 @@ WWW_DIR = ROOT_DIR / "custom_components" / "multizone_thermostat" / "www"
 
 OUTPUT_CARD = WWW_DIR / "multizone-thermostat-card.js"
 OUTPUT_CARD_V24 = WWW_DIR / "multizone-thermostat-card-v24.js"
+WIKI_CARD = ROOT_DIR / "docs" / "wiki" / "multizone-thermostat-card.js"
+DOCS_CARD = ROOT_DIR / "docs" / "multizone-thermostat-card.js"
 
 SRC_FILES = [
     "00_header.js",
@@ -60,23 +62,35 @@ def build(check_only: bool = False) -> bool:
     WWW_DIR.mkdir(parents=True, exist_ok=True)
 
     if check_only:
-        if not OUTPUT_CARD.exists():
-            print("Check failed: Output card does not exist.", file=sys.stderr)
-            return False
-        current_content = OUTPUT_CARD.read_text(encoding="utf-8")
-        if current_content != bundle:
-            print("Check failed: Production bundle is out-of-date! Run 'python frontend/build.py'.", file=sys.stderr)
-            return False
-        print("Check passed: Production bundle is up-to-date.")
+        targets = [OUTPUT_CARD, OUTPUT_CARD_V24]
+        if WIKI_CARD.parent.exists():
+            targets.append(WIKI_CARD)
+        if DOCS_CARD.parent.exists():
+            targets.append(DOCS_CARD)
+        for target_path in targets:
+            if not target_path.exists():
+                print(f"Check failed: Output card does not exist: {target_path}", file=sys.stderr)
+                return False
+            if target_path.read_text(encoding="utf-8") != bundle:
+                print(
+                    f"Check failed: Production bundle is out-of-date ({target_path.name})! Run 'python frontend/build.py'.",
+                    file=sys.stderr,
+                )
+                return False
+        print("Check passed: Production bundles are up-to-date.")
         return True
 
     OUTPUT_CARD.write_text(bundle, encoding="utf-8")
     OUTPUT_CARD_V24.write_text(bundle, encoding="utf-8")
+    if WIKI_CARD.parent.exists():
+        WIKI_CARD.write_text(bundle, encoding="utf-8")
+    if DOCS_CARD.parent.exists():
+        DOCS_CARD.write_text(bundle, encoding="utf-8")
 
     lines_count = len(bundle.splitlines())
     size_kb = round(len(bundle.encode("utf-8")) / 1024, 1)
 
-    print(f"Bundled {len(SRC_FILES)} files -> {OUTPUT_CARD.name} & {OUTPUT_CARD_V24.name}")
+    print(f"Bundled {len(SRC_FILES)} files -> {OUTPUT_CARD.name}, {OUTPUT_CARD_V24.name}, docs/{DOCS_CARD.name} & docs/wiki/{WIKI_CARD.name}")
     print(f"Total lines: {lines_count} | Size: {size_kb} KB")
     return True
 

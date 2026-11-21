@@ -1,4 +1,22 @@
 function getTempUnit(hass) { return (hass && hass.config && hass.config.unit_system && hass.config.unit_system.temperature) || '°C'; }
+function isFahrenheit(hass) { return getTempUnit(hass) === '°F'; }
+function celsiusToDisplay(val, hass) {
+  if (typeof val !== 'number' || isNaN(val)) return val;
+  return isFahrenheit(hass) ? (val * 9 / 5 + 32) : val;
+}
+function celsiusDeltaToDisplay(val, hass) {
+  if (typeof val !== 'number' || isNaN(val)) return val;
+  return isFahrenheit(hass) ? (val * 1.8) : val;
+}
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 // Helper function to match entity_id to zone slug accurately without false positives
 function isZoneEntityMatch(id, slug) {
   if (!id || !slug) return false;

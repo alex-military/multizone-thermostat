@@ -5,9 +5,18 @@ from datetime import datetime, timedelta
 import homeassistant.util.dt as dt_util
 
 from .calendar_parser import parse_calendar_event
-from .const import CONF_ZONE_NAME, make_zone_entity_id, HVAC_MODE_COOL
+from .const import (
+    CONF_ZONE_NAME,
+    GLOBAL_PRESET_AWAY,
+    HVAC_MODE_COOL,
+    get_state_temp_unit,
+    make_zone_entity_id,
+    resolve_zone_id_safe,
+    to_celsius,
+)
 
 _LOGGER = logging.getLogger(__name__)
+MAX_SMART_START_HOURS = 6.0
 
 class CalendarManager:
     """Manages Home Assistant Calendar integration and Smart Start logic."""
@@ -18,6 +27,7 @@ class CalendarManager:
         
         # State variables
         self.active_event_id: str | None = None
+        self.active_global_preset: str | None = None
         self.current_event_overrides: dict[str, float] = {}
         self.smart_start_overrides: dict[str, float] = {}
         self.mode_overrides: dict[str, str] = {}
@@ -37,6 +47,36 @@ class CalendarManager:
     def temp_overrides(self) -> dict[str, float]:
         """Combine active current event overrides with smart start overrides."""
         return {**self.current_event_overrides, **self.smart_start_overrides}
+
+    def set_temp_override(self, climate_id: str, temp: float) -> None:
+        """Update an active calendar or Smart Start override temperature."""
+        climate_id = resolve_zone_id_safe(self.coordinator, climate_id)
+        updated = False
+        if climate_id in self.current_event_overrides:
+            self.current_event_overrides[climate_id] = temp
+            updated = True
+        if climate_id in self.smart_start_overrides:
+            self.smart_start_overrides[climate_id] = temp
+            updated = True
+        if not updated:
+            self.current_event_overrides[climate_id] = temp
+
+    def clear_temp_override(self, climate_id: str) -> None:
+        """Clear any calendar or Smart Start temperature override for a zone."""
+        climate_id = resolve_zone_id_safe(self.coordinator, climate_id)
+        self.current_event_overrides.pop(climate_id, None)
+        self.smart_start_overrides.pop(climate_id, None)
+
+    def _get_thermal_model(self, climate_id: str):
+        """Look up zone ThermalObserver from ZoneController or coordinator fallback."""
+        climate_id = resolve_zone_id_safe(self.coordinator, climate_id)
+        zc = getattr(self.coordinator, "zone_controller", None)
+        if zc is not None and isinstance(getattr(zc, "thermal_models", None), dict):
+            obs = zc.thermal_models.get(climate_id)
+            if obs is not None:
+                return obs
+        models = getattr(self.coordinator, "_thermal_models", None)
+        return models.get(climate_id) if isinstance(models, dict) else None
 
     def _parse_event_datetime(self, raw_val: str | None) -> datetime | None:
         """Parse an ISO datetime or all-day YYYY-MM-DD date string into a local timezone-aware datetime."""
@@ -144,23 +184,32 @@ class CalendarManager:
                 
                 if self.pre_calendar_preset is None:
                     self.pre_calendar_preset = self.coordinator.zone_manager.current_global_preset
-                
+
+                is_away_locked = (
+                    self.coordinator.zone_manager.current_global_preset == GLOBAL_PRESET_AWAY
+                    and self.active_global_preset is None
+                )
+
                 # Clear temporary overrides from previous events
                 self.current_event_overrides.clear()
                 self.mode_overrides.clear()
-                
+                saw_global_preset = False
+
                 # Parse all active events (later events override earlier ones if conflict)
                 for current_event in current_events:
                     parsed = parse_calendar_event(current_event.get("summary", ""))
-                    
-                    # Apply Global Settings
+
+                    # Apply Global Settings (protect geofenced AWAY unless event explicitly sets AWAY)
                     if parsed["global_preset"]:
-                        await self.coordinator.zone_manager.async_set_global_preset(parsed["global_preset"])
-                        
+                        saw_global_preset = True
+                        if not is_away_locked or parsed["global_preset"] == GLOBAL_PRESET_AWAY:
+                            self.active_global_preset = parsed["global_preset"]
+                            await self.coordinator.zone_manager.async_set_global_preset(parsed["global_preset"])
+
                     master_mode = str(getattr(self.coordinator, "master_hvac_mode", "heat")).lower()
                     is_cool = (master_mode in ("cool", HVAC_MODE_COOL.lower()))
 
-                    if parsed["global_temperature"] is not None:
+                    if parsed["global_temperature"] is not None and not is_away_locked:
                         for zone in self.coordinator.zones:
                             climate_id = make_zone_entity_id(zone[CONF_ZONE_NAME])
                             if is_cool and hasattr(self.coordinator, "can_zone_cool") and not self.coordinator.can_zone_cool(climate_id):
@@ -213,10 +262,17 @@ class CalendarManager:
                                         climate_id, 
                                         target_temp
                                     )
-                            else:
+                            elif not is_away_locked:
                                 # Save temporarily
                                 self.current_event_overrides[climate_id] = target_temp
-                                
+
+                # If overlapping transition moved to an event without global preset, restore prior preset
+                if not saw_global_preset and self.active_global_preset is not None:
+                    if self.pre_calendar_preset is not None and not is_away_locked:
+                        if self.coordinator.zone_manager.current_global_preset != GLOBAL_PRESET_AWAY or self.active_global_preset == GLOBAL_PRESET_AWAY:
+                            await self.coordinator.zone_manager.async_set_global_preset(self.pre_calendar_preset)
+                    self.active_global_preset = None
+
                 # Trigger a refresh of climate entities and sync TRVs
                 self._notify_climates_and_sync_trvs()
         else:
@@ -226,9 +282,11 @@ class CalendarManager:
                 self.current_event_overrides.clear()
                 self.mode_overrides.clear()
                 
-                if self.pre_calendar_preset is not None:
-                    await self.coordinator.zone_manager.async_set_global_preset(self.pre_calendar_preset)
-                    self.pre_calendar_preset = None
+                if self.pre_calendar_preset is not None and self.active_global_preset is not None:
+                    if self.coordinator.zone_manager.current_global_preset != GLOBAL_PRESET_AWAY or self.active_global_preset == GLOBAL_PRESET_AWAY:
+                        await self.coordinator.zone_manager.async_set_global_preset(self.pre_calendar_preset)
+                self.pre_calendar_preset = None
+                self.active_global_preset = None
                     
                 self._notify_climates_and_sync_trvs()
 
@@ -246,7 +304,11 @@ class CalendarManager:
         evaluated_zones: set[str] = set()
         master_mode = str(getattr(self.coordinator, "master_hvac_mode", "heat")).lower()
         is_cool = (master_mode in ("cool", HVAC_MODE_COOL.lower()))
-        for fut_event in future_events:
+        is_away_geofence = (
+            getattr(self.coordinator.zone_manager, "current_global_preset", None) == GLOBAL_PRESET_AWAY
+            and self.active_global_preset is None
+        )
+        for fut_event in future_events if not is_away_geofence else []:
             start_time = self._parse_event_datetime(fut_event.get("start"))
             if not start_time:
                 continue
@@ -289,25 +351,38 @@ class CalendarManager:
                         target = presets.get(parsed_next["global_preset"], {}).get(climate_id, {}).get("target_temp")
                     
                 if target is not None:
-                    evaluated_zones.add(climate_id)
                     current_temp = None
-                    state = self.hass.states.get(climate_id)
-                    if state:
-                        current_temp = state.attributes.get("current_temperature")
-
-                    master_mode = str(getattr(self.coordinator, "master_hvac_mode", "heat")).lower()
-                    is_cool = (master_mode == "cool")
+                    c_ent = getattr(self.coordinator, "_climate_entities", {}).get(climate_id)
+                    ent_cur = getattr(c_ent, "current_temperature", None) if c_ent is not None else None
+                    if isinstance(ent_cur, (int, float)) and not isinstance(ent_cur, bool):
+                        current_temp = float(ent_cur)
+                    else:
+                        state = self.hass.states.get(climate_id)
+                        if state and state.attributes:
+                            raw_cur = state.attributes.get("current_temperature")
+                            if raw_cur is not None:
+                                try:
+                                    current_temp = to_celsius(
+                                        float(raw_cur),
+                                        get_state_temp_unit(state),
+                                        self.hass,
+                                    )
+                                except (ValueError, TypeError):
+                                    current_temp = None
 
                     need_smart_start = False
                     delta_t = 0.0
                     rate = 1.0
+                    thermal_model = self._get_thermal_model(climate_id)
 
                     if is_cool:
                         if current_temp is not None and current_temp > target:
                             delta_t = current_temp - target
-                            thermal_model = getattr(self.coordinator, "_thermal_models", {}).get(climate_id)
+                            ac_rate = getattr(thermal_model, "active_cooling_rate", 0.0) if thermal_model else 0.0
                             c_rate = getattr(thermal_model, "cooling_rate", 0.0) if thermal_model else 0.0
-                            if c_rate > 0.05:
+                            if ac_rate > 0.05:
+                                rate = ac_rate
+                            elif c_rate > 0.05:
                                 rate = c_rate
                             else:
                                 h_rate = getattr(thermal_model, "heating_rate", 0.0) if thermal_model else 0.0
@@ -316,20 +391,20 @@ class CalendarManager:
                     else:
                         if current_temp is not None and current_temp < target:
                             delta_t = target - current_temp
-                            thermal_model = getattr(self.coordinator, "_thermal_models", {}).get(climate_id)
                             h_rate = getattr(thermal_model, "heating_rate", 0.0) if thermal_model else 0.0
                             if h_rate > 0.05:
                                 rate = h_rate
                                 need_smart_start = True
 
                     if need_smart_start and rate > 0:
-                        hours_needed = delta_t / rate
+                        hours_needed = min(MAX_SMART_START_HOURS, max(0.0, delta_t / rate))
                         time_needed = timedelta(hours=hours_needed)
 
                         if now + time_needed >= start_time:
                             _LOGGER.info("Smart Start Active for %s! Target: %.1f, Need: %s", climate_id, target, time_needed)
                             # Override current target temp temporarily
                             self.smart_start_overrides[climate_id] = target
+                            evaluated_zones.add(climate_id)
                             # Wake up zone if temporarily bypassed/off by calendar
                             if self.mode_overrides.get(climate_id) in ("off", "bypass"):
                                 del self.mode_overrides[climate_id]

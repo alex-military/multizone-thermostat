@@ -35,11 +35,21 @@ from ..const import (
     CONF_VALVE_SCALE,
     DEFAULT_VALVE_SCALE,
     CONF_ZONE_TEMP_SENSOR,
+    CONF_ZONE_HUMIDITY_SENSOR,
     CONF_ZONE_TARGET_TEMP,
     CONF_ZONE_TRV_SYNC,
     CONF_ZONE_WINDOW_SENSOR,
     CONF_ZONE_ANTI_SEIZE,
     CONF_ZONE_CALIBRATIONS,
+    CONF_ZONE_TRV_CALIBRATION_MODE,
+    CONF_ZONE_TRV_SENSOR_SELECTS,
+    DEFAULT_TRV_CALIB_MODE,
+    CONF_ZONE_TRV_CONTROL_MODE,
+    DEFAULT_TRV_CONTROL_MODE,
+    CONF_ZONE_TRV_OPEN_BOOST,
+    DEFAULT_TRV_OPEN_BOOST,
+    CONF_ZONE_TRV_CLOSE_OFFSET,
+    DEFAULT_TRV_CLOSE_OFFSET,
     CONF_ZONE_ALLOW_PASSIVE_HEAT,
     CONF_ZONE_SENSOR_TIMEOUT,
     DEFAULT_SENSOR_TIMEOUT_MIN,
@@ -117,6 +127,7 @@ from .validators import (
     validate_geofencing,
     validate_plants_selection,
     validate_heat_pump_temps,
+    validate_heat_pump_cool_temps,
 )
 from ..plant_diagnostics.anomalies import find_suggested_dhw_sensor
 from .schemas import *
@@ -127,6 +138,7 @@ from .helpers import (
     _get_temperature_sensor_entities,
     _remove_entity_from_registry,
     flatten_zone_user_input,
+    parse_trv_calibration_input,
 )
 from .options_flow import MultizoneOptionsFlow
 
@@ -260,12 +272,13 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             self._boiler_switch = user_input[CONF_BOILER_SWITCH]
             self._dhw_active_sensor = user_input.get(CONF_DHW_ACTIVE_SENSOR) or None
+            self._has_mixing_valve = user_input.get(CONF_HAS_MIXING_VALVE, DEFAULT_HAS_MIXING_VALVE)
             if self._enable_hp:
                 return await self.async_step_heat_pump()
             return await self.async_step_add_zone()
 
         suggested_dhw = self._dhw_active_sensor or find_suggested_dhw_sensor(self.hass)
-        schema = get_boiler_relay_schema(suggested_dhw)
+        schema = get_boiler_relay_schema(suggested_dhw, self._has_mixing_valve)
         return self.async_show_form(
             step_id="boiler_relay",
             data_schema=schema,
@@ -316,6 +329,8 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._hp_cool_max_temp = user_input.get(CONF_HEAT_PUMP_COOL_MAX_TEMP, DEFAULT_HP_COOL_MAX_TEMP)
             self._has_mixing_valve = user_input.get(CONF_HAS_MIXING_VALVE, self._has_mixing_valve)
             errors.update(validate_heat_pump_temps(self._hp_min_temp, self._hp_max_temp))
+            if self._hp_cooling:
+                errors.update(validate_heat_pump_cool_temps(self._hp_cool_min_temp, self._hp_cool_max_temp))
             if not errors:
                 return await self.async_step_add_zone()
 
@@ -368,6 +383,11 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_ZONE_SENSOR_TIMEOUT: user_input.get(CONF_ZONE_SENSOR_TIMEOUT, DEFAULT_SENSOR_TIMEOUT_MIN),
                     CONF_ZONE_TARGET_TEMP: user_input.get(CONF_ZONE_TARGET_TEMP, 20.0),
                     CONF_ZONE_CALIBRATIONS: {},
+                    CONF_ZONE_TRV_CALIBRATION_MODE: user_input.get(CONF_ZONE_TRV_CALIBRATION_MODE, DEFAULT_TRV_CALIB_MODE),
+                    CONF_ZONE_TRV_SENSOR_SELECTS: {},
+                    CONF_ZONE_TRV_CONTROL_MODE: user_input.get(CONF_ZONE_TRV_CONTROL_MODE, DEFAULT_TRV_CONTROL_MODE),
+                    CONF_ZONE_TRV_OPEN_BOOST: float(user_input.get(CONF_ZONE_TRV_OPEN_BOOST, DEFAULT_TRV_OPEN_BOOST)),
+                    CONF_ZONE_TRV_CLOSE_OFFSET: float(user_input.get(CONF_ZONE_TRV_CLOSE_OFFSET, DEFAULT_TRV_CLOSE_OFFSET)),
                     CONF_ZONE_EMITTER_TYPE: user_input.get(CONF_ZONE_EMITTER_TYPE, DEFAULT_ZONE_EMITTER_TYPE),
                     # Phase 11 Split Settings
                     CONF_ZONE_SPLIT_CLIMATE: split_climate,
@@ -380,7 +400,10 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 
                 if user_input.get(CONF_ZONE_TEMP_SENSOR) and user_input[CONF_ZONE_TEMP_SENSOR] != "none":
                     zone_data[CONF_ZONE_TEMP_SENSOR] = user_input[CONF_ZONE_TEMP_SENSOR]
-                    
+
+                if user_input.get(CONF_ZONE_HUMIDITY_SENSOR) and user_input[CONF_ZONE_HUMIDITY_SENSOR] != "none":
+                    zone_data[CONF_ZONE_HUMIDITY_SENSOR] = user_input[CONF_ZONE_HUMIDITY_SENSOR]
+
                 if user_input.get(CONF_ZONE_WINDOW_SENSOR) and user_input[CONF_ZONE_WINDOW_SENSOR] != "none":
                     zone_data[CONF_ZONE_WINDOW_SENSOR] = user_input[CONF_ZONE_WINDOW_SENSOR]
                     
@@ -411,7 +434,12 @@ class MultizoneConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     ) -> config_entries.FlowResult:
         """Step 3: Map calibration entities for TRVs."""
         if user_input is not None:
-            self._current_zone_data[CONF_ZONE_CALIBRATIONS] = user_input
+            climates = self._current_zone_data.get(CONF_ZONE_CLIMATES, [])
+            calibrations, sensor_selects = parse_trv_calibration_input(
+                user_input, climates=climates
+            )
+            self._current_zone_data[CONF_ZONE_CALIBRATIONS] = calibrations
+            self._current_zone_data[CONF_ZONE_TRV_SENSOR_SELECTS] = sensor_selects
             self._zones.append(self._current_zone_data)
             self._current_zone_data = None
             return await self.async_step_another_zone()

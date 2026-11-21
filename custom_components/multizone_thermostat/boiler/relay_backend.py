@@ -15,8 +15,9 @@ from homeassistant.const import (
 )
 
 from .base import BoilerBackend
+from .valve_readiness import evaluate_trvs_ready
 from ..pwm_engine import PWMEngine
-from ..const import CONF_ZONE_NAME, CONF_ZONE_CLIMATES, ZONE_MODE_PRIMARY, ZONE_MODE_SECONDARY, make_zone_entity_id
+from ..const import CONF_ZONE_NAME, CONF_ZONE_CLIMATES, HVAC_MODE_COOL, ZONE_MODE_PRIMARY, ZONE_MODE_SECONDARY, make_zone_entity_id
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -51,6 +52,7 @@ class RelayBoilerBackend(BoilerBackend):
         self._last_logged_reason_key: str = "INIT"
         self._unavailable_warned: bool = False
         self._last_demand = 0.0
+        self._last_peak_zone: str | None = None
         self._last_frost_emergency = False
         # Command confirmation tracking: None | ("on"/"off", monotonic_ts)
         self._pending_command: tuple[str, float] | None = None
@@ -135,6 +137,11 @@ class RelayBoilerBackend(BoilerBackend):
         """Re-check Master, DHW and demand before igniting after valve delay."""
         if self._last_frost_emergency:
             return True
+        if self._last_peak_zone == "Anti-Seize":
+            return self._last_demand > 0.0
+        anti_seize = getattr(self.coordinator, "anti_seize_manager", None)
+        if anti_seize is not None and getattr(anti_seize, "is_running", False) is True:
+            return self._last_demand > 0.0
         if not self.coordinator.get_master_state():
             return False
         if self.coordinator.is_dhw_active:
@@ -225,6 +232,7 @@ class RelayBoilerBackend(BoilerBackend):
     async def async_update(self, demand: float, peak_zone: str | None, frost_emergency: bool) -> None:
         """Feed Peak Load to PWM Engine and control the relay."""
         self._last_demand = demand
+        self._last_peak_zone = peak_zone
         self._last_frost_emergency = frost_emergency
         wanted_state = self._boiler_pwm.calculate(demand)
 
@@ -242,17 +250,19 @@ class RelayBoilerBackend(BoilerBackend):
             else:
                 self._unavailable_warned = False
         current_boiler_on = boiler_state is not None and boiler_state.state == STATE_ON
+        is_valid_state = boiler_state is not None and boiler_state.state in (STATE_ON, STATE_OFF)
 
         if current_boiler_on and hasattr(self.coordinator, "reset_last_active_time"):
             self.coordinator.reset_last_active_time()
 
-        if current_boiler_on and not self._last_known_boiler_on:
-            if self._pending_command is None or self._pending_command[0] != "on":
-                self._last_boiler_change = time.monotonic()
-        elif not current_boiler_on and self._last_known_boiler_on:
-            if self._pending_command is None or self._pending_command[0] != "off":
-                self._last_boiler_change = time.monotonic()
-        self._last_known_boiler_on = current_boiler_on
+        if is_valid_state:
+            if current_boiler_on and not self._last_known_boiler_on:
+                if self._pending_command is None or self._pending_command[0] != "on":
+                    self._last_boiler_change = time.monotonic()
+            elif not current_boiler_on and self._last_known_boiler_on:
+                if self._pending_command is None or self._pending_command[0] != "off":
+                    self._last_boiler_change = time.monotonic()
+            self._last_known_boiler_on = current_boiler_on
 
         # Diagnostics follow the CONFIRMED entity state, not the command sent
         diag = getattr(self.coordinator, "plant_diagnostics", None)
@@ -263,69 +273,37 @@ class RelayBoilerBackend(BoilerBackend):
                 diag.record_boiler_state(False)
         if self._pending_command is not None:
             cmd, ts = self._pending_command
-            if (cmd == "on" and current_boiler_on) or (cmd == "off" and boiler_state is not None and not current_boiler_on):
+            if (cmd == "on" and current_boiler_on) or (
+                cmd == "off" and boiler_state is not None and boiler_state.state == STATE_OFF
+            ):
                 self._pending_command = None
             elif time.monotonic() - ts > COMMAND_CONFIRM_TIMEOUT:
                 _LOGGER.warning("Boiler switch %s did not confirm '%s' within %ss", self.boiler_switch, cmd, COMMAND_CONFIRM_TIMEOUT)
                 self.coordinator.record_diagnostic_event("BOILER_COMMAND_TIMEOUT", {"switch": self.boiler_switch, "command": cmd})
                 self._pending_command = None
 
-        # DHW priority: heating request is suppressed, so release the relay even if min_cycle_on is active
+        # DHW & Cooling priorities: heating request is suppressed, so release the relay even if min_cycle_on is active
         dhw_override = bool(getattr(self.coordinator, "is_dhw_active", False)) and not frost_emergency
+        cooling_override = getattr(self.coordinator, "master_hvac_mode", None) == HVAC_MODE_COOL and not frost_emergency
 
         if wanted_state and not current_boiler_on:
             time_since_change = time.monotonic() - self._last_boiler_change
             min_off_sec = self._min_cycle_off * 60
-            if time_since_change < min_off_sec:
+            if time_since_change < min_off_sec and not frost_emergency:
+                self.cancel_pending_tasks()
                 self._status_reason = f"HOLD_OFF - min_cycle_off active ({round(min_off_sec - time_since_change)}s remaining)"
                 _LOGGER.debug("PWM Tick: Boiler wants to turn ON, but min_cycle_off (%.0fs) hasn't elapsed. Waiting...", min_off_sec)
                 return
 
             _LOGGER.debug("PWM Tick: Boiler -> ON (Peak Demand: %.1f%%)", demand)
 
-            trvs_ready = False
-            for zone in self.coordinator.zones:
-                climate_id = make_zone_entity_id(zone[CONF_ZONE_NAME])
-                mode = self.coordinator.get_zone_mode(climate_id)
-                if mode in (ZONE_MODE_PRIMARY, ZONE_MODE_SECONDARY) and self.coordinator.get_zone_demand(climate_id) > 0:
-                    trv_list = zone.get(CONF_ZONE_CLIMATES) or zone.get("climates") or zone.get("climate_entities") or []
-                    if not trv_list:
-                        # Zone has no TRVs (e.g. relay only). Heat path is fully open by default.
-                        trvs_ready = True
-                        break
-                    
-                    for trv in trv_list:
-                        trv_state = self.hass.states.get(trv)
-                        if trv_state and trv_state.state not in ("unavailable", "unknown"):
-                            position = None
-                            for attr in ["position", "valve_position", "pi_heating_demand", "heating_demand", "valve_state"]:
-                                if attr in trv_state.attributes:
-                                    position = trv_state.attributes[attr]
-                                    break
-                            if position is not None:
-                                try:
-                                    if float(position) > 10.0:
-                                        trvs_ready = True
-                                        break
-                                except (ValueError, TypeError):
-                                    if isinstance(position, str) and position.lower() in ("open", "heating", "on", "true"):
-                                        trvs_ready = True
-                                        break
-                            else:
-                                trvs_ready = True
-                                break
-                if trvs_ready:
-                    break
-
-            has_any_trvs = any(
-                (zone.get(CONF_ZONE_CLIMATES) or zone.get("climates") or zone.get("climate_entities") or [])
-                for zone in self.coordinator.zones
-            )
+            trvs_ready, has_any_trvs = evaluate_trvs_ready(self.hass, self.coordinator)
             if not trvs_ready and has_any_trvs and not frost_emergency and peak_zone != "Anti-Seize":
                 if self._trv_wait_start is None:
                     self._trv_wait_start = time.monotonic()
                 elapsed = time.monotonic() - self._trv_wait_start
                 if elapsed < 120.0:
+                    self.cancel_pending_tasks()
                     self._status_reason = f"HOLD_TRV_CLOSED - Waiting for TRVs to open ({round(120.0 - elapsed)}s remaining)"
                     _LOGGER.warning("PWM Tick: Boiler wants to turn ON, but no TRVs are open > 10%%. Waiting for TRVs to open (%.0fs/120s)", elapsed)
                     return
@@ -334,7 +312,7 @@ class RelayBoilerBackend(BoilerBackend):
 
             self._trv_wait_start = None
 
-            if self._valve_delay > 0:
+            if self._valve_delay > 0 and peak_zone != "Anti-Seize":
                 if not self._pending_boiler_task:
                     self._status_reason = f"WAITING_VALVES - Valve delay active ({self._valve_delay}s)"
                     _LOGGER.debug("Waiting %s seconds for valves to open...", self._valve_delay)
@@ -346,7 +324,7 @@ class RelayBoilerBackend(BoilerBackend):
             self._trv_wait_start = None
             time_since_change = time.monotonic() - self._last_boiler_change
             min_on_sec = self._min_cycle_on * 60
-            if current_boiler_on and time_since_change < min_on_sec and not dhw_override:
+            if current_boiler_on and time_since_change < min_on_sec and not dhw_override and not cooling_override:
                 self._status_reason = f"HOLD_ON - min_cycle_on active ({round(min_on_sec - time_since_change)}s remaining)"
                 _LOGGER.debug("PWM Tick: Boiler wants to turn OFF, but min_cycle_on (%.0fs) hasn't elapsed. Waiting...", min_on_sec)
                 return

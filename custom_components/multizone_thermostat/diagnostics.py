@@ -91,15 +91,18 @@ async def async_get_config_entry_diagnostics(
 
     # 3. Zones Diagnostic Details
     zones_diag: dict[str, Any] = {}
-    pids_cool = getattr(coordinator, "_pids_cool", {})
+    pids_cool = getattr(coordinator, "_pids_cool", None)
     if not pids_cool:
         try:
-            pids_cool = coordinator.zone_controller.pids_cool()
+            raw_pids_cool = coordinator.zone_controller.pids_cool
+            pids_cool = raw_pids_cool() if callable(raw_pids_cool) else raw_pids_cool
         except AttributeError:
             pids_cool = {}
+    if not isinstance(pids_cool, dict):
+        pids_cool = {}
     for zone in coordinator.zones:
         z_name = zone.get("name", "Unknown")
-        climate_id = make_zone_entity_id(z_name)
+        climate_id = zone.get("climate_id") or make_zone_entity_id(z_name)
 
         # Get climate entity instance if registered
         climate_entity = coordinator._climate_entities.get(climate_id)

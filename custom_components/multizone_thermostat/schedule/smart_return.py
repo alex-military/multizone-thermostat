@@ -1,7 +1,7 @@
 """Smart Return and Thermal Radar preheating engine for Multizone Thermostat."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 from typing import Any
 
@@ -12,7 +12,10 @@ from ..const import (
     CONF_ZONE_NAME,
     DEFAULT_SMART_START_HEATING_RATE,
     MAX_SMART_START_HOURS,
+    get_state_temp_unit,
     make_zone_entity_id,
+    resolve_zone_id_safe,
+    to_celsius,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -63,31 +66,16 @@ class SmartReturnPlanner:
         if self._resolve_preset_temp_fn:
             try:
                 if actual_cid is not None:
-                    return float(self._resolve_preset_temp_fn(preset, actual_cid))
+                    try:
+                        return float(self._resolve_preset_temp_fn(preset, actual_cid, hvac_mode=actual_hvac_mode))
+                    except TypeError:
+                        return float(self._resolve_preset_temp_fn(preset, actual_cid))
                 return float(self._resolve_preset_temp_fn(preset, actual_hvac_mode))
             except TypeError:
                 try:
                     return float(self._resolve_preset_temp_fn(preset))
                 except (ValueError, TypeError, AttributeError):
                     pass
-
-        if hasattr(self.coordinator, "get_DynamicPresets") and callable(self.coordinator.get_DynamicPresets):
-            dyn = self.coordinator.get_DynamicPresets()
-            if isinstance(dyn, dict):
-                if actual_hvac_mode == "cool":
-                    if f"{preset}_cool" in dyn:
-                        val = dyn[f"{preset}_cool"]
-                        if isinstance(val, (int, float)):
-                            return float(val)
-                    if preset in dyn:
-                        val = dyn[preset]
-                        if isinstance(val, (int, float)):
-                            return float(val)
-                else:
-                    if preset in dyn:
-                        val = dyn[preset]
-                        if isinstance(val, (int, float)):
-                            return float(val)
 
         zm = getattr(self.coordinator, "zone_manager", None)
         if zm is not None and hasattr(zm, "get_preset_temperature") and actual_cid:
@@ -102,6 +90,7 @@ class SmartReturnPlanner:
 
     def get_zone_current_temp(self, climate_id: str) -> float | None:
         """Get current temperature for zone from climate entity or HA state."""
+        climate_id = resolve_zone_id_safe(self.coordinator, climate_id)
         entities = getattr(self.coordinator, "_climate_entities", None)
         if isinstance(entities, dict):
             climate_ent = entities.get(climate_id)
@@ -114,11 +103,12 @@ class SmartReturnPlanner:
             if st and hasattr(st, "attributes") and isinstance(st.attributes, dict):
                 cur = st.attributes.get("current_temperature")
                 if isinstance(cur, (int, float)):
-                    return float(cur)
+                    return to_celsius(float(cur), get_state_temp_unit(st), self.hass)
         return None
 
     def get_zone_heating_rate(self, climate_id: str) -> float:
         """Get zone heating rate from thermal model or default fallback."""
+        climate_id = resolve_zone_id_safe(self.coordinator, climate_id)
         models = getattr(self.coordinator, "_thermal_models", None)
         if isinstance(models, dict):
             model = models.get(climate_id)
@@ -129,42 +119,44 @@ class SmartReturnPlanner:
         return float(DEFAULT_SMART_START_HEATING_RATE)
 
     def get_zone_cooling_rate(self, climate_id: str) -> float:
-        """Get zone cooling rate from thermal model or default fallback."""
-        models = getattr(self.coordinator, "_thermal_models", None)
-        if isinstance(models, dict):
-            model = models.get(climate_id)
-            if model is not None:
-                rate = getattr(model, "cooling_rate", None)
-                if isinstance(rate, (int, float)) and rate > 0.05:
-                    return float(rate)
+        """Get zone cooling rate (preferring active cooling rate) from thermal model or default fallback."""
+        climate_id = resolve_zone_id_safe(self.coordinator, climate_id)
+        zc = getattr(self.coordinator, "zone_controller", None)
+        zc_models = getattr(zc, "thermal_models", None) if zc is not None else None
+        coord_models = getattr(self.coordinator, "_thermal_models", None)
+        for models in (zc_models, coord_models):
+            if isinstance(models, dict):
+                model = models.get(climate_id)
+                if model is not None:
+                    active_rate = getattr(model, "active_cooling_rate", None)
+                    if isinstance(active_rate, (int, float)) and active_rate > 0.05:
+                        return float(active_rate)
+                    rate = getattr(model, "cooling_rate", None)
+                    if isinstance(rate, (int, float)) and rate > 0.05:
+                        return float(rate)
         return float(DEFAULT_SMART_START_HEATING_RATE)
 
     def parse_arrival_time(self, arrival_time: str | datetime, now: datetime) -> datetime:
-        """Parse arrival time string ('HH:MM' or ISO) or datetime relative to now."""
+        """Parse arrival time string ('HH:MM', 'HH:MM:SS', or ISO) or datetime relative to local now."""
+        now = self._as_local(now)
         if isinstance(arrival_time, datetime):
-            target_dt = arrival_time
-            if target_dt.tzinfo is not None and now.tzinfo is None:
-                target_dt = target_dt.replace(tzinfo=None)
-            elif target_dt.tzinfo is None and now.tzinfo is not None:
-                target_dt = target_dt.replace(tzinfo=now.tzinfo)
-            return target_dt
+            return self._as_local(arrival_time)
 
         val = str(arrival_time).strip()
-        if ":" in val and len(val) <= 5:
-            h, m = map(int, val.split(":"))
-            target_dt = now.replace(hour=h, minute=m, second=0, microsecond=0)
-            if target_dt <= now:
-                target_dt += timedelta(days=1)
-            return target_dt
+        if ":" in val and "T" not in val and "-" not in val and len(val) <= 8:
+            parts = [int(p) for p in val.split(":")]
+            if len(parts) in (2, 3):
+                h, m = parts[0], parts[1]
+                s = parts[2] if len(parts) == 3 else 0
+                target_dt = now.replace(hour=h, minute=m, second=s, microsecond=0)
+                if target_dt <= now:
+                    target_dt += timedelta(days=1)
+                return target_dt
 
         parsed = dt_util.parse_datetime(val)
         if parsed is None:
             parsed = datetime.fromisoformat(val)
-        if parsed.tzinfo is not None and now.tzinfo is None:
-            parsed = parsed.replace(tzinfo=None)
-        elif parsed.tzinfo is None and now.tzinfo is not None:
-            parsed = parsed.replace(tzinfo=now.tzinfo)
-        return parsed
+        return self._as_local(parsed)
 
     def calculate_plan(
         self,
@@ -226,7 +218,12 @@ class SmartReturnPlanner:
                     current_temp is not None and current_temp >= target_temp
                 )
 
-            ignition_dt = arrival_dt - timedelta(hours=hours_needed)
+            if arrival_dt.tzinfo is not None:
+                ignition_dt = self._as_local(
+                    arrival_dt.astimezone(timezone.utc) - timedelta(hours=hours_needed)
+                )
+            else:
+                ignition_dt = arrival_dt - timedelta(hours=hours_needed)
             plan[climate_id] = {
                 "zone_name": zone_name or climate_id,
                 "climate_id": climate_id,
@@ -257,13 +254,15 @@ class SmartReturnPlanner:
         get_cooling_rate_fn: Any = None,
     ) -> dict | None:
         """Evaluate if upcoming blocks require predictive pre-heating or pre-cooling."""
+        now = self._as_local(now)
         for next_b in future_blocks:
-            block_start_iso = next_b["start_dt"].isoformat()
+            block_start_dt = self._as_local(next_b["start_dt"])
+            block_start_iso = block_start_dt.isoformat()
 
             is_already_preheating = (
                 active_ss is not None
                 and active_ss.get("block_start") == block_start_iso
-                and now < next_b["start_dt"]
+                and now < block_start_dt
             )
 
             if is_already_preheating:
@@ -312,14 +311,14 @@ class SmartReturnPlanner:
                     should_precondition = True
 
             if should_precondition:
-                preheat_dt = next_b["start_dt"] - timedelta(hours=hours_needed)
-                check_now = now
-                if preheat_dt.tzinfo is not None and check_now.tzinfo is None:
-                    check_now = check_now.replace(tzinfo=preheat_dt.tzinfo)
-                elif preheat_dt.tzinfo is None and check_now.tzinfo is not None:
-                    preheat_dt = preheat_dt.replace(tzinfo=check_now.tzinfo)
+                if block_start_dt.tzinfo is not None:
+                    preheat_dt = self._as_local(
+                        block_start_dt.astimezone(timezone.utc) - timedelta(hours=hours_needed)
+                    )
+                else:
+                    preheat_dt = block_start_dt - timedelta(hours=hours_needed)
 
-                if check_now >= preheat_dt:
+                if now >= preheat_dt:
                     return {
                         "target_temp": float(next_b["target_temp"]),
                         "preset": next_b["preset"],

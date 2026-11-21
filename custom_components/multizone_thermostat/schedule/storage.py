@@ -4,6 +4,7 @@ from __future__ import annotations
 import copy
 from datetime import datetime, timedelta, time
 import logging
+import math
 from typing import Any
 
 import homeassistant.util.dt as dt_util
@@ -261,6 +262,9 @@ class ScheduleProfileStorage:
             return None
 
         ov = self.manual_overrides[climate_id]
+        if not isinstance(ov, dict):
+            self.manual_overrides.pop(climate_id, None)
+            return None
         ov_until_str = ov.get("until")
         ov_slot_id = ov.get("slot_id")
 
@@ -285,4 +289,12 @@ class ScheduleProfileStorage:
             self.manual_overrides.pop(climate_id, None)
             return None
 
-        return float(ov["target_temp"])
+        try:
+            temp_val = float(ov["target_temp"])
+        except (KeyError, ValueError, TypeError):
+            self.manual_overrides.pop(climate_id, None)
+            return None
+        if not math.isfinite(temp_val):
+            self.manual_overrides.pop(climate_id, None)
+            return None
+        return temp_val

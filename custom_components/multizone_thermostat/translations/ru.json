@@ -30,7 +30,8 @@
           "name": "Имя зоны",
           "temp_sensor": "Датчик температуры зоны",
           "target_temperature": "Базовая целевая температура",
-          "emitter_type": "Тип отопительного прибора"
+          "emitter_type": "Тип отопительного прибора",
+          "humidity_sensor": "Датчик влажности (необязательно)"
         },
         "sections": {
           "trv_settings": {
@@ -39,7 +40,11 @@
             "data": {
               "climate_entities": "Объект климата",
               "trv_preset_sync": "Включить синхронизацию пресетов TRV",
-              "authoritative_climate_sync": "Приоритетная синхронизация настенного термостата"
+              "authoritative_climate_sync": "Приоритетная синхронизация настенного термостата",
+              "trv_calibration_mode": "Режим калибровки TRV (Смещение / Внешняя темп.)",
+              "trv_control_mode": "Режим управления TRV (Стандартный или По запросу)",
+              "trv_open_boost": "Усиление открытия по запросу (°C выше комнатной/цели)",
+              "trv_close_offset": "Смещение закрытия по запросу (°C ниже комнатной в простое)"
             }
           },
           "valve_settings": {
@@ -84,12 +89,13 @@
         "data_description": {
           "name": "Понятное имя для этой зоны",
           "temp_sensor": "Основной датчик температуры окружающей среды зоны",
-          "target_temperature": "Целевая температура по умолчанию для этой зоны"
+          "target_temperature": "Целевая температура по умолчанию для этой зоны",
+          "humidity_sensor": "Дополнительный датчик влажности помещения для защиты от точки росы при охлаждении"
         }
       },
       "trv_calibration": {
-        "title": "Настройка TRV (датчик смещения)",
-        "description": "Выберите объекты смещения температуры (калибровки) для каждого TRV в зоне {zone_name}. Обычно это сущности `number`, предоставляемые интеграцией TRV (например, Better Thermostat, Z2M, ZHA). Если оставить пустым, будет использоваться компенсация целевой температуры.",
+        "title": "Настройка TRV (Смещение / Внешняя температура)",
+        "description": "Для каждого TRV в зоне {zone_name} выберите сущность смещения (`local_temperature_calibration`) или сущность внешней температуры (`external_temperature_input`). При желании выберите сущность `select` источника датчика (`...__sensor_select`, например `temperature_sensor_select`) для автоматического переключения remote/local при сбое датчика. Если оставить пустым, будет использоваться компенсация целевой температуры.",
         "data": {}
       },
       "another_zone": {
@@ -195,7 +201,8 @@
       "invalid_temp_range": "Минимальная температура должна быть ниже максимальной.",
       "no_actuators_selected": "Необходимо выбрать хотя бы одну сущность climate или switch для зоны.",
       "zone_name_exists": "Зона с таким именем уже существует.",
-      "no_plants_selected": "You must select at least one central heating plant (Gas boiler or Heat pump)."
+      "no_plants_selected": "You must select at least one central heating plant (Gas boiler or Heat pump).",
+      "hp_temps_invalid": "Минимальная температура отопления/охлаждения ТН должна быть ниже максимальной."
     }
   },
   "options": {
@@ -244,7 +251,8 @@
           "temp_sensor": "Zone Temperature Sensor",
           "target_temperature": "Base Target Temperature",
           "sensor_timeout_min": "Тайм-аут сторожевого таймера датчика (минуты)",
-          "emitter_type": "Тип отопительного прибора"
+          "emitter_type": "Тип отопительного прибора",
+          "humidity_sensor": "Датчик влажности (необязательно)"
         },
         "sections": {
           "trv_settings": {
@@ -253,7 +261,11 @@
             "data": {
               "climate_entities": "Объект климата",
               "trv_preset_sync": "Включить синхронизацию пресетов TRV",
-              "authoritative_climate_sync": "Приоритетная синхронизация настенного термостата"
+              "authoritative_climate_sync": "Приоритетная синхронизация настенного термостата",
+              "trv_calibration_mode": "Режим калибровки TRV (Смещение / Внешняя темп.)",
+              "trv_control_mode": "Режим управления TRV (Стандартный или По запросу)",
+              "trv_open_boost": "Усиление открытия по запросу (°C выше комнатной/цели)",
+              "trv_close_offset": "Смещение закрытия по запросу (°C ниже комнатной в простое)"
             }
           },
           "valve_settings": {
@@ -301,7 +313,8 @@
           "window_sensor": "Автоматически пропускать зону, когда этот датчик открыт",
           "sensor_timeout_min": "Максимальное время без обновлений перед переходом в безопасный режим",
           "name": "Понятное имя для этой зоны (заполняется из имени объекта климата)",
-          "trv_preset_sync": "Автоматически синхронизировать режим пресета при изменении режима HVAC (для физических клапанов TRV)"
+          "trv_preset_sync": "Автоматически синхронизировать режим пресета при изменении режима HVAC (для физических клапанов TRV)",
+          "humidity_sensor": "Дополнительный датчик влажности помещения для защиты от точки росы при охлаждении"
         }
       },
       "remove_zone": {
@@ -318,7 +331,8 @@
           "zone_name": "Зона",
           "temp_sensor": "Zone Temperature Sensor",
           "target_temperature": "Base Target Temperature",
-          "emitter_type": "Тип отопительного прибора"
+          "emitter_type": "Тип отопительного прибора",
+          "humidity_sensor": "Датчик влажности (необязательно)"
         },
         "sections": {
           "trv_settings": {
@@ -327,7 +341,11 @@
             "data": {
               "climate_entities": "TRV / Термостаты зоны",
               "trv_preset_sync": "Включить синхронизацию пресетов TRV",
-              "authoritative_climate_sync": "Приоритетная синхронизация настенного термостата"
+              "authoritative_climate_sync": "Приоритетная синхронизация настенного термостата",
+              "trv_calibration_mode": "Режим калибровки TRV (Смещение / Внешняя темп.)",
+              "trv_control_mode": "Режим управления TRV (Стандартный или По запросу)",
+              "trv_open_boost": "Усиление открытия по запросу (°C выше комнатной/цели)",
+              "trv_close_offset": "Смещение закрытия по запросу (°C ниже комнатной в простое)"
             }
           },
           "valve_settings": {
@@ -368,6 +386,9 @@
               "split_sensor_injection": "Inject Room Sensor (Bypass Ceiling Probe)"
             }
           }
+        },
+        "data_description": {
+          "humidity_sensor": "Дополнительный датчик влажности помещения для защиты от точки росы при охлаждении"
         }
       },
       "edit_geofencing": {
@@ -379,13 +400,13 @@
         }
       },
       "trv_calibration_add": {
-        "title": "Настройка TRV (Датчик смещения) (Добавление)",
-        "description": "Выберите объекты смещения температуры (калибровки) для каждого TRV в зоне {zone_name}. Обычно это сущности `number`, предоставляемые интеграцией TRV (например, Better Thermostat, Z2M, ZHA). Если оставить пустым, будет использоваться компенсация целевой температуры.",
+        "title": "Настройка TRV (Смещение / Внешняя температура) (Добавление)",
+        "description": "Для каждого TRV в зоне {zone_name} выберите сущность смещения (`local_temperature_calibration`) или сущность внешней температуры (`external_temperature_input`). При желании выберите сущность `select` источника датчика (`...__sensor_select`, например `temperature_sensor_select`) для автоматического переключения remote/local при сбое датчика. Если оставить пустым, будет использоваться компенсация целевой температуры.",
         "data": {}
       },
       "trv_calibration_edit": {
-        "title": "Настройка TRV (Датчик смещения) (Редактирование)",
-        "description": "Выберите объекты смещения температуры (калибровки) для каждого TRV в зоне {zone_name}. Обычно это сущности `number`, предоставляемые интеграцией TRV (например, Better Thermostat, Z2M, ZHA). Если оставить пустым, будет использоваться компенсация целевой температуры.",
+        "title": "Настройка TRV (Смещение / Внешняя температура) (Редактирование)",
+        "description": "Для каждого TRV в зоне {zone_name} выберите сущность смещения (`local_temperature_calibration`) или сущность внешней температуры (`external_temperature_input`). При желании выберите сущность `select` источника датчика (`...__sensor_select`, например `temperature_sensor_select`) для автоматического переключения remote/local при сбое датчика. Если оставить пустым, будет использоваться компенсация целевой температуры.",
         "data": {}
       },
       "edit_weather_comp": {
@@ -470,7 +491,8 @@
       "no_climates_available": "Все доступные климатические сущности уже настроены как зоны.",
       "no_temp_sensors_found": "В Home Assistant не найдено датчиков температуры.",
       "no_switches_found": "В Home Assistant не найдено сущностей переключателей.",
-      "no_virtual_thermostats": "Виртуальные термостаты не настроены."
+      "no_virtual_thermostats": "Виртуальные термостаты не настроены.",
+      "zone_not_found": "Выбранная зона не найдена."
     },
     "error": {
       "zone_name_required": "Имя зоны не может быть пустым.",

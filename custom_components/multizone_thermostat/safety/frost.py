@@ -18,6 +18,7 @@ from ..const import (
     KEY_ANTI_FROST_ENABLED,
     KEY_FROST_PROTECTION_TEMP,
     make_zone_entity_id,
+    get_state_temp_unit,
     to_celsius,
     from_celsius,
 )
@@ -42,11 +43,12 @@ class FrostManager:
         self.coordinator = coordinator
         self._watchdog = SensorWatchdog(hass)
         self._pre_frost_targets: dict[str, float] = {}
+        self._pre_frost_modes: dict[str, str] = {}
         self._active_frost_emergencies: set[str] = set()
         self._sync_pre_frost_targets_from_storage()
 
     def _sync_pre_frost_targets_from_storage(self) -> None:
-        """Synchronize in-memory pre-frost targets from persistent storage."""
+        """Synchronize in-memory pre-frost targets and modes from persistent storage."""
         if hasattr(self.coordinator, "get_persistent_data"):
             stored = self.coordinator.get_persistent_data("pre_frost_targets", {})
             if isinstance(stored, dict):
@@ -56,26 +58,40 @@ class FrostManager:
                             self._pre_frost_targets[k] = float(v)
                         except (ValueError, TypeError):
                             pass
+            stored_modes = self.coordinator.get_persistent_data("pre_frost_modes", {})
+            if isinstance(stored_modes, dict):
+                for k, v in stored_modes.items():
+                    if k not in self._pre_frost_modes and isinstance(v, str):
+                        self._pre_frost_modes[k] = v
 
     async def _async_persist_pre_frost_targets(self) -> None:
-        """Persist pre-frost targets to coordinator storage."""
+        """Persist pre-frost targets and modes to coordinator storage."""
         data = dict(self._pre_frost_targets)
+        modes_data = dict(self._pre_frost_modes)
         if hasattr(self.coordinator, "async_set_persistent_data"):
             res = self.coordinator.async_set_persistent_data("pre_frost_targets", data)
             if inspect.isawaitable(res):
                 await res
+            res_m = self.coordinator.async_set_persistent_data("pre_frost_modes", modes_data)
+            if inspect.isawaitable(res_m):
+                await res_m
         if hasattr(self.coordinator, "_settings") and isinstance(self.coordinator._settings, dict):
             self.coordinator._settings["pre_frost_targets"] = data
+            self.coordinator._settings["pre_frost_modes"] = modes_data
         if hasattr(self.coordinator, "_persistent_data") and isinstance(self.coordinator._persistent_data, dict):
             self.coordinator._persistent_data["pre_frost_targets"] = data
+            self.coordinator._persistent_data["pre_frost_modes"] = modes_data
 
     def _sync_persist_pre_frost_targets(self) -> None:
-        """Synchronously persist pre-frost targets to memory dicts."""
+        """Synchronously persist pre-frost targets and modes to memory dicts."""
         data = dict(self._pre_frost_targets)
+        modes_data = dict(self._pre_frost_modes)
         if hasattr(self.coordinator, "_settings") and isinstance(self.coordinator._settings, dict):
             self.coordinator._settings["pre_frost_targets"] = data
+            self.coordinator._settings["pre_frost_modes"] = modes_data
         if hasattr(self.coordinator, "_persistent_data") and isinstance(self.coordinator._persistent_data, dict):
             self.coordinator._persistent_data["pre_frost_targets"] = data
+            self.coordinator._persistent_data["pre_frost_modes"] = modes_data
 
     def check_zone_frost(self, climate_id: str) -> bool:
         """Check if zone is in frost emergency."""
@@ -94,11 +110,13 @@ class FrostManager:
         # Try virtual thermostat temperature first
         st = self.hass.states.get(climate_id)
         current_temp = None
-        is_faulty = (
-            self.coordinator.plant_diagnostics.has_critical_sensor_fault(climate_id)
-            if hasattr(self.coordinator, "plant_diagnostics")
+        diag = getattr(self.coordinator, "plant_diagnostics", None)
+        res_fault = (
+            diag.has_critical_sensor_fault(climate_id)
+            if diag is not None and callable(getattr(diag, "has_critical_sensor_fault", None))
             else False
         )
+        is_faulty = res_fault if isinstance(res_fault, bool) else False
         if st and not is_faulty:
             raw_ct = st.attributes.get("current_temperature")
             if raw_ct is not None:
@@ -144,11 +162,12 @@ class FrostManager:
                             out_t = attrs.get("temperature") if isinstance(attrs, dict) else None
                     if out_t is not None:
                         try:
-                            if float(out_t) <= 2.0:
+                            out_c = to_celsius(float(out_t), get_state_temp_unit(w_st), self.hass)
+                            if out_c <= 2.0:
                                 _LOGGER.warning(
                                     "Frost check for %s: Sensor faulty & no valves, but outdoor temp is %.1f°C! Engaging safety frost protection.",
                                     climate_id,
-                                    float(out_t),
+                                    out_c,
                                 )
                                 return True
                         except (ValueError, TypeError):
@@ -194,9 +213,12 @@ class FrostManager:
                 )
                 # Force zone demand to 100% so boiler PWM activates
                 self.coordinator.set_zone_demand(climate_id, 100.0)
-                # Force zone to HEAT mode if OFF or COOL
+                # Force zone to HEAT mode if OFF or COOL, preserving original mode
                 st = self.hass.states.get(climate_id)
                 if st and st.state in (HVAC_MODE_OFF, HVAC_MODE_COOL, "off", "cool"):
+                    if climate_id not in self._pre_frost_modes:
+                        self._pre_frost_modes[climate_id] = str(st.state)
+                        await self._async_persist_pre_frost_targets()
                     await self.coordinator._async_set_hvac_mode(climate_id, HVAC_MODE_HEAT)
 
                 # Set target temperature above frost threshold so TRV internal PID opens valve
@@ -210,7 +232,7 @@ class FrostManager:
                 )
                 st = self.hass.states.get(climate_id)
                 if st:
-                    # Save user target prior to frost override (always stored in internal °C)
+                    # Save user target prior to frost override (always stored in internal °C, including <= frost_target)
                     curr_user_target = st.attributes.get(ATTR_TEMPERATURE)
                     curr_user_target_c: float | None = None
                     if curr_user_target is not None:
@@ -220,7 +242,6 @@ class FrostManager:
                             curr_user_target_c = None
                     if (
                         curr_user_target_c is not None
-                        and curr_user_target_c > frost_target
                         and climate_id not in self._pre_frost_targets
                     ):
                         self._pre_frost_targets[climate_id] = curr_user_target_c
@@ -235,10 +256,12 @@ class FrostManager:
                             blocking=False,
                         )
             else:
-                # Zone is NOT in frost emergency: restore previous user target if it was overridden
-                if climate_id in self._pre_frost_targets:
-                    restored_target = self._pre_frost_targets.pop(climate_id)
+                # Zone is NOT in frost emergency: restore previous user target and mode if overridden
+                restored_target = self._pre_frost_targets.pop(climate_id, None)
+                restored_mode = self._pre_frost_modes.pop(climate_id, None)
+                if restored_target is not None or restored_mode is not None:
                     await self._async_persist_pre_frost_targets()
+                if restored_target is not None:
                     out_restored = round(from_celsius(restored_target, self.hass), 1)
                     _LOGGER.info(
                         "Anti-Frost emergency ended for %s: restoring user target to %.1f°C",
@@ -251,6 +274,13 @@ class FrostManager:
                         {ATTR_ENTITY_ID: climate_id, ATTR_TEMPERATURE: out_restored},
                         blocking=False,
                     )
+                if restored_mode is not None:
+                    _LOGGER.info(
+                        "Anti-Frost emergency ended for %s: restoring hvac mode to %s",
+                        climate_id,
+                        restored_mode,
+                    )
+                    await self.coordinator._async_set_hvac_mode(climate_id, restored_mode)
 
         return frost_emergency
 

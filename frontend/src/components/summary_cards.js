@@ -10,10 +10,16 @@ if (!customElements.get("multizone-thermostat-spacer")) {
 /* ==================== HEALTH SUMMARY CARD ==================== */
 /* ==================== SCHEDULE SUMMARY NAVIGATION BUTTON CARD ==================== */
 
+let _mzStandaloneKeyHandler = null;
+
 function closeMzStandaloneModal() {
   const existing = document.getElementById('mz-standalone-nav-overlay');
   if (existing) {
     existing.remove();
+  }
+  if (_mzStandaloneKeyHandler) {
+    window.removeEventListener('keydown', _mzStandaloneKeyHandler);
+    _mzStandaloneKeyHandler = null;
   }
 }
 
@@ -81,13 +87,12 @@ function openMzStandaloneModal(type, hass) {
 
   const dismissModal = () => {
     closeMzStandaloneModal();
-    window.removeEventListener('keydown', keyHandler);
   };
 
-  const keyHandler = (e) => {
+  _mzStandaloneKeyHandler = (e) => {
     if (e.key === 'Escape') dismissModal();
   };
-  window.addEventListener('keydown', keyHandler);
+  window.addEventListener('keydown', _mzStandaloneKeyHandler);
   closeBtn.addEventListener('click', dismissModal);
 
   topBar.appendChild(titleEl);

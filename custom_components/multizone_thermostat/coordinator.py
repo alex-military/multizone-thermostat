@@ -19,6 +19,8 @@ from .const import (
     DEFAULT_HEAT_SOURCE_PRIORITY,
     KEY_HP_MIN_CYCLE_ON,
     KEY_HP_MIN_CYCLE_OFF,
+    CONF_ZONE_NAME,
+    make_zone_entity_id,
 )
 from .protocols import (
     BoilerBackendProtocol,

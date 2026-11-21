@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from homeassistant.util import dt as dt_util
@@ -31,9 +31,11 @@ class SensorWatchdog:
             return False
         if isinstance(last_update, datetime):
             now_dt = dt_util.utcnow()
+            if last_update.tzinfo is None:
+                last_update = last_update.replace(tzinfo=timezone.utc)
             lu = dt_util.as_utc(last_update)
             return (now_dt - lu).total_seconds() > timeout_seconds
-        if last_update > 1e8:
+        if last_update > 1e9:
             return (time.time() - last_update) > timeout_seconds
         return (time.monotonic() - last_update) > timeout_seconds
 

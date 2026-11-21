@@ -21,6 +21,7 @@ from .const import (
     HVAC_MODE_COOL,
     HVAC_MODE_OFF,
     ZONE_MODE_BYPASS,
+    from_celsius,
     make_zone_entity_id,
 )
 
@@ -83,12 +84,7 @@ class MasterController:
                             self.coordinator.zone_manager.current_global_preset, cid, HVAC_MODE_COOL
                         )
                         if t is not None:
-                            await self.hass.services.async_call(
-                                CLIMATE_DOMAIN,
-                                SERVICE_SET_TEMPERATURE,
-                                {ATTR_ENTITY_ID: cid, ATTR_TEMPERATURE: float(t)},
-                                blocking=True,
-                            )
+                            await self._async_apply_zone_target(cid, float(t))
                     else:
                         await self.async_set_hvac_mode(cid, HVAC_MODE_OFF)
             else:
@@ -104,12 +100,7 @@ class MasterController:
                             self.coordinator.zone_manager.current_global_preset, cid, HVAC_MODE_HEAT
                         )
                         if t is not None:
-                            await self.hass.services.async_call(
-                                CLIMATE_DOMAIN,
-                                SERVICE_SET_TEMPERATURE,
-                                {ATTR_ENTITY_ID: cid, ATTR_TEMPERATURE: float(t)},
-                                blocking=True,
-                            )
+                            await self._async_apply_zone_target(cid, float(t))
                     else:
                         await self.async_set_hvac_mode(cid, HVAC_MODE_OFF)
 
@@ -125,7 +116,10 @@ class MasterController:
         _LOGGER.debug("Master ON (mode: %s) → applying to all zones", self.coordinator.master_hvac_mode)
         if self.coordinator.master_hvac_mode == HVAC_MODE_COOL:
             for zone in self.coordinator.zones:
-                cid = make_zone_entity_id(zone[CONF_ZONE_NAME])
+                zname = zone.get(CONF_ZONE_NAME) or zone.get("zone_name")
+                if not zname:
+                    continue
+                cid = zone.get("climate_id") or make_zone_entity_id(zname)
                 mode = self.coordinator.zone_manager.get_zone_mode(cid)
                 if self.coordinator.can_zone_cool(cid) and mode != ZONE_MODE_BYPASS:
                     await self.async_set_hvac_mode(cid, HVAC_MODE_COOL)
@@ -133,17 +127,15 @@ class MasterController:
                         self.coordinator.zone_manager.current_global_preset, cid, HVAC_MODE_COOL
                     )
                     if t is not None:
-                        await self.hass.services.async_call(
-                            CLIMATE_DOMAIN,
-                            SERVICE_SET_TEMPERATURE,
-                            {ATTR_ENTITY_ID: cid, ATTR_TEMPERATURE: float(t)},
-                            blocking=True,
-                        )
+                        await self._async_apply_zone_target(cid, float(t))
                 else:
                     await self.async_set_hvac_mode(cid, HVAC_MODE_OFF)
         else:
             for zone in self.coordinator.zones:
-                cid = make_zone_entity_id(zone[CONF_ZONE_NAME])
+                zname = zone.get(CONF_ZONE_NAME) or zone.get("zone_name")
+                if not zname:
+                    continue
+                cid = zone.get("climate_id") or make_zone_entity_id(zname)
                 mode = self.coordinator.zone_manager.get_zone_mode(cid)
                 if mode != ZONE_MODE_BYPASS:
                     await self.async_set_hvac_mode(cid, HVAC_MODE_HEAT)
@@ -151,12 +143,7 @@ class MasterController:
                         self.coordinator.zone_manager.current_global_preset, cid, HVAC_MODE_HEAT
                     )
                     if t is not None:
-                        await self.hass.services.async_call(
-                            CLIMATE_DOMAIN,
-                            SERVICE_SET_TEMPERATURE,
-                            {ATTR_ENTITY_ID: cid, ATTR_TEMPERATURE: float(t)},
-                            blocking=True,
-                        )
+                        await self._async_apply_zone_target(cid, float(t))
                 else:
                     await self.async_set_hvac_mode(cid, HVAC_MODE_OFF)
 
@@ -164,7 +151,10 @@ class MasterController:
         """Master turned OFF: turn off all zones and boiler."""
         _LOGGER.debug("Master OFF → turning off all zones")
         for zone in self.coordinator.zones:
-            climate_id = make_zone_entity_id(zone[CONF_ZONE_NAME])
+            zname = zone.get(CONF_ZONE_NAME) or zone.get("zone_name")
+            if not zname:
+                continue
+            climate_id = zone.get("climate_id") or make_zone_entity_id(zname)
             await self.async_set_hvac_mode(climate_id, HVAC_MODE_OFF)
 
         # Boiler will auto-turn off via state change listener,
@@ -177,12 +167,26 @@ class MasterController:
             if inspect.isawaitable(res_b):
                 await res_b
         hp_backend = getattr(self.coordinator, "heat_pump_backend", None) or getattr(
-            self.coordinator.plant_orchestrator, "heat_pump_backend", None
+            getattr(self.coordinator, "plant_orchestrator", None), "heat_pump_backend", None
         )
         if hp_backend is not None and hasattr(hp_backend, "async_emergency_off"):
             res = hp_backend.async_emergency_off()
             if inspect.isawaitable(res):
                 await res
+
+    async def _async_apply_zone_target(self, cid: str, t_val: float) -> None:
+        """Apply internal Celsius target setpoint without triggering manual schedule overrides."""
+        climate_ent = getattr(self.coordinator, "_climate_entities", {}).get(cid)
+        apply_fn = getattr(climate_ent, "async_apply_internal_target", None) if climate_ent is not None else None
+        if inspect.iscoroutinefunction(apply_fn):
+            await apply_fn(t_val)
+            return
+        await self.hass.services.async_call(
+            CLIMATE_DOMAIN,
+            SERVICE_SET_TEMPERATURE,
+            {ATTR_ENTITY_ID: cid, ATTR_TEMPERATURE: round(from_celsius(t_val, self.hass), 1)},
+            blocking=True,
+        )
 
     async def async_set_hvac_mode(self, climate_entity: str, mode: str) -> None:
         """Set HVAC mode on a climate entity."""

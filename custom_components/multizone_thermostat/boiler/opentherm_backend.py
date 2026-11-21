@@ -12,7 +12,8 @@ import time
 
 from homeassistant.core import HomeAssistant
 from .base import BoilerBackend
-from ..const import KEY_FROST_FLOW_TEMP, to_celsius, from_celsius
+from .valve_readiness import evaluate_trvs_ready
+from ..const import DEFAULT_FROST_FLOW_TEMP, KEY_FROST_FLOW_TEMP, to_celsius, from_celsius
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -31,6 +32,7 @@ class OpenThermBoilerBackend(BoilerBackend):
         min_temp: float,
         max_temp: float,
         ch_switch: str | None = None,
+        valve_delay: int = 0,
     ) -> None:
         """Initialize OpenTherm backend."""
         self.hass = hass
@@ -39,8 +41,15 @@ class OpenThermBoilerBackend(BoilerBackend):
         self.opentherm_min_temp = min_temp
         self.opentherm_max_temp = max_temp
         self.ch_switch = ch_switch
+        self._valve_delay = int(valve_delay)
+        self._trv_wait_start: float | None = None
+        self._valve_delay_start: float | None = None
         self._status_reason = "INIT"
         self._pending_command: tuple[str, float] | None = None
+
+    def set_valve_delay(self, value: int) -> None:
+        """Set the valve delay time (seconds)."""
+        self._valve_delay = int(value)
 
     @property
     def status_reason(self) -> str:
@@ -132,10 +141,15 @@ class OpenThermBoilerBackend(BoilerBackend):
 
         if frost_emergency:
             p_val = self.coordinator.get_persistent_data(KEY_FROST_FLOW_TEMP, None) if hasattr(self.coordinator, "get_persistent_data") else None
-            if isinstance(p_val, (int, float)):
+            if isinstance(p_val, (int, float)) and not isinstance(p_val, bool):
                 frost_flow = float(p_val)
             else:
-                frost_flow = float(getattr(self.coordinator, "frost_flow_temp", 45.0))
+                raw_ff = getattr(self.coordinator, "frost_flow_temp", None)
+                frost_flow = (
+                    float(raw_ff)
+                    if isinstance(raw_ff, (int, float)) and not isinstance(raw_ff, bool)
+                    else DEFAULT_FROST_FLOW_TEMP
+                )
             target_temp = max(self.opentherm_min_temp, min(self.opentherm_max_temp, frost_flow))
         elif norm_demand > 0.0 and outdoor_temp is not None and curve_val > 0.0:
             curve = create_flow_curve_for_emitter(
@@ -157,42 +171,45 @@ class OpenThermBoilerBackend(BoilerBackend):
 
         _LOGGER.debug("OpenTherm: Demand %.1f%% -> Target Water Temp: %.1f°C", norm_demand * 100, target_temp)
 
-        # Diagnostics follow the CONFIRMED entity/flame state, not the commanded demand
+        # Diagnostics track burner flame telemetry; command confirmation tracks entity/switch state
         diag = getattr(self.coordinator, "plant_diagnostics", None)
-        confirmed_on = False
-        ot_diag = diag.get_opentherm_diagnostics() if diag else {}
-        if ot_diag.get("flame_active") is not None:
-            confirmed_on = bool(ot_diag["flame_active"])
-        elif self.ch_switch:
+        entity_confirmed_on = False
+        if self.ch_switch:
             sw_st = self.hass.states.get(self.ch_switch)
-            confirmed_on = sw_st is not None and sw_st.state == "on"
+            entity_confirmed_on = sw_st is not None and sw_st.state == "on"
         else:
             st_check = self.hass.states.get(self.opentherm_entity)
             if domain == "climate":
-                confirmed_on = st_check is not None and st_check.state == "heat"
+                entity_confirmed_on = st_check is not None and st_check.state == "heat"
             elif domain == "number":
                 if st_check is not None and st_check.state not in ("unavailable", "unknown"):
                     try:
                         val = float(st_check.state)
                         m = float(st_check.attributes.get("min", 0.0)) if st_check.attributes.get("min") is not None else 0.0
-                        confirmed_on = val > m
+                        entity_confirmed_on = val > m
                     except (ValueError, TypeError):
-                        confirmed_on = False
+                        entity_confirmed_on = False
             else:
-                confirmed_on = st_check is not None and st_check.state not in ("unavailable", "unknown", "off")
+                entity_confirmed_on = st_check is not None and st_check.state not in ("unavailable", "unknown", "off")
 
-        if (confirmed_on or wanted_on) and hasattr(self.coordinator, "reset_last_active_time"):
+        ot_diag = diag.get_opentherm_diagnostics() if diag else {}
+        if isinstance(ot_diag, dict) and ot_diag.get("flame_active") is not None:
+            burner_on = bool(ot_diag["flame_active"])
+        else:
+            burner_on = entity_confirmed_on
+
+        if (entity_confirmed_on or burner_on or wanted_on) and hasattr(self.coordinator, "reset_last_active_time"):
             self.coordinator.reset_last_active_time()
 
         if diag and hasattr(diag, "record_boiler_state"):
-            if confirmed_on and diag._current_boiler_start is None:
+            if burner_on and diag._current_boiler_start is None:
                 diag.record_boiler_state(True)
-            elif not confirmed_on and diag._current_boiler_start is not None:
+            elif not burner_on and diag._current_boiler_start is not None:
                 diag.record_boiler_state(False)
 
         if self._pending_command is not None:
             cmd, ts = self._pending_command
-            if (cmd == "on" and confirmed_on) or (cmd == "off" and not confirmed_on):
+            if (cmd == "on" and entity_confirmed_on) or (cmd == "off" and not entity_confirmed_on):
                 self._pending_command = None
             elif time.monotonic() - ts > COMMAND_CONFIRM_TIMEOUT:
                 _LOGGER.warning(
@@ -209,9 +226,59 @@ class OpenThermBoilerBackend(BoilerBackend):
                 self._pending_command = None
 
         if wanted_on:
+            cold_start = (not entity_confirmed_on and not burner_on)
+            if cold_start and not frost_emergency and peak_zone != "Anti-Seize":
+                trvs_ready, has_any_trvs = evaluate_trvs_ready(self.hass, self.coordinator)
+                if not trvs_ready and has_any_trvs:
+                    self._valve_delay_start = None
+                    now_mono = time.monotonic()
+                    if self._trv_wait_start is None:
+                        self._trv_wait_start = now_mono
+                    elapsed = now_mono - self._trv_wait_start
+                    if elapsed < 120.0:
+                        self._status_reason = (
+                            f"HOLD_TRV_CLOSED - Waiting for TRVs to open ({round(120.0 - elapsed)}s remaining)"
+                        )
+                        _LOGGER.warning(
+                            "OpenTherm %s: Boiler wants cold start, but demanding TRVs are closed. Waiting (%.0fs/120s)",
+                            self.opentherm_entity,
+                            elapsed,
+                        )
+                        return
+                    _LOGGER.info(
+                        "OpenTherm %s: TRV opening grace period (120s) elapsed. Proceeding with boiler ignition.",
+                        self.opentherm_entity,
+                    )
+                self._trv_wait_start = None
+
+                if self._valve_delay > 0:
+                    now_mono = time.monotonic()
+                    if self._valve_delay_start is None:
+                        self._valve_delay_start = now_mono
+                    vd_elapsed = now_mono - self._valve_delay_start
+                    if vd_elapsed < self._valve_delay:
+                        remaining = round(self._valve_delay - vd_elapsed)
+                        self._status_reason = (
+                            f"WAITING_VALVES - Valve delay active ({remaining}s remaining)"
+                        )
+                        _LOGGER.debug(
+                            "OpenTherm %s: Waiting %ss for valves to open (%ss remaining)",
+                            self.opentherm_entity,
+                            self._valve_delay,
+                            remaining,
+                        )
+                        return
+                self._valve_delay_start = None
+            else:
+                self._trv_wait_start = None
+                self._valve_delay_start = None
+
             self._status_reason = f"MODULATING - Target water: {target_temp}°C (Demand: {round(demand, 1)}% from {peak_zone or 'None'})"
-        elif self._status_reason != "OFF - Emergency/Master OFF":
-            self._status_reason = "OFF - No Demand"
+        else:
+            self._trv_wait_start = None
+            self._valve_delay_start = None
+            if self._status_reason != "OFF - Emergency/Master OFF":
+                self._status_reason = "OFF - No Demand"
 
         try:
             st = self.hass.states.get(self.opentherm_entity)
@@ -262,9 +329,17 @@ class OpenThermBoilerBackend(BoilerBackend):
                 value = target_temp
                 if num_unit is not None and str(num_unit).strip().lower() in ("°f", "f", "fahrenheit"):
                     value = round(from_celsius(target_temp, unit=num_unit), 1)
-                if not heat_enabled and not self.ch_switch:
-                    # A bare number entity has no OFF command: write the lowest value the
-                    # entity accepts (normally 0 = CH disabled) instead of the min flow temp.
+                ch_st = (
+                    self.hass.states.get(self.ch_switch)
+                    if (self.ch_switch and hasattr(self.hass, "states") and self.hass.states)
+                    else None
+                )
+                ch_unavailable = bool(
+                    self.ch_switch
+                    and (ch_st is None or getattr(ch_st, "state", None) in (None, "unavailable", "unknown"))
+                )
+                if not heat_enabled and (not self.ch_switch or ch_unavailable):
+                    # Drop flow setpoint to minimum whenever CH switch is absent or unavailable
                     entity_min = st.attributes.get("min") if st else None
                     try:
                         value = float(entity_min) if entity_min is not None else 0.0
@@ -295,10 +370,11 @@ class OpenThermBoilerBackend(BoilerBackend):
         if not self.ch_switch:
             return
         st = self.hass.states.get(self.ch_switch)
-        if st is None or st.state in ("unavailable", "unknown"):
+        st_val = getattr(st, "state", None) if st is not None else None
+        if enabled and (st is None or st_val in ("unavailable", "unknown")):
             _LOGGER.debug("CH switch %s is not available yet, skipping command", self.ch_switch)
             return
-        current_on = st.state == "on" if st else None
+        current_on = (st_val == "on") if (st is not None and st_val not in ("unavailable", "unknown")) else None
         if current_on == enabled:
             return
         self._pending_command = ("on" if enabled else "off", time.monotonic())
@@ -313,5 +389,7 @@ class OpenThermBoilerBackend(BoilerBackend):
 
     async def async_emergency_off(self) -> None:
         """Force OpenTherm boiler off immediately."""
+        self._trv_wait_start = None
+        self._valve_delay_start = None
         self._status_reason = "OFF - Emergency/Master OFF"
         await self.async_update(0.0, None, False)

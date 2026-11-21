@@ -131,35 +131,30 @@ class EnergyManager:
         except (ValueError, TypeError):
             return None
 
-    def get_solar_power(self) -> float | None:
-        """Return current solar generation power in Watts."""
-        if not self.solar_sensor or not hasattr(self.hass, "states"):
+    def _parse_watts_state(self, entity_id: str | None) -> float | None:
+        """Read a power sensor in Watts (converting kW to W, handling None units)."""
+        if not entity_id or not hasattr(self.hass, "states"):
             return None
-        st = self.hass.states.get(self.solar_sensor)
+        st = self.hass.states.get(entity_id)
         if not st:
             return None
         val = self._safe_float(st.state)
         if val is None:
             return None
-        unit = st.attributes.get("unit_of_measurement", "").lower() if getattr(st, "attributes", None) else ""
+        attrs = getattr(st, "attributes", None)
+        unit = (attrs.get("unit_of_measurement") or "").lower() if attrs else ""
         if unit == "kw":
-            return val * 1000.0
+            val *= 1000.0
         return val
+
+    def get_solar_power(self) -> float | None:
+        """Return current solar generation power in Watts."""
+        return self._parse_watts_state(self.solar_sensor)
 
     def get_grid_export(self) -> float | None:
         """Return current grid export power in Watts (positive = exporting)."""
-        if not self.export_sensor or not hasattr(self.hass, "states"):
-            return None
-        st = self.hass.states.get(self.export_sensor)
-        if not st:
-            return None
-        val = self._safe_float(st.state)
-        if val is None:
-            return None
-        unit = st.attributes.get("unit_of_measurement", "").lower() if getattr(st, "attributes", None) else ""
-        if unit == "kw":
-            val *= 1000.0
-        if self.export_power_inverted:
+        val = self._parse_watts_state(self.export_sensor)
+        if val is not None and self.export_power_inverted:
             val = -val
         return val
 
@@ -174,18 +169,8 @@ class EnergyManager:
 
     def get_battery_power(self) -> float | None:
         """Return battery power in Watts (standard: positive = charging, negative = discharging)."""
-        if not self.battery_power_sensor or not hasattr(self.hass, "states"):
-            return None
-        st = self.hass.states.get(self.battery_power_sensor)
-        if not st:
-            return None
-        val = self._safe_float(st.state)
-        if val is None:
-            return None
-        unit = st.attributes.get("unit_of_measurement", "").lower() if getattr(st, "attributes", None) else ""
-        if unit == "kw":
-            val *= 1000.0
-        if self.battery_power_inverted:
+        val = self._parse_watts_state(self.battery_power_sensor)
+        if val is not None and self.battery_power_inverted:
             val = -val
         return val
 
@@ -207,47 +192,39 @@ class EnergyManager:
             return None
         return self._safe_float(st.state)
 
-    def is_battery_discharging_too_long(self) -> bool:
+    def is_battery_discharging_too_long(self, readonly: bool = False) -> bool:
         """Return True if battery has been actively discharging (> 150W) for longer than max discharge time."""
         bat_p = self.get_battery_power()
         if bat_p is None:
-            self._discharge_start_timestamp = None
+            if not readonly:
+                self._discharge_start_timestamp = None
             return False
 
         # If discharging (negative power < -150W)
         if bat_p < -150.0:
             now_mono = time.monotonic()
             if self._discharge_start_timestamp is None:
-                self._discharge_start_timestamp = now_mono
+                if not readonly:
+                    self._discharge_start_timestamp = now_mono
                 return False
             elapsed_min = (now_mono - self._discharge_start_timestamp) / 60.0
             if elapsed_min >= self.battery_max_discharge_time:
-                _LOGGER.warning(
-                    "Battery discharge guard tripped: discharging %.0fW continuously for %.1f min (limit %.1f min). Suppressing electric surplus to protect night reserve.",
-                    bat_p,
-                    elapsed_min,
-                    self.battery_max_discharge_time,
-                )
+                if not readonly:
+                    _LOGGER.warning(
+                        "Battery discharge guard tripped: discharging %.0fW continuously for %.1f min (limit %.1f min). Suppressing electric surplus to protect night reserve.",
+                        bat_p,
+                        elapsed_min,
+                        self.battery_max_discharge_time,
+                    )
                 return True
-        else:
+        elif not readonly:
             self._discharge_start_timestamp = None
 
         return False
 
     def get_external_override_power(self) -> float | None:
         """Return allocated deferrable load power in Watts if override entity is numeric (e.g. EMHASS sensor.p_deferrable0)."""
-        if not self.override_entity or not hasattr(self.hass, "states"):
-            return None
-        st = self.hass.states.get(self.override_entity)
-        if not st:
-            return None
-        val = self._safe_float(st.state)
-        if val is None:
-            return None
-        unit = st.attributes.get("unit_of_measurement", "").lower() if getattr(st, "attributes", None) else ""
-        if unit == "kw":
-            return val * 1000.0
-        return val
+        return self._parse_watts_state(self.override_entity)
 
     def is_external_override_active(self) -> bool:
         """Check if an external solar optimizer signal (EMHASS / Predbat) is active."""
@@ -266,36 +243,37 @@ class EnergyManager:
             return num_val > 0.0
         return False
 
-    def is_solar_surplus(self) -> bool:
+    def is_solar_surplus(self, readonly: bool = False) -> bool:
         """Calculate whether free solar surplus is currently available.
 
         Priority order:
-        1. Continuous Battery Discharge Guard -> if battery is discharging for too long, strictly suppresses surplus!
-        2. External optimizer override (EMHASS/Predbat) -> Forces True immediately.
-        3. Energy management enabled with sensor telemetry:
+        1. Energy management enabled check -> False if disabled.
+        2. Continuous Battery Discharge Guard -> if battery is discharging for too long, strictly suppresses surplus!
+        3. External optimizer override (EMHASS/Predbat) -> Forces True immediately.
+        4. Sensor telemetry evaluation:
            - Battery reserve check: if battery SOC < min_reserve_soc, surplus is suppressed (reserve for the night).
-           - Off-Grid / Battery Saturated Clipping: if SOC >= 95% and PV >= 300W (or battery charging >= 500W), surplus is True.
+           - Off-Grid / Battery Saturated Clipping: if SOC >= 95% and PV >= 300W (or battery charging >= 400W) and not importing (>100W).
            - Grid export check: if exporting >= export_threshold (with 0.7 hysteresis on hold), surplus is True.
            - Solar power check: if solar power >= export_threshold (with 0.7 hysteresis on hold) and no export sensor configured.
            - Solar min run time hold: keeps surplus active until min run time elapses.
         """
+        if not self.enabled:
+            if not readonly:
+                self._surplus_hold_active = False
+                self._surplus_active_since = None
+            return False
+
         # 1. Battery discharge guard has top priority against wasting stored energy
-        if self.is_battery_discharging_too_long():
-            self._surplus_hold_active = False
-            self._surplus_active_since = None
-            self._last_surplus_state = False
+        if self.is_battery_discharging_too_long(readonly=readonly):
+            if not readonly:
+                self._surplus_hold_active = False
+                self._surplus_active_since = None
             return False
 
         # 2. External override
         if self.is_external_override_active():
             _LOGGER.debug("Solar surplus ACTIVE via external optimizer override (%s)", self.override_entity)
             return True
-
-        if not self.enabled:
-            self._surplus_hold_active = False
-            self._surplus_active_since = None
-            self._last_surplus_state = False
-            return False
 
         # 3. Night reserve protection (SoC check)
         soc = self.get_battery_soc()
@@ -305,9 +283,9 @@ class EnergyManager:
                 soc,
                 self.min_reserve_soc,
             )
-            self._surplus_hold_active = False
-            self._surplus_active_since = None
-            self._last_surplus_state = False
+            if not readonly:
+                self._surplus_hold_active = False
+                self._surplus_active_since = None
             return False
 
         # 4. Sensor telemetry evaluation
@@ -318,13 +296,14 @@ class EnergyManager:
         raw_surplus = False
         if soc is not None and soc >= 95.0:
             if (solar_w is not None and solar_w >= 300.0) or (bat_p is not None and bat_p >= 400.0):
-                _LOGGER.debug(
-                    "Solar surplus ACTIVE via Off-Grid/Battery Saturation (SoC=%.1f%%, PV=%sW, BatP=%sW)",
-                    soc,
-                    solar_w,
-                    bat_p,
-                )
-                raw_surplus = True
+                if export_w is None or export_w >= -100.0:
+                    _LOGGER.debug(
+                        "Solar surplus ACTIVE via Off-Grid/Battery Saturation (SoC=%.1f%%, PV=%sW, BatP=%sW)",
+                        soc,
+                        solar_w,
+                        bat_p,
+                    )
+                    raw_surplus = True
 
         threshold = (
             0.7 * self.export_threshold if self._surplus_hold_active else self.export_threshold
@@ -352,10 +331,10 @@ class EnergyManager:
 
         now_mono = time.monotonic()
         if raw_surplus:
-            if self._surplus_active_since is None:
-                self._surplus_active_since = now_mono
-            self._surplus_hold_active = True
-            self._last_surplus_state = True
+            if not readonly:
+                if self._surplus_active_since is None:
+                    self._surplus_active_since = now_mono
+                self._surplus_hold_active = True
             return True
 
         if self._surplus_hold_active and self._surplus_active_since is not None:
@@ -367,15 +346,14 @@ class EnergyManager:
                     self.solar_min_run_time,
                 )
                 return True
-            else:
+            if not readonly:
                 self._surplus_hold_active = False
                 self._surplus_active_since = None
-                self._last_surplus_state = False
-                return False
+            return False
 
-        self._surplus_hold_active = False
-        self._surplus_active_since = None
-        self._last_surplus_state = False
+        if not readonly:
+            self._surplus_hold_active = False
+            self._surplus_active_since = None
         return False
 
     def is_split_heating_allowed(self) -> bool:
@@ -496,12 +474,12 @@ class EnergyManager:
             "grid_export_w": self.get_grid_export(),
             "battery_soc_pct": self.get_battery_soc(),
             "battery_power_w": self.get_battery_power(),
-            "battery_discharging_guard_active": self.is_battery_discharging_too_long(),
+            "battery_discharging_guard_active": self.is_battery_discharging_too_long(readonly=True),
             "solar_forecast": self.get_solar_forecast(),
             "solar_irradiance": self.get_solar_irradiance(),
             "external_override_active": self.is_external_override_active(),
             "external_override_power_w": self.get_external_override_power(),
-            "is_solar_surplus": self.is_solar_surplus(),
+            "is_solar_surplus": self.is_solar_surplus(readonly=True),
             "export_threshold_w": self.export_threshold,
             "min_reserve_soc_pct": self.min_reserve_soc,
             "solar_min_run_time_min": self.solar_min_run_time,

@@ -18,10 +18,13 @@ from ..const import (
     DEFAULT_SCHEDULE_PROFILE,
     DEFAULT_SMART_START_HEATING_RATE,
     GLOBAL_PRESET_AWAY,
+    GLOBAL_PRESET_SLEEP,
     KEY_ACTIVE_PROFILE,
+    KEY_AUTO_NIGHT_MODE,
     KEY_FALLBACK_PROFILE,
     KEY_GEOFENCING_TOGGLE,
     KEY_MANUAL_OVERRIDES,
+    KEY_PRE_NIGHT_PRESET,
     KEY_PROFILE_EXPIRES_AT,
     KEY_SCHEDULE_PROFILES,
     KEY_SCHEDULER_ENABLED,
@@ -30,6 +33,7 @@ from ..const import (
     SCHEDULE_DAYS,
     ZONE_MODE_BYPASS,
     make_zone_entity_id,
+    resolve_zone_id_safe,
 )
 from .smart_return import SmartReturnPlanner
 from .storage import ScheduleProfileStorage, default_profiles_dict
@@ -272,7 +276,6 @@ class ScheduleProfileManager:
     def _get_zone_cooling_rate(self, climate_id: str) -> float:
         """Backward-compatible alias for get_zone_cooling_rate."""
         return self.get_zone_cooling_rate(climate_id)
-        return self._smart_return_planner.get_zone_heating_rate(climate_id)
 
     def _parse_arrival_time(self, arrival_time: str | datetime, now: datetime) -> datetime:
         """Parse arrival time string or datetime relative to now."""
@@ -297,8 +300,7 @@ class ScheduleProfileManager:
         now: datetime | None = None,
     ) -> dict[str, Any]:
         """Schedule Smart Return and trigger immediate plan calculation and ignition."""
-        if now is None:
-            now = dt_util.now()
+        now = self._as_local(now)
         arrival_dt = self._parse_arrival_time(arrival_time, now)
         norm_zones = (
             [z if z.startswith("climate.") else make_zone_entity_id(z) for z in zones]
@@ -339,9 +341,14 @@ class ScheduleProfileManager:
         """Convert block start/end strings to datetime objects relative to ref_date."""
         return self._slot_engine.parse_block_times(block, ref_date)
 
-    def _resolve_preset_temp(self, preset: str, climate_id: str) -> float:
-        """Resolve preset temperature for a zone."""
-        master_mode = str(getattr(self.coordinator, "master_hvac_mode", "heat")).lower()
+    def _resolve_preset_temp(
+        self, preset: str, climate_id: str, hvac_mode: str | None = None
+    ) -> float:
+        """Resolve preset temperature for a zone and mode."""
+        climate_id = resolve_zone_id_safe(self.coordinator, climate_id)
+        master_mode = str(
+            hvac_mode if hvac_mode is not None else getattr(self.coordinator, "master_hvac_mode", "heat")
+        ).lower()
         zone_mgr = getattr(self.coordinator, "zone_manager", None)
         if zone_mgr is not None:
             try:
@@ -359,6 +366,7 @@ class ScheduleProfileManager:
 
     def evaluate_zone_slot(self, climate_id: str, now: datetime) -> dict[str, Any]:
         """Evaluate active schedule profile for a specific zone at time now."""
+        climate_id = resolve_zone_id_safe(self.coordinator, climate_id)
         profile = self.profiles.get(self.active_profile, {})
         return self._slot_engine.evaluate_zone_slot(profile, climate_id, now)
 
@@ -366,6 +374,7 @@ class ScheduleProfileManager:
         self, climate_id: str, now: datetime, horizon_hours: int = 24
     ) -> list[dict[str, Any]]:
         """Return chronological list of upcoming scheduled blocks within horizon_hours."""
+        climate_id = resolve_zone_id_safe(self.coordinator, climate_id)
         profile = self.profiles.get(self.active_profile, {})
         return self._slot_engine.get_upcoming_blocks(profile, climate_id, now, horizon_hours)
 
@@ -373,6 +382,7 @@ class ScheduleProfileManager:
         self, climate_id: str, target_temp: float, now: datetime | None = None
     ) -> None:
         """Record manual override for zone lasting until current slot changes/expires."""
+        climate_id = resolve_zone_id_safe(self.coordinator, climate_id)
         master_mode = str(getattr(self.coordinator, "master_hvac_mode", "heat")).lower()
         if master_mode == "cool" and hasattr(self.coordinator, "can_zone_cool") and not self.coordinator.can_zone_cool(climate_id):
             return
@@ -395,6 +405,7 @@ class ScheduleProfileManager:
         if climate_id is None:
             self.manual_overrides.clear()
         else:
+            climate_id = resolve_zone_id_safe(self.coordinator, climate_id)
             self.manual_overrides.pop(climate_id, None)
         coro = self.async_evaluate_schedule(now)
         if hasattr(self.hass, "async_create_task"):
@@ -408,6 +419,7 @@ class ScheduleProfileManager:
         if climate_id is None:
             self.manual_overrides.clear()
         else:
+            climate_id = resolve_zone_id_safe(self.coordinator, climate_id)
             self.manual_overrides.pop(climate_id, None)
         await self.async_evaluate_schedule(now)
         self._notify_climates()
@@ -534,7 +546,29 @@ class ScheduleProfileManager:
                     if not self.scheduler_enabled:
                         zone_mgr = getattr(self.coordinator, "zone_manager", None)
                         if zone_mgr is not None:
-                            await zone_mgr.async_set_global_preset(sr_preset)
+                            if sr_zones is None:
+                                await zone_mgr.async_set_global_preset(sr_preset)
+                            else:
+                                cur_gp = getattr(zone_mgr, "current_global_preset", None)
+                                for cid in sr_zones:
+                                    if master_mode == "cool" and hasattr(self.coordinator, "can_zone_cool") and not self.coordinator.can_zone_cool(cid):
+                                        continue
+                                    z_mode = None
+                                    if hasattr(self.coordinator, "get_zone_mode"):
+                                        z_mode = self.coordinator.get_zone_mode(cid)
+                                    elif hasattr(zone_mgr, "get_zone_mode"):
+                                        z_mode = zone_mgr.get_zone_mode(cid)
+                                    if z_mode == ZONE_MODE_BYPASS:
+                                        continue
+                                    sr_target = self._resolve_preset_temp(sr_preset, cid, hvac_mode=master_mode)
+                                    if cur_gp and cur_gp != "none" and hasattr(zone_mgr, "update_preset_temperature"):
+                                        try:
+                                            if master_mode == "cool":
+                                                zone_mgr.update_preset_temperature(cur_gp, cid, sr_target, hvac_mode="cool")
+                                            else:
+                                                zone_mgr.update_preset_temperature(cur_gp, cid, sr_target)
+                                        except TypeError:
+                                            zone_mgr.update_preset_temperature(cur_gp, cid, sr_target)
                     self.smart_return = None
                     await self.async_save_to_storage()
                     self._record_diag(
@@ -551,7 +585,37 @@ class ScheduleProfileManager:
 
         old_overrides = dict(self.schedule_overrides)
         old_smart_start = dict(self.smart_start_info)
+        prev_manual_overrides = copy.deepcopy(self.manual_overrides)
         self.smart_start_info.clear()
+
+        # Check external priority presets before weekly slot evaluation
+        zone_manager = getattr(self.coordinator, "zone_manager", None)
+        cur_gp = getattr(zone_manager, "current_global_preset", None) if zone_manager else None
+        routine_mgr = getattr(self.coordinator, "routine_manager", None)
+        cal_mgr = getattr(self.coordinator, "calendar_manager", None)
+        try:
+            raw_geo = self.coordinator.get_persistent_data(KEY_GEOFENCING_TOGGLE, True)
+            geo_enabled = raw_geo if isinstance(raw_geo, bool) else True
+        except AttributeError:
+            geo_enabled = True
+        last_presence = getattr(routine_mgr, "_last_known_presence", None) if routine_mgr else None
+        is_geofence_away = bool(
+            geo_enabled
+            and routine_mgr is not None
+            and getattr(routine_mgr, "presence_sensor", None)
+            and isinstance(last_presence, str)
+            and routine_mgr._is_state_away(last_presence)
+        )
+        external_away = is_geofence_away or (cur_gp == GLOBAL_PRESET_AWAY)
+        auto_night_raw = (
+            self.coordinator.get_persistent_data(KEY_AUTO_NIGHT_MODE, False)
+            if hasattr(self.coordinator, "get_persistent_data")
+            else False
+        )
+        external_sleep = (cur_gp == GLOBAL_PRESET_SLEEP) and (auto_night_raw is True)
+        cal_active_preset = getattr(cal_mgr, "active_global_preset", None) if cal_mgr is not None else None
+        has_cal_preset = isinstance(cal_active_preset, str) and bool(cal_active_preset)
+        external_preset_active = external_away or external_sleep or has_cal_preset
 
         # Calculate Smart Return plan if active
         sr_plan = {}
@@ -672,6 +736,10 @@ class ScheduleProfileManager:
 
             # 5. Weekly scheduler baseline & Predictive Smart Start
             if self.scheduler_enabled:
+                if external_preset_active:
+                    self.schedule_overrides.pop(climate_id, None)
+                    self._active_smart_starts.pop(climate_id, None)
+                    continue
                 self.schedule_overrides[climate_id] = float(slot["target_temp"])
 
                 # Check predictive smart start for upcoming block
@@ -709,46 +777,32 @@ class ScheduleProfileManager:
                 )
                 scheduled_zone_presets.append(zone_preset_name)
 
+        if self.manual_overrides != prev_manual_overrides:
+            await self.async_save_to_storage()
+
         preset_synced = False
-        zone_manager = getattr(self.coordinator, "zone_manager", None)
         if (
             (self.scheduler_enabled or sr_plan)
             and scheduled_zone_presets
             and zone_manager is not None
+            and not is_geofence_away
+            and not external_preset_active
         ):
-            routine_mgr = getattr(self.coordinator, "routine_manager", None)
-            try:
-                raw_geo = self.coordinator.get_persistent_data(KEY_GEOFENCING_TOGGLE, True)
-                geo_enabled = raw_geo if isinstance(raw_geo, bool) else True
-            except AttributeError:
-                geo_enabled = True
-            last_presence = getattr(routine_mgr, "_last_known_presence", None) if routine_mgr else None
-            is_away_active = (
-                geo_enabled
-                and routine_mgr is not None
-                and getattr(routine_mgr, "presence_sensor", None)
-                and isinstance(last_presence, str)
-                and routine_mgr._is_state_away(last_presence)
+            counts: dict[str, int] = {}
+            for p in scheduled_zone_presets:
+                counts[p] = counts.get(p, 0) + 1
+            priority = {"comfort": 0, "eco": 1, "sleep": 2, "away": 3}
+            dominant_preset = min(
+                counts.keys(),
+                key=lambda p: (-counts[p], priority.get(p, 99)),
             )
-            if not is_away_active:
-                counts: dict[str, int] = {}
-                for p in scheduled_zone_presets:
-                    counts[p] = counts.get(p, 0) + 1
-                priority = {"comfort": 0, "eco": 1, "sleep": 2, "away": 3}
-                dominant_preset = min(
-                    counts.keys(),
-                    key=lambda p: (-counts[p], priority.get(p, 99)),
-                )
-                cur_gp = getattr(zone_manager, "current_global_preset", None)
-                try:
-                    if cur_gp != dominant_preset and cur_gp != GLOBAL_PRESET_AWAY:
-                        zone_manager.set_global_preset(dominant_preset)
-                        preset_synced = True
-                    elif cur_gp == GLOBAL_PRESET_AWAY and dominant_preset != GLOBAL_PRESET_AWAY:
-                        zone_manager.set_global_preset(dominant_preset)
-                        preset_synced = True
-                except AttributeError:
-                    pass
+            cur_gp_now = getattr(zone_manager, "current_global_preset", None)
+            try:
+                if cur_gp_now != dominant_preset and cur_gp_now != GLOBAL_PRESET_AWAY:
+                    zone_manager.set_global_preset(dominant_preset)
+                    preset_synced = True
+            except AttributeError:
+                pass
 
         target_changed = old_overrides != self.schedule_overrides
         smart_start_changed = old_smart_start != self.smart_start_info
@@ -759,6 +813,7 @@ class ScheduleProfileManager:
         """Return currently scheduled effective target temperature for zone, or None."""
         if not self.scheduler_enabled and self.smart_return is None:
             return None
+        climate_id = resolve_zone_id_safe(self.coordinator, climate_id)
         return self.schedule_overrides.get(climate_id)
 
     def get_state_summary(self, now: datetime | None = None) -> dict[str, Any]:
