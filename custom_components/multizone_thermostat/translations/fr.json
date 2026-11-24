@@ -31,7 +31,9 @@
           "temp_sensor": "Capteur de Température de Zone",
           "target_temperature": "Température Cible de Base",
           "emitter_type": "Type d'émetteur",
-          "humidity_sensor": "Capteur d'Humidité (Optionnel)"
+          "humidity_sensor": "Capteur d'Humidité (Optionnel)",
+          "invert_switch": "Inverser la logique du relais (Actionneur normalement ouvert - NO)",
+          "invert_valve": "Inverser la position de la vanne (Normalement ouverte / Action inverse)"
         },
         "sections": {
           "trv_settings": {
@@ -52,14 +54,16 @@
             "description": "Contrôle direct du pourcentage d'ouverture ou tension analogique 0-10V.",
             "data": {
               "valve_entities": "Entités de vanne / actionneur",
-              "valve_scale": "Mode d'échelle de sortie"
+              "valve_scale": "Mode d'échelle de sortie",
+              "invert_valve": "Inverser la position de la vanne (Normalement ouverte / Action inverse)"
             }
           },
           "relay_settings": {
             "name": "Actionneurs à relais (PWM)",
             "description": "Interrupteurs ON/OFF et actionneurs thermiques contrôlés par modulation d'impulsions (PWM).",
             "data": {
-              "switch_entities": "Interrupteurs de Zone / Relais"
+              "switch_entities": "Interrupteurs de Zone / Relais",
+              "invert_switch": "Inverser la logique du relais (Actionneur normalement ouvert - NO)"
             }
           },
           "safety_settings": {
@@ -252,7 +256,9 @@
           "target_temperature": "Température Cible de Base",
           "sensor_timeout_min": "Délai Watchdog Capteur (minutes)",
           "emitter_type": "Type d'émetteur",
-          "humidity_sensor": "Capteur d'Humidité (Optionnel)"
+          "humidity_sensor": "Capteur d'Humidité (Optionnel)",
+          "invert_switch": "Inverser la logique du relais (Actionneur normalement ouvert - NO)",
+          "invert_valve": "Inverser la position de la vanne (Normalement ouverte / Action inverse)"
         },
         "sections": {
           "trv_settings": {
@@ -273,14 +279,16 @@
             "description": "Contrôle direct du pourcentage d'ouverture ou tension analogique 0-10V.",
             "data": {
               "valve_entities": "Entités de vanne / actionneur",
-              "valve_scale": "Mode d'échelle de sortie"
+              "valve_scale": "Mode d'échelle de sortie",
+              "invert_valve": "Inverser la position de la vanne (Normalement ouverte / Action inverse)"
             }
           },
           "relay_settings": {
             "name": "Actionneurs à relais (PWM)",
             "description": "Interrupteurs ON/OFF et actionneurs thermiques contrôlés par modulation d'impulsions (PWM).",
             "data": {
-              "switch_entities": "Interrupteurs de Zone / Relais"
+              "switch_entities": "Interrupteurs de Zone / Relais",
+              "invert_switch": "Inverser la logique du relais (Actionneur normalement ouvert - NO)"
             }
           },
           "safety_settings": {
@@ -332,7 +340,9 @@
           "temp_sensor": "Capteur de Température de Zone",
           "target_temperature": "Température Cible de Base",
           "emitter_type": "Type d'émetteur",
-          "humidity_sensor": "Capteur d'Humidité (Optionnel)"
+          "humidity_sensor": "Capteur d'Humidité (Optionnel)",
+          "invert_switch": "Inverser la logique du relais (Actionneur normalement ouvert - NO)",
+          "invert_valve": "Inverser la position de la vanne (Normalement ouverte / Action inverse)"
         },
         "sections": {
           "trv_settings": {
@@ -353,14 +363,16 @@
             "description": "Contrôle direct du pourcentage d'ouverture ou tension analogique 0-10V.",
             "data": {
               "valve_entities": "Entités de vanne / actionneur",
-              "valve_scale": "Mode d'échelle de sortie"
+              "valve_scale": "Mode d'échelle de sortie",
+              "invert_valve": "Inverser la position de la vanne (Normalement ouverte / Action inverse)"
             }
           },
           "relay_settings": {
             "name": "Actionneurs à relais (PWM)",
             "description": "Interrupteurs ON/OFF et actionneurs thermiques contrôlés par modulation d'impulsions (PWM).",
             "data": {
-              "switch_entities": "Interrupteurs de Zone / Relais"
+              "switch_entities": "Interrupteurs de Zone / Relais",
+              "invert_switch": "Inverser la logique du relais (Actionneur normalement ouvert - NO)"
             }
           },
           "safety_settings": {

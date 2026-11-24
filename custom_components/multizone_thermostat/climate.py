@@ -38,7 +38,11 @@ from .const import (
     CONF_ZONE_NAME,
     CONF_ZONE_CLIMATES,
     CONF_ZONE_SWITCHES,
+    CONF_ZONE_INVERT_SWITCH,
+    DEFAULT_ZONE_INVERT_SWITCH,
     CONF_ZONE_VALVES,
+    CONF_ZONE_INVERT_VALVE,
+    DEFAULT_ZONE_INVERT_VALVE,
     CONF_VALVE_SCALE,
     DEFAULT_VALVE_SCALE,
     CONF_ZONE_TEMP_SENSOR,
@@ -222,7 +226,13 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         self._temp_sensor = zone_data.get(CONF_ZONE_TEMP_SENSOR)
         self._climates = zone_data.get(CONF_ZONE_CLIMATES, [])
         self._switches = zone_data.get(CONF_ZONE_SWITCHES, [])
+        self._invert_switch: bool = bool(
+            zone_data.get(CONF_ZONE_INVERT_SWITCH, DEFAULT_ZONE_INVERT_SWITCH)
+        )
         self._valves = zone_data.get(CONF_ZONE_VALVES, [])
+        self._invert_valve: bool = bool(
+            zone_data.get(CONF_ZONE_INVERT_VALVE, DEFAULT_ZONE_INVERT_VALVE)
+        )
         self._valve_scale = zone_data.get(CONF_VALVE_SCALE, DEFAULT_VALVE_SCALE)
         self._calibrations = zone_data.get(CONF_ZONE_CALIBRATIONS, {})
         self._trv_calibration_mode: str = zone_data.get(
@@ -279,9 +289,11 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
             entity_id=self._zone_id,
             climates=self._climates,
             switches=self._switches,
+            invert_switch=self._invert_switch,
             calibrations=self._calibrations,
             valves=self._valves,
             valve_scale=self._valve_scale,
+            invert_valve=self._invert_valve,
             authoritative_sync=self._authoritative_sync,
             emitter_type=self._emitter_type,
             calibration_mode=self._trv_calibration_mode,

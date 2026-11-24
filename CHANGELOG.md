@@ -1,5 +1,20 @@
 # Changelog
 
+## [6.1.0-beta.18] - 2026-11-24
+### Feat: Output Inversion (Normally Open / Normally Closed) for Zone Actuators (#17)
+- **Normally Open (NO) Relay Actuator Support (`invert_switch`)**:
+  - Added native UI toggle `"Invert switch logic (Normally Open / NO actuator)"` in Setup & Options Flow under *Relay Actuators (PWM)* (`relay_settings`).
+  - Inverted hardware actuation logic in `ZoneSyncManager.async_sync_switches()`: when demand is active (`_local_pwm_state = True`), sends `switch.turn_off` (de-energizes to open NO electrothermal valve); when demand is idle or zone is `OFF`, sends `switch.turn_on` (energizes to close NO valve).
+  - Preserved command de-duplication to prevent redundant state writes on Home Assistant event bus.
+- **Proportional & 0–10V Inverted Valve Support (`invert_valve`)**:
+  - Added native UI toggle `"Invert valve position (Normally Open / Inverted action)"` under *Proportional & 0-10V Valves* (`valve_settings`).
+  - Inverts demand percentage calculation: `effective_pct = (100.0 - target_pct)` across percentage (0–100%) and voltage (0.0–10.0 V) scales.
+- **Diagnostics & Translations**:
+  - Exposed `invert_switch` and `invert_valve` per zone in diagnostics dumps (`diagnostics.py`).
+  - Added complete translations and descriptions across all 6 supported languages (`en`, `it`, `de`, `es`, `fr`, `ru`).
+- **Automated Tests**:
+  - Added dedicated test suite `tests/test_actuator_inversion.py` covering standard and inverted actuation, state filtering, and voltage/percentage scaling (491 tests passing).
+
 ## [6.1.0-beta.17] - 2026-11-21
 ### TRV Architecture, PID Baseline Seeding, 360° Audit Hardening & UI Fixes
 - **TRV Architecture (Phases 1–3, GitHub Discussion #13):**

@@ -31,7 +31,9 @@
           "temp_sensor": "Zonentemperatursensor",
           "target_temperature": "Basis-Solltemperatur",
           "emitter_type": "Emittententyp",
-          "humidity_sensor": "Feuchtigkeitssensor (Optional)"
+          "humidity_sensor": "Feuchtigkeitssensor (Optional)",
+          "invert_switch": "Schaltlogik invertieren (Stellantrieb stromlos offen - NO)",
+          "invert_valve": "Ventilposition invertieren (stromlos offen / inverse Wirkung)"
         },
         "sections": {
           "trv_settings": {
@@ -52,14 +54,16 @@
             "description": "Direkte Steuerung des Öffnungsprozentsatzes oder analoge Spannungssteuerung 0-10V.",
             "data": {
               "valve_entities": "Ventil- / Stellantrieb-Entitäten",
-              "valve_scale": "Ausgangsskalierungsmodus"
+              "valve_scale": "Ausgangsskalierungsmodus",
+              "invert_valve": "Ventilposition invertieren (stromlos offen / inverse Wirkung)"
             }
           },
           "relay_settings": {
             "name": "Relais-Aktoren (PWM)",
             "description": "EIN/AUS-Schalter und thermische Stellantriebe, gesteuert über Pulsweitenmodulation.",
             "data": {
-              "switch_entities": "Zonenschalter / Relais"
+              "switch_entities": "Zonenschalter / Relais",
+              "invert_switch": "Schaltlogik invertieren (Stellantrieb stromlos offen - NO)"
             }
           },
           "safety_settings": {
@@ -252,7 +256,9 @@
           "target_temperature": "Basis-Zieltemperatur",
           "sensor_timeout_min": "Sensor-Watchdog-Timeout (Minuten)",
           "emitter_type": "Emittententyp",
-          "humidity_sensor": "Feuchtigkeitssensor (Optional)"
+          "humidity_sensor": "Feuchtigkeitssensor (Optional)",
+          "invert_switch": "Schaltlogik invertieren (Stellantrieb stromlos offen - NO)",
+          "invert_valve": "Ventilposition invertieren (stromlos offen / inverse Wirkung)"
         },
         "sections": {
           "trv_settings": {
@@ -273,14 +279,16 @@
             "description": "Direkte Steuerung des Öffnungsprozentsatzes oder analoge Spannungssteuerung 0-10V.",
             "data": {
               "valve_entities": "Ventil- / Stellantrieb-Entitäten",
-              "valve_scale": "Ausgangsskalierungsmodus"
+              "valve_scale": "Ausgangsskalierungsmodus",
+              "invert_valve": "Ventilposition invertieren (stromlos offen / inverse Wirkung)"
             }
           },
           "relay_settings": {
             "name": "Relais-Aktoren (PWM)",
             "description": "EIN/AUS-Schalter und thermische Stellantriebe, gesteuert über Pulsweitenmodulation.",
             "data": {
-              "switch_entities": "Zonenschalter / Relais"
+              "switch_entities": "Zonenschalter / Relais",
+              "invert_switch": "Schaltlogik invertieren (Stellantrieb stromlos offen - NO)"
             }
           },
           "safety_settings": {
@@ -332,7 +340,9 @@
           "temp_sensor": "Zonen-Temperatursensor",
           "target_temperature": "Basis-Zieltemperatur",
           "emitter_type": "Emittententyp",
-          "humidity_sensor": "Feuchtigkeitssensor (Optional)"
+          "humidity_sensor": "Feuchtigkeitssensor (Optional)",
+          "invert_switch": "Schaltlogik invertieren (Stellantrieb stromlos offen - NO)",
+          "invert_valve": "Ventilposition invertieren (stromlos offen / inverse Wirkung)"
         },
         "sections": {
           "trv_settings": {
@@ -353,14 +363,16 @@
             "description": "Direkte Steuerung des Öffnungsprozentsatzes oder analoge Spannungssteuerung 0-10V.",
             "data": {
               "valve_entities": "Ventil- / Stellantrieb-Entitäten",
-              "valve_scale": "Ausgangsskalierungsmodus"
+              "valve_scale": "Ausgangsskalierungsmodus",
+              "invert_valve": "Ventilposition invertieren (stromlos offen / inverse Wirkung)"
             }
           },
           "relay_settings": {
             "name": "Relais-Aktoren (PWM)",
             "description": "EIN/AUS-Schalter und thermische Stellantriebe, gesteuert über Pulsweitenmodulation.",
             "data": {
-              "switch_entities": "Zonenschalter / Relais"
+              "switch_entities": "Zonenschalter / Relais",
+              "invert_switch": "Schaltlogik invertieren (Stellantrieb stromlos offen - NO)"
             }
           },
           "safety_settings": {

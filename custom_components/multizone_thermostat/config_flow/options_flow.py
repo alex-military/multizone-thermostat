@@ -419,7 +419,9 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                     CONF_ZONE_NAME: name,
                     CONF_ZONE_CLIMATES: climates,
                     CONF_ZONE_SWITCHES: switches,
+                    CONF_ZONE_INVERT_SWITCH: bool(user_input.get(CONF_ZONE_INVERT_SWITCH, DEFAULT_ZONE_INVERT_SWITCH)),
                     CONF_ZONE_VALVES: valves,
+                    CONF_ZONE_INVERT_VALVE: bool(user_input.get(CONF_ZONE_INVERT_VALVE, DEFAULT_ZONE_INVERT_VALVE)),
                     CONF_VALVE_SCALE: user_input.get(CONF_VALVE_SCALE, DEFAULT_VALVE_SCALE),
                     CONF_ZONE_TRV_SYNC: user_input.get(CONF_ZONE_TRV_SYNC, DEFAULT_TRV_SYNC),
                     CONF_ZONE_AUTHORITATIVE_SYNC: user_input.get(CONF_ZONE_AUTHORITATIVE_SYNC, DEFAULT_AUTHORITATIVE_SYNC),
@@ -604,7 +606,9 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                         if z.get(CONF_ZONE_NAME, 'Unnamed Zone') == self._current_zone_name:
                             self._zones[i][CONF_ZONE_CLIMATES] = climates
                             self._zones[i][CONF_ZONE_SWITCHES] = switches
+                            self._zones[i][CONF_ZONE_INVERT_SWITCH] = bool(user_input.get(CONF_ZONE_INVERT_SWITCH, self._zones[i].get(CONF_ZONE_INVERT_SWITCH, DEFAULT_ZONE_INVERT_SWITCH)))
                             self._zones[i][CONF_ZONE_VALVES] = valves
+                            self._zones[i][CONF_ZONE_INVERT_VALVE] = bool(user_input.get(CONF_ZONE_INVERT_VALVE, self._zones[i].get(CONF_ZONE_INVERT_VALVE, DEFAULT_ZONE_INVERT_VALVE)))
                             self._zones[i][CONF_VALVE_SCALE] = user_input.get(CONF_VALVE_SCALE, DEFAULT_VALVE_SCALE)
                             self._zones[i][CONF_ZONE_TRV_SYNC] = user_input.get(CONF_ZONE_TRV_SYNC, DEFAULT_TRV_SYNC)
                             self._zones[i][CONF_ZONE_AUTHORITATIVE_SYNC] = user_input.get(CONF_ZONE_AUTHORITATIVE_SYNC, DEFAULT_AUTHORITATIVE_SYNC)

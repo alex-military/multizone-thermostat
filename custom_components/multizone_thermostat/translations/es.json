@@ -31,7 +31,9 @@
           "temp_sensor": "Sensor de Temperatura de Zona",
           "target_temperature": "Temperatura Objetivo Base",
           "emitter_type": "Tipo de emisor",
-          "humidity_sensor": "Sensor de Humedad (Opcional)"
+          "humidity_sensor": "Sensor de Humedad (Opcional)",
+          "invert_switch": "Invertir lógica del relé (Actuador normalmente abierto - NO)",
+          "invert_valve": "Invertir posición de la válvula (Normalmente abierta / Acción inversa)"
         },
         "sections": {
           "trv_settings": {
@@ -52,14 +54,16 @@
             "description": "Control directo de porcentaje de apertura o voltaje analógico de 0-10V.",
             "data": {
               "valve_entities": "Entidades de Válvula / Actuador",
-              "valve_scale": "Modo de Escala de Salida"
+              "valve_scale": "Modo de Escala de Salida",
+              "invert_valve": "Invertir posición de la válvula (Normalmente abierta / Acción inversa)"
             }
           },
           "relay_settings": {
             "name": "Actuadores de Relé (PWM)",
             "description": "Interruptores ON/OFF y actuadores térmicos controlados por modulación por ancho de pulsos.",
             "data": {
-              "switch_entities": "Interruptores de Zona / Relés"
+              "switch_entities": "Interruptores de Zona / Relés",
+              "invert_switch": "Invertir lógica del relé (Actuador normalmente abierto - NO)"
             }
           },
           "safety_settings": {
@@ -252,7 +256,9 @@
           "target_temperature": "Temperatura Objetivo Base",
           "sensor_timeout_min": "Tiempo de espera del Watchdog del Sensor (minutos)",
           "emitter_type": "Tipo de emisor",
-          "humidity_sensor": "Sensor de Humedad (Opcional)"
+          "humidity_sensor": "Sensor de Humedad (Opcional)",
+          "invert_switch": "Invertir lógica del relé (Actuador normalmente abierto - NO)",
+          "invert_valve": "Invertir posición de la válvula (Normalmente abierta / Acción inversa)"
         },
         "sections": {
           "trv_settings": {
@@ -273,14 +279,16 @@
             "description": "Control directo de porcentaje de apertura o voltaje analógico de 0-10V.",
             "data": {
               "valve_entities": "Entidades de Válvula / Actuador",
-              "valve_scale": "Modo de Escala de Salida"
+              "valve_scale": "Modo de Escala de Salida",
+              "invert_valve": "Invertir posición de la válvula (Normalmente abierta / Acción inversa)"
             }
           },
           "relay_settings": {
             "name": "Actuadores de Relé (PWM)",
             "description": "Interruptores ON/OFF y actuadores térmicos controlados por modulación por ancho de pulsos.",
             "data": {
-              "switch_entities": "Interruptores de Zona / Relés"
+              "switch_entities": "Interruptores de Zona / Relés",
+              "invert_switch": "Invertir lógica del relé (Actuador normalmente abierto - NO)"
             }
           },
           "safety_settings": {
@@ -332,7 +340,9 @@
           "temp_sensor": "Sensor de Temperatura de la Zona",
           "target_temperature": "Temperatura Objetivo Base",
           "emitter_type": "Tipo de emisor",
-          "humidity_sensor": "Sensor de Humedad (Opcional)"
+          "humidity_sensor": "Sensor de Humedad (Opcional)",
+          "invert_switch": "Invertir lógica del relé (Actuador normalmente abierto - NO)",
+          "invert_valve": "Invertir posición de la válvula (Normalmente abierta / Acción inversa)"
         },
         "sections": {
           "trv_settings": {
@@ -353,14 +363,16 @@
             "description": "Control directo de porcentaje de apertura o voltaje analógico de 0-10V.",
             "data": {
               "valve_entities": "Entidades de Válvula / Actuador",
-              "valve_scale": "Modo de Escala de Salida"
+              "valve_scale": "Modo de Escala de Salida",
+              "invert_valve": "Invertir posición de la válvula (Normalmente abierta / Acción inversa)"
             }
           },
           "relay_settings": {
             "name": "Actuadores de Relé (PWM)",
             "description": "Interruptores ON/OFF y actuadores térmicos controlados por modulación por ancho de pulsos.",
             "data": {
-              "switch_entities": "Interruptores de Zona / Relés"
+              "switch_entities": "Interruptores de Zona / Relés",
+              "invert_switch": "Invertir lógica del relé (Actuador normalmente abierto - NO)"
             }
           },
           "safety_settings": {

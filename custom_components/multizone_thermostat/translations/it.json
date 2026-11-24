@@ -31,7 +31,9 @@
           "temp_sensor": "Sensore Temperatura Zona",
           "target_temperature": "Temperatura Target Base",
           "emitter_type": "Tipo di emettitore",
-          "humidity_sensor": "Sensore di Umidità (Opzionale)"
+          "humidity_sensor": "Sensore di Umidità (Opzionale)",
+          "invert_switch": "Inverti logica relè (Attuatore Normalmente Aperto - NO)",
+          "invert_valve": "Inverti posizione valvola (Normalmente Aperta / Azione Inversa)"
         },
         "sections": {
           "trv_settings": {
@@ -52,14 +54,16 @@
             "description": "Controllo diretto della percentuale di apertura o tensione analogica 0-10V.",
             "data": {
               "valve_entities": "Entità Valvole / Attuatori",
-              "valve_scale": "Scala Uscita"
+              "valve_scale": "Scala Uscita",
+              "invert_valve": "Inverti posizione valvola (Normalmente Aperta / Azione Inversa)"
             }
           },
           "relay_settings": {
             "name": "Attuatori a Relè (PWM)",
             "description": "Interruttori ON/OFF ed elettrotermici controllati a modulazione d'impulso.",
             "data": {
-              "switch_entities": "Interruttori / Relè di Zona"
+              "switch_entities": "Interruttori / Relè di Zona",
+              "invert_switch": "Inverti logica relè (Attuatore Normalmente Aperto - NO)"
             }
           },
           "safety_settings": {
@@ -252,7 +256,9 @@
           "target_temperature": "Base Target Temperature",
           "sensor_timeout_min": "Timeout Watchdog Sensore (minuti)",
           "emitter_type": "Tipo di emettitore",
-          "humidity_sensor": "Sensore di Umidità (Opzionale)"
+          "humidity_sensor": "Sensore di Umidità (Opzionale)",
+          "invert_switch": "Inverti logica relè (Attuatore Normalmente Aperto - NO)",
+          "invert_valve": "Inverti posizione valvola (Normalmente Aperta / Azione Inversa)"
         },
         "sections": {
           "trv_settings": {
@@ -273,14 +279,16 @@
             "description": "Controllo diretto della percentuale di apertura o tensione analogica 0-10V.",
             "data": {
               "valve_entities": "Entità Valvole / Attuatori",
-              "valve_scale": "Scala Uscita"
+              "valve_scale": "Scala Uscita",
+              "invert_valve": "Inverti posizione valvola (Normalmente Aperta / Azione Inversa)"
             }
           },
           "relay_settings": {
             "name": "Attuatori a Relè (PWM)",
             "description": "Interruttori ON/OFF ed elettrotermici controllati a modulazione d'impulso.",
             "data": {
-              "switch_entities": "Interruttori / Relè di Zona"
+              "switch_entities": "Interruttori / Relè di Zona",
+              "invert_switch": "Inverti logica relè (Attuatore Normalmente Aperto - NO)"
             }
           },
           "safety_settings": {
@@ -332,7 +340,9 @@
           "temp_sensor": "Sensore Temperatura Zona",
           "target_temperature": "Temperatura Target Base",
           "emitter_type": "Tipo di emettitore",
-          "humidity_sensor": "Sensore di Umidità (Opzionale)"
+          "humidity_sensor": "Sensore di Umidità (Opzionale)",
+          "invert_switch": "Inverti logica relè (Attuatore Normalmente Aperto - NO)",
+          "invert_valve": "Inverti posizione valvola (Normalmente Aperta / Azione Inversa)"
         },
         "sections": {
           "trv_settings": {
@@ -353,14 +363,16 @@
             "description": "Controllo diretto della percentuale di apertura o tensione analogica 0-10V.",
             "data": {
               "valve_entities": "Entità Valvole / Attuatori",
-              "valve_scale": "Scala Uscita"
+              "valve_scale": "Scala Uscita",
+              "invert_valve": "Inverti posizione valvola (Normalmente Aperta / Azione Inversa)"
             }
           },
           "relay_settings": {
             "name": "Attuatori a Relè (PWM)",
             "description": "Interruttori ON/OFF ed elettrotermici controllati a modulazione d'impulso.",
             "data": {
-              "switch_entities": "Interruttori / Relè di Zona"
+              "switch_entities": "Interruttori / Relè di Zona",
+              "invert_switch": "Inverti logica relè (Attuatore Normalmente Aperto - NO)"
             }
           },
           "safety_settings": {
