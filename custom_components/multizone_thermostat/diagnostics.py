@@ -95,6 +95,9 @@ async def async_get_config_entry_diagnostics(
             "battery_level": battery_level,
             "climates_configured": zone.get("climates") or zone.get("climate_entities", []),
             "switches_configured": zone.get("switches") or zone.get("switch_entities", []),
+            "invert_switch": bool(zone.get("invert_switch", False)),
+            "valves_configured": zone.get("valves") or zone.get("valve_entities", []),
+            "invert_valve": bool(zone.get("invert_valve", False)),
             "autotuner": {
                 "state": tuner.state if tuner else "N/A",
                 "completed_cycles": len(tuner.completed_cycles) if tuner else 0,

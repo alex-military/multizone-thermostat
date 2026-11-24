@@ -65,6 +65,8 @@ class ZoneSyncManager:
         trv_close_offset: float = DEFAULT_TRV_CLOSE_OFFSET,
         trv_demand_open_threshold: float = DEFAULT_TRV_DEMAND_OPEN_THRESHOLD,
         trv_demand_debounce_s: float = DEFAULT_TRV_DEMAND_DEBOUNCE_S,
+        invert_switch: bool = False,
+        invert_valve: bool = False,
     ) -> None:
         """Initialize the sync manager."""
         self.hass = hass
@@ -75,6 +77,8 @@ class ZoneSyncManager:
         self._switches = switches
         self._valves = valves or []
         self._valve_scale = valve_scale
+        self._invert_switch = bool(invert_switch)
+        self._invert_valve = bool(invert_valve)
         self._calibrations = calibrations
         self._authoritative_sync = bool(authoritative_sync)
         self._calibration_mode = (
@@ -838,13 +842,15 @@ class ZoneSyncManager:
         if not self._switches:
             return
 
-        service = SERVICE_TURN_ON if self._local_pwm_state else SERVICE_TURN_OFF
-        
+        is_active = not self._local_pwm_state if self._invert_switch else self._local_pwm_state
+        service = SERVICE_TURN_ON if is_active else SERVICE_TURN_OFF
+        expected_state = STATE_ON if is_active else "off"
+
         for switch in self._switches:
             st = self.hass.states.get(switch)
             if not st or st.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
                 continue
-            if st.state != (STATE_ON if self._local_pwm_state else "off"):
+            if st.state != expected_state:
                 await self.hass.services.async_call(
                     "switch",
                     service,
@@ -864,12 +870,13 @@ class ZoneSyncManager:
             target_pct = float(self._coordinator.get_zone_demand(self._entity_id))
 
         target_pct = max(0.0, min(100.0, target_pct))
+        effective_pct = (100.0 - target_pct) if self._invert_valve else target_pct
 
         for valve_entity in self._valves:
             st = self.hass.states.get(valve_entity)
             if not st or st.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
                 continue
-            target_val = round(target_pct / 10.0, 1) if self._valve_scale == VALVE_SCALE_VOLT else round(target_pct, 1)
+            target_val = round(effective_pct / 10.0, 1) if self._valve_scale == VALVE_SCALE_VOLT else round(effective_pct, 1)
             last_val = self._last_valve_positions.get(valve_entity)
 
             # Deadband: only update if change is significant (>= 0.5% or 0.05V) or when going to 0 / 100
@@ -884,7 +891,7 @@ class ZoneSyncManager:
                     await self.hass.services.async_call(
                         "valve",
                         "set_valve_position",
-                        {ATTR_ENTITY_ID: valve_entity, "position": int(round(target_pct))},
+                        {ATTR_ENTITY_ID: valve_entity, "position": int(round(effective_pct))},
                         context=self._internal_context,
                     )
                 elif domain in ("number", "input_number"):

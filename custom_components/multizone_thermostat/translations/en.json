@@ -28,7 +28,9 @@
         "data": {
           "name": "Zone Name",
           "temp_sensor": "Zone Temperature Sensor",
-          "target_temperature": "Base Target Temperature"
+          "target_temperature": "Base Target Temperature",
+          "invert_switch": "Invert switch logic (Normally Open / NO actuator)",
+          "invert_valve": "Invert valve position (Normally Open / Inverted action)"
         },
         "sections": {
           "trv_settings": {
@@ -49,14 +51,16 @@
             "description": "Direct opening percentage or 0-10V analog voltage control.",
             "data": {
               "valve_entities": "Valve / Actuator Entities",
-              "valve_scale": "Output Scale Mode"
+              "valve_scale": "Output Scale Mode",
+              "invert_valve": "Invert valve position (Normally Open / Inverted action)"
             }
           },
           "relay_settings": {
             "name": "Relay Actuators (PWM)",
             "description": "ON/OFF switches and thermal actuators controlled via pulse-width modulation.",
             "data": {
-              "switch_entities": "Zone Switches / Relays"
+              "switch_entities": "Zone Switches / Relays",
+              "invert_switch": "Invert switch logic (Normally Open / NO actuator)"
             }
           },
           "safety_settings": {
@@ -175,7 +179,9 @@
           "switch_entities": "Zone Switches / Relays",
           "temp_sensor": "Zone Temperature Sensor",
           "target_temperature": "Base Target Temperature",
-          "sensor_timeout_min": "Sensor Watchdog Timeout (minutes)"
+          "sensor_timeout_min": "Sensor Watchdog Timeout (minutes)",
+          "invert_switch": "Invert switch logic (Normally Open / NO actuator)",
+          "invert_valve": "Invert valve position (Normally Open / Inverted action)"
         },
         "sections": {
           "trv_settings": {
@@ -196,14 +202,16 @@
             "description": "Direct opening percentage or 0-10V analog voltage control.",
             "data": {
               "valve_entities": "Valve / Actuator Entities",
-              "valve_scale": "Output Scale Mode"
+              "valve_scale": "Output Scale Mode",
+              "invert_valve": "Invert valve position (Normally Open / Inverted action)"
             }
           },
           "relay_settings": {
             "name": "Relay Actuators (PWM)",
             "description": "ON/OFF switches and thermal actuators controlled via pulse-width modulation.",
             "data": {
-              "switch_entities": "Zone Switches / Relays"
+              "switch_entities": "Zone Switches / Relays",
+              "invert_switch": "Invert switch logic (Normally Open / NO actuator)"
             }
           },
           "safety_settings": {
@@ -240,7 +248,9 @@
         "data": {
           "zone_name": "Zone",
           "temp_sensor": "Zone Temperature Sensor",
-          "target_temperature": "Base Target Temperature"
+          "target_temperature": "Base Target Temperature",
+          "invert_switch": "Invert switch logic (Normally Open / NO actuator)",
+          "invert_valve": "Invert valve position (Normally Open / Inverted action)"
         },
         "sections": {
           "trv_settings": {
@@ -261,14 +271,16 @@
             "description": "Direct opening percentage or 0-10V analog voltage control.",
             "data": {
               "valve_entities": "Valve / Actuator Entities",
-              "valve_scale": "Output Scale Mode"
+              "valve_scale": "Output Scale Mode",
+              "invert_valve": "Invert valve position (Normally Open / Inverted action)"
             }
           },
           "relay_settings": {
             "name": "Relay Actuators (PWM)",
             "description": "ON/OFF switches and thermal actuators controlled via pulse-width modulation.",
             "data": {
-              "switch_entities": "Zone Switches / Relays"
+              "switch_entities": "Zone Switches / Relays",
+              "invert_switch": "Invert switch logic (Normally Open / NO actuator)"
             }
           },
           "safety_settings": {

@@ -24,7 +24,11 @@ from ..const import (
     CONF_ZONE_NAME,
     CONF_ZONE_CLIMATES,
     CONF_ZONE_SWITCHES,
+    CONF_ZONE_INVERT_SWITCH,
+    DEFAULT_ZONE_INVERT_SWITCH,
     CONF_ZONE_VALVES,
+    CONF_ZONE_INVERT_VALVE,
+    DEFAULT_ZONE_INVERT_VALVE,
     CONF_VALVE_SCALE,
     VALVE_SCALE_PERCENT,
     VALVE_SCALE_VOLT,
@@ -171,6 +175,7 @@ def get_add_zone_schema() -> vol.Schema:
                         mode=selector.SelectSelectorMode.DROPDOWN,
                     )
                 ),
+                vol.Optional(CONF_ZONE_INVERT_VALVE, default=DEFAULT_ZONE_INVERT_VALVE): bool,
             }),
             {"collapsed": True},
         ),
@@ -179,6 +184,7 @@ def get_add_zone_schema() -> vol.Schema:
         vol.Optional("relay_settings"): data_entry_flow.section(
             vol.Schema({
                 vol.Optional(CONF_ZONE_SWITCHES, default=[]): selector.EntitySelector(selector.EntitySelectorConfig(domain=SWITCH_DOMAIN, multiple=True)),
+                vol.Optional(CONF_ZONE_INVERT_SWITCH, default=DEFAULT_ZONE_INVERT_SWITCH): bool,
             }),
             {"collapsed": True},
         ),
@@ -381,6 +387,7 @@ def get_options_edit_zone_schema(zone_data: dict[str, Any], temp_desc: dict[str,
                         mode=selector.SelectSelectorMode.DROPDOWN,
                     )
                 ),
+                vol.Optional(CONF_ZONE_INVERT_VALVE, default=zone_data.get(CONF_ZONE_INVERT_VALVE, DEFAULT_ZONE_INVERT_VALVE)): bool,
             }),
             {"collapsed": True},
         ),
@@ -389,6 +396,7 @@ def get_options_edit_zone_schema(zone_data: dict[str, Any], temp_desc: dict[str,
         vol.Optional("relay_settings"): data_entry_flow.section(
             vol.Schema({
                 vol.Optional(CONF_ZONE_SWITCHES, default=zone_data.get(CONF_ZONE_SWITCHES, [])): selector.EntitySelector(selector.EntitySelectorConfig(domain=SWITCH_DOMAIN, multiple=True)),
+                vol.Optional(CONF_ZONE_INVERT_SWITCH, default=zone_data.get(CONF_ZONE_INVERT_SWITCH, DEFAULT_ZONE_INVERT_SWITCH)): bool,
             }),
             {"collapsed": True},
         ),
