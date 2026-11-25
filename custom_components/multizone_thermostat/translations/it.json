@@ -43,7 +43,7 @@
               "climate_entities": "Entità Climate / TRV",
               "trv_preset_sync": "Abilita Sincronizzazione Preset TRV",
               "authoritative_climate_sync": "Sincronizzazione Autoritativa Termostato Fisico",
-              "trv_calibration_mode": "Modalità Calibrazione TRV (Offset vs Temp. Esterna)",
+              "trv_calibration_mode": "Modalità Calibrazione TRV (Auto / Offset / Esterno / Disabilitata)",
               "trv_control_mode": "Modalità Controllo TRV (Standard vs Valvola a Domanda)",
               "trv_open_boost": "Boost Apertura a Domanda (°C sopra ambiente/target)",
               "trv_close_offset": "Offset Chiusura a Domanda (°C sotto ambiente a riposo)"
@@ -268,7 +268,7 @@
               "climate_entities": "Entità Climate / TRV",
               "trv_preset_sync": "Abilita Sincronizzazione Preset TRV",
               "authoritative_climate_sync": "Sincronizzazione Autoritativa Termostato Fisico",
-              "trv_calibration_mode": "Modalità Calibrazione TRV (Offset vs Temp. Esterna)",
+              "trv_calibration_mode": "Modalità Calibrazione TRV (Auto / Offset / Esterno / Disabilitata)",
               "trv_control_mode": "Modalità Controllo TRV (Standard vs Valvola a Domanda)",
               "trv_open_boost": "Boost Apertura a Domanda (°C sopra ambiente/target)",
               "trv_close_offset": "Offset Chiusura a Domanda (°C sotto ambiente a riposo)"
@@ -352,7 +352,7 @@
               "climate_entities": "Zone TRVs / Climates",
               "trv_preset_sync": "Sincronizza modalità Termostato (TRV) -> Centrale",
               "authoritative_climate_sync": "Sincronizzazione Autoritativa Termostato Fisico",
-              "trv_calibration_mode": "Modalità Calibrazione TRV (Offset vs Temp. Esterna)",
+              "trv_calibration_mode": "Modalità Calibrazione TRV (Auto / Offset / Esterno / Disabilitata)",
               "trv_control_mode": "Modalità Controllo TRV (Standard vs Valvola a Domanda)",
               "trv_open_boost": "Boost Apertura a Domanda (°C sopra ambiente/target)",
               "trv_close_offset": "Offset Chiusura a Domanda (°C sotto ambiente a riposo)"

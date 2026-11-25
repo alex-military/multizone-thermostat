@@ -143,10 +143,10 @@ def test_autotune_clamps_kp_before_ki_kd():
     assert len(obs.completed_cycles) == 1
     cycle = obs.completed_cycles[0]
     assert cycle["Kp"] == 500.0
-    # Verify Ti = max(600.0, 2.0 * L) and Kd = min(500.0, kp * min(60.0, 0.25 * L))
+    # Verify Ti = max(900.0, 2.0 * L), Ki <= 0.15, and Kd = min(500.0, kp * min(60.0, 0.25 * L))
     L = cycle["L"]
-    expected_ti = max(600.0, 2.0 * L)
-    expected_ki = round(500.0 / expected_ti, 5)
+    expected_ti = max(900.0, 2.0 * L)
+    expected_ki = round(min(0.15, 500.0 / expected_ti), 5)
     expected_td = min(60.0, 0.25 * L)
     expected_kd = round(min(500.0, 500.0 * expected_td), 2)
     assert abs(cycle["Ki"] - expected_ki) < 1e-6

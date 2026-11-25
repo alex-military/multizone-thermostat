@@ -63,30 +63,28 @@ def test_pid_max_dt_clamps_integral_accumulation():
 
 
 def test_pid_derivative_filtering_and_clamping():
-    """Verify derivative EMA filter with tau=60s, clamping to [-15, 15], and reset on dt < 1s."""
-    pid = PID(kp=10.0, ki=0.0, kd=100.0)
+    """Verify least-squares derivative over 15-min window, flicker immunity, clamping to [-15, 15], and reset on dt < 1s."""
+    pid = PID(kp=10.0, ki=0.0, kd=1000.0)
 
-    # Initial sample at t=0, temp=20.0
+    # Initial sample and < 5 min span: derivative stays 0.0
     pid.calc(input_val=20.0, set_point=20.0, input_time=0.0, last_input_time=None)
     assert pid.derivative == 0.0
+    pid.calc(input_val=19.5, set_point=20.0, input_time=10.0, last_input_time=0.0)
+    assert pid.derivative == 0.0
 
-    # Step change: temp drops to 19.0 at t=10s (dt=10s)
-    # raw_deriv = -(100 * (19.0 - 20.0)) / 10 = +10.0
-    # alpha = 10 / (10 + 60) = 1/7 ~= 0.142857
-    # filtered_deriv = (1/7) * 10 + (6/7) * 0 = 1.42857
-    pid.calc(input_val=19.0, set_point=20.0, input_time=10.0, last_input_time=0.0)
-    assert pid.derivative == pytest.approx(10.0 / 7.0, rel=1e-3)
+    # Real downward ramp >= 5 min span and > 0.105 C excursion -> positive D bounded by +/-15
+    pid.calc(input_val=19.0, set_point=20.0, input_time=300.0, last_input_time=10.0)
+    assert 0.0 < pid.derivative <= 15.0
 
-    # Extreme jump that would produce raw derivative of 1000:
-    # clamped to <= 15.0
-    pid_spike = PID(kp=10.0, ki=0.0, kd=500.0)
+    # Massive drop over 600s -> raw -Kd*slope exceeds +15 -> clamps to exactly +15.0
+    pid_spike = PID(kp=10.0, ki=0.0, kd=5000.0)
     pid_spike.calc(input_val=20.0, set_point=20.0, input_time=0.0, last_input_time=None)
-    # Massive drop from 20.0 to 10.0 over 1 second -> raw = 5000 -> must clamp to 15.0
-    pid_spike.calc(input_val=10.0, set_point=20.0, input_time=1.0, last_input_time=0.0)
+    pid_spike.calc(input_val=19.0, set_point=20.0, input_time=300.0, last_input_time=0.0)
+    pid_spike.calc(input_val=10.0, set_point=20.0, input_time=600.0, last_input_time=300.0)
     assert pid_spike.derivative == pytest.approx(15.0)
 
     # When dt < 1.0s: derivative must be explicitly reset to 0.0
-    pid_spike.calc(input_val=10.0, set_point=20.0, input_time=1.5, last_input_time=1.0)
+    pid_spike.calc(input_val=10.0, set_point=20.0, input_time=600.5, last_input_time=600.0)
     assert pid_spike.derivative == 0.0
 
 

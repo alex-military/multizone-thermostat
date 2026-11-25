@@ -105,3 +105,23 @@ class MultizonePID:
             self._last_input_time = now
         self._last_demand = demand
         return self._last_demand
+
+    def get_diagnostics(self) -> dict[str, float | None]:
+        """Return live internal PID breakdown for Home Assistant diagnostics."""
+        sp = self._pid.set_point
+        if sp is not None and self.action == "cool":
+            sp = -sp
+        return {
+            "kp": round(float(self._pid._Kp), 4),
+            "ki": round(float(self._pid._Ki), 6),
+            "kd": round(float(self._pid._Kd), 2),
+            "p_contribution": round(float(self._pid.proportional), 4),
+            "i_contribution": round(float(self._pid.integral), 4),
+            "d_contribution": round(float(self._pid.derivative), 4),
+            "integral_accumulator": round(float(self._pid.integral), 4),
+            "pid_raw_output": round(float(self._pid.raw_output), 4),
+            "pid_clamped_output": round(float(self._pid.output), 4),
+            "pid_error": round(float(self._pid.error), 4),
+            "pid_target": round(float(sp), 4) if sp is not None else None,
+            "dt_seconds": round(float(self._pid.dt), 2),
+        }

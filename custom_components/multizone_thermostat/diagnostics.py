@@ -35,6 +35,18 @@ def _pid_params(pid_wrapper: Any) -> dict[str, float] | None:
     }
 
 
+def _pid_state(pid_wrapper: Any) -> dict[str, Any] | None:
+    """Extract live internal PID breakdown safely."""
+    if not pid_wrapper:
+        return None
+    getter = getattr(pid_wrapper, "get_diagnostics", None)
+    if callable(getter):
+        res = getter()
+        if isinstance(res, dict):
+            return res
+    return None
+
+
 async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, entry: ConfigEntry
 ) -> dict[str, Any]:
@@ -156,6 +168,8 @@ async def async_get_config_entry_diagnostics(
             } if thermal else None,
             "pid_parameters": _pid_params(pid),
             "pid_parameters_cool": _pid_params(pid_cool),
+            "pid_state": _pid_state(pid),
+            "pid_state_cool": _pid_state(pid_cool),
             "split": {
                 "split_climate_entity": zone.get("split_climate_entity") or zone.get("split_climate"),
                 "split_role": zone.get("split_role"),

@@ -301,20 +301,18 @@ def test_audit_pid_monotonic_inf_max_dt_derivative():
     expected_integral = 0.01 * 1.0 * 600.0  # 6.0
     assert pid_windup.integral == pytest.approx(expected_integral)
 
-    # 4. High Kd step: 0.1°C jump with Kd=1000.0 over 10s
-    # raw_derivative = -(1000 * 0.1) / 10 = -10.0
-    # Filtered and clamped to [-15, 15]
-    pid_deriv = PID(kp=0.0, ki=0.0, kd=1000.0)
+    # 4. Least-squares derivative over 15-min window: 0.1C flicker stays 0, real ramp clamps to [-15, 15]
+    pid_deriv = PID(kp=0.0, ki=0.0, kd=5000.0)
     pid_deriv.calc(input_val=20.0, set_point=20.0, input_time=0.0, last_input_time=None)
-    pid_deriv.calc(input_val=20.1, set_point=20.0, input_time=10.0, last_input_time=0.0)
-    assert abs(pid_deriv.derivative) <= 15.0
+    pid_deriv.calc(input_val=20.1, set_point=20.0, input_time=300.0, last_input_time=0.0)
+    assert pid_deriv.derivative == 0.0  # pure 0.1 C step ignored
 
-    # Extreme jump (drop 5°C in 1s) -> raw = +5000 -> clamped to exactly 15.0
-    pid_deriv.calc(input_val=15.1, set_point=20.0, input_time=11.0, last_input_time=10.0)
+    # Real drop over >= 5 min span -> raw positive D exceeds +15 -> clamped to exactly 15.0
+    pid_deriv.calc(input_val=15.1, set_point=20.0, input_time=600.0, last_input_time=300.0)
     assert pid_deriv.derivative == pytest.approx(15.0)
 
     # 5. dt < 1.0s: derivative must be reset to 0.0
-    pid_deriv.calc(input_val=15.1, set_point=20.0, input_time=11.5, last_input_time=11.0)
+    pid_deriv.calc(input_val=15.1, set_point=20.0, input_time=600.5, last_input_time=600.0)
     assert pid_deriv.derivative == 0.0
 
 

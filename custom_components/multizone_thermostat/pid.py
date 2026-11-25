@@ -16,10 +16,17 @@ _LOGGER = logging.getLogger(__name__)
 # Based on Arduino PID Library
 # See https://github.com/br3ttb/Arduino-PID-Library
 class PID:
+    # Defaults for least-squares derivative over a 15-minute window, bounded to +/-15%
+    DEFAULT_DERIVATIVE_WINDOW = 900.0
+    MAX_DERIVATIVE = 15.0
+    MIN_DERIVATIVE_SAMPLES = 3
+    MIN_SPAN_FRACTION = 1.0 / 3.0
+    MIN_DERIVATIVE_TEMP_SPAN = 0.105
     error: float
 
     def __init__(self, kp, ki, kd, ke=0, out_min=float('-inf'), out_max=float('+inf'),
-                 sampling_period=0, cold_tolerance=0.3, hot_tolerance=0.3, max_dt=600.0):
+                 sampling_period=0, cold_tolerance=0.3, hot_tolerance=0.3, max_dt=600.0,
+                 derivative_window=DEFAULT_DERIVATIVE_WINDOW, derivative_limit=MAX_DERIVATIVE):
         """A proportional-integral-derivative controller.
             :param kp: Proportional coefficient.
             :type kp: float
@@ -30,8 +37,7 @@ class PID:
             :param ke: Outdoor temperature compensation coefficient.
             :type ke: float
             :param out_min: Lower output limit.
-            :type out_min: float
-            :param out_max: Upper output limit.
+            :type out_max: Upper output limit.
             :type out_max: float
             :param sampling_period: time period between two PID calculations in seconds
             :type sampling_period: float
@@ -41,6 +47,10 @@ class PID:
             :type hot_tolerance: float
             :param max_dt: Upper bound on dt for integral accumulation in seconds
             :type max_dt: float
+            :param derivative_window: Seconds of history used for least-squares derivative slope
+            :type derivative_window: float
+            :param derivative_limit: Max absolute derivative contribution in output units
+            :type derivative_limit: float
         """
         if kp is None:
             raise ValueError('kp must be specified')
@@ -73,13 +83,16 @@ class PID:
         self._dt = 0
         self._last_output = 0
         self._output = 0
-        self._proportional = 0
-        self._derivative = 0
+        self._raw_output = 0.0
         self._external = 0
         self._mode = 'AUTO'
         self._sampling_period = sampling_period
         self._cold_tolerance = cold_tolerance
         self._hot_tolerance = hot_tolerance
+        self._derivative_window = 0.0
+        self._derivative_limit = 0.0
+        self._history: deque[tuple[float, float]] = deque()
+        self.set_derivative_params(window=derivative_window, limit=derivative_limit)
 
     @property
     def mode(self):
@@ -142,6 +155,63 @@ class PID:
         return self._dt
 
     @property
+    def output(self):
+        return self._output
+
+    @property
+    def raw_output(self):
+        return self._raw_output
+
+    @property
+    def set_point(self):
+        return self._set_point
+
+    @property
+    def derivative_window(self):
+        """Seconds of history used for the least-squares derivative slope (0 disables D)."""
+        return self._derivative_window
+
+    @property
+    def derivative_limit(self):
+        """Maximum absolute derivative contribution in output units (0 disables D)."""
+        return self._derivative_limit
+
+    def set_derivative_params(self, window=None, limit=None):
+        """Configure derivative window (seconds) and output limit; ignore invalid values."""
+        if isinstance(window, (int, float)) and not isinstance(window, bool) and math.isfinite(window):
+            self._derivative_window = max(0.0, float(window))
+        if isinstance(limit, (int, float)) and not isinstance(limit, bool) and math.isfinite(limit):
+            self._derivative_limit = max(0.0, float(limit))
+
+    def _temperature_slope(self, now):
+        """Least-squares slope (input units per second) over the derivative window."""
+        window = self._derivative_window
+        if window <= 0.0 or now is None or not isinstance(now, (int, float)) or isinstance(now, bool) or not math.isfinite(now):
+            return None
+        now = float(now)
+        history = self._history
+        if history and now <= history[-1][0]:
+            history[-1] = (now, float(self._input))
+        else:
+            history.append((now, float(self._input)))
+        while history and history[0][0] < now - window:
+            history.popleft()
+        if len(history) < self.MIN_DERIVATIVE_SAMPLES:
+            return None
+        if history[-1][0] - history[0][0] < window * self.MIN_SPAN_FRACTION:
+            return None
+        vals = [v for _, v in history]
+        if (max(vals) - min(vals)) <= self.MIN_DERIVATIVE_TEMP_SPAN:
+            return 0.0
+        n = len(history)
+        mean_t = sum(t for t, _ in history) / n
+        mean_v = sum(vals) / n
+        den = sum((t - mean_t) ** 2 for t, _ in history)
+        if den <= 0.0:
+            return None
+        return sum((t - mean_t) * (v - mean_v) for t, v in history) / den
+
+    @property
     def max_dt(self):
         return self._max_dt
 
@@ -168,6 +238,7 @@ class PID:
         self._last_input = None
         self._last_input_time = None
         self._derivative = 0.0
+        self._history.clear()
         
     def calc(self, input_val, set_point, input_time=None, last_input_time=None, ext_temp=None):
         """Adjusts and holds the given setpoint.
@@ -209,10 +280,12 @@ class PID:
         if self.mode == 'OFF':  # If PID is off, simply switch between min and max output
             if input_val <= set_point - self._cold_tolerance:
                 self._output = self._out_max
+                self._raw_output = self._output
                 _LOGGER.debug("PID is off and input lower than set point: heater ON")
                 return self._output, True
             elif input_val >= set_point + self._hot_tolerance:
                 self._output = self._out_min
+                self._raw_output = self._output
                 _LOGGER.debug("PID is off and input higher than set point: heater OFF")
                 return self._output, True
             else:
@@ -238,19 +311,19 @@ class PID:
 
         # Compute P and D before integral update for conditional anti-windup
         self._proportional = self._Kp * self._error
-        if self._dt < 1.0 or self._last_input is None:
+        slope = self._temperature_slope(self._input_time)
+        if slope is None or self._derivative_limit <= 0.0 or (self._last_input is not None and self._dt < 1.0):
             self._derivative = 0.0
         else:
-            raw_deriv = -(self._Kd * (self._input - self._last_input)) / self._dt
-            alpha = self._dt / (self._dt + 60.0)
-            filtered_deriv = alpha * raw_deriv + (1.0 - alpha) * self._derivative
-            self._derivative = max(-15.0, min(15.0, filtered_deriv))
+            raw_d = -self._Kd * slope
+            self._derivative = max(-self._derivative_limit, min(self._derivative_limit, raw_d))
 
         # Anti-windup: conditional integration + back-calculation clamp
-        # Reset integral on large setpoint change (>= 1.5°C) to allow faster convergence
-        # without wiping integral on minor thermal-inertia effective_target shifts
-        if self._last_set_point is not None and abs(self._last_set_point - self._set_point) >= 1.5:
-            self._integral = 0.0  # Reset integral if set point has changed significantly
+        # Reset integral only on large setpoint drop (>= 1.5°C, or rise in cool mode)
+        # while preserving steady-state integral on warm-up steps and minor inertia shifts.
+        if self._last_set_point is not None and (self._last_set_point - self._set_point) >= 1.5:
+            self._integral = 0.0
+            pre_backcalc_total = self._proportional + self._integral + self._derivative + self._external
         else:
             dt_int = max(0.0, min(self._dt, self._max_dt))
             delta_i = self._Ki * self._error * dt_int
@@ -264,16 +337,18 @@ class PID:
             max_i = self._out_max - self._external
             self._integral = max(min(self._integral, max_i), min_i)
 
+            pre_backcalc_total = self._proportional + self._integral + self._derivative + self._external
+
             # Back-calculation clamp to prevent residual P+I+D+ext overshoot without inverting sign
-            raw_total = self._proportional + self._integral + self._derivative + self._external
-            if self._integral > 0.0 and raw_total > self._out_max:
+            if self._integral > 0.0 and pre_backcalc_total > self._out_max:
                 back_max = max(0.0, self._out_max - self._proportional - self._derivative - self._external)
                 self._integral = max(min(self._integral, back_max), min_i)
-            elif self._integral < 0.0 and raw_total < self._out_min:
+            elif self._integral < 0.0 and pre_backcalc_total < self._out_min:
                 back_min = min(0.0, self._out_min - self._proportional - self._derivative - self._external)
                 self._integral = min(max(self._integral, back_min), max_i)
 
         # Compute PID Output
+        self._raw_output = pre_backcalc_total
         output = self._proportional + self._integral + self._derivative + self._external
         self._output = max(min(output, self._out_max), self._out_min)
         return self._output, True

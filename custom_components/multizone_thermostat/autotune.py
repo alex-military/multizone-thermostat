@@ -32,6 +32,22 @@ class PassiveAutotuneObserver:
     WEEKLY_MIN_DURATION = 300.0
     WEEKLY_MIN_DT = 0.4
 
+    MIN_TI_SECONDS = 900.0
+    MAX_AUTOTUNE_KI = 0.15
+    MAX_TD_SECONDS = 60.0
+    MAX_AUTOTUNE_KD = 500.0
+
+    @classmethod
+    def _derive_pid_from_fopdt(cls, L: float, effective_slope: float) -> tuple[float, float, float]:
+        """Derive coherent (Kp, Ki, Kd) gains from FOPDT parameters (L, effective_slope)."""
+        kp_calc = 120.0 / (effective_slope * L)
+        kp_calc = min(max(kp_calc, 10.0), 500.0)
+        ti_calc = max(cls.MIN_TI_SECONDS, 2.0 * L)
+        td_calc = min(cls.MAX_TD_SECONDS, 0.25 * L)
+        ki_calc = round(min(cls.MAX_AUTOTUNE_KI, kp_calc / ti_calc), 5) if ti_calc > 0 else 0.0
+        kd_calc = round(min(cls.MAX_AUTOTUNE_KD, kp_calc * td_calc), 2)
+        return kp_calc, ki_calc, kd_calc
+
     def __init__(self, zone_name: str, required_cycles: int = 3, mode: str = "heat"):
         self.zone_name = zone_name
         self.required_cycles = required_cycles
@@ -457,14 +473,7 @@ class PassiveAutotuneObserver:
         # Compensate slope for effective duty ratio and ambient cooling loss (heating mode)
         ambient_loss = max(0.0, cooling_rate_c_per_hr / 3600.0) if self.mode != "cool" else 0.0
         effective_slope = (max_slope / max(0.7, min(1.0, u_avg))) + ambient_loss
-        kp_calc = 120.0 / (effective_slope * L)
-        # Clamp Kp to reasonable bounds before deriving Ki and Kd so Ti/Td ratios hold
-        kp_calc = min(max(kp_calc, 10.0), 500.0)
-        ti_calc = max(600.0, 2.0 * L)
-        td_calc = min(60.0, 0.25 * L)
-
-        ki_calc = round(kp_calc / ti_calc, 5) if ti_calc > 0 else 0.0
-        kd_calc = round(min(500.0, kp_calc * td_calc), 2)
+        kp_calc, ki_calc, kd_calc = self._derive_pid_from_fopdt(L, effective_slope)
 
         return {
             "L": L,
@@ -656,22 +665,55 @@ class PassiveAutotuneObserver:
             )
 
     def _compute_final_pid(self):
-        """Average the valid cycles to find final PID parameters."""
+        """Derive coherent final PID parameters across valid completed cycles."""
         if not self.completed_cycles:
             return
 
-        avg_kp = sum(c.get("Kp", c.get("kp", 0.0)) for c in self.completed_cycles) / len(self.completed_cycles)
-        avg_ki = sum(c.get("Ki", c.get("ki", 0.0)) for c in self.completed_cycles) / len(self.completed_cycles)
-        avg_kd = sum(c.get("Kd", c.get("kd", 0.0)) for c in self.completed_cycles) / len(self.completed_cycles)
+        if len(self.completed_cycles) == 1:
+            c0 = self.completed_cycles[0]
+            final_kp = float(c0.get("Kp", c0.get("kp", 0.0)))
+            final_ki = float(c0.get("Ki", c0.get("ki", 0.0)))
+            final_kd = float(c0.get("Kd", c0.get("kd", 0.0)))
+        else:
+            valid_fopdt: list[tuple[float, float]] = []
+            for c in self.completed_cycles:
+                raw_l = c.get("L")
+                raw_s = c.get("slope")
+                raw_kp = c.get("Kp", c.get("kp"))
+                if (
+                    isinstance(raw_l, (int, float))
+                    and not isinstance(raw_l, bool)
+                    and math.isfinite(raw_l)
+                    and raw_l > 0.0
+                    and isinstance(raw_s, (int, float))
+                    and not isinstance(raw_s, bool)
+                    and math.isfinite(raw_s)
+                    and raw_s > 0.0
+                    and isinstance(raw_kp, (int, float))
+                    and not isinstance(raw_kp, bool)
+                    and math.isfinite(raw_kp)
+                ):
+                    derived_kp = self._derive_pid_from_fopdt(float(raw_l), float(raw_s))[0]
+                    if abs(float(raw_kp) - derived_kp) <= max(0.5, 0.02 * derived_kp):
+                        valid_fopdt.append((float(raw_l), float(raw_s)))
 
-        self._learned_kp = avg_kp
-        self._learned_ki = avg_ki
-        self._learned_kd = avg_kd
+            if len(valid_fopdt) == len(self.completed_cycles):
+                med_l = statistics.median(l_val for l_val, _ in valid_fopdt)
+                med_slope = statistics.median(s_val for _, s_val in valid_fopdt)
+                final_kp, final_ki, final_kd = self._derive_pid_from_fopdt(med_l, med_slope)
+            else:
+                final_kp = float(statistics.median(float(c.get("Kp", c.get("kp", 0.0))) for c in self.completed_cycles))
+                final_ki = float(statistics.median(float(c.get("Ki", c.get("ki", 0.0))) for c in self.completed_cycles))
+                final_kd = float(statistics.median(float(c.get("Kd", c.get("kd", 0.0))) for c in self.completed_cycles))
+
+        self._learned_kp = final_kp
+        self._learned_ki = final_ki
+        self._learned_kd = final_kd
         self._seeded_pi_only = False
         if self._baseline_kp == 0.0:
-            self._baseline_kp = avg_kp
-            self._baseline_ki = avg_ki
-            self._baseline_kd = avg_kd
+            self._baseline_kp = final_kp
+            self._baseline_ki = final_ki
+            self._baseline_kd = final_kd
         self._sync_effective_pid()
 
         _LOGGER.info("Autotune [%s - %s]: FINAL PID: Kp=%.1f, Ki=%.4f, Kd=%.1f", self.zone_name, self.mode, self.kp, self.ki, self.kd)
