@@ -40,7 +40,7 @@
               "climate_entities": "Entité Climate",
               "trv_preset_sync": "Activer la synchro des préréglages TRV",
               "authoritative_climate_sync": "Synchronisation Faisant Foi du Thermostat Mural",
-              "trv_calibration_mode": "Mode de Calibration TRV (Offset vs Temp. Externe)",
+              "trv_calibration_mode": "Mode de calibration TRV (Auto / Décalage / Externe / Désactivé)",
               "trv_control_mode": "Mode de contrôle TRV (Standard vs Vanne sur Demande)",
               "trv_open_boost": "Boost d'ouverture sur demande (°C au-dessus ambiance/cible)",
               "trv_close_offset": "Décalage de fermeture sur demande (°C sous temp ambiante au repos)"
@@ -191,7 +191,7 @@
               "climate_entities": "Entité Climate",
               "trv_preset_sync": "Activer la synchro des préréglages TRV",
               "authoritative_climate_sync": "Synchronisation Faisant Foi du Thermostat Mural",
-              "trv_calibration_mode": "Mode de Calibration TRV (Offset vs Temp. Externe)",
+              "trv_calibration_mode": "Mode de calibration TRV (Auto / Décalage / Externe / Désactivé)",
               "trv_control_mode": "Mode de contrôle TRV (Standard vs Vanne sur Demande)",
               "trv_open_boost": "Boost d'ouverture sur demande (°C au-dessus ambiance/cible)",
               "trv_close_offset": "Décalage de fermeture sur demande (°C sous temp ambiante au repos)"
@@ -260,7 +260,7 @@
               "climate_entities": "TRVs de Zone / Climates",
               "trv_preset_sync": "Activer la synchro des préréglages TRV",
               "authoritative_climate_sync": "Synchronisation Faisant Foi du Thermostat Mural",
-              "trv_calibration_mode": "Mode de Calibration TRV (Offset vs Temp. Externe)",
+              "trv_calibration_mode": "Mode de calibration TRV (Auto / Décalage / Externe / Désactivé)",
               "trv_control_mode": "Mode de contrôle TRV (Standard vs Vanne sur Demande)",
               "trv_open_boost": "Boost d'ouverture sur demande (°C au-dessus ambiance/cible)",
               "trv_close_offset": "Décalage de fermeture sur demande (°C sous temp ambiante au repos)"

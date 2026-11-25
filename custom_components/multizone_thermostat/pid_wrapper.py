@@ -41,12 +41,13 @@ class MultizonePID:
     def set_pid_param(self, kp=None, ki=None, kd=None):
         self._pid.set_pid_param(kp=kp, ki=ki, kd=kd)
         
-    def clear_samples(self):
-        """Clear samples, dt tracking, integral and refresh sensor timestamp."""
+    def clear_samples(self, reset_sensor_timer: bool = False):
+        """Clear samples, dt tracking and integral; optionally refresh sensor timestamp."""
         self._last_input_time = None
         self._pid.clear_samples()
         self._pid.integral = 0.0
-        self.update_sensor_timestamp()
+        if reset_sensor_timer:
+            self.update_sensor_timestamp()
         
     def update_sensor_timestamp(self):
         """Called externally when the temperature sensor actually reports a new value."""
@@ -60,11 +61,33 @@ class MultizonePID:
         if self.sensor_timeout > 0 and (now - self.last_sensor_update) > self.sensor_timeout:
             zone_desc = f" for zone '{self.zone_id}'" if self.zone_id else ""
             _LOGGER.warning("PID: Dead Sensor Timeout reached (%.1f seconds)%s. Forcing demand to 0%%.", (now - self.last_sensor_update), zone_desc)
+            self._last_input_time = None
+            self._pid.clear_samples()
+            self._pid.integral = 0.0
             self._last_demand = 0.0
             return self._last_demand
             
         # Calculate PID with tracked last_input_time to ensure proper dt calculation without jumps
-        demand, _ = self._pid.calc(current_temp, target_temp, input_time=now, last_input_time=self._last_input_time)
-        self._last_input_time = now
+        demand, updated = self._pid.calc(current_temp, target_temp, input_time=now, last_input_time=self._last_input_time)
+        if updated:
+            self._last_input_time = now
         self._last_demand = demand
         return self._last_demand
+
+    def get_diagnostics(self) -> dict[str, float | None]:
+        """Return live internal PID breakdown for Home Assistant diagnostics."""
+        sp = self._pid.set_point
+        return {
+            "kp": round(float(self._pid._Kp), 4),
+            "ki": round(float(self._pid._Ki), 6),
+            "kd": round(float(self._pid._Kd), 2),
+            "p_contribution": round(float(self._pid.proportional), 4),
+            "i_contribution": round(float(self._pid.integral), 4),
+            "d_contribution": round(float(self._pid.derivative), 4),
+            "integral_accumulator": round(float(self._pid.integral), 4),
+            "pid_raw_output": round(float(self._pid.raw_output), 4),
+            "pid_clamped_output": round(float(self._pid.output), 4),
+            "pid_error": round(float(self._pid.error), 4),
+            "pid_target": round(float(sp), 4) if sp is not None else None,
+            "dt_seconds": round(float(self._pid.dt), 2),
+        }

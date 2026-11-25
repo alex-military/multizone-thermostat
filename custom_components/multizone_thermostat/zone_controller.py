@@ -15,6 +15,7 @@ from .const import (
     CONF_ZONE_TEMP_SENSOR,
     make_zone_entity_id,
     HVAC_MODE_HEAT,
+    MODE_OPENTHERM,
     ZONE_MODE_BYPASS,
     KEY_WEATHER_CURVE,
     to_celsius,
@@ -380,60 +381,62 @@ class ZoneController:
                 pid_target = target_temp if entity_id in self._smart_stop_bypass else effective_target
                 demand = pid_ctrl.calc(current_temp, pid_target)
 
-                # Apply Weather Compensation (Feed Forward)
-                try:
-                    curve_val = float(self.coordinator.get_persistent_data(KEY_WEATHER_CURVE, 0.0) or 0.0)
-                except (ValueError, TypeError):
-                    curve_val = 0.0
-                if self.coordinator.weather_sensor_id:
-                    weather_state = self.hass.states.get(self.coordinator.weather_sensor_id)
-                    if weather_state and weather_state.state not in ("unavailable", "unknown"):
-                        try:
-                            outdoor_temp = None
-                            is_weather_domain = (
-                                str(self.coordinator.weather_sensor_id).startswith("weather.")
-                                or getattr(weather_state, "entity_id", "").startswith("weather.")
-                            )
-                            if is_weather_domain:
-                                temp_attr = weather_state.attributes.get("temperature") if getattr(weather_state, "attributes", None) else None
-                                if temp_attr is not None:
-                                    w_unit = weather_state.attributes.get("temperature_unit") or weather_state.attributes.get("unit_of_measurement")
-                                    outdoor_temp = to_celsius(float(temp_attr), w_unit, self.hass)
-                            else:
-                                w_unit = weather_state.attributes.get("unit_of_measurement") if getattr(weather_state, "attributes", None) else None
-                                outdoor_temp = to_celsius(float(weather_state.state), w_unit, self.hass)
+                # Apply Weather Compensation (Feed Forward) ONLY for non-OpenTherm plants
+                # For OpenTherm, backend applies weather_curve directly to flow temperature.
+                if getattr(self.coordinator, "boiler_mode", None) != MODE_OPENTHERM:
+                    try:
+                        curve_val = float(self.coordinator.get_persistent_data(KEY_WEATHER_CURVE, 0.0) or 0.0)
+                    except (ValueError, TypeError):
+                        curve_val = 0.0
+                    if curve_val > 0.0 and self.coordinator.weather_sensor_id:
+                        weather_state = self.hass.states.get(self.coordinator.weather_sensor_id)
+                        if weather_state and weather_state.state not in ("unavailable", "unknown"):
+                            try:
+                                outdoor_temp = None
+                                is_weather_domain = (
+                                    str(self.coordinator.weather_sensor_id).startswith("weather.")
+                                    or getattr(weather_state, "entity_id", "").startswith("weather.")
+                                )
+                                if is_weather_domain:
+                                    temp_attr = weather_state.attributes.get("temperature") if getattr(weather_state, "attributes", None) else None
+                                    if temp_attr is not None:
+                                        w_unit = weather_state.attributes.get("temperature_unit") or weather_state.attributes.get("unit_of_measurement")
+                                        outdoor_temp = to_celsius(float(temp_attr), w_unit, self.hass)
+                                else:
+                                    w_unit = weather_state.attributes.get("unit_of_measurement") if getattr(weather_state, "attributes", None) else None
+                                    outdoor_temp = to_celsius(float(weather_state.state), w_unit, self.hass)
 
-                            if outdoor_temp is not None:
-                                # Adaptive Curve Calculation (SAT Math)
-                                curve_val = thermal_model.get_weather_multiplier(manual_base_curve=curve_val)
+                                if outdoor_temp is not None:
+                                    # Adaptive Curve Calculation (SAT Math)
+                                    curve_val = thermal_model.get_weather_multiplier(manual_base_curve=curve_val)
 
-                                # (Target - OutdoorTemp) * Ke
-                                delta_t = effective_target - outdoor_temp
-                                if delta_t > 0.0 and curve_val > 0.0:
-                                    ff_demand = delta_t * curve_val
-                                    # Clamp the weather bonus to a max of +40% to avoid it dominating the PID
-                                    ff_demand = min(40.0, ff_demand)
-                                    
-                                    # Scale down FF as we approach or exceed effective_target to prevent ghost heating
-                                    overheat = current_temp - effective_target
-                                    if overheat >= 0:
-                                        ff_demand = 0.0
-                                    elif overheat > -0.5:
-                                        ff_factor = max(0.0, -overheat / 0.5)
-                                        ff_demand *= ff_factor
-                                        
-                                    demand = min(100.0, max(0.0, demand + ff_demand))
-                                    _LOGGER.debug(
-                                        "[%s] SAT Weather Comp: Target=%.1f, Outdoor=%.1f, Ke=%.2f, FF=+%.1f%%, Final=%.1f%%",
-                                        entity_id,
-                                        effective_target,
-                                        outdoor_temp,
-                                        curve_val,
-                                        ff_demand,
-                                        demand,
-                                    )
-                        except (ValueError, TypeError):
-                            pass
+                                    # (Target - OutdoorTemp) * Ke
+                                    delta_t = effective_target - outdoor_temp
+                                    if delta_t > 0.0 and curve_val > 0.0:
+                                        ff_demand = delta_t * curve_val
+                                        # Clamp the weather bonus to a max of +40% to avoid it dominating the PID
+                                        ff_demand = min(40.0, ff_demand)
+
+                                        # Scale down FF as we approach or exceed effective_target to prevent ghost heating
+                                        overheat = current_temp - effective_target
+                                        if overheat >= 0:
+                                            ff_demand = 0.0
+                                        elif overheat > -0.5:
+                                            ff_factor = max(0.0, -overheat / 0.5)
+                                            ff_demand *= ff_factor
+
+                                        demand = min(100.0, max(0.0, demand + ff_demand))
+                                        _LOGGER.debug(
+                                            "[%s] SAT Weather Comp: Target=%.1f, Outdoor=%.1f, Ke=%.2f, FF=+%.1f%%, Final=%.1f%%",
+                                            entity_id,
+                                            effective_target,
+                                            outdoor_temp,
+                                            curve_val,
+                                            ff_demand,
+                                            demand,
+                                        )
+                            except (ValueError, TypeError):
+                                pass
         else:
             self._smart_stop_bypass.discard(entity_id)
             demand = 0.0

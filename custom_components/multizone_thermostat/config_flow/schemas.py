@@ -53,6 +53,7 @@ from ..const import (
     TRV_CALIB_MODE_AUTO,
     TRV_CALIB_MODE_OFFSET,
     TRV_CALIB_MODE_EXTERNAL,
+    TRV_CALIB_MODE_DISABLED,
     DEFAULT_TRV_CALIB_MODE,
     CONF_ZONE_TRV_CONTROL_MODE,
     TRV_CONTROL_MODE_STANDARD,
@@ -139,6 +140,7 @@ def get_add_zone_schema() -> vol.Schema:
                             selector.SelectOptionDict(value=TRV_CALIB_MODE_AUTO, label="Auto-Detect (Offset vs External Temp)"),
                             selector.SelectOptionDict(value=TRV_CALIB_MODE_OFFSET, label="Offset Calibration (local_temperature_calibration)"),
                             selector.SelectOptionDict(value=TRV_CALIB_MODE_EXTERNAL, label="External Temperature Feed (external_temperature_input)"),
+                            selector.SelectOptionDict(value=TRV_CALIB_MODE_DISABLED, label="Disabled (No Offset / External Temp Push)"),
                         ],
                         mode=selector.SelectSelectorMode.DROPDOWN,
                     )
@@ -351,6 +353,7 @@ def get_options_edit_zone_schema(zone_data: dict[str, Any], temp_desc: dict[str,
                             selector.SelectOptionDict(value=TRV_CALIB_MODE_AUTO, label="Auto-Detect (Offset vs External Temp)"),
                             selector.SelectOptionDict(value=TRV_CALIB_MODE_OFFSET, label="Offset Calibration (local_temperature_calibration)"),
                             selector.SelectOptionDict(value=TRV_CALIB_MODE_EXTERNAL, label="External Temperature Feed (external_temperature_input)"),
+                            selector.SelectOptionDict(value=TRV_CALIB_MODE_DISABLED, label="Disabled (No Offset / External Temp Push)"),
                         ],
                         mode=selector.SelectSelectorMode.DROPDOWN,
                     )

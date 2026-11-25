@@ -46,6 +46,7 @@ from .const import (
     CONF_ZONE_CALIBRATIONS,
     CONF_ZONE_TRV_CALIBRATION_MODE,
     CONF_ZONE_TRV_SENSOR_SELECTS,
+    TRV_CALIB_MODE_DISABLED,
     DEFAULT_TRV_CALIB_MODE,
     CONF_ZONE_TRV_CONTROL_MODE,
     DEFAULT_TRV_CONTROL_MODE,
@@ -408,7 +409,12 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
                 )
             )
 
-        if self._climates and self._temp_sensor and self._calibrations:
+        if (
+            self._climates
+            and self._temp_sensor
+            and self._calibrations
+            and self._trv_calibration_mode != TRV_CALIB_MODE_DISABLED
+        ):
             self._unsub_listeners.append(
                 async_track_time_interval(
                     self.hass, self._async_ext_temp_heartbeat_tick, timedelta(minutes=10)

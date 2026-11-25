@@ -23,6 +23,18 @@ TO_REDACT = {
 }
 
 
+def _pid_state(pid_wrapper: Any) -> dict[str, Any] | None:
+    """Extract live internal PID breakdown safely."""
+    if not pid_wrapper:
+        return None
+    getter = getattr(pid_wrapper, "get_diagnostics", None)
+    if callable(getter):
+        res = getter()
+        if isinstance(res, dict):
+            return res
+    return None
+
+
 async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, entry: ConfigEntry
 ) -> dict[str, Any]:
@@ -116,6 +128,7 @@ async def async_get_config_entry_diagnostics(
                 "ki": getattr(getattr(pid, "_pid", None), "_Ki", 0.0) if pid else 0.0,
                 "kd": getattr(getattr(pid, "_pid", None), "_Kd", 0.0) if pid else 0.0,
             } if pid else None,
+            "pid_state": _pid_state(pid),
         }
 
         if climate_entity:

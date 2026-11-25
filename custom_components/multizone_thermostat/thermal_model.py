@@ -121,21 +121,18 @@ class ThermalObserver:
     def get_weather_multiplier(self, manual_base_curve: float = 0.0) -> float:
         """
         Calculate the weather compensation multiplier (Ke) based on thermal metrics.
-        If manual_base_curve is provided, it acts as a starting point.
-        Otherwise, it calculates an adaptive curve based on cooling/heating ratio.
+        If manual_base_curve is <= 0.0, weather compensation is disabled and returns 0.0.
         """
+        if manual_base_curve <= 0.0:
+            return 0.0
+
         if self.heating_rate > 0.1 and self.cooling_rate > 0.01:
             # Dispersion ratio: higher ratio = more dispersion = higher multiplier
-            adaptive_curve = (self.cooling_rate / self.heating_rate)
-            
-            # If a manual base curve was set, we blend it or use it as a base
-            if manual_base_curve > 0.0:
-                # We let the adaptive curve 'bend' the manual one by +/- 50%
-                # Clamping the adaptive part between 0.5 and 1.5
-                bend_factor = max(0.5, min(1.5, adaptive_curve))
-                return manual_base_curve * bend_factor
-            
-            return adaptive_curve
-            
+            adaptive_curve = self.cooling_rate / self.heating_rate
+            # We let the adaptive curve 'bend' the manual one by +/- 50%
+            # Clamping the adaptive part between 0.5 and 1.5
+            bend_factor = max(0.5, min(1.5, adaptive_curve))
+            return manual_base_curve * bend_factor
+
         # Fallback if model hasn't learned enough yet
-        return manual_base_curve if manual_base_curve > 0.0 else 0.5
+        return manual_base_curve

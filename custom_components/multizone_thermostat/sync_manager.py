@@ -24,9 +24,15 @@ from .const import (
     TRV_CALIB_MODE_AUTO,
     TRV_CALIB_MODE_OFFSET,
     TRV_CALIB_MODE_EXTERNAL,
+    TRV_CALIB_MODE_DISABLED,
+    TRV_CALIB_MODES,
     DEFAULT_TRV_CALIB_MODE,
     DEFAULT_EXTERNAL_TEMP_HEARTBEAT_S,
     DEFAULT_EXTERNAL_TEMP_MIN_INTERVAL_S,
+    DEFAULT_OFFSET_MIN_INTERVAL_S,
+    DEFAULT_OFFSET_DEADBAND_C,
+    DEFAULT_OFFSET_SETTLE_S,
+    DEFAULT_OFFSET_MAX_UNRESPONSIVE,
     TRV_CONTROL_MODE_STANDARD,
     TRV_CONTROL_MODE_DEMAND_DRIVEN,
     TRV_CONTROL_MODES,
@@ -60,6 +66,10 @@ class ZoneSyncManager:
         trv_sensor_selects: dict[str, str] | None = None,
         ext_temp_heartbeat_s: float = DEFAULT_EXTERNAL_TEMP_HEARTBEAT_S,
         ext_temp_min_interval_s: float = DEFAULT_EXTERNAL_TEMP_MIN_INTERVAL_S,
+        offset_min_interval_s: float = DEFAULT_OFFSET_MIN_INTERVAL_S,
+        offset_deadband_c: float = DEFAULT_OFFSET_DEADBAND_C,
+        offset_settle_s: float = DEFAULT_OFFSET_SETTLE_S,
+        offset_max_unresponsive: int = DEFAULT_OFFSET_MAX_UNRESPONSIVE,
         trv_control_mode: str = DEFAULT_TRV_CONTROL_MODE,
         trv_open_boost: float = DEFAULT_TRV_OPEN_BOOST,
         trv_close_offset: float = DEFAULT_TRV_CLOSE_OFFSET,
@@ -83,13 +93,21 @@ class ZoneSyncManager:
         self._authoritative_sync = bool(authoritative_sync)
         self._calibration_mode = (
             calibration_mode
-            if calibration_mode in (TRV_CALIB_MODE_AUTO, TRV_CALIB_MODE_OFFSET, TRV_CALIB_MODE_EXTERNAL)
+            if calibration_mode in TRV_CALIB_MODES
             else DEFAULT_TRV_CALIB_MODE
         )
         self._trv_sensor_selects: dict[str, str] = dict(trv_sensor_selects or {})
         self._ext_temp_heartbeat_s = float(ext_temp_heartbeat_s)
         self._ext_temp_min_interval_s = float(ext_temp_min_interval_s)
+        self._offset_min_interval_s = max(0.0, float(offset_min_interval_s))
+        self._offset_deadband_c = max(0.0, float(offset_deadband_c))
+        self._offset_settle_s = max(0.0, float(offset_settle_s))
+        self._offset_max_unresponsive = max(1, int(offset_max_unresponsive))
         self._last_ext_temp_push: dict[str, tuple[float, float]] = {}
+        self._last_offset_write_ts: dict[str, float] = {}
+        self._last_written_calib: dict[str, float] = {}
+        self._offset_unresponsive_count: dict[str, int] = {}
+        self._offset_stalled: dict[str, bool] = {}
         self._last_valve_positions: dict[str, float] = {}
 
         self._trv_control_mode = (
@@ -176,7 +194,9 @@ class ZoneSyncManager:
                     pass
 
     def resolve_calibration_mode(self, calib_entity: str, calib_state: State | None) -> str:
-        """Resolve whether a calibration entity uses offset or absolute external temperature."""
+        """Resolve whether a calibration entity uses offset, external temperature, or is disabled."""
+        if self._calibration_mode == TRV_CALIB_MODE_DISABLED:
+            return TRV_CALIB_MODE_DISABLED
         if self._calibration_mode == TRV_CALIB_MODE_OFFSET:
             return TRV_CALIB_MODE_OFFSET
         if self._calibration_mode == TRV_CALIB_MODE_EXTERNAL:
@@ -404,7 +424,12 @@ class ZoneSyncManager:
         has_external_sensor: bool,
     ) -> None:
         """Periodic heartbeat / fallback check for TRVs configured with external temperature feed."""
-        if not has_external_sensor or not self._calibrations or not self._climates:
+        if (
+            self._calibration_mode == TRV_CALIB_MODE_DISABLED
+            or not has_external_sensor
+            or not self._calibrations
+            or not self._climates
+        ):
             return
 
         async with self._sync_lock:
@@ -425,6 +450,143 @@ class ZoneSyncManager:
                     await self._async_push_external_temp(
                         trv, calib_entity, float(master_current_temp)
                     )
+
+    async def _async_sync_trv_offset(
+        self,
+        trv: str,
+        calib_entity: str,
+        calib_state: State | None,
+        master_curr_f: float,
+        trv_curr_f: float,
+    ) -> None:
+        """Synchronize TRV temperature_offset with deadband, cooldown, and anti-ratchet guard."""
+        try:
+            if calib_state is not None and calib_state.state == STATE_UNAVAILABLE:
+                return
+
+            now_mono = time.monotonic()
+            current_calib_value = 0.0
+            calib_state_valid = False
+            if calib_state and calib_state.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+                try:
+                    parsed = float(calib_state.state)
+                    if math.isfinite(parsed):
+                        current_calib_value = parsed
+                        calib_state_valid = True
+                except (ValueError, TypeError):
+                    pass
+
+            last_written = self._last_written_calib.get(trv)
+            if (
+                last_written is not None
+                and calib_state_valid
+                and abs(current_calib_value - last_written) >= 0.15
+            ):
+                self._pending_calib.pop(trv, None)
+                self._last_written_calib.pop(trv, None)
+                self._last_offset_write_ts.pop(trv, None)
+                self._offset_unresponsive_count[trv] = 0
+                self._offset_stalled[trv] = False
+                self.trv_health.setdefault(trv, {})["offset_stalled"] = False
+
+            effective_base_calib = current_calib_value
+            if trv in self._pending_calib:
+                _written_off, prev_trv_curr, prev_base_calib, expected_delta_c, sent_ts = (
+                    self._pending_calib[trv]
+                )
+                trv_shift = trv_curr_f - prev_trv_curr
+                moved_expected = (
+                    expected_delta_c != 0.0
+                    and (trv_shift * expected_delta_c) > 0.0
+                    and abs(trv_shift) >= max(0.1, 0.3 * abs(expected_delta_c))
+                )
+                if moved_expected:
+                    self._pending_calib.pop(trv, None)
+                    self._offset_unresponsive_count[trv] = 0
+                    self._offset_stalled[trv] = False
+                    self.trv_health.setdefault(trv, {})["offset_stalled"] = False
+                elif (now_mono - sent_ts) < self._offset_settle_s:
+                    effective_base_calib = prev_base_calib
+                else:
+                    self._pending_calib.pop(trv, None)
+                    if abs(expected_delta_c) >= 0.3:
+                        cnt = self._offset_unresponsive_count.get(trv, 0) + 1
+                        self._offset_unresponsive_count[trv] = cnt
+                        if cnt >= self._offset_max_unresponsive:
+                            self._offset_stalled[trv] = True
+                            self.trv_health.setdefault(trv, {})["offset_stalled"] = True
+                            _LOGGER.warning(
+                                "TRV %s current_temperature did not respond after %d offset writes "
+                                "(common when externally bound via Matter/Thread); pausing offset "
+                                "integration. Consider setting trv_calibration_mode to 'disabled'.",
+                                trv,
+                                cnt,
+                            )
+
+            health = self.trv_health.setdefault(trv, {})
+            health["ext_temp_feed_mode"] = TRV_CALIB_MODE_OFFSET
+
+            if self._offset_stalled.get(trv):
+                return
+
+            delta_c = master_curr_f - trv_curr_f
+            if abs(delta_c) < self._offset_deadband_c:
+                return
+
+            last_ts = self._last_offset_write_ts.get(trv)
+            if last_ts is not None and (now_mono - last_ts) < self._offset_min_interval_s:
+                return
+
+            c_unit = (
+                calib_state.attributes.get("unit_of_measurement")
+                if (calib_state and getattr(calib_state, "attributes", None))
+                else None
+            )
+            if c_unit is not None and str(c_unit).strip().lower() in ("°f", "f", "fahrenheit"):
+                delta_out = delta_c * 9.0 / 5.0
+            else:
+                delta_out = delta_c
+
+            offset = round(effective_base_calib + delta_out, 1)
+            if calib_state:
+                c_min = calib_state.attributes.get("min")
+                c_max = calib_state.attributes.get("max")
+                if c_min is not None:
+                    try:
+                        offset = max(float(c_min), offset)
+                    except (ValueError, TypeError):
+                        pass
+                if c_max is not None:
+                    try:
+                        offset = min(float(c_max), offset)
+                    except (ValueError, TypeError):
+                        pass
+
+            if not calib_state_valid or abs(offset - current_calib_value) >= 0.1:
+                domain = "number" if not calib_entity.startswith("input_number.") else "input_number"
+                await self.hass.services.async_call(
+                    domain,
+                    "set_value",
+                    {"entity_id": calib_entity, "value": offset},
+                    blocking=True,
+                    context=self._internal_context,
+                )
+                self._last_offset_write_ts[trv] = now_mono
+                self._last_written_calib[trv] = offset
+                self._pending_calib[trv] = (
+                    offset,
+                    trv_curr_f,
+                    effective_base_calib,
+                    delta_c,
+                    now_mono,
+                )
+        except Exception as calib_err:
+            _LOGGER.warning(
+                "Failed to update calibration entity %s for TRV %s: %s",
+                calib_entity,
+                trv,
+                calib_err,
+            )
 
     @property
     def demand_valve_open(self) -> bool | None:
@@ -568,13 +730,19 @@ class ZoneSyncManager:
                                 context=self._internal_context,
                             )
 
-                    calib_entity = self._calibrations.get(trv)
-                    calib_state = self.hass.states.get(calib_entity) if calib_entity else None
-                    resolved_calib_mode = (
-                        self.resolve_calibration_mode(calib_entity, calib_state)
-                        if calib_entity
-                        else None
-                    )
+                    if self._calibration_mode == TRV_CALIB_MODE_DISABLED:
+                        calib_entity = None
+                        calib_state = None
+                        resolved_calib_mode = TRV_CALIB_MODE_DISABLED
+                        self.trv_health.setdefault(trv, {})["ext_temp_feed_mode"] = TRV_CALIB_MODE_DISABLED
+                    else:
+                        calib_entity = self._calibrations.get(trv)
+                        calib_state = self.hass.states.get(calib_entity) if calib_entity else None
+                        resolved_calib_mode = (
+                            self.resolve_calibration_mode(calib_entity, calib_state)
+                            if calib_entity
+                            else None
+                        )
                     if (
                         has_external_sensor
                         and calib_entity
@@ -624,60 +792,13 @@ class ZoneSyncManager:
                                     if resolved_calib_mode == TRV_CALIB_MODE_EXTERNAL:
                                         pass  # Already handled via absolute external temperature push
                                     else:
-                                        try:
-                                            current_calib_value = 0.0
-                                            if calib_state and calib_state.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN):
-                                                try:
-                                                    current_calib_value = float(calib_state.state)
-                                                except (ValueError, TypeError):
-                                                    current_calib_value = 0.0
-
-                                            effective_base_calib = current_calib_value
-                                            if trv in self._pending_calib:
-                                                prev_trv_curr, prev_base_calib, sent_ts = self._pending_calib[trv]
-                                                if abs(trv_curr_f - prev_trv_curr) < 0.01 and (time.monotonic() - sent_ts) < 60.0:
-                                                    effective_base_calib = prev_base_calib
-                                                else:
-                                                    self._pending_calib.pop(trv, None)
-
-                                            delta_c = master_curr_f - trv_curr_f
-                                            c_unit = (
-                                                calib_state.attributes.get("unit_of_measurement")
-                                                if (calib_state and getattr(calib_state, "attributes", None))
-                                                else None
-                                            )
-                                            if c_unit is not None and str(c_unit).strip().lower() in ("°f", "f", "fahrenheit"):
-                                                delta_out = delta_c * 9.0 / 5.0
-                                            else:
-                                                delta_out = delta_c
-                                            offset = round(effective_base_calib + delta_out, 1)
-                                            if calib_state:
-                                                c_min = calib_state.attributes.get("min")
-                                                c_max = calib_state.attributes.get("max")
-                                                if c_min is not None:
-                                                    try:
-                                                        offset = max(float(c_min), offset)
-                                                    except (ValueError, TypeError):
-                                                        pass
-                                                if c_max is not None:
-                                                    try:
-                                                        offset = min(float(c_max), offset)
-                                                    except (ValueError, TypeError):
-                                                        pass
-
-                                            if not calib_state or abs(offset - current_calib_value) >= 0.1 or current_calib_value == 0.0:
-                                                domain = "number" if not calib_entity.startswith("input_number.") else "input_number"
-                                                await self.hass.services.async_call(
-                                                    domain,
-                                                    "set_value",
-                                                    {"entity_id": calib_entity, "value": offset},
-                                                    blocking=True,
-                                                    context=self._internal_context,
-                                                )
-                                                self._pending_calib[trv] = (trv_curr_f, effective_base_calib, time.monotonic())
-                                            self.trv_health.setdefault(trv, {})["ext_temp_feed_mode"] = TRV_CALIB_MODE_OFFSET
-                                        except Exception as calib_err:
-                                            _LOGGER.warning("Failed to update calibration entity %s for TRV %s: %s", calib_entity, trv, calib_err)
+                                        await self._async_sync_trv_offset(
+                                            trv,
+                                            calib_entity,
+                                            calib_state,
+                                            master_curr_f,
+                                            trv_curr_f,
+                                        )
                                 else:
                                     if not effective_demand_driven:
                                         trv_target = master_target_temp + (trv_curr_f - master_curr_f)
@@ -830,12 +951,12 @@ class ZoneSyncManager:
                     if demand < 99.0 and min_off_s > 0.0 and elapsed < min_off_s:
                         new_pwm_state = False
 
-        if new_pwm_state != self._local_pwm_state:
+        changed = new_pwm_state != self._local_pwm_state
+        if changed:
             self._local_pwm_state = new_pwm_state
             self._last_pwm_change = now
-            await self.async_sync_switches()
-            return True
-        return False
+        await self.async_sync_switches()
+        return changed
 
     async def async_sync_switches(self) -> None:
         """Turn local switches ON or OFF based on PWM state."""
@@ -848,7 +969,7 @@ class ZoneSyncManager:
 
         for switch in self._switches:
             st = self.hass.states.get(switch)
-            if not st or st.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+            if not st or st.state == STATE_UNAVAILABLE:
                 continue
             if st.state != expected_state:
                 await self.hass.services.async_call(
@@ -874,7 +995,7 @@ class ZoneSyncManager:
 
         for valve_entity in self._valves:
             st = self.hass.states.get(valve_entity)
-            if not st or st.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+            if not st or st.state == STATE_UNAVAILABLE:
                 continue
             target_val = round(effective_pct / 10.0, 1) if self._valve_scale == VALVE_SCALE_VOLT else round(effective_pct, 1)
             last_val = self._last_valve_positions.get(valve_entity)

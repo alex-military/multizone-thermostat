@@ -1,8 +1,10 @@
 import logging
+import math
 import statistics
 import time
 from collections import deque
 from datetime import datetime
+from typing import Any
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -28,6 +30,22 @@ class PassiveAutotuneObserver:
     WEEKLY_MIN_DURATION = 300.0
     WEEKLY_MIN_DT = 0.4
 
+    MIN_TI_SECONDS = 900.0
+    MAX_AUTOTUNE_KI = 0.15
+    MAX_TD_SECONDS = 60.0
+    MAX_AUTOTUNE_KD = 500.0
+
+    @classmethod
+    def _derive_pid_from_fopdt(cls, L: float, effective_slope: float) -> tuple[float, float, float]:
+        """Derive coherent (Kp, Ki, Kd) gains from FOPDT parameters (L, effective_slope)."""
+        kp_calc = 120.0 / (effective_slope * L)
+        kp_calc = min(max(kp_calc, 10.0), 500.0)
+        ti_calc = max(cls.MIN_TI_SECONDS, 2.0 * L)
+        td_calc = min(cls.MAX_TD_SECONDS, 0.25 * L)
+        ki_calc = round(min(cls.MAX_AUTOTUNE_KI, kp_calc / ti_calc), 5) if ti_calc > 0 else 0.0
+        kd_calc = round(min(cls.MAX_AUTOTUNE_KD, kp_calc * td_calc), 2)
+        return kp_calc, ki_calc, kd_calc
+
     def __init__(self, zone_name: str, required_cycles: int = 3):
         self.zone_name = zone_name
         self.required_cycles = required_cycles
@@ -51,6 +69,12 @@ class PassiveAutotuneObserver:
         self._ramp_demand_count = 0
         self._last_ramp_hist_time = None
         self._last_ramp_hist_temp = None
+
+        self._was_idle_before_ramp: bool = True
+        self._last_sample_mono: float | None = None
+        self._baseline_kp: float = 0.0
+        self._baseline_ki: float = 0.0
+        self._baseline_kd: float = 0.0
 
         self.kp = 0.0
         self.ki = 0.0
@@ -80,6 +104,12 @@ class PassiveAutotuneObserver:
             if norm and raw_val is not None:
                 self.manual_overrides[norm] = float(raw_val)
 
+        baseline = data.get("baseline_pid")
+        if isinstance(baseline, dict) and baseline.get("Kp"):
+            self._baseline_kp = float(baseline.get("Kp", 0.0))
+            self._baseline_ki = float(baseline.get("Ki", 0.0))
+            self._baseline_kd = float(baseline.get("Kd", 0.0))
+
         if len(self.completed_cycles) >= self.required_cycles:
             self.state = self.STATE_COMPLETED
             learned = data.get("learned_pid")
@@ -87,6 +117,10 @@ class PassiveAutotuneObserver:
                 self._learned_kp = float(learned.get("Kp", 0.0))
                 self._learned_ki = float(learned.get("Ki", 0.0))
                 self._learned_kd = float(learned.get("Kd", 0.0))
+                if self._baseline_kp == 0.0:
+                    self._baseline_kp = self._learned_kp
+                    self._baseline_ki = self._learned_ki
+                    self._baseline_kd = self._learned_kd
                 self._sync_effective_pid()
             else:
                 self._compute_final_pid()
@@ -115,8 +149,34 @@ class PassiveAutotuneObserver:
                 "Ki": self._learned_ki,
                 "Kd": self._learned_kd,
             },
+            "baseline_pid": {
+                "Kp": self._baseline_kp,
+                "Ki": self._baseline_ki,
+                "Kd": self._baseline_kd,
+            },
             "pre_reset_snapshot": dict(self._pre_reset_snapshot) if self._pre_reset_snapshot else None,
         }
+
+    @property
+    def baseline_kp(self) -> float:
+        return self._baseline_kp
+
+    @property
+    def baseline_ki(self) -> float:
+        return self._baseline_ki
+
+    @property
+    def baseline_kd(self) -> float:
+        return self._baseline_kd
+
+    def rollback_to_baseline(self) -> None:
+        """Restore learned PID parameters back to the initial 3-cycle baseline."""
+        if self._baseline_kp > 0.0:
+            self._learned_kp = self._baseline_kp
+            self._learned_ki = self._baseline_ki
+            self._learned_kd = self._baseline_kd
+            self._sync_effective_pid()
+            self.needs_save = True
 
     def _sync_effective_pid(self) -> None:
         """Synchronize kp/ki/kd from learned baseline and manual overrides."""
@@ -144,6 +204,9 @@ class PassiveAutotuneObserver:
         self._learned_kp = float(kp)
         self._learned_ki = float(ki)
         self._learned_kd = float(kd)
+        self._baseline_kp = float(kp)
+        self._baseline_ki = float(ki)
+        self._baseline_kd = float(kd)
         self._seeded_pi_only = (float(kd) == 0.0)
         self.state = self.STATE_COMPLETED
         while len(self.completed_cycles) < self.required_cycles:
@@ -235,6 +298,11 @@ class PassiveAutotuneObserver:
         self._learned_kp = 0.0
         self._learned_ki = 0.0
         self._learned_kd = 0.0
+        self._baseline_kp = 0.0
+        self._baseline_ki = 0.0
+        self._baseline_kd = 0.0
+        self._was_idle_before_ramp = True
+        self._last_sample_mono = None
         self._seeded_pi_only = False
         if not keep_manual_overrides:
             self.manual_overrides.clear()
@@ -357,26 +425,20 @@ class PassiveAutotuneObserver:
 
         # Find L (Dead Time) before duty/cooling slope compensation
         t0 = (start_temp - max_slope_temp) / max_slope + max_slope_t
+        t0 = min(t0, max_slope_t)
         L = t0 - start_time
 
         if L < 60.0:
             _LOGGER.info("Autotune [%s]: Dead time too short (%.1fs), clamping to 60s.", self.zone_name, L)
             L = 60.0
 
-        if L > 7200.0:
+        if L > 14400.0:
             _LOGGER.warning("Autotune [%s]: Dead time too long (%.1fs). Cycle discarded.", self.zone_name, L)
             return None
 
         # Compensate slope for effective duty ratio and ambient cooling loss
         effective_slope = (max_slope / max(0.7, min(1.0, u_avg))) + max(0.0, cooling_rate_c_per_hr / 3600.0)
-        kp_calc = 120.0 / (effective_slope * L)
-        # Clamp Kp before deriving Ki/Kd so Ti/Td ratios hold
-        kp_calc = min(max(kp_calc, 10.0), 500.0)
-        ti_calc = 2.0 * L
-        td_calc = 0.5 * L
-
-        ki_calc = kp_calc / ti_calc if ti_calc > 0 else 0
-        kd_calc = kp_calc * td_calc
+        kp_calc, ki_calc, kd_calc = self._derive_pid_from_fopdt(L, effective_slope)
 
         return {
             "L": L,
@@ -419,6 +481,34 @@ class PassiveAutotuneObserver:
             self.last_weekly_update = wall_time if wall_time is not None else time.time()
             self._compute_final_pid()
 
+    def _finalize_weekly_ramp(
+        self,
+        now_mono: float,
+        current_temp: float,
+        wall_time: float,
+        cooling_rate: float,
+    ) -> None:
+        if not self._ramp_history or now_mono > self._ramp_history[-1][0]:
+            self._ramp_history.append((now_mono, current_temp))
+        duration = now_mono - self._ramp_start_mono
+        delta_t = current_temp - self._ramp_start_temp
+        if duration >= self.WEEKLY_MIN_DURATION and delta_t >= self.WEEKLY_MIN_DT:
+            u_avg = (self._ramp_demand_sum / max(1, self._ramp_demand_count)) / 100.0
+            candidate = self._analyze_reaction_curve(
+                list(self._ramp_history),
+                self._ramp_start_mono,
+                self._ramp_start_temp,
+                wall_time=wall_time,
+                u_avg=u_avg,
+                cooling_rate_c_per_hr=cooling_rate,
+            )
+            if candidate is not None:
+                self.weekly_candidates.append(candidate)
+                if len(self.weekly_candidates) > 50:
+                    self.weekly_candidates = self.weekly_candidates[-50:]
+                self.needs_save = True
+        self._reset_ramp()
+
     def _update_weekly_learning(
         self,
         current_temp: float,
@@ -429,19 +519,29 @@ class PassiveAutotuneObserver:
         cooling_rate: float,
     ) -> None:
         """Continuously observe high-demand ramps and refine PID weekly via smoothed EMA."""
+        if self._last_sample_mono is not None and (now_mono - self._last_sample_mono) >= 1800.0:
+            self._was_idle_before_ramp = True
+        self._last_sample_mono = now_mono
+
         if demand is not None:
-            high_demand = is_heating and demand >= self.WEEKLY_MIN_DEMAND
-            if high_demand:
+            if not is_heating or demand < 20.0:
+                self._was_idle_before_ramp = True
+            elif is_heating and demand < self.WEEKLY_MIN_DEMAND and not self._ramp_active:
+                self._was_idle_before_ramp = False
+
+            if is_heating and demand >= self.WEEKLY_MIN_DEMAND:
                 if not self._ramp_active:
-                    self._ramp_active = True
-                    self._ramp_start_mono = now_mono
-                    self._ramp_start_temp = current_temp
-                    self._ramp_history.clear()
-                    self._ramp_history.append((now_mono, current_temp))
-                    self._ramp_demand_sum = float(demand)
-                    self._ramp_demand_count = 1
-                    self._last_ramp_hist_time = now_mono
-                    self._last_ramp_hist_temp = current_temp
+                    if self._was_idle_before_ramp:
+                        self._ramp_active = True
+                        self._was_idle_before_ramp = False
+                        self._ramp_start_mono = now_mono
+                        self._ramp_start_temp = current_temp
+                        self._ramp_history.clear()
+                        self._ramp_history.append((now_mono, current_temp))
+                        self._ramp_demand_sum = float(demand)
+                        self._ramp_demand_count = 1
+                        self._last_ramp_hist_time = now_mono
+                        self._last_ramp_hist_temp = current_temp
                 else:
                     self._ramp_demand_sum += float(demand)
                     self._ramp_demand_count += 1
@@ -454,26 +554,13 @@ class PassiveAutotuneObserver:
                         self._last_ramp_hist_time = now_mono
                         self._last_ramp_hist_temp = current_temp
             elif self._ramp_active:
-                if not self._ramp_history or now_mono > self._ramp_history[-1][0]:
-                    self._ramp_history.append((now_mono, current_temp))
-                duration = now_mono - self._ramp_start_mono
-                delta_t = current_temp - self._ramp_start_temp
-                if duration >= self.WEEKLY_MIN_DURATION and delta_t >= self.WEEKLY_MIN_DT:
-                    u_avg = (self._ramp_demand_sum / max(1, self._ramp_demand_count)) / 100.0
-                    candidate = self._analyze_reaction_curve(
-                        list(self._ramp_history),
-                        self._ramp_start_mono,
-                        self._ramp_start_temp,
-                        wall_time=wall_time,
-                        u_avg=u_avg,
-                        cooling_rate_c_per_hr=cooling_rate,
-                    )
-                    if candidate is not None:
-                        self.weekly_candidates.append(candidate)
-                        if len(self.weekly_candidates) > 50:
-                            self.weekly_candidates = self.weekly_candidates[-50:]
-                        self.needs_save = True
-                self._reset_ramp()
+                self._finalize_weekly_ramp(now_mono, current_temp, wall_time, cooling_rate)
+                if is_heating and demand >= 20.0:
+                    self._was_idle_before_ramp = False
+        elif not is_heating:
+            self._was_idle_before_ramp = True
+            if self._ramp_active:
+                self._finalize_weekly_ramp(now_mono, current_temp, wall_time, cooling_rate)
 
         if self.last_weekly_update <= 0.0:
             self.last_weekly_update = wall_time
@@ -486,12 +573,13 @@ class PassiveAutotuneObserver:
             med_ki = statistics.median(c["Ki"] for c in self.weekly_candidates)
             med_kd = statistics.median(c["Kd"] for c in self.weekly_candidates)
 
-            for attr, target in (
-                ("_learned_kp", med_kp),
-                ("_learned_ki", med_ki),
-                ("_learned_kd", med_kd),
+            for attr, baseline_attr, target in (
+                ("_learned_kp", "_baseline_kp", med_kp),
+                ("_learned_ki", "_baseline_ki", med_ki),
+                ("_learned_kd", "_baseline_kd", med_kd),
             ):
                 prev = getattr(self, attr)
+                baseline = getattr(self, baseline_attr, 0.0)
                 if attr == "_learned_kd" and prev == 0.0 and self._seeded_pi_only:
                     new_val = 0.0
                 elif prev > 0.0:
@@ -502,8 +590,15 @@ class PassiveAutotuneObserver:
                 else:
                     new_val = target
                 if attr == "_learned_kp":
-                    kp_floor = max(0.1, min(10.0, 0.5 * prev)) if prev > 0.0 else 10.0
+                    if baseline > 0.0:
+                        kp_floor = max(0.1, min(10.0, 0.5 * baseline))
+                    elif prev > 0.0:
+                        kp_floor = max(0.1, min(10.0, 0.5 * prev))
+                    else:
+                        kp_floor = 10.0
                     new_val = min(max(new_val, kp_floor), 500.0)
+                if baseline > 0.0:
+                    new_val = min(max(new_val, 0.5 * baseline), 2.0 * baseline)
                 setattr(self, attr, new_val)
 
             self._sync_effective_pid()
@@ -520,18 +615,55 @@ class PassiveAutotuneObserver:
             )
 
     def _compute_final_pid(self):
-        """Average the valid cycles to find final PID parameters."""
+        """Derive coherent final PID parameters across valid completed cycles."""
         if not self.completed_cycles:
             return
 
-        avg_kp = sum(c.get("Kp", c.get("kp", 0.0)) for c in self.completed_cycles) / len(self.completed_cycles)
-        avg_ki = sum(c.get("Ki", c.get("ki", 0.0)) for c in self.completed_cycles) / len(self.completed_cycles)
-        avg_kd = sum(c.get("Kd", c.get("kd", 0.0)) for c in self.completed_cycles) / len(self.completed_cycles)
+        if len(self.completed_cycles) == 1:
+            c0 = self.completed_cycles[0]
+            final_kp = float(c0.get("Kp", c0.get("kp", 0.0)))
+            final_ki = float(c0.get("Ki", c0.get("ki", 0.0)))
+            final_kd = float(c0.get("Kd", c0.get("kd", 0.0)))
+        else:
+            valid_fopdt: list[tuple[float, float]] = []
+            for c in self.completed_cycles:
+                raw_l = c.get("L")
+                raw_s = c.get("slope")
+                raw_kp = c.get("Kp", c.get("kp"))
+                if (
+                    isinstance(raw_l, (int, float))
+                    and not isinstance(raw_l, bool)
+                    and math.isfinite(raw_l)
+                    and raw_l > 0.0
+                    and isinstance(raw_s, (int, float))
+                    and not isinstance(raw_s, bool)
+                    and math.isfinite(raw_s)
+                    and raw_s > 0.0
+                    and isinstance(raw_kp, (int, float))
+                    and not isinstance(raw_kp, bool)
+                    and math.isfinite(raw_kp)
+                ):
+                    derived_kp = self._derive_pid_from_fopdt(float(raw_l), float(raw_s))[0]
+                    if abs(float(raw_kp) - derived_kp) <= max(0.5, 0.02 * derived_kp):
+                        valid_fopdt.append((float(raw_l), float(raw_s)))
 
-        self._learned_kp = avg_kp
-        self._learned_ki = avg_ki
-        self._learned_kd = avg_kd
+            if len(valid_fopdt) == len(self.completed_cycles):
+                med_l = statistics.median(l_val for l_val, _ in valid_fopdt)
+                med_slope = statistics.median(s_val for _, s_val in valid_fopdt)
+                final_kp, final_ki, final_kd = self._derive_pid_from_fopdt(med_l, med_slope)
+            else:
+                final_kp = float(statistics.median(float(c.get("Kp", c.get("kp", 0.0))) for c in self.completed_cycles))
+                final_ki = float(statistics.median(float(c.get("Ki", c.get("ki", 0.0))) for c in self.completed_cycles))
+                final_kd = float(statistics.median(float(c.get("Kd", c.get("kd", 0.0))) for c in self.completed_cycles))
+
+        self._learned_kp = final_kp
+        self._learned_ki = final_ki
+        self._learned_kd = final_kd
         self._seeded_pi_only = False
+        if self._baseline_kp == 0.0:
+            self._baseline_kp = final_kp
+            self._baseline_ki = final_ki
+            self._baseline_kd = final_kd
         self._sync_effective_pid()
 
         _LOGGER.info(

@@ -40,7 +40,7 @@
               "climate_entities": "Climate Entity",
               "trv_preset_sync": "Enable TRV Preset Sync",
               "authoritative_climate_sync": "Authoritative Wall Thermostat Sync",
-              "trv_calibration_mode": "TRV Calibration Mode (Offset vs External Temp)",
+              "trv_calibration_mode": "TRV Calibration Mode (Auto / Offset / External / Disabled)",
               "trv_control_mode": "TRV Control Mode (Standard vs Demand-Driven Valve)",
               "trv_open_boost": "Demand-Driven Open Boost (°C above room/target)",
               "trv_close_offset": "Demand-Driven Close Offset (°C below room temp when idle)"
@@ -193,7 +193,7 @@
               "climate_entities": "Climate Entity",
               "trv_preset_sync": "Enable TRV Preset Sync",
               "authoritative_climate_sync": "Authoritative Wall Thermostat Sync",
-              "trv_calibration_mode": "TRV Calibration Mode (Offset vs External Temp)",
+              "trv_calibration_mode": "TRV Calibration Mode (Auto / Offset / External / Disabled)",
               "trv_control_mode": "TRV Control Mode (Standard vs Demand-Driven Valve)",
               "trv_open_boost": "Demand-Driven Open Boost (°C above room/target)",
               "trv_close_offset": "Demand-Driven Close Offset (°C below room temp when idle)"
@@ -262,7 +262,7 @@
               "climate_entities": "Zone TRVs / Climates",
               "trv_preset_sync": "Enable TRV Preset Sync",
               "authoritative_climate_sync": "Authoritative Wall Thermostat Sync",
-              "trv_calibration_mode": "TRV Calibration Mode (Offset vs External Temp)",
+              "trv_calibration_mode": "TRV Calibration Mode (Auto / Offset / External / Disabled)",
               "trv_control_mode": "TRV Control Mode (Standard vs Demand-Driven Valve)",
               "trv_open_boost": "Demand-Driven Open Boost (°C above room/target)",
               "trv_close_offset": "Demand-Driven Close Offset (°C below room temp when idle)"

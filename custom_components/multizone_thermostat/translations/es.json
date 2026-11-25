@@ -40,7 +40,7 @@
               "climate_entities": "Entidad Climate",
               "trv_preset_sync": "Habilitar Sincronización de Preajustes TRV",
               "authoritative_climate_sync": "Sincronización Autoritativa del Termostato de Pared",
-              "trv_calibration_mode": "Modo de Calibración TRV (Offset vs Temp. Externa)",
+              "trv_calibration_mode": "Modo de calibración TRV (Auto / Offset / Externo / Deshabilitado)",
               "trv_control_mode": "Modo de control TRV (Estándar vs Válvula por Demanda)",
               "trv_open_boost": "Impulso de apertura por demanda (°C sobre ambiente/objetivo)",
               "trv_close_offset": "Compensación de cierre por demanda (°C bajo temp ambiente en reposo)"
@@ -191,7 +191,7 @@
               "climate_entities": "Entidad Climate",
               "trv_preset_sync": "Habilitar Sincronización de Preajustes TRV",
               "authoritative_climate_sync": "Sincronización Autoritativa del Termostato de Pared",
-              "trv_calibration_mode": "Modo de Calibración TRV (Offset vs Temp. Externa)",
+              "trv_calibration_mode": "Modo de calibración TRV (Auto / Offset / Externo / Deshabilitado)",
               "trv_control_mode": "Modo de control TRV (Estándar vs Válvula por Demanda)",
               "trv_open_boost": "Impulso de apertura por demanda (°C sobre ambiente/objetivo)",
               "trv_close_offset": "Compensación de cierre por demanda (°C bajo temp ambiente en reposo)"
@@ -260,7 +260,7 @@
               "climate_entities": "TRVs de Zona / Climates",
               "trv_preset_sync": "Habilitar Sincronización de Preajustes TRV",
               "authoritative_climate_sync": "Sincronización Autoritativa del Termostato de Pared",
-              "trv_calibration_mode": "Modo de Calibración TRV (Offset vs Temp. Externa)",
+              "trv_calibration_mode": "Modo de calibración TRV (Auto / Offset / Externo / Deshabilitado)",
               "trv_control_mode": "Modo de control TRV (Estándar vs Válvula por Demanda)",
               "trv_open_boost": "Impulso de apertura por demanda (°C sobre ambiente/objetivo)",
               "trv_close_offset": "Compensación de cierre por demanda (°C bajo temp ambiente en reposo)"

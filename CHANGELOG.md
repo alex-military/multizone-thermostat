@@ -1,5 +1,20 @@
 # Changelog
 
+## [6.0.24] - 2026-11-25
+### Fix & Hardening: PID/Autotuner Hardening, PID Diagnostics & TRV Offset/Disabled Fixes (#18, #19)
+- **TRV Calibration `Disabled` Mode & Offset Anti-Ratchet Fixes (#18)**:
+  - Added `"disabled"` option (`Disabled (No Offset / External Temp Push)`) to per-zone `trv_calibration_mode` in Config/Options Flow (all 6 locales + `strings.json`), disabling all calibration writes and external-temp heartbeats while keeping `demand_driven` (Bounded Overdrive) active — ideal for TRVs using native Matter/Zigbee binding to external room sensors (e.g., Eve Thermo + IKEA Timmerflotte).
+  - Fixed TRV offset ratchet and `0.0` write spam in `sync_manager.py`: removed `or current_calib_value == 0.0` forced writes, added `0.25 °C` error deadband, `180 s` minimum write cooldown, `300 s` settle window anti-ratchet, external manual reset detection (`_last_written_calib`), and unresponsive TRV stall protection (`offset_stalled` in `trv_health` after 2 unresponsive writes).
+- **PID Controller, Autotuner Hardening & Diagnostics (#19 + Community PID Improvements)**:
+  - Added coherent median `(L, slope)` FOPDT aggregation and physically bounded gain derivation in `autotune.py` (`MIN_TI_SECONDS = 900.0`, `MAX_AUTOTUNE_KI = 0.15`, `MAX_TD_SECONDS = 60.0`, `MAX_AUTOTUNE_KD = 500.0`), plus warm-start idle ramp guard (`1800 s` gap reset), `t0 = min(t0, max_slope_t)`, `L <= 14400 s` cap, and `[0.5x, 2.0x]` baseline weekly drift clamp with `rollback_to_baseline()`.
+  - Upgraded `pid.py` and `pid_wrapper.py`: 15-minute least-squares derivative with `0.105 °C` quantization anti-flicker guard (`MIN_DERIVATIVE_TEMP_SPAN`), conditional integration + back-calculation anti-windup, smart setpoint-drop integral reset (`>= 1.5 °C` drop resets integral; warm-up raises preserve it), monotonic clock, `math.isfinite()` guard, sample-2 throttle fix, `max_dt = 600 s`, dead-sensor timeout reset, and `Ki` UI number upper bound raised to `10.0`.
+  - Added live `pid_state` breakdown in Home Assistant diagnostics (`diagnostics.py` / `pid_wrapper.py`): `p_term`, `i_term`, `d_term`, `integral_accumulator`, `raw_output`, `clamped_output`, `last_error`, `set_point`, `derivative_window_s`, and `derivative_limit`.
+  - Fixed weather feed-forward (`thermal_model.py`, `zone_controller.py`) so `weather_curve <= 0.0` yields `0.0` (no phantom `0.5` multiplier) and OpenTherm zones skip redundant zone-level weather FF (avoiding double compensation with `opentherm_backend.py`).
+- **Resilient Zone Actuation**:
+  - `async_sync_switches()` and `async_sync_proportional_valves()` now command `STATE_UNKNOWN` entities (skipping only `STATE_UNAVAILABLE`), and `async_pwm_tick()` uses level-triggered resync.
+- **Automated Tests**:
+  - Added `tests/test_issues_18_19_pid_trv_fixes.py` (262 tests passing, 100% translation key parity across 6 languages).
+
 ## [6.0.23] - 2026-11-24
 ### Feat: Output Inversion (Normally Open / Normally Closed) for Zone Actuators (#17)
 - **Normally Open (NO) Relay Actuator Support (`invert_switch`)**:

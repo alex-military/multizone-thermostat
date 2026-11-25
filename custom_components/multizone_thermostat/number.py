@@ -283,7 +283,7 @@ class MultizonePersistentNumber(NumberEntity):
 
 PID_PARAM_SPECS: tuple[tuple[str, float, float, float, int], ...] = (
     ("Kp", 0.1, 500.0, 0.1, 2),
-    ("Ki", 0.0, 1.0, 0.0001, 4),
+    ("Ki", 0.0, 10.0, 0.0001, 4),
     ("Kd", 0.0, 50000.0, 1.0, 2),
 )
 

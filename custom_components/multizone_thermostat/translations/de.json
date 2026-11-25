@@ -40,7 +40,7 @@
               "climate_entities": "Climate-Entität",
               "trv_preset_sync": "TRV-Preset-Synchronisierung aktivieren",
               "authoritative_climate_sync": "Autoritative Wandthermostat-Synchronisierung",
-              "trv_calibration_mode": "TRV-Kalibrierungsmodus (Offset vs. Externe Temp.)",
+              "trv_calibration_mode": "TRV-Kalibrierungsmodus (Auto / Offset / Extern / Deaktiviert)",
               "trv_control_mode": "TRV-Steuerungsmodus (Standard vs. Bedarfsgeführt)",
               "trv_open_boost": "Bedarfs-Öffnungs-Boost (°C über Raum/Sollwert)",
               "trv_close_offset": "Bedarfs-Schließ-Offset (°C unter Raumtemp im Leerlauf)"
@@ -191,7 +191,7 @@
               "climate_entities": "Climate-Entität",
               "trv_preset_sync": "TRV-Preset-Synchronisierung aktivieren",
               "authoritative_climate_sync": "Autoritative Wandthermostat-Synchronisierung",
-              "trv_calibration_mode": "TRV-Kalibrierungsmodus (Offset vs. Externe Temp.)",
+              "trv_calibration_mode": "TRV-Kalibrierungsmodus (Auto / Offset / Extern / Deaktiviert)",
               "trv_control_mode": "TRV-Steuerungsmodus (Standard vs. Bedarfsgeführt)",
               "trv_open_boost": "Bedarfs-Öffnungs-Boost (°C über Raum/Sollwert)",
               "trv_close_offset": "Bedarfs-Schließ-Offset (°C unter Raumtemp im Leerlauf)"
@@ -260,7 +260,7 @@
               "climate_entities": "Zonen-TRVs / Climates",
               "trv_preset_sync": "TRV-Preset-Synchronisierung aktivieren",
               "authoritative_climate_sync": "Autoritative Wandthermostat-Synchronisierung",
-              "trv_calibration_mode": "TRV-Kalibrierungsmodus (Offset vs. Externe Temp.)",
+              "trv_calibration_mode": "TRV-Kalibrierungsmodus (Auto / Offset / Extern / Deaktiviert)",
               "trv_control_mode": "TRV-Steuerungsmodus (Standard vs. Bedarfsgeführt)",
               "trv_open_boost": "Bedarfs-Öffnungs-Boost (°C über Raum/Sollwert)",
               "trv_close_offset": "Bedarfs-Schließ-Offset (°C unter Raumtemp im Leerlauf)"
