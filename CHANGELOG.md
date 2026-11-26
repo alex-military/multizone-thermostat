@@ -1,5 +1,17 @@
 # Changelog
 
+## [6.1.0-beta.20] - 2026-11-26
+### Feat: Per-Zone Configurable Setpoint Temperature Step (`0.5°` / `0.1°`) (#20)
+- **Per-Zone Temperature Step (`target_temp_step`)**:
+  - Added native per-zone `"Setpoint Temperature Step"` dropdown (`0.5° (Standard)` default vs `0.1° (Fine / High-Resolution Sensor)`) in Setup & Options Flow (`config_flow/schemas.py`, `config_flow/__init__.py`, `config_flow/options_flow.py`), plus `step=0.1` on the zone *Base Target Temperature* field.
+  - Wired `MultizoneVirtualThermostat` (`climate.py`) to expose the configured `target_temperature_step` (`0.5` or `0.1`, backward-compatible default `0.5`), while `sync_manager.py` continues rounding outbound commands to each physical TRV's own hardware step.
+  - Exposed `target_temp_step` per zone in Home Assistant diagnostics (`diagnostics.py`).
+- **Frontend & Translations**:
+  - Updated `scheduler_card.js` (`openPresetModal`) so `#input-preset-temp` inherits the zone's `target_temp_step`, updated `dial_card.js` `+/-` button tooltips dynamically, and rebuilt synchronized Lovelace + simulator bundles.
+  - Added translations and descriptions across `strings.json` and all 6 locales (`en`, `it`, `de`, `es`, `fr`, `ru`) with 100% key parity.
+- **Automated Tests**:
+  - Added `tests/test_target_temp_step.py` (505 tests passing).
+
 ## [6.1.0-beta.19] - 2026-11-25
 ### Fix & Hardening: PID/Autotuner Hardening, PID Diagnostics & TRV Offset/Disabled Fixes (#18, #19)
 - **TRV Calibration `Disabled` Mode & Offset Anti-Ratchet Fixes (#18)**:

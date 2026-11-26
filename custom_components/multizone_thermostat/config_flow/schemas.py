@@ -43,6 +43,9 @@ from ..const import (
     CONF_ZONE_TEMP_SENSOR,
     CONF_ZONE_HUMIDITY_SENSOR,
     CONF_ZONE_TARGET_TEMP,
+    CONF_ZONE_TEMP_STEP,
+    DEFAULT_ZONE_TEMP_STEP,
+    normalize_zone_temp_step,
     CONF_ZONE_TRV_SYNC,
     CONF_ZONE_WINDOW_SENSOR,
     CONF_ZONE_ANTI_SEIZE,
@@ -408,7 +411,16 @@ def get_add_zone_schema() -> vol.Schema:
         vol.Required(CONF_ZONE_NAME): str,
         vol.Optional(CONF_ZONE_TEMP_SENSOR): selector.EntitySelector(selector.EntitySelectorConfig(domain=SENSOR_DOMAIN, device_class="temperature")),
         vol.Optional(CONF_ZONE_HUMIDITY_SENSOR): selector.EntitySelector(selector.EntitySelectorConfig(domain=SENSOR_DOMAIN, device_class="humidity")),
-        vol.Optional(CONF_ZONE_TARGET_TEMP, default=20.0): selector.NumberSelector(selector.NumberSelectorConfig(min=5, max=35, step=0.5, mode=selector.NumberSelectorMode.BOX)),
+        vol.Optional(CONF_ZONE_TARGET_TEMP, default=20.0): selector.NumberSelector(selector.NumberSelectorConfig(min=5, max=35, step=0.1, mode=selector.NumberSelectorMode.BOX)),
+        vol.Optional(CONF_ZONE_TEMP_STEP, default=f"{DEFAULT_ZONE_TEMP_STEP:.1f}"): selector.SelectSelector(
+            selector.SelectSelectorConfig(
+                options=[
+                    selector.SelectOptionDict(value="0.5", label="0.5° (Standard)"),
+                    selector.SelectOptionDict(value="0.1", label="0.1° (Fine / High-Resolution Sensor)"),
+                ],
+                mode=selector.SelectSelectorMode.DROPDOWN,
+            )
+        ),
         vol.Optional(CONF_ZONE_EMITTER_TYPE, default=DEFAULT_ZONE_EMITTER_TYPE): selector.SelectSelector(
             selector.SelectSelectorConfig(
                 options=[
@@ -674,10 +686,21 @@ def get_options_edit_zone_schema(zone_data: dict[str, Any], temp_desc: dict[str,
         else {}
     )
 
+    current_step_str = f"{normalize_zone_temp_step(zone_data.get(CONF_ZONE_TEMP_STEP, DEFAULT_ZONE_TEMP_STEP)):.1f}"
+
     return vol.Schema({
         vol.Optional(CONF_ZONE_TEMP_SENSOR, **temp_desc): selector.EntitySelector(selector.EntitySelectorConfig(domain=SENSOR_DOMAIN, device_class="temperature")),
         vol.Optional(CONF_ZONE_HUMIDITY_SENSOR, **humidity_desc): selector.EntitySelector(selector.EntitySelectorConfig(domain=SENSOR_DOMAIN, device_class="humidity")),
-        vol.Optional(CONF_ZONE_TARGET_TEMP, default=zone_data.get(CONF_ZONE_TARGET_TEMP, 20.0)): selector.NumberSelector(selector.NumberSelectorConfig(min=5, max=35, step=0.5, mode=selector.NumberSelectorMode.BOX)),
+        vol.Optional(CONF_ZONE_TARGET_TEMP, default=zone_data.get(CONF_ZONE_TARGET_TEMP, 20.0)): selector.NumberSelector(selector.NumberSelectorConfig(min=5, max=35, step=0.1, mode=selector.NumberSelectorMode.BOX)),
+        vol.Optional(CONF_ZONE_TEMP_STEP, default=current_step_str): selector.SelectSelector(
+            selector.SelectSelectorConfig(
+                options=[
+                    selector.SelectOptionDict(value="0.5", label="0.5° (Standard)"),
+                    selector.SelectOptionDict(value="0.1", label="0.1° (Fine / High-Resolution Sensor)"),
+                ],
+                mode=selector.SelectSelectorMode.DROPDOWN,
+            )
+        ),
         vol.Optional(CONF_ZONE_EMITTER_TYPE, default=zone_data.get(CONF_ZONE_EMITTER_TYPE, DEFAULT_ZONE_EMITTER_TYPE)): selector.SelectSelector(
             selector.SelectSelectorConfig(
                 options=[

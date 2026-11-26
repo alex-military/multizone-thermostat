@@ -30,6 +30,7 @@
           "name": "Nome Zona",
           "temp_sensor": "Sensore Temperatura Zona",
           "target_temperature": "Temperatura Target Base",
+          "target_temp_step": "Passo Incremento Temperatura Setpoint",
           "emitter_type": "Tipo di emettitore",
           "humidity_sensor": "Sensore di Umidità (Opzionale)",
           "invert_switch": "Inverti logica relè (Attuatore Normalmente Aperto - NO)",
@@ -94,6 +95,7 @@
           "name": "Un nome amichevole per questa zona",
           "temp_sensor": "Sensore di temperatura ambiente principale per la zona",
           "target_temperature": "Temperatura di riferimento predefinita per la zona",
+          "target_temp_step": "Incremento per la regolazione del setpoint in questa zona (0.5° standard oppure 0.1° di precisione per sensori ad alta risoluzione)",
           "humidity_sensor": "Sensore opzionale di umidità della stanza per la protezione dal punto di rugiada in raffrescamento"
         }
       },
@@ -254,6 +256,7 @@
           "switch_entities": "Zone Switches / Relays",
           "temp_sensor": "Zone Temperature Sensor",
           "target_temperature": "Base Target Temperature",
+          "target_temp_step": "Passo Incremento Temperatura Setpoint",
           "sensor_timeout_min": "Timeout Watchdog Sensore (minuti)",
           "emitter_type": "Tipo di emettitore",
           "humidity_sensor": "Sensore di Umidità (Opzionale)",
@@ -322,7 +325,8 @@
           "sensor_timeout_min": "Tempo massimo senza ricezione dati prima di passare in modalità di sicurezza/fallback su TRV",
           "name": "Un nome per questa zona (precompilato dal nome dell'entità climate)",
           "trv_preset_sync": "Sincronizza automaticamente la modalità preset quando cambia la modalità HVAC (per valvole TRV fisiche)",
-          "humidity_sensor": "Sensore opzionale di umidità della stanza per la protezione dal punto di rugiada in raffrescamento"
+          "humidity_sensor": "Sensore opzionale di umidità della stanza per la protezione dal punto di rugiada in raffrescamento",
+          "target_temp_step": "Incremento per la regolazione del setpoint in questa zona (0.5° standard oppure 0.1° di precisione per sensori ad alta risoluzione)"
         }
       },
       "remove_zone": {
@@ -339,6 +343,7 @@
           "zone_name": "Zona",
           "temp_sensor": "Sensore Temperatura Zona",
           "target_temperature": "Temperatura Target Base",
+          "target_temp_step": "Passo Incremento Temperatura Setpoint",
           "emitter_type": "Tipo di emettitore",
           "humidity_sensor": "Sensore di Umidità (Opzionale)",
           "invert_switch": "Inverti logica relè (Attuatore Normalmente Aperto - NO)",
@@ -400,7 +405,8 @@
           }
         },
         "data_description": {
-          "humidity_sensor": "Sensore opzionale di umidità della stanza per la protezione dal punto di rugiada in raffrescamento"
+          "humidity_sensor": "Sensore opzionale di umidità della stanza per la protezione dal punto di rugiada in raffrescamento",
+          "target_temp_step": "Incremento per la regolazione del setpoint in questa zona (0.5° standard oppure 0.1° di precisione per sensori ad alta risoluzione)"
         }
       },
       "edit_geofencing": {

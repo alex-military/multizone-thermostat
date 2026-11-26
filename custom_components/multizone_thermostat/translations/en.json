@@ -30,6 +30,7 @@
           "name": "Zone Name",
           "temp_sensor": "Zone Temperature Sensor",
           "target_temperature": "Base Target Temperature",
+          "target_temp_step": "Setpoint Temperature Step",
           "emitter_type": "Emitter Type",
           "humidity_sensor": "Humidity Sensor (Optional)",
           "invert_switch": "Invert switch logic (Normally Open / NO actuator)",
@@ -94,6 +95,7 @@
           "name": "A friendly name for this zone (pre-filled from climate entity name)",
           "temp_sensor": "Zone primary ambient temperature sensor",
           "target_temperature": "Default setpoint target for this zone",
+          "target_temp_step": "Increment step for target temperature adjustments in this zone (0.5° standard or 0.1° fine precision for high-resolution sensors)",
           "humidity_sensor": "Optional room humidity sensor used for dew-point protection during cooling"
         }
       },
@@ -254,6 +256,7 @@
           "switch_entities": "Zone Switches / Relays",
           "temp_sensor": "Zone Temperature Sensor",
           "target_temperature": "Base Target Temperature",
+          "target_temp_step": "Setpoint Temperature Step",
           "sensor_timeout_min": "Sensor Watchdog Timeout (minutes)",
           "emitter_type": "Emitter Type",
           "humidity_sensor": "Humidity Sensor (Optional)",
@@ -322,7 +325,8 @@
           "sensor_timeout_min": "Max duration without updates before falling back to onboard TRV sensors / safety mode",
           "name": "A friendly name for this zone (pre-filled from climate entity name)",
           "trv_preset_sync": "Automatically sync preset mode when HVAC mode changes (for physical TRV valves)",
-          "humidity_sensor": "Optional room humidity sensor used for dew-point protection during cooling"
+          "humidity_sensor": "Optional room humidity sensor used for dew-point protection during cooling",
+          "target_temp_step": "Increment step for target temperature adjustments in this zone (0.5° standard or 0.1° fine precision for high-resolution sensors)"
         }
       },
       "remove_zone": {
@@ -339,6 +343,7 @@
           "zone_name": "Zone",
           "temp_sensor": "Zone Temperature Sensor",
           "target_temperature": "Base Target Temperature",
+          "target_temp_step": "Setpoint Temperature Step",
           "emitter_type": "Emitter Type",
           "humidity_sensor": "Humidity Sensor (Optional)",
           "invert_switch": "Invert switch logic (Normally Open / NO actuator)",
@@ -400,7 +405,8 @@
           }
         },
         "data_description": {
-          "humidity_sensor": "Optional room humidity sensor used for dew-point protection during cooling"
+          "humidity_sensor": "Optional room humidity sensor used for dew-point protection during cooling",
+          "target_temp_step": "Increment step for target temperature adjustments in this zone (0.5° standard or 0.1° fine precision for high-resolution sensors)"
         }
       },
       "edit_geofencing": {

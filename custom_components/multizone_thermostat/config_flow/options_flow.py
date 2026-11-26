@@ -24,6 +24,9 @@ from ..const import (
     DEFAULT_ZONE_WEIGHT,
     CONF_ZONE_AUTHORITATIVE_SYNC,
     DEFAULT_AUTHORITATIVE_SYNC,
+    CONF_ZONE_TEMP_STEP,
+    DEFAULT_ZONE_TEMP_STEP,
+    normalize_zone_temp_step,
     # Phase 11
     CONF_ENABLE_GAS_HEATER,
     CONF_ENABLE_HEAT_PUMP,
@@ -430,6 +433,7 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                     CONF_ZONE_ALLOW_PASSIVE_HEAT: user_input.get(CONF_ZONE_ALLOW_PASSIVE_HEAT, False),
                     CONF_ZONE_SENSOR_TIMEOUT: user_input.get(CONF_ZONE_SENSOR_TIMEOUT, DEFAULT_SENSOR_TIMEOUT_MIN),
                     CONF_ZONE_TARGET_TEMP: user_input.get(CONF_ZONE_TARGET_TEMP, 20.0),
+                    CONF_ZONE_TEMP_STEP: normalize_zone_temp_step(user_input.get(CONF_ZONE_TEMP_STEP, DEFAULT_ZONE_TEMP_STEP)),
                     CONF_ZONE_CALIBRATIONS: {},
                     CONF_ZONE_TRV_CALIBRATION_MODE: user_input.get(CONF_ZONE_TRV_CALIBRATION_MODE, DEFAULT_TRV_CALIB_MODE),
                     CONF_ZONE_TRV_SENSOR_SELECTS: {},
@@ -623,6 +627,9 @@ class MultizoneOptionsFlow(config_entries.OptionsFlow):
                             self._zones[i][CONF_ZONE_ALLOW_PASSIVE_HEAT] = user_input.get(CONF_ZONE_ALLOW_PASSIVE_HEAT, False)
                             self._zones[i][CONF_ZONE_SENSOR_TIMEOUT] = user_input.get(CONF_ZONE_SENSOR_TIMEOUT, DEFAULT_SENSOR_TIMEOUT_MIN)
                             self._zones[i][CONF_ZONE_TARGET_TEMP] = user_input.get(CONF_ZONE_TARGET_TEMP, 20.0)
+                            self._zones[i][CONF_ZONE_TEMP_STEP] = normalize_zone_temp_step(
+                                user_input.get(CONF_ZONE_TEMP_STEP, self._zones[i].get(CONF_ZONE_TEMP_STEP, DEFAULT_ZONE_TEMP_STEP))
+                            )
                             self._zones[i][CONF_ZONE_EMITTER_TYPE] = user_input.get(CONF_ZONE_EMITTER_TYPE, DEFAULT_ZONE_EMITTER_TYPE)
                             
                             # Phase 11 Split Settings

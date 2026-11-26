@@ -30,6 +30,7 @@
           "name": "Nombre de la Zona",
           "temp_sensor": "Sensor de Temperatura de Zona",
           "target_temperature": "Temperatura Objetivo Base",
+          "target_temp_step": "Paso de Incremento de Temperatura",
           "emitter_type": "Tipo de emisor",
           "humidity_sensor": "Sensor de Humedad (Opcional)",
           "invert_switch": "Invertir lógica del relé (Actuador normalmente abierto - NO)",
@@ -94,6 +95,7 @@
           "name": "Un nombre descriptivo para esta zona",
           "temp_sensor": "Sensor principal de temperatura ambiente de la zona",
           "target_temperature": "Temperatura objetivo predeterminada para esta zona",
+          "target_temp_step": "Paso de ajuste de la temperatura objetivo en esta zona (0.5° estándar o 0.1° fino para sensores de alta resolución)",
           "humidity_sensor": "Sensor opcional de humedad de la habitación para protección contra punto de rocío en refrigeración"
         }
       },
@@ -254,6 +256,7 @@
           "switch_entities": "Interruptores de Zona / Relés",
           "temp_sensor": "Sensor de Temperatura de la Zona",
           "target_temperature": "Temperatura Objetivo Base",
+          "target_temp_step": "Paso de Incremento de Temperatura",
           "sensor_timeout_min": "Tiempo de espera del Watchdog del Sensor (minutos)",
           "emitter_type": "Tipo de emisor",
           "humidity_sensor": "Sensor de Humedad (Opcional)",
@@ -322,7 +325,8 @@
           "sensor_timeout_min": "Duración máxima sin actualizaciones antes de cambiar al modo seguro / sensor integrado en el TRV",
           "name": "Un nombre descriptivo para esta zona (rellenado previamente con el nombre de la entidad climate)",
           "trv_preset_sync": "Sincronizar automáticamente el modo preestablecido cuando cambia el modo HVAC (para válvulas TRV físicas)",
-          "humidity_sensor": "Sensor opcional de humedad de la habitación para protección contra punto de rocío en refrigeración"
+          "humidity_sensor": "Sensor opcional de humedad de la habitación para protección contra punto de rocío en refrigeración",
+          "target_temp_step": "Paso de ajuste de la temperatura objetivo en esta zona (0.5° estándar o 0.1° fino para sensores de alta resolución)"
         }
       },
       "remove_zone": {
@@ -339,6 +343,7 @@
           "zone_name": "Zona",
           "temp_sensor": "Sensor de Temperatura de la Zona",
           "target_temperature": "Temperatura Objetivo Base",
+          "target_temp_step": "Paso de Incremento de Temperatura",
           "emitter_type": "Tipo de emisor",
           "humidity_sensor": "Sensor de Humedad (Opcional)",
           "invert_switch": "Invertir lógica del relé (Actuador normalmente abierto - NO)",
@@ -400,7 +405,8 @@
           }
         },
         "data_description": {
-          "humidity_sensor": "Sensor opcional de humedad de la habitación para protección contra punto de rocío en refrigeración"
+          "humidity_sensor": "Sensor opcional de humedad de la habitación para protección contra punto de rocío en refrigeración",
+          "target_temp_step": "Paso de ajuste de la temperatura objetivo en esta zona (0.5° estándar o 0.1° fino para sensores de alta resolución)"
         }
       },
       "edit_geofencing": {

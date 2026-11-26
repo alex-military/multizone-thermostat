@@ -47,6 +47,9 @@ from .const import (
     DEFAULT_VALVE_SCALE,
     CONF_ZONE_TEMP_SENSOR,
     CONF_ZONE_TARGET_TEMP,
+    CONF_ZONE_TEMP_STEP,
+    DEFAULT_ZONE_TEMP_STEP,
+    normalize_zone_temp_step,
     CONF_ZONE_CALIBRATIONS,
     CONF_ZONE_TRV_CALIBRATION_MODE,
     CONF_ZONE_TRV_SENSOR_SELECTS,
@@ -210,7 +213,7 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_min_temp = 5.0
     _attr_max_temp = 35.0
-    _attr_target_temperature_step = 0.5
+    _attr_target_temperature_step = DEFAULT_ZONE_TEMP_STEP
 
     def __init__(
         self,
@@ -266,6 +269,10 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
         
         self._hvac_mode = HVACMode.OFF
         self._target_temperature = zone_data.get(CONF_ZONE_TARGET_TEMP, 20.0)
+        self._target_temp_step: float = normalize_zone_temp_step(
+            zone_data.get(CONF_ZONE_TEMP_STEP, DEFAULT_ZONE_TEMP_STEP)
+        )
+        self._attr_target_temperature_step = self._target_temp_step
         self._current_temperature: float | None = None
         
         self._coordinator = hass.data[DOMAIN][entry_id]["coordinator"]
@@ -367,6 +374,10 @@ class MultizoneVirtualThermostat(RestoreEntity, ClimateEntity):
                 if sched_temp is not None and isinstance(sched_temp, (int, float)):
                     return float(sched_temp)
         return self._target_temperature
+
+    @property
+    def target_temperature_step(self) -> float:
+        return self._target_temp_step
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:

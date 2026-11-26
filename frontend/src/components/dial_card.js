@@ -140,6 +140,8 @@ class MultizoneThermostatDialCard extends HTMLElement {
   }
 
   renderUnifiedStructure(radius, isClassic) {
+    const initStep = this.getStep();
+    const initUnit = this._hass ? getTempUnit(this._hass) : '°C';
     const cardBgStyle = isClassic ? `
         ha-card {
           padding: 16px 16px 14px 16px;
@@ -660,10 +662,10 @@ class MultizoneThermostatDialCard extends HTMLElement {
           </div>
 
           <div class="step-buttons">
-            <button class="step-btn" id="btn-temp-down" title="Diminuisci target (-0.5°C)">
+            <button class="step-btn" id="btn-temp-down" title="Diminuisci target (-${initStep}${initUnit})">
               <ha-icon icon="mdi:minus"></ha-icon>
             </button>
-            <button class="step-btn" id="btn-temp-up" title="Aumenta target (+0.5°C)">
+            <button class="step-btn" id="btn-temp-up" title="Aumenta target (+${initStep}${initUnit})">
               <ha-icon icon="mdi:plus"></ha-icon>
             </button>
           </div>
@@ -1435,6 +1437,13 @@ class MultizoneThermostatDialCard extends HTMLElement {
         valveEl.style.color = "#94a3b8";
       }
     }
+
+    const dynStep = this.getStep();
+    const dynUnit = getTempUnit(this._hass);
+    const btnDown = this.shadowRoot.querySelector('#btn-temp-down');
+    const btnUp = this.shadowRoot.querySelector('#btn-temp-up');
+    if (btnDown) btnDown.setAttribute('title', `Diminuisci target (-${dynStep}${dynUnit})`);
+    if (btnUp) btnUp.setAttribute('title', `Aumenta target (+${dynStep}${dynUnit})`);
   }
 }
 

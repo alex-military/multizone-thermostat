@@ -2439,6 +2439,8 @@ class MultizoneThermostatDialCard extends HTMLElement {
   }
 
   renderUnifiedStructure(radius, isClassic) {
+    const initStep = this.getStep();
+    const initUnit = this._hass ? getTempUnit(this._hass) : '°C';
     const cardBgStyle = isClassic ? `
         ha-card {
           padding: 16px 16px 14px 16px;
@@ -2959,10 +2961,10 @@ class MultizoneThermostatDialCard extends HTMLElement {
           </div>
 
           <div class="step-buttons">
-            <button class="step-btn" id="btn-temp-down" title="Diminuisci target (-0.5°C)">
+            <button class="step-btn" id="btn-temp-down" title="Diminuisci target (-${initStep}${initUnit})">
               <ha-icon icon="mdi:minus"></ha-icon>
             </button>
-            <button class="step-btn" id="btn-temp-up" title="Aumenta target (+0.5°C)">
+            <button class="step-btn" id="btn-temp-up" title="Aumenta target (+${initStep}${initUnit})">
               <ha-icon icon="mdi:plus"></ha-icon>
             </button>
           </div>
@@ -3734,6 +3736,13 @@ class MultizoneThermostatDialCard extends HTMLElement {
         valveEl.style.color = "#94a3b8";
       }
     }
+
+    const dynStep = this.getStep();
+    const dynUnit = getTempUnit(this._hass);
+    const btnDown = this.shadowRoot.querySelector('#btn-temp-down');
+    const btnUp = this.shadowRoot.querySelector('#btn-temp-up');
+    if (btnDown) btnDown.setAttribute('title', `Diminuisci target (-${dynStep}${dynUnit})`);
+    if (btnUp) btnUp.setAttribute('title', `Aumenta target (+${dynStep}${dynUnit})`);
   }
 }
 
@@ -10478,6 +10487,11 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
     const isCoolMode = (typeof getMasterHVACMode === 'function' && getMasterHVACMode(this._hass) === 'cool');
     const isF = isFahrenheit(this._hass);
     const unit = getTempUnit(this._hass);
+    const zoneState = this._hass && this._hass.states ? this._hass.states[zone.climate] : null;
+    const rawStep = zoneState?.attributes?.target_temp_step;
+    const zoneStep = (typeof rawStep === 'number' && !isNaN(rawStep) && rawStep > 0)
+      ? rawStep
+      : (isF ? 1 : 0.5);
     const safeTemp = (typeof currentTemp === 'number' && !isNaN(currentTemp))
       ? currentTemp
       : celsiusToDisplay(isCoolMode ? 24.5 : 20.0, this._hass);
@@ -10511,7 +10525,7 @@ class MultizoneThermostatSchedulerCard extends HTMLElement {
             </div>
             <div class="form-row">
               <label class="form-label">${escapeHtml(getTranslation(this._hass, 'target_temp') || 'Target Temperature')} (${unit}):</label>
-              <input type="number" id="input-preset-temp" class="form-control" step="${isF ? '1' : '0.5'}" min="${isF ? '41' : '5'}" max="${isF ? '95' : '35'}" value="${safeTemp.toFixed(1)}" style="font-size:1.2rem; font-weight:700; text-align:center; padding:8px;">
+              <input type="number" id="input-preset-temp" class="form-control" step="${zoneStep}" min="${isF ? '41' : '5'}" max="${isF ? '95' : '35'}" value="${safeTemp.toFixed(1)}" style="font-size:1.2rem; font-weight:700; text-align:center; padding:8px;">
             </div>
           </div>
           <div class="modal-actions">
