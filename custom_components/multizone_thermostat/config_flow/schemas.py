@@ -35,6 +35,9 @@ from ..const import (
     DEFAULT_VALVE_SCALE,
     CONF_ZONE_TEMP_SENSOR,
     CONF_ZONE_TARGET_TEMP,
+    CONF_ZONE_TEMP_STEP,
+    DEFAULT_ZONE_TEMP_STEP,
+    normalize_zone_temp_step,
     CONF_ZONE_TRV_SYNC,
     CONF_ZONE_WINDOW_SENSOR,
     CONF_ZONE_ANTI_SEIZE,
@@ -126,7 +129,16 @@ def get_add_zone_schema() -> vol.Schema:
     return vol.Schema({
         vol.Required(CONF_ZONE_NAME): str,
         vol.Optional(CONF_ZONE_TEMP_SENSOR): selector.EntitySelector(selector.EntitySelectorConfig(domain=SENSOR_DOMAIN, device_class="temperature")),
-        vol.Optional(CONF_ZONE_TARGET_TEMP, default=20.0): selector.NumberSelector(selector.NumberSelectorConfig(min=5, max=35, step=0.5, mode=selector.NumberSelectorMode.BOX)),
+        vol.Optional(CONF_ZONE_TARGET_TEMP, default=20.0): selector.NumberSelector(selector.NumberSelectorConfig(min=5, max=35, step=0.1, mode=selector.NumberSelectorMode.BOX)),
+        vol.Optional(CONF_ZONE_TEMP_STEP, default=f"{DEFAULT_ZONE_TEMP_STEP:.1f}"): selector.SelectSelector(
+            selector.SelectSelectorConfig(
+                options=[
+                    selector.SelectOptionDict(value="0.5", label="0.5° (Standard)"),
+                    selector.SelectOptionDict(value="0.1", label="0.1° (Fine / High-Resolution Sensor)"),
+                ],
+                mode=selector.SelectSelectorMode.DROPDOWN,
+            )
+        ),
         
         # Section 1: TRV Standard
         vol.Optional("trv_settings"): data_entry_flow.section(
@@ -337,9 +349,19 @@ def get_zone_select_schema(zone_options: dict[str, str]) -> vol.Schema:
 
 
 def get_options_edit_zone_schema(zone_data: dict[str, Any], temp_desc: dict[str, Any], window_desc: dict[str, Any]) -> vol.Schema:
+    current_step_str = f"{normalize_zone_temp_step(zone_data.get(CONF_ZONE_TEMP_STEP, DEFAULT_ZONE_TEMP_STEP)):.1f}"
     return vol.Schema({
         vol.Optional(CONF_ZONE_TEMP_SENSOR, **temp_desc): selector.EntitySelector(selector.EntitySelectorConfig(domain=SENSOR_DOMAIN, device_class="temperature")),
-        vol.Optional(CONF_ZONE_TARGET_TEMP, default=zone_data.get(CONF_ZONE_TARGET_TEMP, 20.0)): selector.NumberSelector(selector.NumberSelectorConfig(min=5, max=35, step=0.5, mode=selector.NumberSelectorMode.BOX)),
+        vol.Optional(CONF_ZONE_TARGET_TEMP, default=zone_data.get(CONF_ZONE_TARGET_TEMP, 20.0)): selector.NumberSelector(selector.NumberSelectorConfig(min=5, max=35, step=0.1, mode=selector.NumberSelectorMode.BOX)),
+        vol.Optional(CONF_ZONE_TEMP_STEP, default=current_step_str): selector.SelectSelector(
+            selector.SelectSelectorConfig(
+                options=[
+                    selector.SelectOptionDict(value="0.5", label="0.5° (Standard)"),
+                    selector.SelectOptionDict(value="0.1", label="0.1° (Fine / High-Resolution Sensor)"),
+                ],
+                mode=selector.SelectSelectorMode.DROPDOWN,
+            )
+        ),
 
         # Section 1: TRV Standard
         vol.Optional("trv_settings"): data_entry_flow.section(

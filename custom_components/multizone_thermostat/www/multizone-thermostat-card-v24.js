@@ -1625,6 +1625,19 @@ class MultizoneThermostatDialCard extends HTMLElement {
     this.updateCard();
   }
 
+  getStep() {
+    if (this._config && (this._config.step !== undefined || this._config.target_temp_step !== undefined)) {
+      const cfgStep = parseFloat(this._config.step ?? this._config.target_temp_step);
+      if (!isNaN(cfgStep) && cfgStep > 0) return cfgStep;
+    }
+    const climateState = this._hass && this._config && this._config.entity ? this._hass.states[this._config.entity] : null;
+    if (climateState && climateState.attributes && climateState.attributes.target_temp_step !== undefined && climateState.attributes.target_temp_step !== null) {
+      const attrStep = parseFloat(climateState.attributes.target_temp_step);
+      if (!isNaN(attrStep) && attrStep > 0) return attrStep;
+    }
+    return 0.5;
+  }
+
   async loadHelpers() {
     try {
       this._helpers = await window.loadCardHelpers();
@@ -2218,9 +2231,11 @@ class MultizoneThermostatDialCard extends HTMLElement {
 
     const minTemp = this._minTemp || 10;
     const maxTemp = this._maxTemp || 30;
+    const step = this.getStep();
+    const decimals = (step.toString().split('.')[1] || '').length;
     const pct = Math.max(0, Math.min(1, (angle + 135) / 270));
     let temp = minTemp + pct * (maxTemp - minTemp);
-    temp = Math.round(temp * 2) / 2; // Step 0.5
+    temp = parseFloat((Math.round(temp / step) * step).toFixed(decimals));
     temp = Math.max(minTemp, Math.min(maxTemp, temp));
 
     this._dragTargetTemp = temp;

@@ -30,6 +30,20 @@ CONF_ZONE_INVERT_SWITCH = "invert_switch"
 DEFAULT_ZONE_INVERT_SWITCH = False
 CONF_ZONE_TEMP_SENSOR = "temp_sensor"
 CONF_ZONE_TARGET_TEMP = "target_temperature"
+CONF_ZONE_TEMP_STEP = "target_temp_step"
+DEFAULT_ZONE_TEMP_STEP = 0.5
+ZONE_TEMP_STEP_OPTIONS: tuple[float, ...] = (0.5, 0.1)
+
+
+def normalize_zone_temp_step(value: Any) -> float:
+    """Return a validated per-zone target temperature step (0.5 or 0.1)."""
+    try:
+        parsed = float(value)
+    except (ValueError, TypeError):
+        return DEFAULT_ZONE_TEMP_STEP
+    if abs(parsed - 0.1) < 1e-6:
+        return 0.1
+    return DEFAULT_ZONE_TEMP_STEP
 CONF_ZONE_TRV_SYNC = "trv_preset_sync"
 CONF_ZONE_WINDOW_SENSOR = "window_sensor"
 CONF_ZONE_ANTI_SEIZE = "anti_seize_zone_enable"

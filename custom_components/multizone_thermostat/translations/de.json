@@ -29,6 +29,7 @@
           "name": "Zonenname",
           "temp_sensor": "Zonentemperatursensor",
           "target_temperature": "Basis-Solltemperatur",
+          "target_temp_step": "Temperatur-Schrittweite (Sollwert)",
           "invert_switch": "Schaltlogik invertieren (Stellantrieb stromlos offen - NO)",
           "invert_valve": "Ventilposition invertieren (stromlos offen / inverse Wirkung)"
         },
@@ -78,7 +79,8 @@
         "data_description": {
           "name": "Ein benutzerfreundlicher Name für diese Zone",
           "temp_sensor": "Primärer Raumtemperatursensor der Zone",
-          "target_temperature": "Standard-Solltemperatur für diese Zone"
+          "target_temperature": "Standard-Solltemperatur für diese Zone",
+          "target_temp_step": "Schrittweite für Sollwert-Anpassungen in dieser Zone (0.5° Standard oder 0.1° Feinabstimmung für hochauflösende Sensoren)"
         }
       },
       "trv_calibration": {
@@ -179,6 +181,7 @@
           "switch_entities": "Zonenschalter / Relais",
           "temp_sensor": "Zonen-Temperatursensor",
           "target_temperature": "Basis-Zieltemperatur",
+          "target_temp_step": "Temperatur-Schrittweite (Sollwert)",
           "sensor_timeout_min": "Sensor-Watchdog-Timeout (Minuten)",
           "invert_switch": "Schaltlogik invertieren (Stellantrieb stromlos offen - NO)",
           "invert_valve": "Ventilposition invertieren (stromlos offen / inverse Wirkung)"
@@ -232,7 +235,8 @@
           "window_sensor": "Zone automatisch umgehen, wenn dieser Sensor geöffnet ist",
           "sensor_timeout_min": "Maximale Dauer ohne Updates, bevor in den Sicherheitsmodus / TRV-internen Sensor gewechselt wird",
           "name": "Ein benutzerfreundlicher Name für diese Zone (vorausgefüllt aus dem Namen der Climate-Entität)",
-          "trv_preset_sync": "Preset-Modus automatisch synchronisieren, wenn sich der HVAC-Modus ändert (für physische TRV-Ventile)"
+          "trv_preset_sync": "Preset-Modus automatisch synchronisieren, wenn sich der HVAC-Modus ändert (für physische TRV-Ventile)",
+          "target_temp_step": "Schrittweite für Sollwert-Anpassungen in dieser Zone (0.5° Standard oder 0.1° Feinabstimmung für hochauflösende Sensoren)"
         }
       },
       "remove_zone": {
@@ -249,6 +253,7 @@
           "zone_name": "Zone",
           "temp_sensor": "Zonen-Temperatursensor",
           "target_temperature": "Basis-Zieltemperatur",
+          "target_temp_step": "Temperatur-Schrittweite (Sollwert)",
           "invert_switch": "Schaltlogik invertieren (Stellantrieb stromlos offen - NO)",
           "invert_valve": "Ventilposition invertieren (stromlos offen / inverse Wirkung)"
         },
@@ -294,6 +299,9 @@
               "weight": "Thermisches Zonengewicht (Fläche / Heizkörperleistung)"
             }
           }
+        },
+        "data_description": {
+          "target_temp_step": "Schrittweite für Sollwert-Anpassungen in dieser Zone (0.5° Standard oder 0.1° Feinabstimmung für hochauflösende Sensoren)"
         }
       },
       "edit_geofencing": {

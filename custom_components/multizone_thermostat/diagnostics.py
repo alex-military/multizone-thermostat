@@ -7,7 +7,13 @@ from homeassistant.core import HomeAssistant
 from homeassistant.components.diagnostics import async_redact_data
 import homeassistant.util.dt as dt_util
 
-from .const import DOMAIN, make_zone_entity_id
+from .const import (
+    CONF_ZONE_TEMP_STEP,
+    DEFAULT_ZONE_TEMP_STEP,
+    DOMAIN,
+    make_zone_entity_id,
+    normalize_zone_temp_step,
+)
 from .coordinator import MultizoneCoordinator
 
 TO_REDACT = {
@@ -103,6 +109,9 @@ async def async_get_config_entry_diagnostics(
             "climate_id": climate_id,
             "mode": coordinator.get_zone_mode(climate_id),
             "demand_percent": coordinator.get_zone_demand(climate_id),
+            "target_temp_step": normalize_zone_temp_step(
+                zone.get(CONF_ZONE_TEMP_STEP, DEFAULT_ZONE_TEMP_STEP)
+            ),
             "is_frost_emergency": coordinator.is_zone_in_frost_emergency(climate_id),
             "battery_level": battery_level,
             "climates_configured": zone.get("climates") or zone.get("climate_entities", []),

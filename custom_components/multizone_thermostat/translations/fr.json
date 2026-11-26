@@ -29,6 +29,7 @@
           "name": "Nom de la Zone",
           "temp_sensor": "Capteur de Température de Zone",
           "target_temperature": "Température Cible de Base",
+          "target_temp_step": "Pas d'Incrémentation de la Consigne",
           "invert_switch": "Inverser la logique du relais (Actionneur normalement ouvert - NO)",
           "invert_valve": "Inverser la position de la vanne (Normalement ouverte / Action inverse)"
         },
@@ -78,7 +79,8 @@
         "data_description": {
           "name": "Un nom convivial pour cette zone",
           "temp_sensor": "Capteur principal de température ambiante de la zone",
-          "target_temperature": "Consigne de température par défaut pour cette zone"
+          "target_temperature": "Consigne de température par défaut pour cette zone",
+          "target_temp_step": "Pas de réglage de la température cible dans cette zone (0.5° standard ou 0.1° précis pour capteurs haute résolution)"
         }
       },
       "trv_calibration": {
@@ -179,6 +181,7 @@
           "switch_entities": "Interrupteurs de Zone / Relais",
           "temp_sensor": "Capteur de Température de Zone",
           "target_temperature": "Température Cible de Base",
+          "target_temp_step": "Pas d'Incrémentation de la Consigne",
           "sensor_timeout_min": "Délai Watchdog Capteur (minutes)",
           "invert_switch": "Inverser la logique du relais (Actionneur normalement ouvert - NO)",
           "invert_valve": "Inverser la position de la vanne (Normalement ouverte / Action inverse)"
@@ -232,7 +235,8 @@
           "window_sensor": "Contourner automatiquement la zone lorsque ce capteur est ouvert",
           "sensor_timeout_min": "Durée maximale sans mise à jour avant le basculement en mode sécurité / capteur TRV interne",
           "name": "Un nom convivial pour cette zone (pré-rempli à partir du nom de l'entité climate)",
-          "trv_preset_sync": "Synchroniser automatiquement le mode prédéfini lors du changement de mode HVAC (pour vannes TRV physiques)"
+          "trv_preset_sync": "Synchroniser automatiquement le mode prédéfini lors du changement de mode HVAC (pour vannes TRV physiques)",
+          "target_temp_step": "Pas de réglage de la température cible dans cette zone (0.5° standard ou 0.1° précis pour capteurs haute résolution)"
         }
       },
       "remove_zone": {
@@ -249,6 +253,7 @@
           "zone_name": "Zone",
           "temp_sensor": "Capteur de Température de Zone",
           "target_temperature": "Température Cible de Base",
+          "target_temp_step": "Pas d'Incrémentation de la Consigne",
           "invert_switch": "Inverser la logique du relais (Actionneur normalement ouvert - NO)",
           "invert_valve": "Inverser la position de la vanne (Normalement ouverte / Action inverse)"
         },
@@ -294,6 +299,9 @@
               "weight": "Poids Thermique de la Zone (Surface / Puissance des Émetteurs)"
             }
           }
+        },
+        "data_description": {
+          "target_temp_step": "Pas de réglage de la température cible dans cette zone (0.5° standard ou 0.1° précis pour capteurs haute résolution)"
         }
       },
       "edit_geofencing": {

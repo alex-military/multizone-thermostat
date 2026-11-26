@@ -29,6 +29,7 @@
           "name": "Zone Name",
           "temp_sensor": "Zone Temperature Sensor",
           "target_temperature": "Base Target Temperature",
+          "target_temp_step": "Setpoint Temperature Step",
           "invert_switch": "Invert switch logic (Normally Open / NO actuator)",
           "invert_valve": "Invert valve position (Normally Open / Inverted action)"
         },
@@ -78,7 +79,8 @@
         "data_description": {
           "name": "A friendly name for this zone",
           "temp_sensor": "Zone primary ambient temperature sensor",
-          "target_temperature": "Default setpoint target for this zone"
+          "target_temperature": "Default setpoint target for this zone",
+          "target_temp_step": "Increment step for target temperature adjustments in this zone (0.5° standard or 0.1° fine precision for high-resolution sensors)"
         }
       },
       "trv_calibration": {
@@ -181,6 +183,7 @@
           "switch_entities": "Zone Switches / Relays",
           "temp_sensor": "Zone Temperature Sensor",
           "target_temperature": "Base Target Temperature",
+          "target_temp_step": "Setpoint Temperature Step",
           "sensor_timeout_min": "Sensor Watchdog Timeout (minutes)",
           "invert_switch": "Invert switch logic (Normally Open / NO actuator)",
           "invert_valve": "Invert valve position (Normally Open / Inverted action)"
@@ -234,7 +237,8 @@
           "window_sensor": "Automatically bypass the zone when this sensor is open",
           "sensor_timeout_min": "Max duration without updates before falling back to onboard TRV sensors / safety mode",
           "name": "A friendly name for this zone (pre-filled from climate entity name)",
-          "trv_preset_sync": "Automatically sync preset mode when HVAC mode changes (for physical TRV valves)"
+          "trv_preset_sync": "Automatically sync preset mode when HVAC mode changes (for physical TRV valves)",
+          "target_temp_step": "Increment step for target temperature adjustments in this zone (0.5° standard or 0.1° fine precision for high-resolution sensors)"
         }
       },
       "remove_zone": {
@@ -251,6 +255,7 @@
           "zone_name": "Zone",
           "temp_sensor": "Zone Temperature Sensor",
           "target_temperature": "Base Target Temperature",
+          "target_temp_step": "Setpoint Temperature Step",
           "invert_switch": "Invert switch logic (Normally Open / NO actuator)",
           "invert_valve": "Invert valve position (Normally Open / Inverted action)"
         },
@@ -296,6 +301,9 @@
               "weight": "Zone Thermal Weight (Area / Emitter Power)"
             }
           }
+        },
+        "data_description": {
+          "target_temp_step": "Increment step for target temperature adjustments in this zone (0.5° standard or 0.1° fine precision for high-resolution sensors)"
         }
       },
       "edit_geofencing": {

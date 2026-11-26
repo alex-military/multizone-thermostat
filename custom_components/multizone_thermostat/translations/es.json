@@ -29,6 +29,7 @@
           "name": "Nombre de la Zona",
           "temp_sensor": "Sensor de Temperatura de Zona",
           "target_temperature": "Temperatura Objetivo Base",
+          "target_temp_step": "Paso de Incremento de Temperatura",
           "invert_switch": "Invertir lógica del relé (Actuador normalmente abierto - NO)",
           "invert_valve": "Invertir posición de la válvula (Normalmente abierta / Acción inversa)"
         },
@@ -78,7 +79,8 @@
         "data_description": {
           "name": "Un nombre descriptivo para esta zona",
           "temp_sensor": "Sensor principal de temperatura ambiente de la zona",
-          "target_temperature": "Temperatura objetivo predeterminada para esta zona"
+          "target_temperature": "Temperatura objetivo predeterminada para esta zona",
+          "target_temp_step": "Paso de ajuste de la temperatura objetivo en esta zona (0.5° estándar o 0.1° fino para sensores de alta resolución)"
         }
       },
       "trv_calibration": {
@@ -179,6 +181,7 @@
           "switch_entities": "Interruptores de Zona / Relés",
           "temp_sensor": "Sensor de Temperatura de la Zona",
           "target_temperature": "Temperatura Objetivo Base",
+          "target_temp_step": "Paso de Incremento de Temperatura",
           "sensor_timeout_min": "Tiempo de espera del Watchdog del Sensor (minutos)",
           "invert_switch": "Invertir lógica del relé (Actuador normalmente abierto - NO)",
           "invert_valve": "Invertir posición de la válvula (Normalmente abierta / Acción inversa)"
@@ -232,7 +235,8 @@
           "window_sensor": "Ignorar automáticamente la zona cuando este sensor está abierto",
           "sensor_timeout_min": "Duración máxima sin actualizaciones antes de cambiar al modo seguro / sensor integrado en el TRV",
           "name": "Un nombre descriptivo para esta zona (rellenado previamente con el nombre de la entidad climate)",
-          "trv_preset_sync": "Sincronizar automáticamente el modo preestablecido cuando cambia el modo HVAC (para válvulas TRV físicas)"
+          "trv_preset_sync": "Sincronizar automáticamente el modo preestablecido cuando cambia el modo HVAC (para válvulas TRV físicas)",
+          "target_temp_step": "Paso de ajuste de la temperatura objetivo en esta zona (0.5° estándar o 0.1° fino para sensores de alta resolución)"
         }
       },
       "remove_zone": {
@@ -249,6 +253,7 @@
           "zone_name": "Zona",
           "temp_sensor": "Sensor de Temperatura de la Zona",
           "target_temperature": "Temperatura Objetivo Base",
+          "target_temp_step": "Paso de Incremento de Temperatura",
           "invert_switch": "Invertir lógica del relé (Actuador normalmente abierto - NO)",
           "invert_valve": "Invertir posición de la válvula (Normalmente abierta / Acción inversa)"
         },
@@ -294,6 +299,9 @@
               "weight": "Peso Térmico de la Zona (Superficie / Potencia del Emisor)"
             }
           }
+        },
+        "data_description": {
+          "target_temp_step": "Paso de ajuste de la temperatura objetivo en esta zona (0.5° estándar o 0.1° fino para sensores de alta resolución)"
         }
       },
       "edit_geofencing": {
