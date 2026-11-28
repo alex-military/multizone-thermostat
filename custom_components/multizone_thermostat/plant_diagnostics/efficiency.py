@@ -14,35 +14,42 @@ def get_zone_energy_class(coordinator: Any, hass: HomeAssistant, climate_id: str
     """
     try:
         thermal = coordinator.zone_controller.get_thermal_model(climate_id)
-        if not thermal or thermal.cooling_rate <= 0.02:
+        if not thermal:
             return "Learning..."
 
-        st = hass.states.get(climate_id)
-        raw_cur = st.attributes.get("current_temperature") if st else None
-        cur_unit = st.attributes.get("temperature_unit") or st.attributes.get("unit_of_measurement") if (st and getattr(st, "attributes", None)) else None
-        current_temp = to_celsius(float(raw_cur), cur_unit, hass) if raw_cur is not None else 20.0
+        k_loss = getattr(thermal, "k_loss", 0.0) or 0.0
+        if isinstance(k_loss, (int, float)) and not isinstance(k_loss, bool) and k_loss >= 0.001:
+            normalized_dispersion = k_loss * 20.0
+        else:
+            if thermal.cooling_rate <= 0.02:
+                return "Learning..."
 
-        # Outdoor temperature lookup
-        outdoor_temp = None
-        if coordinator.weather_sensor_id:
-            w_st = hass.states.get(coordinator.weather_sensor_id)
-            if w_st and w_st.state not in ("unavailable", "unknown"):
-                try:
-                    w_attrs = getattr(w_st, "attributes", None) or {}
-                    raw_out = w_attrs.get("temperature") if hasattr(w_attrs, "get") else None
-                    w_unit = (w_attrs.get("temperature_unit") or w_attrs.get("unit_of_measurement")) if hasattr(w_attrs, "get") else None
-                    outdoor_temp = to_celsius(float(raw_out if raw_out is not None else w_st.state), w_unit, hass)
-                except (ValueError, TypeError):
-                    pass
+            st = hass.states.get(climate_id)
+            raw_cur = st.attributes.get("current_temperature") if st else None
+            cur_unit = st.attributes.get("temperature_unit") or st.attributes.get("unit_of_measurement") if (st and getattr(st, "attributes", None)) else None
+            current_temp = to_celsius(float(raw_cur), cur_unit, hass) if raw_cur is not None else 20.0
 
-        # If weather is mild (inside - outside < 7.0°C), thermal gradient is too small for reliable calculation
-        if outdoor_temp is None:
-            return "Learning..."
-            
-        delta_t = current_temp - outdoor_temp
-        if delta_t < 7.0:
-            return "Learning..."
-        normalized_dispersion = (thermal.cooling_rate / delta_t) * 20.0
+            # Outdoor temperature lookup
+            outdoor_temp = None
+            if coordinator.weather_sensor_id:
+                w_st = hass.states.get(coordinator.weather_sensor_id)
+                if w_st and w_st.state not in ("unavailable", "unknown"):
+                    try:
+                        w_attrs = getattr(w_st, "attributes", None) or {}
+                        raw_out = w_attrs.get("temperature") if hasattr(w_attrs, "get") else None
+                        w_unit = (w_attrs.get("temperature_unit") or w_attrs.get("unit_of_measurement")) if hasattr(w_attrs, "get") else None
+                        outdoor_temp = to_celsius(float(raw_out if raw_out is not None else w_st.state), w_unit, hass)
+                    except (ValueError, TypeError):
+                        pass
+
+            # If weather is mild (inside - outside < 7.0°C), thermal gradient is too small for reliable calculation
+            if outdoor_temp is None:
+                return "Learning..."
+
+            delta_t = current_temp - outdoor_temp
+            if delta_t < 7.0:
+                return "Learning..."
+            normalized_dispersion = (thermal.cooling_rate / delta_t) * 20.0
 
         # Scale mapping: European Energy Efficiency Class
         if normalized_dispersion < 0.25:

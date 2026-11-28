@@ -45,7 +45,12 @@ class RelayBoilerBackend(BoilerBackend):
         self._min_cycle_off = min_cycle_off
         self._valve_delay = valve_delay
 
-        self._boiler_pwm = PWMEngine(pwm_interval=900.0, min_on=self._min_cycle_on * 60, min_off=self._min_cycle_off * 60)
+        self._boiler_pwm = PWMEngine(
+            pwm_interval=self._compute_pwm_interval(),
+            min_on=self._min_cycle_on * 60,
+            min_off=self._min_cycle_off * 60,
+            phase_locked=True,
+        )
         self._last_boiler_change = 0.0
         self._pending_boiler_task: asyncio.Task | None = None
         self._status_reason_value = "INIT"
@@ -88,15 +93,21 @@ class RelayBoilerBackend(BoilerBackend):
         """Return the current status reason."""
         return self._status_reason_value
 
+    def _compute_pwm_interval(self) -> float:
+        """Compute adaptive PWM cycle period based on boiler min cycle ON/OFF."""
+        min_on_s = max(0.0, float(self._min_cycle_on) * 60.0)
+        min_off_s = max(0.0, float(self._min_cycle_off) * 60.0)
+        return max(900.0, 2.0 * (min_on_s + min_off_s))
+
     def set_min_cycle_on(self, value: int) -> None:
         """Set the min cycle on time (minutes)."""
         self._min_cycle_on = value
-        self._boiler_pwm.set_params(min_on=value * 60)
+        self._boiler_pwm.set_params(pwm_interval=self._compute_pwm_interval(), min_on=value * 60)
 
     def set_min_cycle_off(self, value: int) -> None:
         """Set the min cycle off time (minutes)."""
         self._min_cycle_off = value
-        self._boiler_pwm.set_params(min_off=value * 60)
+        self._boiler_pwm.set_params(pwm_interval=self._compute_pwm_interval(), min_off=value * 60)
 
     def set_valve_delay(self, value: int) -> None:
         """Set the valve delay time (seconds)."""
