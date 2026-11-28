@@ -41,7 +41,7 @@ $$T_{\text{split\_inviato}} = T_{\text{desiderato}} + \left(T_{\text{split\_lett
 
 ## 2. Quick Heat Boost (Shock Termico a Freddo)
 
-Quando una stanza è rimasta chiusa o non riscaldata per ore e presenta un dislivello termico significativo rispetto al setpoint desiderato:
+Quando abilitato (`split_quick_boost: True`; default: `False`) e una stanza è rimasta chiusa o presenta un dislivello termico significativo rispetto al setpoint desiderato:
 
 1. **Scatto del Boost**: Se $\Delta T = (T_{\text{target}} - T_{\text{ambiente}}) \ge 1.5\ ^\circ\text{C}$ (soglia configurabile tramite `split_boost_delta`), il sistema attiva simultaneamente sia i radiatori idronici sia lo split alla massima potenza (**Dual Heat**).
 2. **Accelerazione Termica**: L'aria forzata calda dello split rimescola i volumi d'aria, abbattendo i tempi di riscaldamento del 60–70%.
@@ -50,7 +50,9 @@ Quando una stanza è rimasta chiusa o non riscaldata per ore e presenta un disli
 
 ---
 
-## 3. Disaccoppiamento Idronico Automatico
+## 3. Disaccoppiamento Idronico Automatico & Priorità Solare
+
+Con **`split_solar_priority: True`** *(default)*, il surplus fotovoltaico o le modalità a priorità elettrica instradano automaticamente lo split della stanza prima del riscaldamento idronico.
 
 Quando una stanza viene riscaldata dallo split (per disponibilità di surplus fotovoltaico, per avvio rapido o per accensione manuale):
 * Multizone Thermostat **sopprime istantaneamente a `0.0%` la richiesta idronica di quella specifica stanza**.
@@ -67,7 +69,7 @@ Nella scheda Lovelace **Dial Card**, al centro esatto dell'header, è collocato 
 * **Visibilità Intelligente**: Appare unicamente nelle stanze configurate con un climatizzatore split (`split_climate_entity`). Nelle stanze con soli radiatori è nascosto (poiché non avrebbe senso avviare una caldaia centrale per una singola stanza).
 * **Funzionamento a Master Spento (OFF)**:
   * Facendo clic a riscaldamento generale spento, si accende **esclusivamente lo split elettrico** di quella stanza.
-  * La caldaia a gas e le pompe di circolazione rimangono rigorosamente spente (`switch.switch_caldaia: off`).
+  * La caldaia a gas e le pompe di circolazione rimangono rigorosamente spente (`switch.boiler_switch: off`).
   * La card visualizza immediatamente il badge **`⚡ ELETTRICO`** e l'arco luminescente ciano.
 * **Blocco di Sicurezza a Master Acceso**:
   * Quando l'impianto centrale della casa è acceso, il pulsante viene disabilitato per proteggere l'orchestrazione termica globale della famiglia da tocchi involontari.
@@ -80,6 +82,6 @@ Nella scheda Lovelace **Dial Card**, al centro esatto dell'header, è collocato 
 ## 5. Ruoli Operativi dello Split
 
 Configurabile tramite il parametro `split_role` nel Config Flow o nelle Opzioni:
-* **`heat_cool` (Tutto l'anno)**: Lo split interviene sia per il supporto riscaldamento in inverno sia come climatizzatore principale in estate.
+* **`heat_cool` (Tutto l'anno, default)**: Lo split interviene sia per il supporto riscaldamento in inverno sia come climatizzatore principale in estate.
 * **`heating_only` (Solo Inverno)**: Utilizzato per integrare i radiatori o per il surplus solare, disattivato nella stagione estiva.
 * **`cooling_only` (Solo Estate)**: Riservato esclusivamente all'aria condizionata estiva (non interviene mai in inverno).

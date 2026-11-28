@@ -28,13 +28,13 @@ flowchart TD
 1. **Standard Bivalent Hybrid System**: Gas boiler handles cold winter baselines; heat pump engages during mild shoulder seasons or summer cooling.
 2. **Full-Electric Installation (Heat Pump Only)**: By disabling the boiler (`enable_gas_heater: False`), the heat pump manages 100% of the home's heating and cooling.
 3. **Traditional Gas Boiler + Room Split AC Units**: Central boiler serves hydronic radiators while individual room splits leverage free rooftop solar power.
-4. **Centralized Condo / District Heating (`CentralizedBoilerBackend`)**: For apartments on centralized building heating (`boiler_mode: central` or `enable_gas_heater: False` without a heat pump) with no local boiler switch—drives TRVs and zone actuators directly.
+4. **Centralized Condo / District Heating (`CentralizedBoilerBackend`)**: For apartments on centralized building heating (`enable_gas_heater: True` with `boiler_mode: central`) with no local boiler switch—drives TRVs and zone actuators directly. *(Note: disabling both boiler and heat pump is blocked in Initial Setup; `enable_gas_heater: False` without a heat pump is only allowed in Options Flow if at least one zone has a Room Split AC).*
 
 ---
 
-## 2. The 5 Heat Source Priorities
+## 2. The 7 Heat Source Priorities
 
-Configurable from the Lovelace Preset Card or via `select.master_control_heat_source_priority`:
+Configurable from `select.master_control_heat_source_priority` (with the 5 primary modes also exposed as quick pills on the Lovelace Preset Card):
 
 | Priority | Gas Boiler Behavior | Electric Behavior (Splits & Heat Pump) | Recommended Scenario |
 |---|---|---|---|
@@ -43,6 +43,8 @@ Configurable from the Lovelace Preset Card or via `select.master_control_heat_so
 | **`combined`** | Maintains steady hydronic heating. | Operates in parallel with gas during solar surplus or large temperature drops (`OFF` and `BYPASS` zones excluded) to warm the house as quickly as possible. | Large houses or returning from prolonged absence. |
 | **`electric_only`** | **Locked at 0%** (zero gas burned). | 100% of heat demand directed to central heat pump and room split units. | All-electric homes, gas supply outages, or peak sunny days. |
 | **`gas_only`** | 100% of heat demand supplied by gas. | Splits and heat pumps disabled in heating mode. | Prolonged bad weather or AC maintenance. |
+| **`gas_priority`** | Primary heat source covering house demand. | Central HP / splits assist only as fallback or when electric boost applies. | Gas-preferred bivalent plants during cold tariffs. |
+| **`electric_priority`** | Acts as peak/backup when electric capacity is insufficient. | Prioritizes central heat pump & electric splits first. | Heat-pump primary homes with low electric tariffs. |
 
 ---
 
@@ -93,19 +95,26 @@ Connect your local economic optimizer directly:
 
 | Parameter | Configuration Key | Default | Description |
 |---|---|---|---|
-| Gas Boiler Enable | `enable_gas_heater` | `True` | If disabled, operates in pure Full-Electric mode. |
+| Gas Boiler Enable | `enable_gas_heater` | `True` | If disabled (with HP or splits), removes central combustion heating. |
 | Heat Pump Enable | `enable_heat_pump` | `False` | Enables central hydronic heat pump coordination. |
 | Heat Pump Type | `heat_pump_type` | `climate` | Select from `climate`, `switch`, or `opentherm`. |
+| Heat Pump Entity | `heat_pump_entity` | `None` | Target central heat pump `climate`, `switch`, or `number` entity. |
+| HP Heating Flow Range | `heat_pump_min_temp` / `max` | `25.0–55.0 °C` | Water flow temperature limits in heating mode. |
+| HP CH Enable Switch | `heat_pump_ch_switch` | `None` | Optional external heating enable switch for the heat pump. |
 | Reversible Cooling | `heat_pump_cooling` | `True` | Enables chilled water cooling while locking gas combustion. |
+| HP Cooling Flow Range | `hp_cool_min_temp` / `max` | `7.0–18.0 °C` | Chilled water flow limits in cooling mode. |
+| Mixing Valve Present | `has_mixing_valve` | `False` | Indicates mixed hydronic circuits (removes 40 °C underfloor cap). |
 | Energy Management | `energy_management_enabled` | `False` | Master switch for the Energy Manager. |
 | Solar PV Sensor | `solar_power_sensor` | `None` | Real-time rooftop solar generation in Watts. |
 | Grid Export Sensor | `grid_export_sensor` | `None` | Grid feed-in sensor in Watts (optional). |
 | Invert Grid Export | `grid_export_inverted` | `False` | Enable if your meter reports grid export as negative values. |
 | Export Threshold | `solar_export_threshold` | `500.0 W` | Minimum export power to trigger surplus mode. |
 | Battery SoC Sensor | `battery_soc_sensor` | `None` | Battery state of charge percentage (0-100%). |
-| Battery Power Sensor | `battery_power_sensor` | `None` | Battery charge/discharge power in Watts. |
-| Night Reserve SoC | `battery_min_reserve_soc` | `20.0%` | Recommended 80–85% to preserve battery overnight. |
+| Battery Power Sensor | `battery_power_sensor` | `None` | Battery charge/discharge power in Watts (+ charge, - discharge). |
+| Invert Battery Power | `battery_power_inverted` | `False` | Enable if your battery sensor reports discharge as positive. |
+| Solar Forecast / Irradiance | `solar_forecast_sensor` / `solar_irradiance_sensor` | `None` | Optional PV forecast (`W`/`kWh`) and irradiance (`W/m²`/`lux`) sensors. |
+| Night Reserve SoC | `battery_min_reserve_soc` | `20.0%` | Floor SoC (recommended `50–85%` to preserve night reserve). |
 | Max Discharge Time | `battery_max_discharge_time` | `5 min` | Max consecutive discharge minutes before gas fallback. |
 | Min Cycle Duration | `solar_min_run_time` | `10 min` | Inverter compressor anti-chatter protection. |
-| Thermal Mass Offset | `solar_overheat_offset` | `0.0°C` | Target elevation during free solar surplus (up to +3.0°C). |
+| Thermal Mass Offset | `solar_overheat_offset` | `0.0 °C` | Target elevation during free solar surplus (up to +3.0 °C). |
 | External AI Override | `external_solar_override_entity` | `None` | EMHASS deferrable load sensor or Predbat signal. |

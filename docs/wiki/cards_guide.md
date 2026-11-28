@@ -21,7 +21,7 @@ A modern circular thermostat designed as a **1-to-1 Visual Twin** of Home Assist
 
 ### Key Enhancements (v6.1.0-beta)
 * **Direct Arc Touch / Click**: Tap or click anywhere along the circular arc to immediately set your target temperature without dragging the knob.
-* **Symmetrical Circular Step Buttons `[-]` and `[+]`**: Ergonomic 42px circular buttons positioned in the bottom opening to adjust temperature in 0.5 °C steps.
+* **Symmetrical Circular Step Buttons `[-]` and `[+]`**: Ergonomic 42px circular buttons positioned in the bottom opening to adjust temperature in `0.5 °C` or `0.1 °C` steps matching each zone's configured `target_temp_step` (with matching dynamic arc drag & tooltips).
 * **Active Source Badge (Top Left)**:
   * `🔥 GAS` (Orange): Zone heated by the central gas boiler.
   * `⚡ ELECTRIC` (Cyan): Zone conditioned by the room split AC or heat pump.
@@ -48,7 +48,7 @@ border_radius: "20px" # Card corner curvature
 
 A whole-house control bar combining seasonal switching, heat source priority, and comfort presets at a **guaranteed constant height**:
 
-* **Segmented Heat Source Priority Selector**: Horizontal pill selector for 5 priorities (`Auto`, `Hybrid`, `Combined`, `Electric`, `Gas`).
+* **Segmented Heat Source Priority Selector**: Horizontal pill selector for the 5 primary modes (`Auto`, `Hybrid`, `Combined`, `Electric`, `Gas`); all 7 modes (including `gas_priority` and `electric_priority`) remain selectable on `select.master_control_heat_source_priority`.
 * **Identical Summer Transition**: In summer cooling mode, the priority selector smoothly transforms into the aesthetic pill `❄️ Electric Cooling` with the **exact same height**, preserving layout geometry across seasons.
 * **Master Seasonal Switch (Heat 🔥 / Cool ❄️)**: Instantly toggles the home between heating and cooling.
 * **Dual-Track Preset Buttons**: Quick recall for `Manual`, `Eco`, `Comfort`, `Sleep`, `Away` with isolated memory tracks.
@@ -99,7 +99,7 @@ title: Master Bedroom
 Visual weekly matrix scheduling interface:
 
 * **24-Hour Color Matrix**: Displays schedule blocks for all rooms across the day, including the **"🏠 All Zones (General)"** master summary row, dashed baseline gaps, amber manual override blocks, and responsive sticky-label layout on narrow/mobile screens.
-* **Interactive Editing**: Tap blocks to adjust start/end times and presets.
+* **Interactive Editing**: Tap blocks to adjust start/end times and presets; preset temperature modal inputs automatically inherit each zone's `target_temp_step` (`0.5°` or `0.1°`).
 * **Smart Return Planner**: Schedule arrival times with automated preheating advance per room.
 
 ```yaml
@@ -112,7 +112,7 @@ type: custom:multizone-thermostat-scheduler-card
 
 Technical boiler and heat pump telemetry:
 
-* **Plant Health Score**: Overall hydraulic health percentage (0–100%).
+* **Plant Health Status**: Overall hydraulic health status badge (`Optimal`, `Warning`, or `Critical`) with live status reasons.
 * **Ignition Frequency (Short-Cycling)**: Monitors starts per hour with visual warnings for high wear (> 5 cycles/h).
 * **OpenTherm Telemetry**: Water pressure (Bar), flow & return temperatures with $\Delta T$, modulation %, and boiler OEM fault codes.
 * **Active Anomalies List**: Real-time list of detected hydraulic faults.
@@ -127,11 +127,11 @@ type: custom:multizone-thermostat-plant-card
 
 Displays physical building performance metrics for each room:
 
-* **European Energy Class (A4 → G)**: Calculated from natural heat loss decay and indoor/outdoor $\Delta T$.
+* **European Energy Class (A4 → G)**: Calculated primarily from the weather-invariant Newton cooling coefficient (`k_loss`), protected against open windows, brief drafts (even sensorless via wall rebound + 40-min lockout), and outliers.
 * **Thermal Retention Time**: Hours required to drop by 1.0 °C.
 * **Radiator Sizing**: Evaluates emitter sizing (Undersized, Optimal, Oversized).
 * **Universal TRV Battery Gauge**: Battery monitoring for wireless Zigbee/Z-Wave valves.
-* **Live Seasonal PID Panel**: Displays active season (`heat`/`cool`) `Kp`, `Ki`, `Kd` gains in 3 read-only boxes with protected safety unlock, `seed_autotuner` baseline seeding, and pre-reset backup/restore modals.
+* **Live Seasonal PID Panel**: Displays active season (`heat`/`cool`) `Kp`, `Ki`, and `Kd` values in 3 interactive boxes. Clicking them opens the protected PID modal with **Manual Override** and **Auto EMA Baseline** tabs (`Kp: 0.1–500`, `Ki: 0.0–10.0`, `Kd: 0.0–50000`, pure PI preserved when seeding `Kd = 0.0`) plus pre-reset **Restore Backup** when available.
 * **Interactive Toggles**: Cycle zone mode or toggle passive heat directly from the card.
 
 ```yaml
@@ -146,6 +146,7 @@ entity: climate.multizone_thermostat_living
 Build complete views without writing YAML for individual entities:
 
 ### Climate View Strategy (`custom:multizone-thermostat-dashboard`)
+Automatically builds the main dashboard with navigation bar (`multizone-thermostat-nav-card`), Master Switch, Global Preset Card, and responsive Dial Cards:
 ```yaml
 views:
   - title: Climate
@@ -156,7 +157,19 @@ views:
       columns: 3 # Responsive columns (1, 2, 3, or 4)
 ```
 
+### Weekly Scheduler View Strategy (`custom:multizone-thermostat-scheduler`)
+Automatically renders the full-width 24h schedule matrix view:
+```yaml
+views:
+  - title: Schedule
+    path: schedule
+    icon: mdi:calendar-clock
+    strategy:
+      type: custom:multizone-thermostat-scheduler
+```
+
 ### Diagnostics View Strategy (`custom:multizone-thermostat-diagnostics`)
+Generates the complete plant health view with Central Plant Card and all Zone Energy Cards:
 ```yaml
 views:
   - title: Diagnostics
@@ -166,6 +179,9 @@ views:
       type: custom:multizone-thermostat-diagnostics
       columns: 3
 ```
+
+> [!NOTE]
+> The card bundle also registers internal layout and summary components used by the dashboard strategies: `custom:multizone-thermostat-nav-card`, `custom:multizone-thermostat-schedule-summary-card`, `custom:multizone-thermostat-health-summary-card`, `custom:multizone-thermostat-style-switcher`, `custom:multizone-thermostat-responsive-grid`, and `custom:multizone-thermostat-spacer`.
 
 ---
 

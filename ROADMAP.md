@@ -36,7 +36,7 @@ Multizone Thermostat transforms Home Assistant into an **autonomous, self-learni
 - [x] **Authoritative Hardware Climate Sync (Phase 9)**: Opt-in authoritative mode source for physical wall thermostats (e.g., Vimar, Bticino) propagating manual OFF states without setpoint corruption.
 - [x] **Configurable Demand Aggregator Strategies & Zone Weights (Phase 10)**: Selection of plant formulas (`MAX`, `WEIGHTED_AVERAGE`, `SUM_CAPPED`) with live entity selector and zone weight multipliers.
 - [x] **Dynamic Feed-Forward Weather Curve ($T_{\text{ext}} \rightarrow T_{\text{flow}}$) (Phase 10)**: Continuously adapts boiler flow temperature based on real outdoor temperature and building thermal retention time.
-- [x] **Air-in-Radiator Anomaly Detection (`ANOMALY_AIR_IN_RADIATOR`) (Phase 10)**: Automated supervision identifying valves opened at 100% with abnormally slow heat-up rates.
+- [x] **Hydraulic Anomaly Detection Engine (Phase 10)**: Automated supervision identifying stuck-closed valves (`> 75 min` at 99%+ demand), ghost heating, TRV non-opening (`trv_not_opening`), and plant/sensor faults (superseded legacy `ANOMALY_AIR_IN_RADIATOR` constant).
 - [x] **Startup Availability Guards & Command De-Duplication (v5.1.2)**: Entity readiness verification during late Zigbee2MQTT startup and suppression of duplicate 10s OFF MQTT spam.
 
 ### Advanced Weekly Scheduling & Next-Gen Lovelace UI (v6.0.0 → v6.0.2)
@@ -50,12 +50,18 @@ Multizone Thermostat transforms Home Assistant into an **autonomous, self-learni
 - [x] **"Smart Return" (Pianifica Rientro) Arrival Planner & Auto-Wake (Phase 7)**: Arrival planner with thermal radar and automatic plant wake-up from master OFF.
 - [x] **UI Polish, Single-Column Wrapping & Strategy View Compatibility (v6.0.1 / v6.0.2 - PR #8)**: Responsive layout stacking for top header cards, robust navigation fallback, and seamless support for Lovelace strategy views.
 
+### Hardening, Actuator Precision & SIMC/Sensorless Upgrade (v6.0.23 → v6.0.26)
+- [x] **Normally Open (NO) Output Inversion (`v6.0.23` - #17)**: Added `invert_switch` for NO PWM relays and `invert_valve` for reverse-acting proportional / 0–10V valves.
+- [x] **TRV `Disabled` Mode, Offset Anti-Ratchet & PID Diagnostics (`v6.0.24` - #18, #19)**: Added `disabled` TRV calibration mode (for native Matter/Zigbee binding), offset deadband/cooldown/`offset_stalled` protection, 15-minute least-squares derivative with anti-flicker guard, coherent median FOPDT, and live JSON `pid_state`.
+- [x] **Per-Zone Setpoint Step `0.5° / 0.1°` (`v6.0.25` - #20)**: Configurable high-resolution `target_temp_step` across backend, Config/Options Flow, Lovelace Dial/Scheduler cards, and 6-language translations.
+- [x] **SIMC Autotuner, Sensorless `ThermalObserver`, Anti-Chattering PWM & Live `DemandSensor` Telemetry (`v6.0.26`)**: Comfort-tuned SIMC gain derivation with OLS slope regression, weekly EMA overshoot guardrail & auto-rollback, trapezoidal PID with `0.03 °C` deadband and dynamic zero-offset Smart Stop, sensorless draft/rebound detection + weather-invariant Newton `k_loss`, single-pulse anti-chattering PWM with `95%` continuous-ON threshold, and live `p_term`/`i_term`/`d_term` attributes directly on `DemandSensor`.
+
 ---
 
 ## 🚀 Active Roadmap & Upcoming Features
 
 ### Phase 11 — Hybrid Multi-Generator, Room Split Climate & Solar Self-Consumption (Next Target)
-*Complete architectural design and technical specifications available in [`PHASE_11_SPECIFICATION.md`](PHASE_11_SPECIFICATION.md).*
+*Complete architectural design and guide available in [`hybrid_energy.md`](docs/wiki/hybrid_energy.md).*
 
 - [ ] **Dual-Level Heating Architecture (Central Hydronic + Room Air Splits)**:
   - **Central Hydronic Drive**: Coordinated bivalent staging between primary Heat Pump (PDC) and auxiliary/peak Gas Boiler on the shared water loop.
@@ -82,7 +88,8 @@ Multizone Thermostat transforms Home Assistant into an **autonomous, self-learni
 
 ---
 
-### Phase 12 — Long-Term Research & System Evolutions
+### Phase 12 — Native Telemetry Charts & Long-Term Evolutions
+- [ ] **Native Adaptive Telemetry & PID/Plant Charts Card (`multizone-thermostat-telemetry-card`)**: Zero-dependency SVG charts integrated into *Diagnostics & Efficiency* adapting automatically to control mode (Smart PID P/I/D vs Hysteresis band), zone actuators (proportional valves, PWM relays, TRVs, Split AC), and central plant backend (OpenTherm, Relay PWM, Heat Pump/Bivalent + Solar, Centralized).
 - [ ] **Hydraulic Zone Clustering**: Grouping zones by physical manifolds/floors to maintain minimum loop flow and prevent overpressure on circuits without differential bypass.
 - [ ] **Dynamic Hourly Energy Tariffs (Nord Pool / PUN)**: Automated thermal storage shifting based on variable day-ahead electricity prices.
 

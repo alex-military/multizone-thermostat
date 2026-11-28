@@ -1,6 +1,6 @@
 # 🎮 Simulatore Live Interattivo (3 Dashboard)
 
-Sperimenta in tempo reale il funzionamento di **Multizone Thermostat** con le schede Lovelace ufficiali, la commutazione stagionale Inverno/Estate, le 5 priorità di riscaldamento bivalente, i condizionatori split e la diagnostica d'impianto.
+Sperimenta in tempo reale il funzionamento di **Multizone Thermostat** con le schede Lovelace ufficiali, la commutazione stagionale Inverno/Estate, le 7 priorità di riscaldamento bivalente, i condizionatori split e la diagnostica d'impianto.
 
 <div class="callout-beta">
   <strong>💡 Modalità Schermo Intero</strong><br>
@@ -9,5 +9,5 @@ Sperimenta in tempo reale il funzionamento di **Multizone Thermostat** con le sc
 </div>
 
 <div style="width: 100%; margin-top: 15px;">
-  <iframe src="simulator.html?v=beta11_rev5" class="full-width-sim" style="width: 100%; height: 94vh; min-height: 900px; border: 1px solid #334155; border-radius: 14px; background: #0b1120; box-shadow: 0 8px 32px rgba(0,0,0,0.5);" loading="lazy"></iframe>
+  <iframe src="simulator.html?v=6.1.0-beta.19" class="full-width-sim" style="width: 100%; height: 94vh; min-height: 900px; border: 1px solid #334155; border-radius: 14px; background: #0b1120; box-shadow: 0 8px 32px rgba(0,0,0,0.5);" loading="lazy"></iframe>
 </div>

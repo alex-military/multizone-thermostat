@@ -27,22 +27,22 @@ A comprehensive, 100% UI-configured custom integration for Home Assistant provid
 ## ✨ Key Features
 
 ### Core Climate & Zone Management
-- 🖥️ **100% UI Config & Options Flow**: Guided setup wizard with collapsible sections — no YAML editing required.
-- 🔥 **Dual Boiler Drive**: Supports **ON/OFF Relay (PWM)**, **Modulating OpenTherm** (0–100% demand mapped to flow temperature), and **Centralized Condo / District Heating** (no boiler switch).
-- 🧠 **Adaptive Autotuning (Hysteresis → Silent PID)**: Starts safely in Hysteresis, passively learns room thermal response, and transitions to continuous PID with weekly smoothed EMA and per-zone manual tuning controls.
+- 🖥️ **100% UI Config & Options Flow**: Guided setup wizard with collapsible sections and per-zone **`0.5°` / `0.1°`** setpoint step precision — no YAML editing required.
+- 🔥 **Dual Boiler & Anti-Chattering Drive**: Supports **ON/OFF Relay (PWM)** (single-pulse anti-chattering latch, `95%` continuous-ON threshold, adaptive phase-locked cycle period), **Modulating OpenTherm**, and **Centralized Condo / District Heating**.
+- 🧠 **Adaptive SIMC Autotuning & Sensorless Thermal Model**: Starts safely in Hysteresis, passively learns room response via OLS regression to derive **SIMC (Skogestad IMC)** gains with **trapezoidal PID**, dynamic zero-offset Smart Stop, and **weekly overshoot auto-rollback**, plus a sensorless `ThermalObserver` with draft lockout and weather-invariant Newton `k_loss`.
 - 🏠 **Hierarchical Zone Modes**: Per-zone `Primary`, `Secondary` (passive heat sharing), and `Bypass` selector directly on Lovelace cards.
-- 🎛️ **Broad Actuator Support**: Smart TRVs (`climate.*`, multi-TRV aggregation, physical dial sync, `external_temperature_input` feed & `select.*` sensor-source switching, **Demand-Driven** bounded overdrive), **0–100% / 0–10V proportional valves**, and **PWM relay actuators**.
+- 🎛️ **Broad Actuator Support**: Smart TRVs (`climate.*`, multi-TRV aggregation, physical dial sync, `external_temperature_input` feed, `select.*` sensor-source switching, `Disabled` mode for native Matter/Zigbee binding, offset anti-ratchet protection, and **Demand-Driven** bounded overdrive), **0–100% / 0–10V proportional valves**, and **PWM relay actuators** — all supporting **Normally Open (NO) / inverted output logic** (`invert_switch`, `invert_valve`).
 - 📅 **Weekly Scheduling, Geofencing & Smart Return**: Visual 24h schedule matrix, Local Calendar integration, presence-based presets, and predictive pre-heating based on room inertia.
 
 ### Hybrid Plant, Cooling & Solar *(v6.1.0-beta)*
-- 🔄 **Bivalent Central Plant**: Arbitrates between Gas Boiler and Central Hydronic Heat Pump (`auto`, `hybrid`, `combined`, `electric_only`, `gas_only`).
+- 🔄 **Bivalent Central Plant**: Arbitrates between Gas Boiler and Central Hydronic Heat Pump across **7 priority modes** (`auto`, `hybrid`, `combined`, `electric_only`, `gas_only`, `gas_priority`, `electric_priority`).
 - ❄️ **Room Split AC Integration**: Per-zone split units with ceiling sensor bypass (target injection), Quick Heat Boost, and automatic hydronic decoupling.
 - ☀️ **Off-Grid & Solar Self-Consumption**: Inverter anti-clipping, battery discharge safeguard, night SoC reserve, and EMHASS / Predbat bridge.
 - 🌡️ **Four-Season Dual-Track Engine**: Independent winter/summer preset memories, dual-track PID loops, indoor dew-point anti-condensation, and automatic summer card filtering.
 
 ### Safety, Diagnostics & Lovelace UI
 - 🛡️ **Plant & Pipe Safeguards**: Anti-short-cycle timers (boiler & heat pump), motorized valve opening delay & **TRV hydraulic valve-readiness guard (`HOLD_TRV_CLOSED`)**, summer anti-seize exercise, persistent anti-frost protection, and window-open cutouts.
-- 🚨 **Hydraulic & Energy Diagnostics**: Stuck-valve, TRV non-opening (`trv_not_opening`), and ghost-heating detection, wireless sensor watchdog with TRV fallback, OpenTherm telemetry & DHW priority, European Energy Class (`A4`–`G`), and thermal retention metrics.
+- 🚨 **Hydraulic & Energy Diagnostics**: Live per-zone P/I/D telemetry directly on `sensor.<zone>_demand` attributes (`p_term`, `i_term`, `d_term`, `error`, `kp/ki/kd`) and JSON `pid_state`, stuck-valve (`> 75 min`), TRV non-opening (`trv_not_opening`), and ghost-heating detection, wireless sensor watchdog with TRV fallback, OpenTherm telemetry & DHW priority, Newton `k_loss` European Energy Class (`A4`–`G`), and thermal retention metrics.
 - 🎨 **Visual Twin Lovelace Cards & Auto-Dashboards**: Custom cards matching Home Assistant native styling and auto-generated dashboard strategies in **6 languages** (`EN`, `IT`, `ES`, `FR`, `DE`, `RU`).
 
 ---

@@ -1,6 +1,6 @@
 # 🎮 Interactive Live Simulator (3 Dashboards)
 
-Test the full capabilities of **Multizone Thermostat** in real time with official Lovelace cards, seasonal Heat/Cool switching, 5 bivalent heating priorities, room split units, and plant diagnostics.
+Test the full capabilities of **Multizone Thermostat** in real time with official Lovelace cards, seasonal Heat/Cool switching, 7 bivalent heating priorities, room split units, and plant diagnostics.
 
 <div class="callout-beta">
   <strong>💡 Full-Screen Mode</strong><br>
@@ -9,5 +9,5 @@ Test the full capabilities of **Multizone Thermostat** in real time with officia
 </div>
 
 <div style="width: 100%; margin-top: 15px;">
-  <iframe src="simulator.html?v=beta11_rev5" class="full-width-sim" style="width: 100%; height: 94vh; min-height: 900px; border: 1px solid #334155; border-radius: 14px; background: #0b1120; box-shadow: 0 8px 32px rgba(0,0,0,0.5);" loading="lazy"></iframe>
+  <iframe src="simulator.html?v=6.1.0-beta.19" class="full-width-sim" style="width: 100%; height: 94vh; min-height: 900px; border: 1px solid #334155; border-radius: 14px; background: #0b1120; box-shadow: 0 8px 32px rgba(0,0,0,0.5);" loading="lazy"></iframe>
 </div>

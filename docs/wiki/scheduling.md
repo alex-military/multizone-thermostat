@@ -17,10 +17,11 @@ Multizone Thermostat integrates a native weekly schedule engine with a visual 24
 
 ## 2. Multi-Profile Management & Timed Expirations
 
-* **Standard**: Typical weekday work schedule.
-* **Weekend / Holiday**: Delayed wake-up and continuous daytime comfort.
-* **Smart Working**: Dedicated daytime heating for home offices.
-* **Guests / Vacation**: Custom profiles for temporary events.
+Three built-in profiles are seeded automatically, and users can create any number of custom profiles:
+* **Standard (`standard`)**: Built-in typical weekday/weekly default schedule.
+* **Smart Working (`smart_working`)**: Built-in daytime comfort profile for home offices.
+* **Holiday (`holiday` / `Festivo`)**: Built-in schedule for holidays and continuous daytime comfort.
+* **Custom Profiles** (e.g., *Guests / Vacation*): Create or duplicate unlimited custom profiles via UI or services.
 
 ### Temporary Profiles with Auto-Reversion
 Activate special profiles with an expiration timestamp via UI or Home Assistant service:
@@ -45,12 +46,12 @@ flowchart TD
     Z3 --> Obiettivo
 ```
 
-### Pre-Heating Time Calculation
-Using the learned warm-up rate $R$ (°C/hour):
+### Pre-Heating / Pre-Cooling Time Calculation
+Using the learned heating rate $R$ (or active cooling rate in `cool` mode; fallback default `1.5 °C/h` before initial learning, capped at `6.0 h` max lookahead):
 
-$$\Delta t_{\text{lead\_time}} = \frac{T_{\text{comfort}} - T_{\text{current}}}{R}$$
+$$\Delta t_{\text{lead\_time}} = \min\!\left(6.0\text{ h},\ \frac{|T_{\text{target}} - T_{\text{current}}|}{R}\right)$$
 
-* Rooms warm up at their natural rates without wasted early heating (and in `cool` mode, non-cooling zones are automatically skipped on Smart Return completion).
+* Rooms adjust at their natural rates without wasted early energy (and in `cool` mode, non-cooling zones are automatically skipped on Smart Return completion).
 * **Result**: At 18:30 sharp, every room reaches comfort simultaneously.
 
 ---

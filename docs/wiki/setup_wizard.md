@@ -21,15 +21,16 @@ flowchart TD
     S1b -->|No| Zone1["Step 2: Add First Thermal Zone"]
     C_PDC --> Zone1
     Zone1 --> CalibCheck{"TRVs + External Sensor?"}
-    CalibCheck -->|Yes| S3["Step 3: TRV Calibration & Sensor Mapping"]
-    CalibCheck -->|No| S4{"Add Another Zone?"}
-    S3 --> S4
-    S4 -->|Yes| Zone1
-    S4 -->|No| S5["Step 5: Solar & Battery Management (Optional)"]
-    S5 --> S6["Step 6: Local Calendar"]
-    S6 --> S7["Step 7: Weather Compensation Curve"]
-    S7 --> S8["Step 8: Presence & Geofencing"]
-    S8 --> Fine["Setup Complete!"]
+    CalibCheck -->|Yes| S2b["TRV Calibration & Sensor Mapping"]
+    CalibCheck -->|No| S2c{"Add Another Zone?"}
+    S2b --> S2c
+    S2c -->|Yes| Zone1
+    S2c -->|No| S3["Step 3: Global Local Calendar (Optional)"]
+    S3 --> S4["Step 4: Weather Compensation Sensor"]
+    S4 --> S5["Step 5: Presence & Geofencing"]
+    S5 --> S6["Step 6: Solar Energy, PV & Battery Management (Optional)"]
+    S6 --> S7["Step 7: Review & Confirm"]
+    S7 --> Fine["Setup Complete!"]
 ```
 
 ---
@@ -39,21 +40,23 @@ flowchart TD
 #### Step 1: Central Generator Selection
 <span class="badge-beta">BETA</span>
 
-Select the physical generators present in your heating plant:
-* ☑️ **Gas / Fuel Boiler (`enable_gas_heater`)**: Enables combustion boilers (natural gas, LPG, diesel, pellets).
-* ☑️ **Central Hydronic Heat Pump (`enable_heat_pump`)**: Enables central heat pump coordination for bivalent hybrid or full-electric systems.
+Select the physical generators present in your heating plant (at least one must be enabled):
+* ☑️ **Gas / Fuel Boiler (`enable_gas_heater`)**: Enables combustion boilers (default: `True`; also select this with `boiler_mode: central` for centralized condo/district heating).
+* ☑️ **Central Hydronic Heat Pump (`enable_heat_pump`)**: Enables central heat pump coordination for bivalent hybrid or full-electric systems (default: `False`).
 
 #### Step 1a: Gas Boiler Configuration
 <span class="badge-stable">STABLE</span>
 
 * **Relay Mode (ON/OFF PWM)**:
   * `boiler_switch`: Select the switch entity (`switch.*`) controlling the boiler burner or circulation pump.
+  * `dhw_active_sensor` *(optional)*: Custom binary sensor indicating active Domestic Hot Water (DHW) production so zone PIDs freeze during hot water draw-off.
+  * `has_mixing_valve`: Indicates whether a hydraulic mixing valve is present on mixed radiator/underfloor circuits (default: `False`).
 * **OpenTherm Modulating Mode**:
   * `opentherm_entity`: Select the OpenTherm gateway entity (`climate`, `water_heater`, or `number`).
   * `opentherm_ch_switch`: Optional central heating enable switch (CH switch).
-  * `dhw_active_sensor`: Optional custom DHW (Domestic Hot Water) active sensor (supports EMS-ESP multi-device charging detection).
+  * `dhw_active_sensor`: Optional custom DHW active sensor (supports EMS-ESP multi-device charging detection).
   * `has_mixing_valve`: Indicates whether a hydraulic mixing valve is installed on mixed radiator/underfloor circuits (otherwise a strict 40.0 °C cap protects unmixed underfloor loops).
-  * `opentherm_min_temp` / `opentherm_max_temp`: Water flow temperature limits (e.g. 35 °C – 75 °C for radiators, 25 °C – 45 °C for underfloor).
+  * `opentherm_min_temp` / `opentherm_max_temp`: Water flow temperature limits (default `35.0 °C – 75.0 °C`; e.g. 25 °C – 45 °C for underfloor).
 * **Centralized / No Boiler (Condo)**:
   * `central` mode: Skips boiler entity selection and drives TRVs and zone actuators directly—ideal for centralized condominium or district heating plants.
 
@@ -61,11 +64,15 @@ Select the physical generators present in your heating plant:
 <span class="badge-beta">BETA</span>
 
 * **Control Interface (`heat_pump_type`)**:
-  * `climate`: Modulates flow temperature setpoints and handles `heat`/`cool`/`off` mode switching.
+  * `climate` *(default)*: Modulates flow temperature setpoints and handles `heat`/`cool`/`off` mode switching.
   * `switch`: Dry contact relay or **Smart Grid Ready (SG-Ready)** input.
   * `opentherm`: Modulating OpenTherm / Modbus bus drive.
-* **Heating Range**: Flow setpoint limits for heating (e.g. 25 °C – 50 °C).
-* **Reversible Cooling (`heat_pump_cooling`)**: Enables summer chilled water generation for fancoils or underfloor cooling with dehumidifiers, strictly locking the gas boiler to 0%.
+* **Heat Pump Entity (`heat_pump_entity`)**: Target `climate.*`, `switch.*`, or `number.*` entity.
+* **Heating Range (`heat_pump_min_temp` / `heat_pump_max_temp`)**: Flow setpoint limits for heating (default: `25.0 °C – 55.0 °C`).
+* **Heating Enable Switch (`heat_pump_ch_switch`)** *(optional)*: External CH enable relay for the heat pump.
+* **Reversible Cooling (`heat_pump_cooling`)**: Default `True`. Enables summer chilled water generation for fancoils or underfloor cooling, strictly locking the gas boiler to 0%.
+* **Cooling Range (`hp_cool_min_temp` / `hp_cool_max_temp`)**: Chilled water flow limits in cooling mode (default: `7.0 °C – 18.0 °C`).
+* **Mixing Valve Present (`has_mixing_valve`)**: Default `False`. Marks whether an external hydraulic mixer protects low-temperature radiant loops.
 
 ---
 
@@ -73,57 +80,86 @@ Select the physical generators present in your heating plant:
 Organized into collapsible accordion sections:
 
 * **Main Settings**:
-  * **Room Name**: Display label in the dashboard (e.g. "Living Room", "Master Bedroom").
+  * **Room Name (`name`)**: Display label in the dashboard (e.g. "Living Room", "Master Bedroom").
   * **Primary Temperature Sensor (`temp_sensor`)**: Eye-level reference thermometer (`sensor.*`).
   * **Humidity Sensor (`humidity_sensor`)** *(Optional)*: Used for indoor dew-point anti-condensation protection during hydronic cooling.
-  * **Emitter Type (`emitter_type`)**: Choose `radiator`, `underfloor`, or `fancoil` to tailor flow curves and safety ceilings.
-  * **Base Target Temperature**: Initial setpoint (e.g. 20.5 °C).
-* **▶ Smart Radiator TRVs (Standard & Demand-Driven)** <span class="badge-stable">STABLE</span>:
-  * Select smart radiator valves (`climate.*`). The system synchronizes setpoints and averages temperatures.
-  * **TRV Control Mode (`trv_control_mode`)**: Choose `"standard"` (default; sends direct zone setpoint) or `"demand_driven"` (**Smart Bounded Overdrive**) for TRVs whose internal proportional algorithm pinches/closes too early before the room reaches target.
+  * **Emitter Type (`emitter_type`)**: Choose `radiator` *(default)*, `underfloor`, or `fancoil` to tailor flow curves and safety ceilings.
+  * **Base Target Temperature (`target_temperature`)**: Initial setpoint (default: `20.0 °C`, configurable in `0.1 °C` increments).
+  * **Setpoint Temperature Step (`target_temp_step`)**: Choose `0.5° (Standard)` *(default)* or `0.1° (Fine / High-Resolution Sensor)` per zone; outbound physical TRV commands still round to each valve's hardware step.
+* **▶ Smart Radiator TRVs (`trv_settings`)** <span class="badge-stable">STABLE</span>:
+  * **`climate_entities`**: Select one or more smart radiator valves (`climate.*`). The system averages temperatures and syncs setpoints.
+  * **`trv_preset_sync`**: Synchronize presets to TRVs when supported (default: `False`).
+  * **`authoritative_climate_sync`**: Opt-in authoritative mode allowing physical wall thermostats/TRVs to drive zone OFF/HEAT mode (default: `False`).
+  * **TRV Calibration Mode (`trv_calibration_mode`)**: Choose `"auto"` *(default)*, `"offset"`, `"external_temperature"`, or `"disabled"` (recommended for TRVs using native Matter/Zigbee binding to external room sensors; skips all calibration writes/heartbeats while keeping `demand_driven` active).
+  * **TRV Control Mode (`trv_control_mode`)**: Choose `"standard"` *(default; sends direct zone setpoint)* or `"demand_driven"` (**Smart Bounded Overdrive**) for TRVs whose internal proportional algorithm pinches/closes too early before the room reaches target.
   * **Demand-Driven Tuning**: Configure `trv_open_boost` (default `+1.5 °C`, range `0.0–5.0 °C`) and `trv_close_offset` (default `1.0 °C`, range `0.0–5.0 °C`). Uses zone PID demand hysteresis (`>= 5.0%` opens, `<= 0.0%` closes), `60 s` anti-chatter debounce, `10 s` evaluation tick, and an idle no-chatter guard. Compatible with `physical_sync` relative deltas and automatically reverts to `"standard"` mode if `safety_fallback_active` triggers.
-* **▶ Proportional & 0-10V Analog Actuators** <span class="badge-stable">STABLE</span>:
+* **▶ Proportional & 0-10V Analog Actuators (`valve_settings`)** <span class="badge-stable">STABLE</span>:
   * For gradual motorized valves or 0–10V dimmer modules (`valve.*` or `number.*`).
-  * **Valve Scale**: Choose between **Percentage (0–100%)** or **Voltage (0.0–10.0 V)**.
-* **▶ Relay Actuators (PWM)** <span class="badge-stable">STABLE</span>:
-  * Electrothermal actuators driven via time-proportional cycles.
-* **▶ Room Split Air Conditioners** <span class="badge-beta">BETA</span>:
-  * Associate an individual split unit (`climate.*`).
-  * **Operational Role**: `heat_cool` (all year), `heating_only` (winter boost), `cooling_only` (summer cooling).
-  * **Ceiling Sensor Bypass (Real Sensor Injection)**: Enabled by default. Injects a compensated target to prevent premature throttling caused by ceiling heat pooling.
-  * **Quick Heat Boost**: Fires the split at maximum power alongside radiators when starting cold (ΔT ≥ 1.5 °C).
-* **▶ Protections & Advanced** <span class="badge-stable">STABLE</span>:
-  * **Window Sensors**: Automatically halts heating/cooling when windows are opened.
-  * **Sensor Watchdog Timeout**: Maximum minutes before declaring a wireless sensor offline and switching to TRV internal sensors.
-  * **Summer Anti-Seize & Passive Heat Intake**.
+  * **Valve Scale (`valve_scale`)**: Choose between **Percentage (0–100%)** *(default: `percent`)* or **Voltage (0.0–10.0 V)** (`volt`).
+  * **Invert Valve (`invert_valve`)**: Default `False`. Enable for **Normally Open (NO) / reverse-acting proportional actuators** (`effective_pct = 100.0 - target_pct`, mapped to 0–100% or 0.0–10.0 V).
+* **▶ Relay Actuators (`relay_settings`)** <span class="badge-stable">STABLE</span>:
+  * Electrothermal actuators (`switch_entities`) driven via time-proportional PWM cycles.
+  * **Invert Switch (`invert_switch`)**: Default `False`. Enable for **Normally Open (NO)** zone relays: sends `switch.turn_off` (de-energizes to open NO valve) when PWM demand is active, and `switch.turn_on` (energizes to close) when idle or `OFF`.
+* **▶ Room Split Air Conditioners (`split_settings`)** <span class="badge-beta">BETA</span>:
+  * Associate an individual split unit (`split_climate_entity`: `climate.*`).
+  * **Operational Role (`split_role`)**: `heat_cool` *(default, all year)*, `heating_only` (winter boost), `cooling_only` (summer cooling).
+  * **Solar Priority (`split_solar_priority`)**: Default `True`. Allows solar PV surplus to dispatch the split ahead of gas heating.
+  * **Quick Heat Boost (`split_quick_boost` / `split_boost_delta`)**: Default `False` (`split_boost_delta` default `1.5 °C`). When enabled, fires the split alongside radiators when starting cold ($\Delta T \ge 1.5^\circ\text{C}$).
+  * **Ceiling Sensor Bypass (`split_sensor_injection`)**: Default `True`. Injects a compensated target to prevent premature throttling caused by ceiling heat pooling.
+* **▶ Protections & Advanced (`safety_settings`)** <span class="badge-stable">STABLE</span>:
+  * **Window Sensor (`window_sensor`)**: Optional contact sensor (`binary_sensor.*`) that halts heating/cooling when windows open.
+  * **Sensor Watchdog Timeout (`sensor_timeout_min`)**: Maximum minutes before declaring a wireless sensor offline and switching to TRV internal sensors (default: `240` min).
+  * **Zone Priority Weight (`weight`)**: Multiplier for `WEIGHTED_AVERAGE` plant demand aggregation (default: `1.0`).
+  * **Summer Anti-Seize (`anti_seize_zone_enable`)**: Periodic summer valve exercise (default: `True`).
+  * **Allow Passive Heat (`allow_passive_heat`)**: Suppresses false ghost-heating alerts in open spaces/fancoils without cutoff valves (default: `False`).
 
 ---
 
-#### Step 3: TRV Calibration, External Temperature Feed & Sensor Select
+#### Step 2b: TRV Calibration, External Temperature Feed & Sensor Select
 <span class="badge-stable">STABLE</span>
 
-When a zone uses smart TRVs alongside a primary room sensor:
-* **Calibration Mode (`trv_calibration_mode`)**:
-  * `"auto"` *(default)*: Auto-detects `external_temperature_input` in the calibration entity ID; otherwise falls back to offset mode.
-  * `"offset"`: Dynamically injects local temperature calibration offsets (`number.*`).
-  * `"external"`: For TRVs exposing `number.*external_temperature_input` (e.g. Sonoff TRVZB, Aqara, Tuya/Zigbee2MQTT), writes the room sensor temperature directly in °C (rounded to entity step, clamped to min/max) with a `1200 s` (20 min) anti-offline heartbeat keep-alive and a `60 s` jitter rate-limit on `<= 0.1 °C` deltas.
+Shown automatically after creating/editing a zone when `temp_sensor` and `climate_entities` are both configured:
+* **Calibration Entity per TRV**: Maps each `climate.*` TRV to its `number.*` offset or external temperature entity:
+  * `auto` *(default)*: Auto-detects external temp entities (matching keywords like `external_temperature_input`, `external_temp`, `remote_temp`, or wide `[-10..50]` bounds); otherwise uses offset calibration.
+  * `offset`: Dynamically writes local calibration offsets (`number.*`), protected by a `0.25 °C` error deadband, `180 s` write cooldown, `300 s` settle anti-ratchet window, and `offset_stalled` detection after 2 unresponsive writes.
+  * `external_temperature`: For TRVs exposing `number.*external_temperature_input` (e.g. Sonoff TRVZB, Aqara, Tuya/Zigbee2MQTT), writes the room sensor temperature directly in °C (rounded to entity step, clamped to min/max) with a `1200 s` (20 min) anti-offline heartbeat keep-alive and a `60 s` jitter rate-limit on `<= 0.1 °C` deltas.
+  * `disabled`: Disables all calibration writes and external-temperature heartbeats while keeping `demand_driven` valve overdrive active—recommended when TRVs use **native Matter or Zigbee binding** (e.g., Eve Thermo bound directly to external sensors) to avoid offset ratcheting.
 * **TRV Sensor Source Select (`trv_sensor_selects`)** *(Optional)*:
   * Maps each TRV `climate.*` entity to its `select.*` sensor-source entity directly in the Setup/Options **TRV Calibration** screen.
   * Automatically switches the TRV to its external/remote sensor when active (excluding `"offline"` options such as `remote_source_offline`) and reverts cleanly to the internal/local sensor if `safety_fallback_active` triggers (stale or unavailable room sensor).
 
+*(Choose `add_another` to add more zones before continuing to plant-wide settings.)*
+
 ---
 
-#### Step 5: Solar Energy, PV & Battery Storage
+#### Step 3: Global Local Calendar (`calendar`)
+* **`global_calendar`** *(Optional)*: Select a Home Assistant `calendar.*` entity to drive house-wide preset transitions alongside or instead of the built-in Weekly Scheduler.
+
+#### Step 4: Weather Compensation (`weather`)
+* **`weather_sensor`**: Select an outdoor weather or temperature entity (`weather.*` or `sensor.*`, default `"none"`). Enables dynamic feed-forward adjustment via `number.master_control_weather_curve`.
+
+#### Step 5: Presence & Geofencing (`geofencing`)
+* **`geofencing_enabled`**: Enable presence-based Away/Home automation (default: `True`).
+* **`presence_sensor`**: Select the occupancy/zone entity monitored for geofencing (default: `"zone.home"`).
+
+#### Step 6: Solar Energy, PV & Battery Storage (`energy_management`)
 <span class="badge-beta">BETA</span>
 
-* **Solar Generation Sensor**: Real-time rooftop PV power in Watts (`sensor.*`).
-* **Grid Export Sensor**: Export power in Watts (optional for off-grid setups), with **Invert Grid Export (`grid_export_inverted`)** toggle if your meter reports export as negative.
-* **Battery SoC Sensor**: Household battery state of charge percentage (`sensor.*`).
-* **Battery Power Sensor**: Charge/discharge power in Watts with automatic polarity detection.
-* **Minimum Night Reserve SoC (`battery_min_reserve_soc`)**: Threshold (recommended 80–85%) below which electric heating is locked out.
-* **Continuous Discharge Safeguard (`battery_max_discharge_time`)**: Maximum consecutive minutes of battery discharge (> 150 W) before reverting to the gas boiler (default: 5 min).
-* **EMHASS / Predbat Bridge**: Deferrable load sensor (`sensor.p_deferrable0 > 0 W`) or boolean boost entity.
-* **Thermal Mass Storage Offset**: Room target boost (0.0 °C to +3.0 °C) to store free solar heat into building walls during peak generation.
+* **`energy_management_enabled`**: Master enable switch for solar surplus orchestration (default: `False`).
+* **`solar_power_sensor`**: Real-time rooftop PV generation in Watts (`sensor.*`).
+* **`grid_export_sensor`**: Grid export power in Watts (optional for off-grid setups), with **`grid_export_inverted`** (`False`) toggle if your meter reports export as negative.
+* **`solar_export_threshold`**: Minimum export surplus in Watts before solar heating triggers (default: `500.0 W`).
+* **`battery_soc_sensor`**: Household battery state of charge percentage (`sensor.*`).
+* **`battery_power_sensor`**: Battery charge/discharge power in Watts (convention: **positive = charging**, **negative = discharging**). Enable **`battery_power_inverted`** (`False`) if your inverter reports positive values when discharging.
+* **`battery_min_reserve_soc`**: Minimum battery SoC floor below which electric heating is locked out (default: `20.0%`; `50–85%` recommended if preserving overnight backup).
+* **`battery_max_discharge_time`**: Maximum consecutive minutes of battery discharge (> 150 W) before reverting to the gas boiler (default: `5` min).
+* **`solar_min_run_time`**: Minimum compressor run time anti-chatter protection in minutes (default: `10` min).
+* **`solar_overheat_offset`**: Target boost (`0.0 °C` to `+3.0 °C`, default `0.0 °C`) to store free solar heat into building walls during peak generation.
+* **`solar_forecast_sensor`** / **`solar_irradiance_sensor`** *(Optional)*: PV forecast (`W`/`kWh`) and solar irradiance (`W/m²`/`lux`) sensors.
+* **`external_solar_override_entity`**: EMHASS deferrable load sensor (`sensor.p_deferrable0 > 0 W`) or boolean Predbat signal.
+
+#### Step 7: Review & Confirm (`confirm`)
+Displays the final summary of your configured generators, zones, and global integrations before creating the Home Assistant entry.
 
 ---
 
@@ -133,14 +169,17 @@ At any time after initial installation, you can adjust settings without losing l
 
 1. Navigate to **Settings → Devices & Services**.
 2. Click on **Multizone Thermostat** and select **Configure**.
-3. Choose from the available options:
+3. Choose from the 9 Options Flow menu actions:
 
-* **Modify Central Generators**: Add or remove boiler/heat pump, switch between Relay and OpenTherm, or update water temperature limits.
-* **Configure Solar & Battery Management**: Adjust surplus thresholds, battery timeouts, EMHASS entities, and thermal overheating offsets.
-* **Add New Thermal Zone**: Add a new room with the guided wizard.
-* **Edit Existing Zone**: Reassign actuators, add a room split AC, configure window sensors, or adjust passive heat.
-* **Remove a Thermal Zone**: Cleanly delete a zone and its associated entities.
-* **Edit Calendar, Weather Curve, or Geofencing**: Update weather sensors or presence devices.
+* **Change boiler / plant mode (`change_boiler`)**: Enable/disable gas heating (`enable_gas_heater`), switch between Relay PWM, OpenTherm Modulating, or Centralized Condo, and update flow limits or `dhw_active_sensor`.
+* **Edit Heat Pump (PDC) (`edit_heat_pump`)**: Enable/disable the central hydronic heat pump (`enable_heat_pump`), update `heat_pump_type`, heating/cooling water ranges, or `has_mixing_valve`.
+* **Edit Solar & Energy Management (`edit_energy_management`)**: Adjust PV/export/battery sensors, sign-inversion toggles, battery timeouts, EMHASS entities, and thermal overheating offsets.
+* **Add a zone (`add_zone`)**: Add a new room (and map TRV calibration entities).
+* **Edit a zone (`edit_zone`)**: Reassign actuators, update `target_temp_step` (`0.5°`/`0.1°`), toggle `invert_switch` / `invert_valve`, update `trv_calibration_mode`, add a room split AC, or adjust protections.
+* **Remove a zone (`remove_zone`)**: Cleanly delete a zone and its associated entities.
+* **Edit Weather Compensation (`edit_weather_comp`)**: Update the outdoor `weather_sensor`.
+* **Edit Geofencing Settings (`edit_geofencing`)**: Toggle geofencing or change `presence_sensor`.
+* **Edit Global Calendar (`edit_calendar`)**: Select or clear `global_calendar`.
 
 ---
 
@@ -150,28 +189,30 @@ Use this reference table to find exactly where to activate and tune every single
 
 | Feature | Location in Home Assistant UI | Configuration Keys / Entities |
 |---|---|---|
-| **Gas Boiler (Relay PWM / OpenTherm)** | *Configure → Modify Central Generators* | `boiler_mode`, `boiler_switch`, `opentherm_entity`, `opentherm_min_temp`, `opentherm_max_temp` |
-| **Central Hydronic Heat Pump (PDC)** | *Configure → Modify Central Generators* | `enable_heat_pump`, `heat_pump_type`, `heat_pump_entity`, `heat_pump_cooling` |
-| **Heat Source Priority (5 Modes)** | *Lovelace Preset Card* or Entity Controls | `select.master_control_heat_source_priority` (`auto`, `hybrid`, `combined`, `electric_only`, `gas_only`) |
+| **Gas Boiler (Relay PWM / OpenTherm / Central)** | *Configure → Change boiler / plant mode* | `enable_gas_heater`, `boiler_mode`, `boiler_switch`, `opentherm_entity`, `opentherm_min_temp`, `opentherm_max_temp`, `dhw_active_sensor`, `has_mixing_valve` |
+| **Central Hydronic Heat Pump (PDC)** | *Configure → Edit Heat Pump (PDC)* | `enable_heat_pump`, `heat_pump_type`, `heat_pump_entity`, `heat_pump_cooling`, `heat_pump_min_temp`, `heat_pump_max_temp`, `hp_cool_min_temp`, `hp_cool_max_temp`, `heat_pump_ch_switch` |
+| **Heat Source Priority (7 Modes)** | *Lovelace Preset Card* (5 core pills) or Entity Controls (all 7) | `select.master_control_heat_source_priority` (`auto`, `hybrid`, `combined`, `electric_only`, `gas_only`, `gas_priority`, `electric_priority`) |
 | **Seasonal Mode (Heat 🔥 / Cool ❄️)** | *Lovelace Preset Card* (Slider) or Entity | `select.master_control_master_operation_mode` (`heat`, `cool`) |
-| **Room Split Air Conditioners** | *Configure → Edit Zone → [Room] → Room Split AC* | `split_climate_entity`, `split_role` (`heat_cool`, `heating_only`, `cooling_only`) |
-| **Ceiling Sensor Bypass (Target Injection)** | *Configure → Edit Zone → [Room] → Room Split AC* | `split_sensor_injection: True` (enabled by default) |
-| **Quick Heat Boost (Thermal Shock)** | *Configure → Edit Zone → [Room] → Room Split AC* | `split_quick_boost: True`, threshold `split_boost_delta` (default: 1.5 °C) |
+| **Room Split Air Conditioners** | *Configure → Edit a zone → [Room] → Room Split AC* | `split_climate_entity`, `split_role` (`heat_cool`, `heating_only`, `cooling_only`), `split_solar_priority` |
+| **Ceiling Sensor Bypass (Target Injection)** | *Configure → Edit a zone → [Room] → Room Split AC* | `split_sensor_injection` (default: `True`) |
+| **Quick Heat Boost (Thermal Shock)** | *Configure → Edit a zone → [Room] → Room Split AC* | `split_quick_boost` (default: `False`), `split_boost_delta` (default: `1.5 °C`) |
 | **Single-Room Split Manual Button** | *Lovelace Dial Card* (Header center) | Automatically visible for rooms with split (active when Master is OFF, locked when Master is ON) |
-| **Automatic Dashboard Summer Filter** | *Dial Card YAML Configuration* | Card option: `hide_if_cannot_cool: true` |
+| **Automatic Dashboard Summer Filter** | *Dial Card Editor / YAML Configuration* | Card option: `hide_if_cannot_cool: true` (opt-in) |
 | **Card Visual Style (Classic vs Luxury)** | *Dial Card YAML Configuration* | Card option: `card_style: classic` or `luxury` |
-| **Solar Surplus & Inverter Anti-Clipping** | *Configure → Configure Solar & Batteries* | `solar_power_sensor`, `battery_soc_sensor`, `battery_power_sensor` |
-| **Battery Discharge Safeguard** | *Configure → Configure Solar & Batteries* | `battery_max_discharge_time` (default: 5 min before gas fallback) |
-| **Minimum Night Reserve SoC** | *Configure → Configure Solar & Batteries* | `battery_min_reserve_soc` (recommended 80–85%) |
-| **Thermal Pre-Storage (Wall Overheating)** | *Configure → Configure Solar & Batteries* | `solar_overheat_offset` (0.0 °C to +3.0 °C) |
-| **AI Optimizer Bridge (EMHASS / Predbat)** | *Configure → Configure Solar & Batteries* | `external_solar_override_entity` (Watt sensor or boolean) |
-| **Boiler Anti-Short-Cycle Protection** | *Settings → Devices & Services → Master Entities* | `number.master_control_min_cycle_on` and `min_cycle_off` (default: 5 min) |
-| **Motorized Valve Opening Delay & TRV Guard** | *Settings → Devices & Services → Master Entities* | `number.master_control_valve_delay` (default: 0 sec, 90-120s recommended; runs after the automatic up to 120 s `HOLD_TRV_CLOSED` guard) |
-| **Summer Anti-Seize Valve Exercise** | *Settings → Devices & Services → Master Entities* | `number.master_control_anti_seize_idle_days` (15 days) and `duration` (2 min) |
-| **Emergency Anti-Frost Protection** | *Settings → Devices & Services → Master Entities* | `number.master_control_anti_frost_temperature` (default: 7.0 °C) |
-| **Window Open Contact Sensor** | *Configure → Edit Zone → [Room] → Protections* | `window_sensor` (`binary_sensor.*`) |
-| **TRV Calibration & External Temp Feed** | *Configure → Edit Zone → [Room] → TRV Calibration* | `trv_calibration_mode` (`auto`, `offset`, `external`), `number.*external_temperature_input` / offset entity, `trv_sensor_selects` (`select.*`) |
-| **TRV Demand-Driven Valve Mode** | *Configure → Edit Zone → [Room] → Smart Radiator TRVs* | `trv_control_mode` (`standard`, `demand_driven`), `trv_open_boost` (`0.0–5.0 °C`, default `1.5 °C`), `trv_close_offset` (`0.0–5.0 °C`, default `1.0 °C`) |
-| **Proportional 0–100% or 0–10V Valves** | *Configure → Edit Zone → [Room] → Proportional Valves* | `valve_entities`, scale `percent` (0-100%) or `volt` (0-10.0 V) |
-| **Weekly Matrix Scheduling** | *Lovelace Scheduler Card* | 24-hour visual matrix with profiles (Standard, Weekend, Smart Working, Custom) |
-| **Predictive Smart Return** | *Lovelace Scheduler Card* or HA Service | `multizone_thermostat.set_smart_return` |
+| **Solar Surplus & Inverter Anti-Clipping** | *Configure → Edit Solar & Energy Management* | `solar_power_sensor`, `grid_export_sensor`, `grid_export_inverted`, `solar_export_threshold` (`500.0 W`), `battery_soc_sensor`, `battery_power_sensor`, `battery_power_inverted`, `solar_forecast_sensor`, `solar_irradiance_sensor` |
+| **Battery Discharge Safeguard** | *Configure → Edit Solar & Energy Management* | `battery_max_discharge_time` (default: `5` min before gas fallback) |
+| **Minimum Night Reserve SoC** | *Configure → Edit Solar & Energy Management* | `battery_min_reserve_soc` (default: `20.0%`, recommended `50–85%`) |
+| **Thermal Pre-Storage (Wall Overheating)** | *Configure → Edit Solar & Energy Management* | `solar_overheat_offset` (`0.0 °C` to `+3.0 °C`) |
+| **AI Optimizer Bridge (EMHASS / Predbat)** | *Configure → Edit Solar & Energy Management* | `external_solar_override_entity` (Watt sensor or boolean) |
+| **Boiler & HP Anti-Short-Cycle Protection** | *Settings → Devices & Services → Master Control* | `number.master_control_min_cycle_on` / `off` (`0–60 min`, default: `5`); `number.master_control_heat_pump_min_cycle_on` / `off` (`0–30 min`, default: `5`) |
+| **Motorized Valve Opening Delay & TRV Guard** | *Settings → Devices & Services → Master Control* | `number.master_control_valve_delay` (default: `0` s, 90–120 s recommended; runs after the automatic up to `120 s` `HOLD_TRV_CLOSED` guard) |
+| **Summer Anti-Seize Valve Exercise** | *Settings → Devices & Services → Master Control* | `number.master_control_anti_seize_idle_days` (`1–30`, default: `15` days) and `duration` (default: `2` min) |
+| **Emergency Anti-Frost Protection** | *Settings → Devices & Services → Master Control* | `number.master_control_anti_frost_temperature` (`5.0–16.0 °C`, default: **`12.0 °C`**) & `number.master_control_frost_protection_flow_temp` (`25.0–55.0 °C`, default: `40.0 °C`, modulating/HP plants) |
+| **Window Open Contact Sensor** | *Configure → Edit a zone → [Room] → Protections & Advanced* | `window_sensor` (`binary_sensor.*`), `sensor_timeout_min` (default: `240`), `weight` (default: `1.0`) |
+| **TRV Calibration & External Temp Feed** | *Configure → Edit a zone → [Room] → Thermostatic Radiator Valves (TRV)* (+ *TRV Calibration* step) | `trv_calibration_mode` (`auto`, `offset`, `external_temperature`, `disabled`), `number.*` calibration entity, `trv_sensor_selects` (`select.*`) |
+| **TRV Demand-Driven Valve Mode** | *Configure → Edit a zone → [Room] → Thermostatic Radiator Valves (TRV)* | `trv_control_mode` (`standard`, `demand_driven`), `trv_open_boost` (`0.0–5.0 °C`, default `1.5 °C`), `trv_close_offset` (`0.0–5.0 °C`, default `1.0 °C`) |
+| **Proportional 0–100% or 0–10V & NO/NC Valves** | *Configure → Edit a zone → [Room] → Proportional & 0-10V Valves* | `valve_entities`, `valve_scale` (`percent` / `volt`), `invert_valve` (Normally Open / inverted scale) |
+| **Per-Zone Setpoint Step (`0.5°` / `0.1°`)** | *Configure → Edit a zone → [Room] → Main Settings* | `target_temp_step` (`0.5` or `0.1`), `target_temperature` (`0.1°` step) |
+| **PWM Relay & Normally Open (NO) Actuators** | *Configure → Edit a zone → [Room] → Relay Actuators (PWM)* | `switch_entities`, `invert_switch` (Normally Open actuator inversion) |
+| **Weekly Matrix Scheduling** | *Lovelace Scheduler Card* | 24-hour visual matrix with 3 built-in profiles (`Standard`, `Smart Working`, `Holiday`) + Custom |
+| **Predictive Smart Return** | *Lovelace Scheduler Card* or HA Service | `multizone_thermostat.set_smart_return` (up to `6.0 h` lookahead) |
