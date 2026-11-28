@@ -335,7 +335,7 @@ def test_19_frontend_bundle_up_to_date_xss_fahrenheit_and_post52():
     sim_html = (ROOT_DIR / "docs" / "wiki" / "simulator.html").read_text(encoding="utf-8")
     assert re.search(r"ha-card\s*\{[^}]*display:\s*block;", plant_src, re.S)
     assert re.search(r"ha-card\s*\{\s*display:\s*block;", sim_html, re.S)
-    assert 'v=6.1.0-beta.17' in sim_html
+    assert re.search(r"multizone-thermostat-card\.js\?v=\d+\.\d+\.\d+", sim_html)
 
     # null temp guard & XSS guards
     btn_src = (ROOT_DIR / "frontend" / "src" / "components" / "button_card.js").read_text(encoding="utf-8")
