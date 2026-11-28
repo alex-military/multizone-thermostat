@@ -206,3 +206,13 @@ def test_relay_backend_adaptive_pwm_and_phase_locked_sync():
         t[0] = 460.0
         assert pwm_boiler.calculate(50.0) is False
         assert pwm_valve.calculate(50.0) is False
+
+
+def test_phase_locked_cold_start_second_half_fires_immediately():
+    """Starting from idle in the 2nd half of a phase-locked grid must ignite immediately."""
+    t = [720.0]  # 720 % 900 == 720s >= 450s (past 50% duty mark)
+    with patch("time.monotonic", side_effect=lambda: t[0]):
+        pwm = PWMEngine(pwm_interval=900.0, phase_locked=True)
+        assert pwm.calculate(50.0) is True
+        assert pwm.cycle_start_time == 720.0
+

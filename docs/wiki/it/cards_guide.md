@@ -21,7 +21,7 @@ Un termostato circolare evoluto concepito come **Visual Twin 1-a-1** del compone
 
 ### Funzionalità Esclusive (v6.1.0-beta)
 * **Regolazione Rapida al Tocco (Direct Arc Touch)**: Puoi toccare o cliccare direttamente in qualsiasi punto dell'arco circolare per impostare all'istante la temperatura desiderata, senza dover trascinare la manopola.
-* **Pulsanti Step `[-]` e `[+]` Circolari**: Due pulsanti ergonomici posizionati simmetricamente nell'apertura inferiore dell'arco per incrementare o decrementare il setpoint a passi di $0.5^\circ\text{C}$ con un solo click.
+* **Pulsanti Step `[-]` e `[+]` Circolari**: Due pulsanti ergonomici posizionati simmetricamente nell'apertura inferiore dell'arco per incrementare o decrementare il setpoint a passi di **`0.5 °C` o `0.1 °C`** in base al `target_temp_step` configurato per la zona (con drag sull'arco e tooltip dinamici).
 * **Badge Dinamico della Sorgente Attiva (In alto a sinistra)**:
   * `🔥 GAS` (Arancione): Riscaldamento alimentato dalla caldaia idronica centrale a gas.
   * `⚡ ELETTRICO` (Celeste): Climatizzazione alimentata dallo split d'ambiente locale o dalla pompa di calore.
@@ -48,7 +48,7 @@ border_radius: "20px"        # Raggio di curvatura angoli della scheda
 
 Barra di supervisione globale che unisce il controllo stagionale, la priorità energetica e i profili di comfort in un'unica scheda ad **altezza costante garantita**:
 
-* **Selettore Priorità Calore Segmentato**: Selettore orizzontale a pillola per alternare le 5 priorità (`Auto`, `Ibrido`, `Combinato`, `Elettrico`, `Gas`).
+* **Selettore Priorità Calore Segmentato**: Selettore orizzontale a pillola per le 5 priorità principali (`Auto`, `Ibrido`, `Combinato`, `Elettrico`, `Gas`); tutte e 7 le modalità (incluse `gas_priority` ed `electric_priority`) restano selezionabili su `select.master_control_heat_source_priority`.
 * **Transizione Estiva Identica**: In modalità raffrescamento estivo, il selettore priorità viene sostituito dal badge estetico `❄️ Raffrescamento Elettrico` con la **stessa identica altezza**, mantenendo le dimensioni della card perfettamente invariate tra estate e inverno.
 * **Switch Scorrevole Stagionale (Caldo 🔥 / Freddo ❄️)**: Commuta all'istante l'intera casa tra riscaldamento e climatizzazione estiva.
 * **Pulsanti Preset a Doppio Binario**: Richiamo istantaneo di `Manuale`, `Eco`, `Comfort`, `Notte`, `Fuori Casa` con memorizzazione indipendente tra estate e inverno.
@@ -100,7 +100,7 @@ title: Camera Matrimoniale
 L'interfaccia visuale della programmazione oraria settimanale:
 
 * **Timeline 24h a Matrice di Colori**: Mostra graficamente la sequenza dei blocchi orari per tutte le zone, inclusa la riga master **"🏠 Tutte le Zone (Generale)"**, blocchi tratteggiati di baseline, blocchi ambra di override manuale e layout responsive con etichette fisse su mobile/colonne strette.
-* **Modifica al Tocco**: Regolazione intuitiva di orari e preset associati per ogni stanza.
+* **Modifica al Tocco**: Regolazione intuitiva di orari e preset associati per ogni stanza; i campi temperatura dei preset ereditano automaticamente il `target_temp_step` (`0.5°` o `0.1°`) della zona.
 * **Pianificazione Rientro Intelligente ("Smart Return")**: Pulsante integrato per impostare l'orario di rientro desiderato con calcolo automatico dell'anticipo termico per ciascuna stanza.
 
 ```yaml
@@ -113,10 +113,10 @@ type: custom:multizone-thermostat-scheduler-card
 
 Scheda di supervisione tecnica della centrale termica e telemetria caldaia:
 
-* **Indice di Salute Impianto**: Punteggio percentuale globale della salute idraulica dell'edificio.
+* **Stato Salute Impianto**: Badge testuale dello stato idraulico globale (`Optimal`, `Warning` o `Critical`) con motivazioni dettagliate.
 * **Frequenza di Accensione Caldaia (Short-Cycle)**: Monitoraggio dei cicli/ora con allarme visivo in caso di usura elevata (> 5 cicli/ora).
 * **Telemetria OpenTherm**: Pressione del circuito (Bar), temperatura di mandata e ritorno con calcolo del $\Delta T$, modulazione istantanea della fiamma in % e codici di errore della caldaia.
-* **Riepilogo Anomalie Attive**: Elenco dinamico dei guasti idraulici riscontrati in casa (valvole bloccate, aria nei termosifoni o trafilamenti).
+* **Riepilogo Anomalie Attive**: Elenco dinamico dei guasti idraulici riscontrati in casa (valvole bloccate > 75 min, TRV non in apertura, trafilamenti o overshoot).
 
 ```yaml
 type: custom:multizone-thermostat-plant-card
@@ -128,11 +128,11 @@ type: custom:multizone-thermostat-plant-card
 
 Visualizza le prestazioni dell'involucro edilizio e i parametri termici fisici della singola stanza:
 
-* **Classe Energetica Europea (A4 → G)**: Calcolata matematicamente dalla curva di dispersione naturale e dal salto termico interno/esterno.
+* **Classe Energetica Europea (A4 → G)**: Calcolata dal coefficiente di Newton `k_loss` indipendente dal meteo, protetta contro finestre aperte, correnti d'aria (anche senza sensori tramite rimbalzo muri + blocco 40 min) e picchi anomali.
 * **Tempo di Ritenzione Termica**: Numero di ore necessarie all'ambiente per perdere $1.0^\circ\text{C}$ a riscaldamento spento.
 * **Dimensionamento Radiatore**: Valutazione dell'adeguatezza della potenza installata (Sottodimensionato, Ottimale, Sovradimensionato).
 * **Livello Batteria TRV**: Monitoraggio universale dello stato di carica delle valvole termostatiche Zigbee / Z-Wave.
-* **Pannello PID Stagionale Live**: Mostra i guadagni `Kp`, `Ki`, `Kd` della stagione attiva (`heat`/`cool`) in 3 riquadri di sola lettura con modali protette per sblocco manuale, seeding Auto EMA (`seed_autotuner`) e backup/ripristino pre-reset dell'autotuner.
+* **Pannello PID Stagionale Live**: Mostra i valori `Kp`, `Ki` e `Kd` della stagione attiva (`heat`/`cool`) in 3 riquadri interattivi. Facendoci clic si apre il modal protetto con le schede **Override Manuale** e **Baseline Auto EMA** (`Kp: 0.1–500`, `Ki: 0.0–10.0`, `Kd: 0.0–50000`, modalità PI puro preservata con `Kd = 0.0`) e il pulsante **Ripristina Backup** pre-reset quando disponibile.
 * **Controlli Interattivi**: Possibilità di ciclare la modalità della stanza o abilitare l'Apporto Passivo direttamente dalla card.
 
 ```yaml
@@ -142,12 +142,28 @@ entity: climate.multizone_thermostat_salone
 
 ---
 
-## 8. Generazione Automatica della Dashboard (Strategy)
+## 8. Card Adattiva Grafici & Telemetria (`custom:multizone-thermostat-telemetry-card`)
+<span class="badge-beta">BETA</span>
+
+Studio grafico SVG nativo a schermo intero (griglia **2×2**) con **autodiscovery al 100%** e zero dipendenze esterne da HACS (accessibile tramite il pulsante **Grafici & Telemetria** sulla Plant Card, il pulsante **Grafici** su ogni Zone Energy Card o la subview dedicata `telemetria`):
+
+* **Motore SVG Nativo Zero-Dipendenze**: Grafici a doppio asse Y alimentati direttamente dallo storico nativo Recorder di Home Assistant (`6h` / `24h` / `48h` / `7g`), con crosshair e tooltip interattivi al passaggio del mouse/tap.
+* **Grafici Impianto Adattivi al Generatore**: Commuta automaticamente la vista in base a `boiler_type` (`opentherm`: Mandata/Ritorno/Condensa `55 °C`/Modulazione/ACS + `ΔT`; `relay`: `Master Demand` + impulsi PWM singolo ciclo + `cicli/h`; `heat_pump`: PDC/Esterna + Batteria SoC/Surplus FV; `centralized`: Demand + runtime), affiancata dal grafico **Contributo Zone vs Master Demand**.
+* **Grafici Zona Adattivi a Modalità e Attuatore**: Temperatura/Setpoint/Domanda (con fasce grigie `window_open` e impulsi PWM ON/OFF), modello fisico a 7 giorni (`Heating Rate`, `Cooling Rate`, `Thermal Inertia`, `k_loss`), scomposizione live **`P / I / D / Weather FF`** (oppure `Errore ΔT` vs banda `±0.3 °C` in fase Isteresi) e barre visuali di bilancio output.
+* **Pulsante Rapido `📋 Copia Snapshot Supporto`**: Copia negli appunti un riepilogo diagnostico pulito con stato impianto/zona, guadagni PID, termini P/I/D live e parametri termici per facilitare segnalazioni su GitHub o Forum.
+
+```yaml
+type: custom:multizone-thermostat-telemetry-card
+```
+
+---
+
+## 9. Generazione Automatica della Dashboard (Strategy)
 
 Non desideri creare manualmente la dashboard e scrivere codice YAML per ogni singola card? Puoi sfruttare le strategie native che scoprono in tempo reale tutte le zone e compongono la vista automaticamente.
 
 ### Strategia Termostati Principale (`custom:multizone-thermostat-dashboard`)
-Costruisce automaticamente l'intera dashboard con Master Switch, Global Preset Card e tutte le Dial Card disposte su griglia responsive:
+Costruisce automaticamente l'intera dashboard con barra di navigazione (`multizone-thermostat-nav-card`), Master Switch, Global Preset Card e tutte le Dial Card disposte su griglia responsive:
 
 ```yaml
 views:
@@ -157,6 +173,18 @@ views:
     strategy:
       type: custom:multizone-thermostat-dashboard
       columns: 3   # Colonne responsive (1, 2, 3 o 4 colonne)
+```
+
+### Strategia Programmazione Settimanale (`custom:multizone-thermostat-scheduler`)
+Genera automaticamente la vista completa della matrice oraria 24h:
+
+```yaml
+views:
+  - title: Programmazione
+    path: programmazione
+    icon: mdi:calendar-clock
+    strategy:
+      type: custom:multizone-thermostat-scheduler
 ```
 
 ### Strategia Diagnostica & Efficienza (`custom:multizone-thermostat-diagnostics`)
@@ -172,10 +200,27 @@ views:
       columns: 3
 ```
 
+### Strategia Grafici & Telemetria (`custom:multizone-thermostat-telemetry`)
+Genera la subview dedicata a schermo intero 2×2 per i grafici SVG di impianto e stanze:
+
+```yaml
+views:
+  - title: Grafici & Telemetria
+    path: telemetria
+    icon: mdi:chart-areaspline
+    subview: true
+    panel: true
+    strategy:
+      type: custom:multizone-thermostat-telemetry
+```
+
+> [!NOTE]
+> Il bundle registra anche i componenti ausiliari usati internamente dalle strategie: `custom:multizone-thermostat-nav-card`, `custom:multizone-thermostat-schedule-summary-card`, `custom:multizone-thermostat-health-summary-card`, `custom:multizone-thermostat-style-switcher`, `custom:multizone-thermostat-responsive-grid` e `custom:multizone-thermostat-spacer`.
+
 ---
 
 ## 🎮 Prova le Card nel Simulatore Live
 
-Puoi testare interattivamente tutte le card, la commutazione caldo/freddo, il tocco sull'arco e i pulsanti step direttamente nella pagina dedicata:
+Puoi testare interattivamente tutte le card, la commutazione caldo/freddo, il tocco sull'arco, i pulsanti step e la nuova pagina Grafici & Telemetria direttamente nella pagina dedicata:
 
-👉 [**Vai al Simulatore Live Ufficiale (3 Dashboard)**](simulator_view.md) oppure [**Apri a Schermo Intero in una Nuova Scheda ↗**](simulator.html)
+👉 [**Vai al Simulatore Live Ufficiale (4 Dashboard)**](simulator_view.md) oppure [**Apri a Schermo Intero in una Nuova Scheda ↗**](simulator.html)

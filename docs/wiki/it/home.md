@@ -3,8 +3,8 @@
 Benvenuto nella documentazione ufficiale di **Multizone Thermostat**, l'integrazione personalizzata più avanzata, modulare e completa mai realizzata per la termoregolazione e la climatizzazione intelligente in Home Assistant.
 
 <div class="callout-beta">
-  <strong>Novità v6.1.0-beta.10 (Ramo Beta)</strong><br>
-  La versione v6.1.0-beta introduce il supporto completo a <strong>centrali termiche bivalenti (Caldaia + Pompa di Calore)</strong>, <strong>riscaldamento centralizzato condominiale</strong> (senza switch caldaia), gestione dei <strong>climatizzatori split per singola stanza</strong> con bypass sonda a soffitto, ottimizzazione per <strong>fotovoltaico e batterie Off-Grid</strong> con bridge EMHASS/Predbat, commutazione stagionale <strong>Caldo 🔥 / Freddo ❄️</strong> con doppio binario di preset e PID (controlli manuali per zona ed EMA settimanale), <strong>protezione punto di rugiada e tetto pavimento 40 °C</strong> e schede grafiche <strong>Visual Twin 1-a-1</strong> con il termostato nativo di Home Assistant.
+  <strong>Novità v6.1.0-beta.19 (Ramo Beta)</strong><br>
+  La serie v6.1.0-beta introduce il supporto completo a <strong>centrali termiche bivalenti (Caldaia + Pompa di Calore)</strong>, <strong>riscaldamento centralizzato condominiale</strong> (senza switch caldaia), gestione dei <strong>climatizzatori split per singola stanza</strong> con bypass sonda a soffitto, ottimizzazione per <strong>fotovoltaico e batterie Off-Grid</strong> con bridge EMHASS/Predbat, commutazione stagionale <strong>Caldo 🔥 / Freddo ❄️</strong> con doppio binario di preset e PID (autotuner FOPDT coerente, derivata ai minimi quadrati su 15 min, anti-windup, diagnostica live <code>pid_state</code> / <code>pid_state_cool</code> ed EMA settimanale), supporto <strong>attuatori Normalmente Aperti (NO) / invertiti</strong>, modalità <strong>TRV <code>Disabled</code></strong> per binding nativo Matter/Zigbee con protezione anti-ratchet, <strong>protezione punto di rugiada e tetto pavimento 40 °C</strong> e schede grafiche <strong>Visual Twin 1-a-1</strong>.
 </div>
 
 ---
@@ -16,7 +16,7 @@ Benvenuto nella documentazione ufficiale di **Multizone Thermostat**, l'integraz
 Nei moderni edifici residenziali la termoregolazione è spesso frammentata: caldaie a condensazione gestite da un termostato a parete, pompe di calore con la propria app proprietaria, condizionatori split controllati da telecomandi a infrarossi o integrazioni separate, valvole termostatiche TRV Zigbee con letture falsate dalla vicinanza ai termosifoni, e pannelli fotovoltaici che immettono energia in rete mentre la casa brucia gas fossile.
 
 **Multizone Thermostat unifica tutti questi sistemi sotto un'unica regia autonoma e intelligente:**
-* **Qualsiasi Generatore Termico**: Caldaie a gas/gasolio (Relè PWM o OpenTherm modulante), Pompe di Calore idroniche centralizzate, Stufe a pellet o biomassa, Resistenze elettriche.
+* **Qualsiasi Generatore Termico**: Caldaie a gas/gasolio/pellet (Relè PWM o OpenTherm modulante), Pompe di Calore idroniche centralizzate (aria-acqua), Climatizzatori Split d'ambiente (aria-aria) e Resistenze elettriche.
 * **Qualsiasi Terminale d'Ambiente**: Radiatori con valvole TRV, Riscaldamento a pavimento idronico, Ventilconvettori (Fancoil), Attuatori progressivi 0–10V o valvole 0–100%, Climatizzatori Split ad espansione diretta.
 * **Tutte e Quattro le Stagioni**: Riscaldamento invernale ad alta o bassa temperatura e Raffrescamento estivo continuo con gestione dell'inerzia termica.
 * **Energie Rinnovabili & Accumuli**: Ottimizzazione dell'autoconsumo fotovoltaico anche per impianti **Off-Grid a isola**, protezione della batteria domestica e interfacciamento con intelligenze previsionali (EMHASS, Predbat, Solcast).
@@ -47,7 +47,7 @@ Nessun'altra integrazione o termostato commerciale racchiude questa flessibilit�
 Le 11 caratteristiche fondamentali che distinguono il progetto da qualsiasi altra soluzione sul mercato:
 
 ### 1. Centrale Bivalente Ibrida (Caldaia a Gas + Pompa di Calore Idronica)
-L'orchestrazione (`PlantOrchestrator`) coordina simultaneamente o in alternativa la caldaia a combustibile e la pompa di calore centrale secondo **5 modalità di priorità selezionabili** (`auto`, `hybrid`, `combined`, `electric_only`, `gas_only`). Supporta la reversibilità estiva della PDC per fancoil o pavimento radiante escludendo tassativamente la caldaia a gas a 0%.
+L'orchestrazione (`PlantOrchestrator`) coordina simultaneamente o in alternativa la caldaia a combustibile e la pompa di calore centrale secondo **7 modalità di priorità selezionabili** (`auto`, `hybrid`, `combined`, `electric_only`, `gas_only`, `gas_priority`, `electric_priority`). Supporta la reversibilità estiva della PDC per fancoil o pavimento radiante escludendo tassativamente la caldaia a gas a 0%.
 
 ### 2. Climatizzatori Split d'Ambiente con Bypass Sonda a Soffitto
 Ogni singola stanza può associare il proprio condizionatore split (`climate.*`) per operare in sinergia con i termosifoni.
@@ -83,10 +83,10 @@ Se qualcuno ruota manualmente la manopola fisica di una valvola termostatica, il
 
 ### 9. Sorveglianza Continua delle Anomalie Meccaniche
 Un supervisore idraulico esamina le risposte termiche di ogni stanza, rilevando:
-* Valvole termostatiche bloccate chiuse.
-* Trafilamenti idraulici (*Ghost Heating* a valvola sigillata a 0%).
-* Presenza di bolle d'aria nei termosifoni.
-* Perdita di comunicazione con le sonde wireless (con passaggio istantaneo in sicurezza sulla sonda locale TRV).
+* Valvole termostatiche bloccate chiuse (`> 75 min` a domanda `>= 99%`).
+* TRV che non aprono (`trv_not_opening`) e blocco calibrazione su TRV non reattive (`offset_stalled`).
+* Trafilamenti idraulici (*Ghost Heating* a valvola sigillata a 0%) e sovratemperature anomale (*overshoot*).
+* Perdita di comunicazione con le sonde wireless (con passaggio istantaneo in sicurezza sulla sonda locale TRV) ed errori/pressione OpenTherm.
 
 ### 10. Metriche Energetiche dell'Involucro Edilizio
 L'algoritmo calcola in tempo reale le proprietà fisiche dell'edificio:
@@ -107,7 +107,7 @@ Schede custom gemelle del termostato nativo di Home Assistant:
 ## ⚡ Matrice Completa delle Funzionalità
 
 ### Centrale Bivalente & Climatizzazione Ibrida (v6.1.0-beta)
-* 🔄 **Arbitraggio Multi-Generatore (`PlantOrchestrator`)**: Gestione gerarchica tra Caldaia a Gas e Pompa di Calore Idronica basata su 5 modalità di priorità: `auto`, `hybrid`, `combined`, `electric_only` e `gas_only`.
+* 🔄 **Arbitraggio Multi-Generatore (`PlantOrchestrator`)**: Gestione gerarchica tra Caldaia a Gas e Pompa di Calore Idronica basata su **7 modalità di priorità**: `auto`, `hybrid`, `combined`, `electric_only`, `gas_only`, `gas_priority` ed `electric_priority`.
 * 🏢 **Riscaldamento Centralizzato Condominiale (`CentralizedBoilerBackend`)**: Supporto nativo per impianti centralizzati privi di relè caldaia locale (`boiler_mode: central`), pilotando direttamente TRV e attuatori di zona.
 * ❄️ **Raffrescamento Idronico Reversibile (`heat_pump_cooling`)**: Gestione fancoil e pavimento radiante in estate, con blocco rigoroso della caldaia a gas a 0%, **protezione anti-condensa da punto di rugiada interno** (margine +2.0 °C) e **tetto termico fisso a 40.0 °C** per pavimento non miscelato.
 * ⚡ **Modalità Full Electric**: Funzionamento al 100% solo con pompe di calore o split, senza alcuna caldaia a gas configurata.
@@ -122,7 +122,7 @@ Schede custom gemelle del termostato nativo di Home Assistant:
 ### Autoconsumo Solare & Gestione Energetica (v6.1.0-beta)
 * ☀️ **Rilevamento Off-Grid & Anti-Clipping**: Avvia il riscaldamento elettrico su saturazione batteria (SoC $\ge 95\%$) e produzione FV ($\ge 300\text{ W}$) prima che l'inverter tagli la potenza.
 * 🛡️ **Guardia Anti-Scarica Batteria**: Ritorna immediatamente al gas se la batteria domestica viene scaricata ($> 150\text{ W}$) per oltre 5 minuti continuativi.
-* 🔋 **Riserva Notturna Batteria**: Soglia minima di sicurezza (consigliata 80-85%) sotto la quale il riscaldamento elettrico viene escluso.
+* 🔋 **Riserva Notturna Batteria**: Soglia minima di sicurezza (`default: 20%`, consigliata `50–85%` per preservare l'autonomia notturna) sotto la quale il riscaldamento elettrico viene escluso.
 * 🤖 **Integrazione AI EMHASS & Predbat**: Supporto nativo per segnali booleani e sensori numerici a carico differibile (`p_deferrable0 > 0 W`).
 * 🏠 **Offset di Accumulo Termico nei Muri**: Sovralzo programmabile ($0.0^\circ\text{C} \dots +3.0^\circ\text{C}$) per stoccare calore solare gratuito nelle strutture murarie nelle ore di picco.
 * ⏱️ **Protezione Anti-pendolamento Compressore**: Ciclo minimo di 10 minuti per salvaguardare i compressori inverter dai passaggi nuvolosi.
@@ -144,20 +144,20 @@ Schede custom gemelle del termostato nativo di Home Assistant:
 * 🛡️ **Motore Anti-Short-Cycle**: Tempi minimi ON e OFF configurabili per evitare accensioni repentine della caldaia e usura del bruciatore.
 * ⏱️ **Ritardo Apertura Valvole**: Ritardo programmabile per attendere l'apertura delle valvole elettrotermiche prima di accendere la caldaia.
 * 🐕 **Watchdog Timeout Sonda & Fallback TRV (v4.7)**: Se un sensore wireless cade offline o esaurisce la batteria, la zona passa automaticamente alla sonda interna del TRV.
-* ❄️ **Protezione Antigelo di Emergenza (v4.3)**: Switch e soglia dedicati per forzare il 100% della potenza termica sotto soglia critica (es. 7°C) ignorando finestre aperte o master spento.
+* ❄️ **Protezione Antigelo di Emergenza (v4.3)**: Switch e soglia dedicati (`default: 12.0 °C`, configurabile `5–16 °C`) per forzare il 100% della potenza termica sotto soglia critica ignorando finestre aperte o master spento.
 * ☀️ **Esercizio Anti-Bloccaggio Estivo**: Movimentazione periodica di circolatori e valvole nei mesi estivi per prevenire grippaggi meccanici.
 * 🔄 **Sincronizzazione Fisica TRV Bidirezionale (v4.3)**: Switch dedicati per consentire alle manopole fisiche sui radiatori di aggiornare il setpoint virtuale senza conflitti.
 
-### Diagnostica Impianto & Efficienza Energetica (v4.5 - v4.7)
+### Diagnostica Impianto & Efficienza Energetica (v4.5 - v6.1.0-beta)
 * 🔍 **Supervisione Salute Centrale Termica**: Monitoraggio frequenza accensioni (cicli/ora), tempo di accensione cumulativo 24h e motivazioni di stato in tempo reale.
 * 🔥 **Telemetria OpenTherm & Bus Errori (v4.7)**: Acquisizione pressione acqua (Bar), temperatura di ritorno (°C), fiamma, modulazione bruciatore e codici errore OEM. Blocco PID su prelivo ACS (Acqua Calda Sanitaria).
 * 🔋 **Sorveglianza Batterie Universale (v4.7)**: Rilevamento automatico percentuale batteria per dispositivi Zigbee2MQTT, ZHA e Tuya.
-* 🚨 **Rilevamento Anomalie Meccaniche**: Individuazione valvole bloccate chiuse e trafilamenti idraulici (*ghost heating*).
+* 🚨 **Rilevamento Anomalie Meccaniche**: Individuazione valvole bloccate chiuse (`>= 99%` domanda per `> 75 min` con `< 0.2 °C` salita), TRV che non aprono (`trv_not_opening`) e trafilamenti idraulici (*ghost heating*).
 * ♨️ **Apporto Termico Passivo**: Opzione per zona per sopprimere falsi allarmi in open space, soppalchi o ventilconvettori senza valvola d'intercettazione.
 * 📊 **Classificazione Energetica Edificio (A4 → G)**: Stima della classe energetica europea calcolata dalla dispersione termica reale e dal $\Delta T$ esterno.
 * ⏱️ **Tempo di Ritenzione Termica**: Calcolo delle ore necessarie a perdere $1.0^\circ\text{C}$.
 * 📐 **Valutazione Dimensionamento Radiatori**: Rilevamento radiatori sottodimensionati, ottimali o sovradimensionati.
-* 🩺 **Diagnostica Nativa Home Assistant (v4.4)**: Dump JSON scaricabile dalle impostazioni del dispositivo in HA.
+* 🩺 **Diagnostica Nativa Home Assistant & Telemetria PID Live**: Dump JSON scaricabile dalle impostazioni del dispositivo in HA, completo di dettaglio `pid_state` / `pid_state_cool` (P/I/D per zona) e `trv_health`.
 
 ---
 
@@ -190,7 +190,7 @@ flowchart TD
     subgraph A["4. Arbitraggio & Generatori"]
         A1{"Stanza ha Split AC?"}
         A2["Avvio Split Locale<br>Gas Soppresso a 0%"]
-        A3["Plant Orchestrator (5 Priorita)"]
+        A3["Plant Orchestrator (7 Priorita)"]
         A4["Caldaia a Gas (PWM / OpenTherm)"]
         A5["Pompa di Calore Idronica"]
     end

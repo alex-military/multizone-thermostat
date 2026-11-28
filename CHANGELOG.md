@@ -1,5 +1,26 @@
 # Changelog
 
+## [6.1.0-beta.22] - 2026-11-28
+### Feat: Dedicated Adaptive Telemetry & Charts Subview, Support Snapshot & 4-Dashboard Live Simulator
+- **Dedicated `telemetria` Subview & Auto-Discovered `multizone-thermostat-telemetry-card` (`chart_engine.js`, `telemetry_card.js`, `dashboard_strategy.js`)**:
+  - Added a dedicated full-screen **2×2 interactive SVG Charts & Telemetry** subview (`path: "telemetria"`) and standalone view strategy (`ll-strategy-view-multizone-thermostat-telemetry`) with **100% auto-discovery** and zero external HACS/ApexCharts dependencies.
+  - Queries Home Assistant's native Recorder history (`history/history_during_period` across `6h`, `24h`, `48h`, `7d`) with 60-second caching, smooth downsampling, hover/touch crosshair tooltips, and automatic `°C`/`°F` conversion.
+  - **Adaptive Plant Charts**: Automatically switches graphs based on `boiler_type` (`opentherm` Flow/Return/Condensing `55 °C`/Modulation/DHW + Boiler `ΔT`; `relay` `Master Demand` + single-pulse PWM ON/OFF + `cycles/h`; `heat_pump` Demand/Outdoor + Battery SoC/Solar Boost; `centralized` Demand + runtime) paired with a **Zone Contributions vs Master Demand** chart.
+  - **Adaptive Zone Charts**: Shows Temperature/Setpoint/Actuator (plus `window_open` shaded bands and PWM ON/OFF steps), 7-day physical thermal model (`Heating Rate`, `Cooling Rate`, `Thermal Inertia`, `k_loss`), live **`P / I / D / Weather FF`** breakdown (or `Error ΔT` vs `±0.3 °C` Hysteresis band), and live output-balance horizontal bars.
+  - **One-Click `📋 Copy Support Snapshot`**: Copies a clean diagnostic summary of plant and zone telemetry, PID gains, P/I/D terms, guardrail status, and thermal rates directly to clipboard for fast troubleshooting.
+- **Navigation, Fallback Modal & 6-Language Parity (`plant_card.js`, `zone_energy_card.js`, `summary_cards.js`, `01_translations.js`)**:
+  - Added **Charts & Telemetry** action button on `PlantCard` and quick **Charts** button on every `ZoneEnergyCard` (pre-selecting that zone), with seamless modal fallback for users running custom dashboards.
+  - Added 34 new translation keys (`tel_*`) across all 6 locales (`it`, `en`, `ru`, `fr`, `de`, `es`) with 100% key parity and rebuilt Lovelace bundles (`532.8 KB`).
+- **Lightweight Backend Telemetry Attributes (`sensor.py`, `zone_controller.py`)**:
+  - Exposed `boiler_type`, `boiler_active`, `is_bivalent`, `flow_temp`, `return_temp`, `modulation_level`, `water_pressure`, `condensing_optimal`, `flame_active`, `outdoor_temp`, `solar_boost_active`, and `battery_soc` on `MultizoneMasterDemandSensor`.
+  - Exposed `actuator_type`, `pwm_output_on`, `k_loss`, and `hysteresis_cold_tol` / `hysteresis_hot_tol` on `DemandSensor`.
+- **4-Dashboard Live Simulator & Documentation (`docs/simulator.html`, `docs/wiki/*`)**:
+  - Upgraded the official interactive simulator to 4 dashboards with simulated WS Recorder history and a backend switcher (`OpenTherm`, `Relay PWM`, `Heat Pump + PV`, `Centralized`), and updated all bilingual Wiki pages, `README.md`, and `ROADMAP.md`.
+- **Automated Tests**:
+  - Added `tests/test_telemetry_card_and_attrs.py` (524 tests passing, bundle `--check` passing).
+- **PWM Cold-Start Fix (`pwm_engine.py`)**:
+  - Fixed `PWMEngine(phase_locked=True)` cold-start transitions (`0 -> >0` demand) so fresh heating requests occurring in the second half of a grid window start immediately instead of skipping the first ON pulse.
+
 ## [6.1.0-beta.21] - 2026-11-28
 ### Fix & Upgrade: SIMC Autotuner, Sensorless Thermal Model, Anti-Chattering PWM & Live PID Demand Telemetry
 - **SIMC Autotuner, OLS Reaction Curve & Weekly EMA Guardrail (`autotune.py`, `zone_controller.py`, `sensor.py`)**:

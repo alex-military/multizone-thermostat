@@ -42,7 +42,7 @@ To test v6.1.0-beta features (bivalent central plant, room split AC, solar off-g
 1. Navigate to the **Multizone Thermostat** page within HACS.
 2. Click the **three dots in the top right corner** and select **Redownload**.
 3. Enable the **"Show beta versions"** toggle.
-4. Select the latest pre-release version (e.g. `v6.1.0-beta.10`).
+4. Select the latest pre-release version (e.g. `v6.1.0-beta.19`).
 5. Click **Download**.
 6. Restart Home Assistant to load the updated integration.
 

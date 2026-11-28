@@ -7,13 +7,11 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>Multizone Thermostat — Home Assistant Live Dashboard</title>
-  
-  <!-- Material Design Icons Font -->
+
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css">
 
   <style>
     :root {
-      /* Home Assistant Theme Matching Image 1 */
       --primary-color: #03a9f4;
       --accent-color: #ff9800;
       --primary-text-color: #ffffff;
@@ -32,11 +30,7 @@
       --state-climate-off-color: #334155;
     }
 
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       background-color: #090d16;
@@ -49,7 +43,6 @@
       transition: background-color 0.3s ease;
     }
 
-    /* Classic Home Assistant Native Dark Theme (Flat Charcoal) */
     body.classic-theme {
       background-color: #111111 !important;
       color: #e1e8f5 !important;
@@ -64,11 +57,10 @@
       border-bottom-color: rgba(255, 255, 255, 0.08) !important;
     }
 
-    /* Top Bar: Home Assistant Header Style */
     .ha-topbar {
       background-color: #0f1422;
       border-bottom: 1px solid #1c2438;
-      height: 52px;
+      min-height: 52px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -76,6 +68,8 @@
       position: sticky;
       top: 0;
       z-index: 100;
+      flex-wrap: wrap;
+      gap: 8px;
     }
     .ha-brand {
       display: flex;
@@ -85,53 +79,34 @@
       font-weight: 700;
       color: #ffffff;
     }
-    .ha-brand i {
-      color: #03a9f4;
-      font-size: 1.3rem;
-    }
+    .ha-brand i { color: #03a9f4; font-size: 1.3rem; }
 
-    /* View Navigation Tabs */
-    .ha-tabs {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      height: 100%;
-    }
+    .ha-tabs { display: flex; align-items: center; gap: 4px; height: 52px; flex-wrap: wrap; }
     .ha-tab {
       display: flex;
       align-items: center;
       gap: 6px;
       height: 100%;
-      padding: 0 18px;
+      padding: 0 15px;
       background: none;
       border: none;
       border-bottom: 3px solid transparent;
       color: #94a3b8;
-      font-size: 0.88rem;
+      font-size: 0.86rem;
       font-weight: 600;
       cursor: pointer;
       transition: all 0.2s ease;
       text-decoration: none;
     }
-    .ha-tab:hover {
-      color: #ffffff;
-      background: rgba(255, 255, 255, 0.04);
-    }
+    .ha-tab:hover { color: #ffffff; background: rgba(255, 255, 255, 0.04); }
     .ha-tab.active {
       color: #03a9f4;
       border-bottom-color: #03a9f4;
       background: rgba(3, 169, 244, 0.08);
     }
-    .ha-tab i {
-      font-size: 1.15rem;
-    }
+    .ha-tab i { font-size: 1.15rem; }
 
-    /* Style Switcher Action */
-    .ha-actions {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
+    .ha-actions { display: flex; align-items: center; gap: 8px; }
     .style-pill-btn {
       background: #172033;
       border: 1px solid #2a3754;
@@ -159,15 +134,9 @@
       transition: all 0.2s ease;
     }
     .lang-select:hover, .lang-select:focus {
-      background: #202c46;
-      border-color: #38bdf8;
-      color: #ffffff;
+      background: #202c46; border-color: #38bdf8; color: #ffffff;
     }
-    .style-pill-btn:hover {
-      background: #202c46;
-      border-color: #03a9f4;
-      color: #ffffff;
-    }
+    .style-pill-btn:hover { background: #202c46; border-color: #03a9f4; color: #ffffff; }
     .style-pill-btn.luxury-active {
       background: linear-gradient(135deg, #0284c7, #38bdf8);
       border-color: #7dd3fc;
@@ -175,25 +144,17 @@
       box-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
     }
 
-    /* Main Dashboard Area (Matches Home Assistant Grid Width) */
     .dashboard-container {
       width: 100%;
-      max-width: 1360px;
+      max-width: 1380px;
       margin: 0 auto;
-      padding: 16px 12px;
+      padding: 16px 12px 36px;
       flex: 1;
     }
 
-    .dashboard-view {
-      display: none;
-      flex-direction: column;
-      gap: 14px;
-    }
-    .dashboard-view.active {
-      display: flex;
-    }
+    .dashboard-view { display: none; flex-direction: column; gap: 14px; }
+    .dashboard-view.active { display: flex; }
 
-    /* TOP ROW: EXACT 4-COLUMN RATIO AS HOME ASSISTANT */
     .ha-top-row-grid {
       display: grid;
       grid-template-columns: 1.35fr 1.35fr 0.65fr 0.65fr;
@@ -201,47 +162,66 @@
       width: 100%;
       align-items: stretch;
     }
-    @media (max-width: 1100px) {
-      .ha-top-row-grid {
-        grid-template-columns: 1fr 1fr;
-      }
-    }
-    @media (max-width: 700px) {
-      .ha-top-row-grid {
-        grid-template-columns: 1fr;
-      }
-    }
+    @media (max-width: 1100px) { .ha-top-row-grid { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 700px) { .ha-top-row-grid { grid-template-columns: 1fr; } }
 
-    /* ZONES GRID: 2 COLUMNS DEFAULT AS IN HOME ASSISTANT SCREENSHOT */
     .ha-zones-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 12px;
       width: 100%;
     }
-    .ha-zones-grid.cols-3 {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
+    .ha-zones-grid.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     @media (max-width: 800px) {
-      .ha-zones-grid, .ha-zones-grid.cols-3 {
-        grid-template-columns: 1fr;
-      }
+      .ha-zones-grid, .ha-zones-grid.cols-3 { grid-template-columns: 1fr; }
     }
-    ha-card {
-      display: block;
+
+    .sim-backend-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-radius: 14px;
+      background: rgba(15, 23, 42, 0.65);
+      border: 1px solid rgba(56, 189, 248, 0.22);
     }
+    .sim-backend-lbl {
+      font-size: 11.5px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      color: #94a3b8;
+      margin-right: 4px;
+    }
+    .sim-backend-btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      color: #cbd5e1;
+      border-radius: 999px;
+      padding: 5px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.16s ease;
+    }
+    .sim-backend-btn:hover { border-color: #38bdf8; color: #ffffff; }
+    .sim-backend-btn.active {
+      background: rgba(14, 165, 233, 0.26);
+      border-color: #38bdf8;
+      color: #ffffff;
+    }
+
+    ha-card { display: block; }
   </style>
 
   <!-- Web Component Stubs for HA Architecture -->
   <script>
     if (!customElements.get('ha-card')) {
-      class HaCard extends HTMLElement {
-        constructor() { super(); }
-      }
+      class HaCard extends HTMLElement { constructor() { super(); } }
       customElements.define('ha-card', HaCard);
     }
 
-    // Material Design SVG paths for guaranteed zero-dependency rendering in Shadow DOMs
     const MDI_SVG_MAP = {
       'minus': 'M19,13H5V11H19V13Z',
       'plus': 'M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z',
@@ -254,6 +234,7 @@
       'snowflake': 'M12,2A1,1 0 0,1 13,3V6.17L14.71,4.46A1,1 0 0,1 16.12,5.88L13.59,8.41L13,9V11H15L15.59,10.41L18.12,7.88A1,1 0 0,1 19.54,9.29L17.83,11H21A1,1 0 0,1 22,12A1,1 0 0,1 21,13H17.83L19.54,14.71A1,1 0 0,1 18.12,16.12L15.59,13.59L15,13H13V15L13.59,15.59L16.12,18.12A1,1 0 0,1 14.71,19.54L13,17.83V21A1,1 0 0,1 12,22A1,1 0 0,1 11,21V17.83L9.29,19.54A1,1 0 0,1 7.88,18.12L10.41,15.59L11,15V13H9L8.41,13.59L5.88,16.12A1,1 0 0,1 4.46,14.71L6.17,13H3A1,1 0 0,1 2,12A1,1 0 0,1 3,11H6.17L4.46,9.29A1,1 0 0,1 5.88,7.88L8.41,10.41L9,11H11V9L10.41,8.41L7.88,5.88A1,1 0 0,1 9.29,4.46L11,6.17V3A1,1 0 0,1 12,2Z',
       'calendar-clock': 'M15,13H16.5V15.82L18.9,17.25L18.15,18.5L15,16.69V13M19,8H5V19H9.67C10.24,20.12 11.13,21.05 12.25,21.69C12.17,21.79 12.09,21.9 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2A10,10 0 0,1 22,12C22,12.5 21.96,13 21.88,13.5C21.19,12.68 20.32,12.03 19.33,11.61C19.86,10.49 20,9.26 20,8A1,1 0 0,0 19,7M19,3H18V1H16V3H8V1H6V3H5C3.89,3 3,3.89 3,5V7H21V5C21,3.89 20.1,3 19,3M16.5,11A5.5,5.5 0 0,0 11,16.5A5.5,5.5 0 0,0 16.5,22A5.5,5.5 0 0,0 22,16.5A5.5,5.5 0 0,0 16.5,11Z',
       'shield-check': 'M10,17L6.5,13.5L7.91,12.08L10,14.17L15.18,9L16.6,10.41M12,1L3,5V11C3,16.55 6.84,21.74 12,23C17.16,21.74 21,16.55 21,11V5L12,1Z',
+      'chart-areaspline': 'M17.45,15.18L22,7.31V19L22,21H2V3H4V15.54L9.5,6L16,9.78L20.24,2.45L21.97,3.45L16.74,12.5L10.23,8.75L4.31,19H6.57L10.96,11.44L17.45,15.18Z',
       'leaf': 'M17,8C8,10 5.9,16.17 3.82,21.34L5.71,22L6.66,19.7C7.14,19.87 7.64,20 8,20C19,20 22,3 22,3C21,5 14,5.25 9,6.25C4,7.25 2,11.5 2,13.5C2,15.5 3.75,17.25 3.75,17.25C7,8 17,8 17,8Z',
       'sofa': 'M20,9V15H4V9H20M20,7H4A2,2 0 0,0 2,9V17H4V20H6V17H18V20H20V17H22V9A2,2 0 0,0 20,7Z',
       'bed': 'M19,7H11V14H3V5H1V20H3V17H21V20H23V11A4,4 0 0,0 19,7M7,13A3,3 0 0,0 10,10A3,3 0 0,0 7,7A3,3 0 0,0 4,10A3,3 0 0,0 7,13Z',
@@ -268,10 +249,7 @@
     if (!customElements.get('ha-icon')) {
       class HaIcon extends HTMLElement {
         static get observedAttributes() { return ['icon']; }
-        constructor() {
-          super();
-          this.attachShadow({ mode: 'open' });
-        }
+        constructor() { super(); this.attachShadow({ mode: 'open' }); }
         attributeChangedCallback() { this.render(); }
         connectedCallback() { this.render(); }
         render() {
@@ -285,39 +263,16 @@
           this.shadowRoot.innerHTML = `
             <style>
               :host {
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                position: relative;
-                vertical-align: middle;
-                fill: currentColor;
-                width: var(--mdc-icon-size, 24px);
-                height: var(--mdc-icon-size, 24px);
-                min-width: var(--mdc-icon-size, 24px);
-                min-height: var(--mdc-icon-size, 24px);
-                max-width: var(--mdc-icon-size, 24px);
-                max-height: var(--mdc-icon-size, 24px);
-                box-sizing: border-box;
-                line-height: 1;
-                overflow: hidden;
+                display: inline-flex; align-items: center; justify-content: center;
+                position: relative; vertical-align: middle; fill: currentColor;
+                width: var(--mdc-icon-size, 24px); height: var(--mdc-icon-size, 24px);
+                min-width: var(--mdc-icon-size, 24px); min-height: var(--mdc-icon-size, 24px);
+                max-width: var(--mdc-icon-size, 24px); max-height: var(--mdc-icon-size, 24px);
+                box-sizing: border-box; line-height: 1; overflow: hidden;
               }
-              svg {
-                width: 100%;
-                height: 100%;
-                max-width: 100%;
-                max-height: 100%;
-                display: block;
-                fill: currentColor;
-                pointer-events: none;
-              }
-              i {
-                font-size: var(--mdc-icon-size, 24px);
-                color: inherit;
-                line-height: 1;
-              }
-            </style>
-            ${inner}
-          `;
+              svg { width: 100%; height: 100%; max-width: 100%; max-height: 100%; display: block; fill: currentColor; pointer-events: none; }
+              i { font-size: var(--mdc-icon-size, 24px); color: inherit; line-height: 1; }
+            </style>${inner}`;
         }
       }
       customElements.define('ha-icon', HaIcon);
@@ -325,18 +280,16 @@
   </script>
 
   <!-- Load Official Card Bundle with cache bust -->
-  <script src="multizone-thermostat-card.js?v=6.1.0-beta.17"></script>
+  <script src="multizone-thermostat-card.js?v=6.1.0-beta.22"></script>
 </head>
 <body>
 
-  <!-- TOP APP BAR -->
   <header class="ha-topbar">
     <div class="ha-brand">
       <i class="mdi mdi-home-thermometer-outline"></i>
       <span>Multizone Thermostat</span>
     </div>
 
-    <!-- TABS -->
     <nav class="ha-tabs">
       <button class="ha-tab active" id="tabBtnHome" onclick="switchView('view-home')">
         <i class="mdi mdi-radiator"></i>
@@ -350,9 +303,12 @@
         <i class="mdi mdi-chart-box-outline"></i>
         <span>Diagnostica</span>
       </button>
+      <button class="ha-tab" id="tabBtnTelemetry" onclick="openTelemetryTab('plant')">
+        <i class="mdi mdi-chart-areaspline"></i>
+        <span>Grafici &amp; Telemetria</span>
+      </button>
     </nav>
 
-    <!-- RIGHT: LANGUAGE, LUXURY / CLASSIC STYLE TOGGLE & COLUMNS TOGGLE -->
     <div class="ha-actions">
       <select class="lang-select" id="langSelector" onchange="changeLanguage(this.value)" title="Change Language">
         <option value="en">🇬🇧 English</option>
@@ -371,23 +327,16 @@
     </div>
   </header>
 
-  <!-- DASHBOARD CONTAINER -->
   <main class="dashboard-container">
 
-    <!-- ============================================== -->
-    <!-- VIEW 1: TERMOSTATI (IDENTICA A SCREENSHOT 1)  -->
-    <!-- ============================================== -->
+    <!-- VIEW 1: TERMOSTATI -->
     <div class="dashboard-view active" id="view-home">
-      
-      <!-- TOP ROW: [ PRESET CARD ] [ STATUS CARD ] [ PROGRAMMAZIONE ] [ DIAGNOSTICA ] -->
       <div class="ha-top-row-grid">
         <div id="host-preset-card"></div>
         <div id="host-status-card"></div>
         <div id="host-schedule-summary"></div>
         <div id="host-health-summary"></div>
       </div>
-
-      <!-- ZONES ROW: [ ZONA 1 (SPLIT) ] [ ZONA 2 (STANDARD) ] [ ZONA 3 (STUDIO) ] -->
       <div class="ha-zones-grid">
         <div id="host-dial-1"></div>
         <div id="host-dial-2"></div>
@@ -395,16 +344,12 @@
       </div>
     </div>
 
-    <!-- ============================================== -->
-    <!-- VIEW 2: PROGRAMMAZIONE SETTIMANALE             -->
-    <!-- ============================================== -->
+    <!-- VIEW 2: PROGRAMMAZIONE SETTIMANALE -->
     <div class="dashboard-view" id="view-sched">
       <div id="host-scheduler-card"></div>
     </div>
 
-    <!-- ============================================== -->
-    <!-- VIEW 3: DIAGNOSTICA & EFFICIENZA               -->
-    <!-- ============================================== -->
+    <!-- VIEW 3: DIAGNOSTICA & EFFICIENZA -->
     <div class="dashboard-view" id="view-diag">
       <div id="host-plant-card" style="margin-bottom: 12px;"></div>
       <div class="ha-zones-grid">
@@ -414,14 +359,24 @@
       </div>
     </div>
 
+    <!-- VIEW 4: GRAFICI & TELEMETRIA DEDICATA -->
+    <div class="dashboard-view" id="view-telemetry">
+      <div class="sim-backend-bar">
+        <span class="sim-backend-lbl" id="sim-backend-lbl">Simulate Plant Backend:</span>
+        <button type="button" class="sim-backend-btn active" data-sim-backend="opentherm">🔥 OpenTherm</button>
+        <button type="button" class="sim-backend-btn" data-sim-backend="relay">⚡ Relay PWM</button>
+        <button type="button" class="sim-backend-btn" data-sim-backend="heat_pump">🌿 Heat Pump + PV</button>
+        <button type="button" class="sim-backend-btn" data-sim-backend="centralized">🏢 Centralized</button>
+      </div>
+      <div id="host-telemetry-card"></div>
+    </div>
+
   </main>
 
-  <!-- MOCK HASS STATE (EXACT STATE AS IN SCREENSHOT 1) -->
   <script>
     const MOCK_HASS = {
       language: 'en',
       states: {
-        // --- MASTER SWITCH ---
         'switch.master_control_heating_master': {
           entity_id: 'switch.master_control_heating_master',
           state: 'off',
@@ -437,60 +392,42 @@
           state: 'off',
           attributes: { friendly_name: 'Central Boiler' }
         },
-
-        // --- PRESET & PRIORITY (GAS + COMFORT) ---
         'select.master_control_global_preset': {
           entity_id: 'select.master_control_global_preset',
           state: 'comfort',
-          attributes: {
-            options: ['manual', 'eco', 'comfort', 'sleep', 'away'],
-            friendly_name: 'Global Preset'
-          }
+          attributes: { options: ['manual', 'eco', 'comfort', 'sleep', 'away'], friendly_name: 'Global Preset' }
         },
         'select.master_control_heat_source_priority': {
           entity_id: 'select.master_control_heat_source_priority',
           state: 'gas_only',
-          attributes: {
-            options: ['auto', 'hybrid', 'combined', 'electric_only', 'gas_only'],
-            friendly_name: 'Heat Source Priority'
-          }
+          attributes: { options: ['auto', 'hybrid', 'combined', 'electric_only', 'gas_only'], friendly_name: 'Heat Source Priority' }
         },
         'select.master_control_master_operation_mode': {
           entity_id: 'select.master_control_master_operation_mode',
           state: 'heat',
-          attributes: {
-            options: ['heat', 'cool'],
-            friendly_name: 'Seasonal Mode'
-          }
+          attributes: { options: ['heat', 'cool'], friendly_name: 'Seasonal Mode' }
         },
 
-        // --- ZONE 1: LIVING ROOM (WITH SPLIT AC) ---
+        // ZONE 1: LIVING ROOM (VALVE + SPLIT AC + STEP 0.1)
         'climate.multizone_thermostat_zona_test_1': {
           entity_id: 'climate.multizone_thermostat_zona_test_1',
           state: 'heat',
           attributes: {
             friendly_name: 'Living Room',
-            current_temperature: 19.5,
+            current_temperature: 20.4,
             temperature: 20.5,
-            target_temp_step: 0.5,
-            min_temp: 10,
-            max_temp: 30,
+            target_temp_step: 0.1,
+            min_temp: 10, max_temp: 30,
             hvac_action: 'off',
             active_heating_source: 'gas',
             zone_mode: 'primary',
             can_cool: true,
             split_climate_entity: 'climate.split_test_1',
-            split_active: false,
-            split_manual_on: false,
-            split_hydronic_suppressed: false,
-            heating_rate: 1.5,
-            cooling_rate: 0.3,
-            battery_level: 92,
-            pid_kp: 12.4,
-            pid_ki: 0.014,
-            pid_kd: 110.0,
-            pid_active_mode: 'heat',
-            pid_manual_unlock: false
+            split_active: false, split_manual_on: false, split_hydronic_suppressed: false,
+            heating_rate: 1.5, cooling_rate: 0.26, battery_level: 92,
+            pid_kp: 48.2, pid_ki: 0.0145, pid_kd: 145.0,
+            pid_active_mode: 'heat', pid_manual_unlock: false,
+            autotune_state: 'completed'
           }
         },
         'climate.split_test_1': {
@@ -501,94 +438,113 @@
         'select.multizone_thermostat_zona_test_1_zone_mode': {
           entity_id: 'select.multizone_thermostat_zona_test_1_zone_mode',
           state: 'primary',
-          attributes: {
-            options: ['primary', 'secondary', 'bypass'],
-            friendly_name: 'Mode Living Room'
-          }
+          attributes: { options: ['primary', 'secondary', 'bypass'], friendly_name: 'Mode Living Room' }
         },
 
-        // --- ZONE 2: KITCHEN (WITH COOLING) ---
+        // ZONE 2: KITCHEN (PWM RELAY)
         'climate.multizone_thermostat_zona_test_2': {
           entity_id: 'climate.multizone_thermostat_zona_test_2',
           state: 'heat',
           attributes: {
             friendly_name: 'Kitchen',
-            current_temperature: 18.0,
+            current_temperature: 19.8,
             temperature: 20.5,
             target_temp_step: 0.5,
-            min_temp: 10,
-            max_temp: 30,
+            min_temp: 10, max_temp: 30,
             hvac_action: 'off',
             active_heating_source: 'gas',
             zone_mode: 'primary',
             can_cool: true,
-            heating_rate: 1.2,
-            cooling_rate: 0.25,
-            battery_level: 85,
-            pid_kp: 10.8,
-            pid_ki: 0.012,
-            pid_kd: 95.0,
-            pid_active_mode: 'heat',
-            pid_manual_unlock: false
+            heating_rate: 1.2, cooling_rate: 0.34, battery_level: 85,
+            pid_kp: 36.4, pid_ki: 0.0120, pid_kd: 112.0,
+            pid_active_mode: 'heat', pid_manual_unlock: false,
+            autotune_state: 'completed'
           }
         },
         'select.multizone_thermostat_zona_test_2_zone_mode': {
           entity_id: 'select.multizone_thermostat_zona_test_2_zone_mode',
           state: 'primary',
-          attributes: {
-            options: ['primary', 'secondary', 'bypass'],
-            friendly_name: 'Mode Kitchen'
-          }
+          attributes: { options: ['primary', 'secondary', 'bypass'], friendly_name: 'Mode Kitchen' }
         },
 
-        // --- ZONE 3: OFFICE (HEATING ONLY - RADIATOR) ---
+        // ZONE 3: OFFICE (HYSTERESIS LEARNING 2/3 + TRV)
         'climate.multizone_thermostat_zona_test_3': {
           entity_id: 'climate.multizone_thermostat_zona_test_3',
           state: 'heat',
           attributes: {
             friendly_name: 'Office',
-            current_temperature: 19.0,
+            current_temperature: 19.6,
             temperature: 20.0,
             target_temp_step: 0.5,
-            min_temp: 10,
-            max_temp: 30,
+            min_temp: 10, max_temp: 30,
             hvac_action: 'off',
             active_heating_source: 'gas',
             zone_mode: 'secondary',
             can_cool: false,
-            heating_rate: 0.9,
-            cooling_rate: 0.4,
-            battery_level: 70,
-            pid_kp: 14.2,
-            pid_ki: 0.018,
-            pid_kd: 130.0,
-            pid_active_mode: 'heat',
-            pid_manual_unlock: false
+            heating_rate: 0.9, cooling_rate: 0.42, battery_level: 70,
+            pid_kp: 0.0, pid_ki: 0.0, pid_kd: 0.0,
+            pid_active_mode: 'heat', pid_manual_unlock: false,
+            autotune_cycles: 2, autotune_required_cycles: 3
           }
         },
         'select.multizone_thermostat_zona_test_3_zone_mode': {
           entity_id: 'select.multizone_thermostat_zona_test_3_zone_mode',
           state: 'secondary',
-          attributes: {
-            options: ['primary', 'secondary', 'bypass'],
-            friendly_name: 'Mode Office'
-          }
+          attributes: { options: ['primary', 'secondary', 'bypass'], friendly_name: 'Mode Office' }
         },
 
-        // --- DIAGNOSTICA CENTRALE ---
+        // PLANT DIAGNOSTICS & MASTER DEMAND
+        'sensor.master_control_master_demand': {
+          entity_id: 'sensor.master_control_master_demand',
+          state: '58.4',
+          attributes: {
+            unit_of_measurement: '%',
+            master_on: true,
+            master_hvac_mode: 'heat',
+            boiler_type: 'opentherm',
+            boiler_active: true,
+            boiler_status: 'MODULATING - Target water: 47.0°C (Demand 58.4%)',
+            peak_zone: 'Kitchen',
+            strategy: 'weighted_average',
+            dhw_active: false,
+            frost_emergency: false,
+            flow_temp: 46.5,
+            return_temp: 38.2,
+            modulation_level: 42,
+            water_pressure: 1.3,
+            condensing_optimal: true,
+            flame_active: true,
+            outdoor_temp: 6.8,
+            solar_boost_active: false,
+            battery_soc: 88.0
+          }
+        },
         'sensor.master_control_stato_salute_impianto': {
           entity_id: 'sensor.master_control_stato_salute_impianto',
-          state: '100',
-          attributes: { unit_of_measurement: '%' }
+          state: 'Optimal',
+          attributes: {
+            label: 'Optimal',
+            anomalies: [],
+            opentherm: {
+              enabled: true,
+              water_pressure: 1.3,
+              flow_temperature: 46.5,
+              return_temperature: 38.2,
+              condensing_optimal: true,
+              modulation_level: 42,
+              flame_active: true,
+              dhw_active: false
+            }
+          }
         },
         'sensor.master_control_frequenza_accensioni_caldaia': {
           entity_id: 'sensor.master_control_frequenza_accensioni_caldaia',
-          state: '1.2',
-          attributes: { unit_of_measurement: 'cicli/h' }
+          state: '1.8',
+          attributes: { unit_of_measurement: 'cycles/h' }
         },
         'sensor.master_control_ore_funzionamento_caldaia_24h': {
           entity_id: 'sensor.master_control_ore_funzionamento_caldaia_24h',
-          state: '3.8',
+          state: '4.2',
           attributes: { unit_of_measurement: 'h' }
         },
         'binary_sensor.master_control_plant_anomaly': {
@@ -597,55 +553,172 @@
           attributes: { active_anomalies: [] }
         },
 
-        // --- ZONE ENERGY SENSORS ---
-        'sensor.multizone_brain_zona_test_1_classe_energetica': {
-          entity_id: 'sensor.multizone_brain_zona_test_1_classe_energetica',
-          state: 'A'
+        // PER-ZONE DEMAND, AUTOTUNING & THERMAL SENSORS
+        'sensor.multizone_brain_zona_test_1_demand': {
+          entity_id: 'sensor.multizone_brain_zona_test_1_demand',
+          state: '31.5',
+          attributes: {
+            unit_of_measurement: '%',
+            control_mode: 'smart_pid', active_track: 'heat', actuator_type: 'valve',
+            p_term: 4.8, i_term: 21.6, d_term: -3.4, weather_ff: 8.5,
+            error: 0.10, set_point: 20.5, raw_output: 31.5, clamped_output: 31.5,
+            kp: 48.2, ki: 0.0145, kd: 145.0, k_loss: 0.018, smart_stop_offset: 0.0, window_open: false
+          }
         },
-        'sensor.multizone_brain_zona_test_1_tempo_ritenzione_termica': {
-          entity_id: 'sensor.multizone_brain_zona_test_1_tempo_ritenzione_termica',
-          state: '7.5',
-          attributes: { unit_of_measurement: 'h' }
+        'sensor.multizone_brain_zona_test_1_autotuning': {
+          entity_id: 'sensor.multizone_brain_zona_test_1_autotuning',
+          state: 'Smart PID Active (Caldo)',
+          attributes: { Kp: 48.2, Ki: 0.0145, Kd: 145.0, weekly_guardrail_status: 'confirmed' }
         },
-        'sensor.multizone_brain_zona_test_1_dimensionamento_radiatore': {
-          entity_id: 'sensor.multizone_brain_zona_test_1_dimensionamento_radiatore',
-          state: 'Ottimale'
-        },
+        'sensor.multizone_brain_zona_test_1_heating_rate': { entity_id: 'sensor.multizone_brain_zona_test_1_heating_rate', state: '1.50', attributes: { unit_of_measurement: '°C/hr' } },
+        'sensor.multizone_brain_zona_test_1_cooling_rate': { entity_id: 'sensor.multizone_brain_zona_test_1_cooling_rate', state: '0.26', attributes: { unit_of_measurement: '°C/hr' } },
+        'sensor.multizone_brain_zona_test_1_thermal_inertia': { entity_id: 'sensor.multizone_brain_zona_test_1_thermal_inertia', state: '0.12', attributes: { unit_of_measurement: '°C' } },
+        'sensor.multizone_brain_zona_test_1_classe_energetica': { entity_id: 'sensor.multizone_brain_zona_test_1_classe_energetica', state: 'A' },
+        'sensor.multizone_brain_zona_test_1_tempo_ritenzione_termica': { entity_id: 'sensor.multizone_brain_zona_test_1_tempo_ritenzione_termica', state: '7.5', attributes: { unit_of_measurement: 'h' } },
+        'sensor.multizone_brain_zona_test_1_dimensionamento_radiatore': { entity_id: 'sensor.multizone_brain_zona_test_1_dimensionamento_radiatore', state: 'Optimal' },
 
-        'sensor.multizone_brain_zona_test_2_classe_energetica': {
-          entity_id: 'sensor.multizone_brain_zona_test_2_classe_energetica',
-          state: 'B'
+        'sensor.multizone_brain_zona_test_2_demand': {
+          entity_id: 'sensor.multizone_brain_zona_test_2_demand',
+          state: '58.4',
+          attributes: {
+            unit_of_measurement: '%',
+            control_mode: 'smart_pid', active_track: 'heat', actuator_type: 'pwm_relay', pwm_output_on: true,
+            p_term: 25.5, i_term: 26.5, d_term: -2.1, weather_ff: 8.5,
+            error: 0.70, set_point: 20.5, raw_output: 58.4, clamped_output: 58.4,
+            kp: 36.4, ki: 0.0120, kd: 112.0, k_loss: 0.024, smart_stop_offset: 0.18, window_open: false
+          }
         },
-        'sensor.multizone_brain_zona_test_2_tempo_ritenzione_termica': {
-          entity_id: 'sensor.multizone_brain_zona_test_2_tempo_ritenzione_termica',
-          state: '5.2',
-          attributes: { unit_of_measurement: 'h' }
+        'sensor.multizone_brain_zona_test_2_autotuning': {
+          entity_id: 'sensor.multizone_brain_zona_test_2_autotuning',
+          state: 'Smart PID Active (Caldo)',
+          attributes: { Kp: 36.4, Ki: 0.0120, Kd: 112.0, weekly_guardrail_status: 'monitoring' }
         },
-        'sensor.multizone_brain_zona_test_2_dimensionamento_radiatore': {
-          entity_id: 'sensor.multizone_brain_zona_test_2_dimensionamento_radiatore',
-          state: 'Ottimale'
-        },
+        'sensor.multizone_brain_zona_test_2_heating_rate': { entity_id: 'sensor.multizone_brain_zona_test_2_heating_rate', state: '1.20', attributes: { unit_of_measurement: '°C/hr' } },
+        'sensor.multizone_brain_zona_test_2_cooling_rate': { entity_id: 'sensor.multizone_brain_zona_test_2_cooling_rate', state: '0.34', attributes: { unit_of_measurement: '°C/hr' } },
+        'sensor.multizone_brain_zona_test_2_thermal_inertia': { entity_id: 'sensor.multizone_brain_zona_test_2_thermal_inertia', state: '0.15', attributes: { unit_of_measurement: '°C' } },
+        'sensor.multizone_brain_zona_test_2_classe_energetica': { entity_id: 'sensor.multizone_brain_zona_test_2_classe_energetica', state: 'B' },
+        'sensor.multizone_brain_zona_test_2_tempo_ritenzione_termica': { entity_id: 'sensor.multizone_brain_zona_test_2_tempo_ritenzione_termica', state: '5.2', attributes: { unit_of_measurement: 'h' } },
+        'sensor.multizone_brain_zona_test_2_dimensionamento_radiatore': { entity_id: 'sensor.multizone_brain_zona_test_2_dimensionamento_radiatore', state: 'Optimal' },
 
-        'sensor.multizone_brain_zona_test_3_classe_energetica': {
-          entity_id: 'sensor.multizone_brain_zona_test_3_classe_energetica',
-          state: 'C'
+        'sensor.multizone_brain_zona_test_3_demand': {
+          entity_id: 'sensor.multizone_brain_zona_test_3_demand',
+          state: '100.0',
+          attributes: {
+            unit_of_measurement: '%',
+            control_mode: 'hysteresis', active_track: 'heat', actuator_type: 'trv',
+            hysteresis_cold_tol: 0.3, hysteresis_hot_tol: 0.3,
+            k_loss: 0.031, weather_ff: 0.0, smart_stop_offset: 0.0, window_open: false
+          }
         },
-        'sensor.multizone_brain_zona_test_3_tempo_ritenzione_termica': {
-          entity_id: 'sensor.multizone_brain_zona_test_3_tempo_ritenzione_termica',
-          state: '4.1',
-          attributes: { unit_of_measurement: 'h' }
+        'sensor.multizone_brain_zona_test_3_autotuning': {
+          entity_id: 'sensor.multizone_brain_zona_test_3_autotuning',
+          state: 'Apprendimento Caldo (2/3)',
+          attributes: { Kp: 0.0, Ki: 0.0, Kd: 0.0, weekly_guardrail_status: 'idle' }
         },
-        'sensor.multizone_brain_zona_test_3_dimensionamento_radiatore': {
-          entity_id: 'sensor.multizone_brain_zona_test_3_dimensionamento_radiatore',
-          state: 'Sottodimensionato'
-        }
+        'sensor.multizone_brain_zona_test_3_heating_rate': { entity_id: 'sensor.multizone_brain_zona_test_3_heating_rate', state: '0.90', attributes: { unit_of_measurement: '°C/hr' } },
+        'sensor.multizone_brain_zona_test_3_cooling_rate': { entity_id: 'sensor.multizone_brain_zona_test_3_cooling_rate', state: '0.42', attributes: { unit_of_measurement: '°C/hr' } },
+        'sensor.multizone_brain_zona_test_3_thermal_inertia': { entity_id: 'sensor.multizone_brain_zona_test_3_thermal_inertia', state: '0.19', attributes: { unit_of_measurement: '°C' } },
+        'sensor.multizone_brain_zona_test_3_classe_energetica': { entity_id: 'sensor.multizone_brain_zona_test_3_classe_energetica', state: 'C' },
+        'sensor.multizone_brain_zona_test_3_tempo_ritenzione_termica': { entity_id: 'sensor.multizone_brain_zona_test_3_tempo_ritenzione_termica', state: '4.1', attributes: { unit_of_measurement: 'h' } },
+        'sensor.multizone_brain_zona_test_3_dimensionamento_radiatore': { entity_id: 'sensor.multizone_brain_zona_test_3_dimensionamento_radiatore', state: 'Undersized' }
       },
 
-      // CALLSERVICE REALE
-      callService: function(domain, service, data) {
-        console.log(`[HA SERVICE] ${domain}.${service}`, data);
+      callWS: async function(msg) {
+        if (!msg || msg.type !== 'history/history_during_period') return {};
+        const startMs = Date.parse(msg.start_time) || (Date.now() - 24 * 3600 * 1000);
+        const endMs = Date.parse(msg.end_time) || Date.now();
+        const spanSec = Math.max(3600, (endMs - startMs) / 1000);
+        const points = 72;
+        const out = {};
+        const bType = MOCK_HASS.states['sensor.master_control_master_demand']?.attributes?.boiler_type || 'opentherm';
 
-        // 1. Modifica Temperatura
+        (msg.entity_ids || []).forEach((eid) => {
+          const rows = [];
+          for (let i = 0; i < points; i++) {
+            const frac = i / (points - 1);
+            const lu = Math.round((startMs / 1000) + frac * spanSec);
+            const x = frac * 24;
+
+            if (eid === 'sensor.master_control_master_demand') {
+              const md = Math.max(0, Math.min(100, 46 + 44 * Math.sin(x * 0.55) + 10 * Math.cos(x * 1.4)));
+              const isDhw = (bType === 'opentherm') && (frac > 0.25 && frac < 0.30);
+              const flow = isDhw ? 62.0 : (41.0 + 0.18 * md);
+              const ret = flow - 8.3 + 0.7 * Math.sin(x);
+              const slot = i % 6;
+              const relayActive = md >= 95 ? true : (md <= 5 ? false : slot < Math.round((md / 100) * 6));
+              const solar = (bType === 'heat_pump') && (frac > 0.42 && frac < 0.68);
+              rows.push({
+                s: md.toFixed(1),
+                lu,
+                a: {
+                  boiler_type: bType,
+                  boiler_active: bType === 'relay' ? relayActive : (md > 5),
+                  dhw_active: isDhw,
+                  flow_temp: +flow.toFixed(1),
+                  return_temp: +ret.toFixed(1),
+                  modulation_level: isDhw ? 88 : Math.round(md * 0.85),
+                  outdoor_temp: +(5.5 + 3.8 * Math.sin((x - 7) * Math.PI / 12)).toFixed(1),
+                  solar_boost_active: solar,
+                  battery_soc: Math.round(52 + 38 * Math.sin(x * 0.22))
+                }
+              });
+            } else if (eid === 'sensor.master_control_frequenza_accensioni_caldaia') {
+              rows.push({ s: (1.4 + 0.9 * Math.sin(x * 0.4) + 0.3 * Math.cos(x * 1.2)).toFixed(1), lu, a: {} });
+            } else if (eid === 'sensor.master_control_ore_funzionamento_caldaia_24h') {
+              rows.push({ s: (0.4 + frac * 3.8).toFixed(1), lu, a: {} });
+            } else if (eid.startsWith('climate.')) {
+              const zIdx = eid.includes('_1') ? 1 : (eid.includes('_2') ? 2 : 3);
+              const sp = zIdx === 3 ? 20.0 : 20.5;
+              const isWin = (zIdx === 1) && (frac >= 0.35 && frac <= 0.41);
+              const drop = isWin ? -0.95 * Math.sin(((frac - 0.35) / 0.06) * Math.PI) : 0;
+              const cur = sp + (zIdx === 3 ? 0.36 * Math.sin(x * 0.85) : -0.15 - 0.35 * Math.sin(x * 0.4 + zIdx)) + drop;
+              rows.push({ s: 'heat', lu, a: { current_temperature: +cur.toFixed(2), temperature: sp } });
+            } else if (eid.endsWith('_demand')) {
+              const zIdx = eid.includes('_1') ? 1 : (eid.includes('_2') ? 2 : 3);
+              const isWin = (zIdx === 1) && (frac >= 0.35 && frac <= 0.41);
+              if (zIdx === 3) {
+                const hystOn = Math.sin(x * 0.85) < 0.1;
+                rows.push({ s: hystOn ? '100.0' : '0.0', lu, a: { control_mode: 'hysteresis', window_open: false } });
+              } else {
+                const sp = 20.5;
+                const pv = sp - 0.15 - 0.35 * Math.sin(x * 0.4 + zIdx) + (isWin ? -0.9 : 0);
+                const pt = isWin ? 0 : (sp - pv) * (zIdx === 2 ? 36.4 : 48.2);
+                const it = isWin ? 0 : Math.max(0, 22 + 10 * Math.sin(x * 0.25 + zIdx));
+                const dt = isWin ? 0 : -4.2 * Math.cos(x * 0.4 + zIdx);
+                const wff = isWin ? 0 : 8.5;
+                const dem = isWin ? 0 : Math.max(0, Math.min(100, pt + it + dt + wff));
+                const pwmSlot = i % 6;
+                rows.push({
+                  s: dem.toFixed(1),
+                  lu,
+                  a: {
+                    control_mode: 'smart_pid',
+                    window_open: isWin,
+                    pwm_output_on: dem >= 95 ? true : (dem <= 5 ? false : pwmSlot < Math.round((dem / 100) * 6)),
+                    p_term: +pt.toFixed(1),
+                    i_term: +it.toFixed(1),
+                    d_term: +dt.toFixed(1),
+                    weather_ff: wff
+                  }
+                });
+              }
+            } else if (eid.includes('heating_rate')) {
+              const base = eid.includes('_1') ? 1.50 : (eid.includes('_2') ? 1.20 : 0.90);
+              rows.push({ s: (base + 0.08 * Math.sin(x * 0.5)).toFixed(2), lu, a: {} });
+            } else if (eid.includes('cooling_rate')) {
+              const base = eid.includes('_1') ? 0.26 : (eid.includes('_2') ? 0.34 : 0.42);
+              rows.push({ s: (base + 0.02 * Math.cos(x * 0.4)).toFixed(2), lu, a: {} });
+            } else if (eid.includes('thermal_inertia')) {
+              const base = eid.includes('_1') ? 0.12 : (eid.includes('_2') ? 0.15 : 0.19);
+              rows.push({ s: (base + 0.02 * Math.sin(x * 0.7)).toFixed(2), lu, a: {} });
+            }
+          }
+          out[eid] = rows;
+        });
+        return out;
+      },
+
+      callService: function(domain, service, data) {
         if (domain === 'climate' && service === 'set_temperature') {
           const eid = data.entity_id;
           if (MOCK_HASS.states[eid]) {
@@ -656,14 +729,10 @@
               MOCK_HASS.states[eid].attributes.hvac_action = data.temperature > cur ? 'heating' : 'idle';
             }
           }
-        }
-
-        // 2. Modifica Preset o Priorità o Modalità Stagionale
-        else if (domain === 'select' && service === 'select_option') {
+        } else if (domain === 'select' && service === 'select_option') {
           const eid = data.entity_id;
           if (MOCK_HASS.states[eid]) {
             MOCK_HASS.states[eid].state = data.option;
-
             if (eid.includes('global_preset')) {
               const presets = {
                 comfort: { z1: 20.5, z2: 20.5, z3: 20.0 },
@@ -679,14 +748,11 @@
                 if (p.z3) MOCK_HASS.states['climate.multizone_thermostat_zona_test_3'].attributes.temperature = p.z3;
               }
             }
-
-            // Priorità Sorgente (Auto, Ibrido, Combinato, Elettrico, Gas)
             if (eid.includes('heat_source_priority')) {
               const priority = data.option;
               const z1 = MOCK_HASS.states['climate.multizone_thermostat_zona_test_1'];
               const z2 = MOCK_HASS.states['climate.multizone_thermostat_zona_test_2'];
               const z3 = MOCK_HASS.states['climate.multizone_thermostat_zona_test_3'];
-
               if (priority === 'electric_only') {
                 if (z1) z1.attributes.active_heating_source = 'electric';
                 if (z2) z2.attributes.active_heating_source = 'electric';
@@ -699,32 +765,23 @@
                 if (z1) z1.attributes.active_heating_source = 'gas';
                 if (z2) z2.attributes.active_heating_source = 'gas';
                 if (z3) z3.attributes.active_heating_source = 'gas';
-              } else { // auto / hybrid
+              } else {
                 if (z1) z1.attributes.active_heating_source = 'electric';
                 if (z2) z2.attributes.active_heating_source = 'gas';
                 if (z3) z3.attributes.active_heating_source = 'gas';
               }
             }
-
-            // Commutazione Stagionale (Caldo / Freddo)
             if (eid.includes('master_operation_mode')) {
               const isCool = (data.option === 'cool');
               const isMasterOn = (MOCK_HASS.states['switch.master_control_heating_master'].state === 'on');
-
               MOCK_HASS.states['switch.caldaia'].state = (!isCool && isMasterOn) ? 'on' : 'off';
-
               ['climate.multizone_thermostat_zona_test_1', 'climate.multizone_thermostat_zona_test_2', 'climate.multizone_thermostat_zona_test_3'].forEach(zid => {
                 const z = MOCK_HASS.states[zid];
                 if (z) {
                   if (isMasterOn) {
-                    if (isCool) {
-                      const canCool = z.attributes.can_cool !== false;
-                      z.state = canCool ? 'cool' : 'off';
-                      z.attributes.hvac_action = canCool ? 'cooling' : 'off';
-                    } else {
-                      z.state = 'heat';
-                      z.attributes.hvac_action = 'heating';
-                    }
+                    const canCool = z.attributes.can_cool !== false;
+                    z.state = isCool ? (canCool ? 'cool' : 'off') : 'heat';
+                    z.attributes.hvac_action = isCool ? (canCool ? 'cooling' : 'off') : 'heating';
                   } else {
                     z.state = 'off';
                     z.attributes.hvac_action = z.attributes.split_active ? 'heating' : 'off';
@@ -732,8 +789,6 @@
                 }
               });
             }
-
-            // Selezione Modalità Zona (Primaria, Secondaria, Bypass)
             if (eid.includes('zone_mode')) {
               const zoneMap = {
                 'select.multizone_thermostat_zona_test_1_zone_mode': 'climate.multizone_thermostat_zona_test_1',
@@ -746,36 +801,21 @@
               }
             }
           }
-        }
-
-        // 3. Modifica Interruttore (Master ON / OFF / TOGGLE o Caldaia)
-        else if (domain === 'switch') {
+        } else if (domain === 'switch') {
           const eid = data.entity_id;
           if (MOCK_HASS.states[eid]) {
-            let turnOn;
-            if (service === 'toggle') {
-              turnOn = (MOCK_HASS.states[eid].state !== 'on');
-            } else {
-              turnOn = (service === 'turn_on');
-            }
+            const turnOn = (service === 'toggle') ? (MOCK_HASS.states[eid].state !== 'on') : (service === 'turn_on');
             MOCK_HASS.states[eid].state = turnOn ? 'on' : 'off';
-
             if (eid.includes('master_control_heating_master') || eid.includes('master')) {
               const isCool = (MOCK_HASS.states['select.master_control_master_operation_mode']?.state === 'cool');
               MOCK_HASS.states['switch.caldaia'].state = (!isCool && turnOn) ? 'on' : 'off';
-
               ['climate.multizone_thermostat_zona_test_1', 'climate.multizone_thermostat_zona_test_2', 'climate.multizone_thermostat_zona_test_3'].forEach(zid => {
                 const z = MOCK_HASS.states[zid];
                 if (z) {
                   if (turnOn) {
-                    if (isCool) {
-                      const canCool = z.attributes.can_cool !== false;
-                      z.state = canCool ? 'cool' : 'off';
-                      z.attributes.hvac_action = canCool ? 'cooling' : 'off';
-                    } else {
-                      z.state = 'heat';
-                      z.attributes.hvac_action = 'heating';
-                    }
+                    const canCool = z.attributes.can_cool !== false;
+                    z.state = isCool ? (canCool ? 'cool' : 'off') : 'heat';
+                    z.attributes.hvac_action = isCool ? (canCool ? 'cooling' : 'off') : 'heating';
                   } else {
                     z.state = z.attributes.split_active ? 'heat' : 'off';
                     z.attributes.hvac_action = z.attributes.split_active ? 'heating' : 'off';
@@ -784,10 +824,7 @@
               });
             }
           }
-        }
-
-        // 4. Modifica HVAC Mode (Split Locale Climatizzazione o Termostato)
-        else if (domain === 'climate' && service === 'set_hvac_mode') {
+        } else if (domain === 'climate' && service === 'set_hvac_mode') {
           const eid = data.entity_id;
           const hvacMode = data.hvac_mode;
           if (MOCK_HASS.states[eid]) {
@@ -801,105 +838,73 @@
                 z1.attributes.split_manual_on = isSplitActive;
                 z1.attributes.active_heating_source = isSplitActive ? 'electric' : 'gas';
                 const isMasterOn = MOCK_HASS.states['switch.master_control_heating_master'].state === 'on';
-                if (isSplitActive) {
-                  z1.attributes.hvac_action = 'heating';
-                } else {
-                  z1.attributes.hvac_action = isMasterOn ? (z1.attributes.temperature > z1.attributes.current_temperature ? 'heating' : 'idle') : 'off';
-                }
+                z1.attributes.hvac_action = isSplitActive ? 'heating' : (isMasterOn ? 'heating' : 'off');
               }
-              if (sp1) {
-                sp1.state = hvacMode;
-              }
+              if (sp1) sp1.state = hvacMode;
             }
           }
         }
-
-        // Aggiorna tutte le card registrate
         updateAllCards();
       }
     };
 
     let activeCards = [];
+    let telemetryCardEl = null;
+
+    function openTelemetryTab(targetKey) {
+      if (targetKey) {
+        try { sessionStorage.setItem('mz_telemetry_target', targetKey); } catch (e) {}
+      }
+      switchView('view-telemetry');
+    }
 
     function mountCards() {
       activeCards = [];
 
-      // 1. TOP ROW CARDS
-      // Card 1: Preset Card
       const presetCard = document.createElement('multizone-thermostat-preset-card');
       presetCard.setConfig({ border_radius: '20px' });
       document.getElementById('host-preset-card').appendChild(presetCard);
       activeCards.push(presetCard);
 
-      // Card 2: Status Card
       const statusCard = document.createElement('multizone-thermostat-status-card');
       statusCard.setConfig({ border_radius: '20px' });
       document.getElementById('host-status-card').appendChild(statusCard);
       activeCards.push(statusCard);
 
-      // Card 3: Schedule Summary Card (Programmazione)
       const schedSummary = document.createElement('multizone-thermostat-schedule-summary-card');
       schedSummary.setConfig({ border_radius: '20px', navigation_path: 'programmazione' });
       const hostSched = document.getElementById('host-schedule-summary');
       hostSched.appendChild(schedSummary);
-      hostSched.addEventListener('click', (e) => {
-        e.stopPropagation();
-        switchView('view-sched');
-      }, true);
+      hostSched.addEventListener('click', (e) => { e.stopPropagation(); switchView('view-sched'); }, true);
       activeCards.push(schedSummary);
 
-      // Card 4: Health Summary Card (Diagnostica)
       const healthSummary = document.createElement('multizone-thermostat-health-summary-card');
       healthSummary.setConfig({ border_radius: '20px', navigation_path: 'diagnostica' });
       const hostHealth = document.getElementById('host-health-summary');
       hostHealth.appendChild(healthSummary);
-      hostHealth.addEventListener('click', (e) => {
-        e.stopPropagation();
-        switchView('view-diag');
-      }, true);
+      hostHealth.addEventListener('click', (e) => { e.stopPropagation(); switchView('view-diag'); }, true);
       activeCards.push(healthSummary);
 
-      // 2. DIAL CARDS ROW
-      // Dial 1: Living Room (With Split AC)
       const dial1 = document.createElement('multizone-thermostat-dial-card');
-      dial1.setConfig({
-        entity: 'climate.multizone_thermostat_zona_test_1',
-        switch: 'select.multizone_thermostat_zona_test_1_zone_mode',
-        hide_if_cannot_cool: true,
-        border_radius: '20px'
-      });
+      dial1.setConfig({ entity: 'climate.multizone_thermostat_zona_test_1', switch: 'select.multizone_thermostat_zona_test_1_zone_mode', hide_if_cannot_cool: true, border_radius: '20px' });
       document.getElementById('host-dial-1').appendChild(dial1);
       activeCards.push(dial1);
 
-      // Dial 2: Kitchen (Gas + Summer Cooling)
       const dial2 = document.createElement('multizone-thermostat-dial-card');
-      dial2.setConfig({
-        entity: 'climate.multizone_thermostat_zona_test_2',
-        switch: 'select.multizone_thermostat_zona_test_2_zone_mode',
-        hide_if_cannot_cool: true,
-        border_radius: '20px'
-      });
+      dial2.setConfig({ entity: 'climate.multizone_thermostat_zona_test_2', switch: 'select.multizone_thermostat_zona_test_2_zone_mode', hide_if_cannot_cool: true, border_radius: '20px' });
       document.getElementById('host-dial-2').appendChild(dial2);
       activeCards.push(dial2);
 
-      // Dial 3: Office (Winter Heating Only - Radiator)
       const dial3 = document.createElement('multizone-thermostat-dial-card');
-      dial3.setConfig({
-        entity: 'climate.multizone_thermostat_zona_test_3',
-        switch: 'select.multizone_thermostat_zona_test_3_zone_mode',
-        hide_if_cannot_cool: true,
-        border_radius: '20px'
-      });
+      dial3.setConfig({ entity: 'climate.multizone_thermostat_zona_test_3', switch: 'select.multizone_thermostat_zona_test_3_zone_mode', hide_if_cannot_cool: true, border_radius: '20px' });
       document.getElementById('host-dial-3').appendChild(dial3);
       activeCards.push(dial3);
 
-      // 3. VISTA PROGRAMMAZIONE
       const schedulerCard = document.createElement('multizone-thermostat-scheduler-card');
       schedulerCard.setConfig({});
       document.getElementById('host-scheduler-card').appendChild(schedulerCard);
       activeCards.push(schedulerCard);
 
-      // 4. VISTA DIAGNOSTICA
       const plantCard = document.createElement('multizone-thermostat-plant-card');
       plantCard.setConfig({ border_radius: '20px' });
       document.getElementById('host-plant-card').appendChild(plantCard);
@@ -920,7 +925,31 @@
       document.getElementById('host-energy-3').appendChild(energy3);
       activeCards.push(energy3);
 
-      // Invia stato iniziale
+      telemetryCardEl = document.createElement('multizone-thermostat-telemetry-card');
+      if (telemetryCardEl && typeof telemetryCardEl.setConfig === 'function') {
+        telemetryCardEl.setConfig({ border_radius: '20px' });
+      }
+      document.getElementById('host-telemetry-card').appendChild(telemetryCardEl);
+      activeCards.push(telemetryCardEl);
+
+      document.querySelectorAll('[data-sim-backend]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const bType = btn.dataset.simBackend;
+          document.querySelectorAll('[data-sim-backend]').forEach(b => b.classList.toggle('active', b === btn));
+          const md = MOCK_HASS.states['sensor.master_control_master_demand'];
+          const ph = MOCK_HASS.states['sensor.master_control_stato_salute_impianto'];
+          if (md) md.attributes.boiler_type = bType;
+          if (ph && ph.attributes && ph.attributes.opentherm) {
+            ph.attributes.opentherm.enabled = (bType === 'opentherm');
+          }
+          if (telemetryCardEl) {
+            telemetryCardEl._historyCache = {};
+            telemetryCardEl._lastUpdateMs = 0;
+          }
+          updateAllCards();
+        });
+      });
+
       updateAllCards();
     }
 
@@ -929,14 +958,17 @@
         language: MOCK_HASS.language,
         locale: { language: MOCK_HASS.language },
         states: Object.assign({}, MOCK_HASS.states),
-        callService: MOCK_HASS.callService
+        callService: MOCK_HASS.callService,
+        callWS: MOCK_HASS.callWS
       };
 
       activeCards.forEach(c => {
-        try { c.hass = hassCopy; } catch (e) { console.error(e); }
+        try {
+          if (c === telemetryCardEl) c._lastUpdateMs = 0;
+          c.hass = hassCopy;
+        } catch (e) { console.error(e); }
       });
 
-      // Se una card si nasconde in estate (es. Studio privo di condizionatore), nascondi anche lo slot di griglia
       setTimeout(() => {
         ['host-dial-1', 'host-dial-2', 'host-dial-3'].forEach(id => {
           const host = document.getElementById(id);
@@ -947,130 +979,74 @@
       }, 20);
     }
 
-    // Navigazione Viste
     function switchView(viewId) {
       document.querySelectorAll('.dashboard-view').forEach(v => v.classList.remove('active'));
       document.querySelectorAll('.ha-tab').forEach(t => t.classList.remove('active'));
-
       const target = document.getElementById(viewId);
       if (target) target.classList.add('active');
-
       if (viewId === 'view-home') document.getElementById('tabBtnHome').classList.add('active');
       if (viewId === 'view-sched') document.getElementById('tabBtnSched').classList.add('active');
       if (viewId === 'view-diag') document.getElementById('tabBtnDiag').classList.add('active');
-
+      if (viewId === 'view-telemetry') document.getElementById('tabBtnTelemetry').classList.add('active');
+      if (typeof closeMzStandaloneModal === 'function') closeMzStandaloneModal();
       setTimeout(updateAllCards, 40);
     }
 
-    // Ascolto eventi di navigazione nativi dalle card di riepilogo
     window.addEventListener('hass-navigate', (e) => {
-      const path = e.detail?.path;
-      if (path === 'programmazione' || path === 'scheduler') {
+      const path = String(e.detail?.path || '').toLowerCase();
+      if (path.includes('programmazione') || path.includes('scheduler')) {
         switchView('view-sched');
-      } else if (path === 'diagnostica' || path === 'diagnostics') {
+      } else if (path.includes('telemetria') || path.includes('telemetry')) {
+        switchView('view-telemetry');
+      } else if (path.includes('diagnostica') || path.includes('diagnostics')) {
         switchView('view-diag');
       } else {
         switchView('view-home');
       }
     });
 
-    // Multi-Language Support
     const UI_I18N = {
       en: {
-        tab_thermostats: "Thermostats",
-        tab_scheduling: "Scheduling",
-        tab_diagnostics: "Diagnostics",
-        col_2: "Grid: 2 Columns",
-        col_3: "Grid: 3 Columns",
-        style_luxury: "Style: Luxury",
-        style_classic: "Style: Classic",
-        living_room: "Living Room",
-        kitchen: "Kitchen",
-        office: "Office",
-        optimal: "Optimal",
-        undersized: "Undersized",
-        cycles_unit: "cycles/h",
-        boiler_name: "Central Boiler"
+        tab_thermostats: "Thermostats", tab_scheduling: "Scheduling", tab_diagnostics: "Diagnostics", tab_telemetry: "Charts & Telemetry",
+        col_2: "Grid: 2 Columns", col_3: "Grid: 3 Columns", style_luxury: "Style: Luxury", style_classic: "Style: Classic",
+        living_room: "Living Room", kitchen: "Kitchen", office: "Office",
+        optimal: "Optimal", undersized: "Undersized", cycles_unit: "cycles/h", boiler_name: "Central Boiler",
+        sim_backend_lbl: "Simulate Plant Backend:"
       },
       it: {
-        tab_thermostats: "Termostati",
-        tab_scheduling: "Programmazione",
-        tab_diagnostics: "Diagnostica",
-        col_2: "Griglia: 2 Colonne",
-        col_3: "Griglia: 3 Colonne",
-        style_luxury: "Stile: Luxury",
-        style_classic: "Stile: Classic",
-        living_room: "Soggiorno",
-        kitchen: "Cucina",
-        office: "Studio",
-        optimal: "Ottimale",
-        undersized: "Sottodimensionato",
-        cycles_unit: "cicli/h",
-        boiler_name: "Caldaia Centrale"
+        tab_thermostats: "Termostati", tab_scheduling: "Programmazione", tab_diagnostics: "Diagnostica", tab_telemetry: "Grafici & Telemetria",
+        col_2: "Griglia: 2 Colonne", col_3: "Griglia: 3 Colonne", style_luxury: "Stile: Luxury", style_classic: "Stile: Classic",
+        living_room: "Soggiorno", kitchen: "Cucina", office: "Studio",
+        optimal: "Ottimale", undersized: "Sottodimensionato", cycles_unit: "cicli/h", boiler_name: "Caldaia Centrale",
+        sim_backend_lbl: "Simula Impianto:"
       },
       es: {
-        tab_thermostats: "Termostatos",
-        tab_scheduling: "Programación",
-        tab_diagnostics: "Diagnóstico",
-        col_2: "Cuadrícula: 2 Columnas",
-        col_3: "Cuadrícula: 3 Columnas",
-        style_luxury: "Estilo: Luxury",
-        style_classic: "Estilo: Classic",
-        living_room: "Salón",
-        kitchen: "Cocina",
-        office: "Despacho",
-        optimal: "Óptimo",
-        undersized: "Subdimensionado",
-        cycles_unit: "ciclos/h",
-        boiler_name: "Caldera Central"
+        tab_thermostats: "Termostatos", tab_scheduling: "Programación", tab_diagnostics: "Diagnóstico", tab_telemetry: "Gráficos y Telemetría",
+        col_2: "Cuadrícula: 2 Columnas", col_3: "Cuadrícula: 3 Columnas", style_luxury: "Estilo: Luxury", style_classic: "Estilo: Classic",
+        living_room: "Salón", kitchen: "Cocina", office: "Despacho",
+        optimal: "Óptimo", undersized: "Subdimensionado", cycles_unit: "ciclos/h", boiler_name: "Caldera Central",
+        sim_backend_lbl: "Simular Planta:"
       },
       fr: {
-        tab_thermostats: "Thermostats",
-        tab_scheduling: "Programmation",
-        tab_diagnostics: "Diagnostic",
-        col_2: "Grille: 2 Colonnes",
-        col_3: "Grille: 3 Colonnes",
-        style_luxury: "Style: Luxury",
-        style_classic: "Style: Classic",
-        living_room: "Salon",
-        kitchen: "Cuisine",
-        office: "Bureau",
-        optimal: "Optimal",
-        undersized: "Sous-dimensionné",
-        cycles_unit: "cycles/h",
-        boiler_name: "Chaudière Centrale"
+        tab_thermostats: "Thermostats", tab_scheduling: "Programmation", tab_diagnostics: "Diagnostic", tab_telemetry: "Graphiques & Télémétrie",
+        col_2: "Grille: 2 Colonnes", col_3: "Grille: 3 Colonnes", style_luxury: "Style: Luxury", style_classic: "Style: Classic",
+        living_room: "Salon", kitchen: "Cuisine", office: "Bureau",
+        optimal: "Optimal", undersized: "Sous-dimensionné", cycles_unit: "cycles/h", boiler_name: "Chaudière Centrale",
+        sim_backend_lbl: "Simuler Générateur :"
       },
       de: {
-        tab_thermostats: "Thermostate",
-        tab_scheduling: "Zeitplan",
-        tab_diagnostics: "Diagnose",
-        col_2: "Raster: 2 Spalten",
-        col_3: "Raster: 3 Spalten",
-        style_luxury: "Stil: Luxury",
-        style_classic: "Stil: Classic",
-        living_room: "Wohnzimmer",
-        kitchen: "Küche",
-        office: "Arbeitszimmer",
-        optimal: "Optimal",
-        undersized: "Unterdimensioniert",
-        cycles_unit: "Zyklen/h",
-        boiler_name: "Zentralheizung"
+        tab_thermostats: "Thermostate", tab_scheduling: "Zeitplan", tab_diagnostics: "Diagnose", tab_telemetry: "Diagramme & Telemetrie",
+        col_2: "Raster: 2 Spalten", col_3: "Raster: 3 Spalten", style_luxury: "Stil: Luxury", style_classic: "Stil: Classic",
+        living_room: "Wohnzimmer", kitchen: "Küche", office: "Arbeitszimmer",
+        optimal: "Optimal", undersized: "Unterdimensioniert", cycles_unit: "Zyklen/h", boiler_name: "Zentralheizung",
+        sim_backend_lbl: "Anlage simulieren:"
       },
       ru: {
-        tab_thermostats: "Термостаты",
-        tab_scheduling: "Расписание",
-        tab_diagnostics: "Диагностика",
-        col_2: "Сетка: 2 колонки",
-        col_3: "Сетка: 3 колонки",
-        style_luxury: "Стиль: Luxury",
-        style_classic: "Стиль: Classic",
-        living_room: "Гостиная",
-        kitchen: "Кухня",
-        office: "Кабинет",
-        optimal: "Оптимально",
-        undersized: "Недостаточный",
-        cycles_unit: "циклов/ч",
-        boiler_name: "Центральный котёл"
+        tab_thermostats: "Термостаты", tab_scheduling: "Расписание", tab_diagnostics: "Диагностика", tab_telemetry: "Графики и телеметрия",
+        col_2: "Сетка: 2 колонки", col_3: "Сетка: 3 колонки", style_luxury: "Стиль: Luxury", style_classic: "Стиль: Classic",
+        living_room: "Гостиная", kitchen: "Кухня", office: "Кабинет",
+        optimal: "Оптимально", undersized: "Недостаточный", cycles_unit: "циклов/ч", boiler_name: "Центральный котёл",
+        sim_backend_lbl: "Симулятор котла:"
       }
     };
 
@@ -1078,111 +1054,64 @@
       if (!UI_I18N[lang]) lang = 'en';
       MOCK_HASS.language = lang;
       localStorage.setItem('mz_simulator_lang', lang);
-
       const t = UI_I18N[lang];
-      const tabHome = document.querySelector('#tabBtnHome span');
-      const tabSched = document.querySelector('#tabBtnSched span');
-      const tabDiag = document.querySelector('#tabBtnDiag span');
-      if (tabHome) tabHome.textContent = t.tab_thermostats;
-      if (tabSched) tabSched.textContent = t.tab_scheduling;
-      if (tabDiag) tabDiag.textContent = t.tab_diagnostics;
+      document.querySelector('#tabBtnHome span').textContent = t.tab_thermostats;
+      document.querySelector('#tabBtnSched span').textContent = t.tab_scheduling;
+      document.querySelector('#tabBtnDiag span').textContent = t.tab_diagnostics;
+      document.querySelector('#tabBtnTelemetry span').textContent = t.tab_telemetry;
+      document.getElementById('colBtnText').textContent = currentCols === 2 ? t.col_2 : t.col_3;
+      document.getElementById('styleBtnText').textContent = isLuxury ? t.style_luxury : t.style_classic;
+      document.getElementById('sim-backend-lbl').textContent = t.sim_backend_lbl;
 
-      const colText = document.getElementById('colBtnText');
-      if (colText) colText.textContent = currentCols === 2 ? t.col_2 : t.col_3;
-
-      const styleText = document.getElementById('styleBtnText');
-      if (styleText) styleText.textContent = isLuxury ? t.style_luxury : t.style_classic;
-
-      if (MOCK_HASS.states['climate.multizone_thermostat_zona_test_1']) {
-        MOCK_HASS.states['climate.multizone_thermostat_zona_test_1'].attributes.friendly_name = t.living_room;
-      }
-      if (MOCK_HASS.states['climate.multizone_thermostat_zona_test_2']) {
-        MOCK_HASS.states['climate.multizone_thermostat_zona_test_2'].attributes.friendly_name = t.kitchen;
-      }
-      if (MOCK_HASS.states['climate.multizone_thermostat_zona_test_3']) {
-        MOCK_HASS.states['climate.multizone_thermostat_zona_test_3'].attributes.friendly_name = t.office;
-      }
-      if (MOCK_HASS.states['switch.caldaia']) {
-        MOCK_HASS.states['switch.caldaia'].attributes.friendly_name = t.boiler_name;
-      }
-      if (MOCK_HASS.states['sensor.master_control_frequenza_accensioni_caldaia']) {
-        MOCK_HASS.states['sensor.master_control_frequenza_accensioni_caldaia'].attributes.unit_of_measurement = t.cycles_unit;
-      }
-      if (MOCK_HASS.states['sensor.multizone_brain_zona_test_1_dimensionamento_radiatore']) {
-        MOCK_HASS.states['sensor.multizone_brain_zona_test_1_dimensionamento_radiatore'].state = t.optimal;
-      }
-      if (MOCK_HASS.states['sensor.multizone_brain_zona_test_2_dimensionamento_radiatore']) {
-        MOCK_HASS.states['sensor.multizone_brain_zona_test_2_dimensionamento_radiatore'].state = t.optimal;
-      }
-      if (MOCK_HASS.states['sensor.multizone_brain_zona_test_3_dimensionamento_radiatore']) {
-        MOCK_HASS.states['sensor.multizone_brain_zona_test_3_dimensionamento_radiatore'].state = t.undersized;
-      }
+      MOCK_HASS.states['climate.multizone_thermostat_zona_test_1'].attributes.friendly_name = t.living_room;
+      MOCK_HASS.states['climate.multizone_thermostat_zona_test_2'].attributes.friendly_name = t.kitchen;
+      MOCK_HASS.states['climate.multizone_thermostat_zona_test_3'].attributes.friendly_name = t.office;
+      MOCK_HASS.states['switch.caldaia'].attributes.friendly_name = t.boiler_name;
+      MOCK_HASS.states['sensor.master_control_frequenza_accensioni_caldaia'].attributes.unit_of_measurement = t.cycles_unit;
+      MOCK_HASS.states['sensor.multizone_brain_zona_test_1_dimensionamento_radiatore'].state = t.optimal;
+      MOCK_HASS.states['sensor.multizone_brain_zona_test_2_dimensionamento_radiatore'].state = t.optimal;
+      MOCK_HASS.states['sensor.multizone_brain_zona_test_3_dimensionamento_radiatore'].state = t.undersized;
 
       updateAllCards();
     }
 
-    // Toggle Colonne Griglia (2 o 3 colonne)
     let currentCols = 2;
     function toggleCols() {
       currentCols = currentCols === 2 ? 3 : 2;
-      document.querySelectorAll('.ha-zones-grid').forEach(g => {
-        if (currentCols === 3) {
-          g.classList.add('cols-3');
-        } else {
-          g.classList.remove('cols-3');
-        }
-      });
-      const lang = MOCK_HASS.language || 'en';
-      const t = UI_I18N[lang] || UI_I18N.en;
+      document.querySelectorAll('.ha-zones-grid').forEach(g => g.classList.toggle('cols-3', currentCols === 3));
+      const t = UI_I18N[MOCK_HASS.language] || UI_I18N.en;
       document.getElementById('colBtnText').textContent = currentCols === 2 ? t.col_2 : t.col_3;
     }
 
-    // Style Switcher
     let isLuxury = localStorage.getItem('mz_card_style') !== 'classic';
-
     function toggleStyle() {
       isLuxury = !isLuxury;
       const newStyle = isLuxury ? 'luxury' : 'classic';
       localStorage.setItem('mz_card_style', newStyle);
-
       const btn = document.getElementById('styleSwitcherBtn');
       const icon = document.getElementById('styleBtnIcon');
       const text = document.getElementById('styleBtnText');
-      const lang = MOCK_HASS.language || 'en';
-      const t = UI_I18N[lang] || UI_I18N.en;
-
+      const t = UI_I18N[MOCK_HASS.language] || UI_I18N.en;
       if (isLuxury) {
-        btn.classList.add('luxury-active');
-        icon.textContent = '💎';
-        text.textContent = t.style_luxury;
+        btn.classList.add('luxury-active'); icon.textContent = '💎'; text.textContent = t.style_luxury;
         document.body.classList.remove('classic-theme');
       } else {
-        btn.classList.remove('luxury-active');
-        icon.textContent = '🏛️';
-        text.textContent = t.style_classic;
+        btn.classList.remove('luxury-active'); icon.textContent = '🏛️'; text.textContent = t.style_classic;
         document.body.classList.add('classic-theme');
       }
-
       window.dispatchEvent(new CustomEvent('mz-style-changed', { detail: { style: newStyle } }));
     }
 
-    // Inizializzazione
     window.addEventListener('DOMContentLoaded', () => {
       const savedLang = localStorage.getItem('mz_simulator_lang') || 'en';
       const langSel = document.getElementById('langSelector');
-      if (langSel) {
-        langSel.value = savedLang;
-      }
-
-      const saved = localStorage.getItem('mz_card_style') || 'luxury';
-      if (saved === 'classic') {
+      if (langSel) langSel.value = savedLang;
+      if (!isLuxury) {
         isLuxury = false;
-        const btn = document.getElementById('styleSwitcherBtn');
-        btn.classList.remove('luxury-active');
+        document.getElementById('styleSwitcherBtn').classList.remove('luxury-active');
         document.getElementById('styleBtnIcon').textContent = '🏛️';
         document.body.classList.add('classic-theme');
       }
-
       mountCards();
       changeLanguage(savedLang);
     });

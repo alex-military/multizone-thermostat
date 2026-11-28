@@ -13,6 +13,10 @@ import homeassistant.util.dt as dt_util
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from .const import (
     CONF_ZONE_NAME,
+    CONF_ZONE_CLIMATES,
+    CONF_ZONE_SWITCHES,
+    CONF_ZONE_VALVES,
+    CONF_ZONE_SPLIT_CLIMATE,
     CONF_ZONE_TEMP_SENSOR,
     CONF_ZONE_SENSOR_TIMEOUT,
     CONF_ZONE_WINDOW_SENSOR,
@@ -130,18 +134,71 @@ class ZoneController:
         except (ValueError, TypeError):
             return None
 
+    def _detect_zone_actuator_type(self, resolved_id: str, active_track: str = "heat") -> str:
+        """Infer primary actuator class for telemetry visualization."""
+        zone_cfg: dict[str, Any] | None = None
+        zones = getattr(self, "zones", None)
+        if isinstance(zones, list):
+            for z in zones:
+                if isinstance(z, dict) and z.get(CONF_ZONE_NAME):
+                    if make_zone_entity_id(z[CONF_ZONE_NAME]) == resolved_id:
+                        zone_cfg = z
+                        break
+        if not zone_cfg:
+            return "split" if active_track == "cool" else "trv"
+
+        has_valve = bool(zone_cfg.get(CONF_ZONE_VALVES))
+        has_switch = bool(zone_cfg.get(CONF_ZONE_SWITCHES))
+        has_trv = bool(zone_cfg.get(CONF_ZONE_CLIMATES))
+        has_split = bool(zone_cfg.get(CONF_ZONE_SPLIT_CLIMATE))
+
+        if active_track == "cool" and has_split and not has_valve:
+            return "split"
+
+        hydronic_kinds = int(has_valve) + int(has_switch) + int(has_trv)
+        if hydronic_kinds > 1:
+            return "mixed"
+        if has_valve:
+            return "valve"
+        if has_switch:
+            return "pwm_relay"
+        if has_trv:
+            return "trv"
+        if has_split:
+            return "split"
+        return "trv"
+
     def get_zone_demand_attributes(self, entity_id: str) -> dict[str, Any]:
         """Return live PID component breakdown and control telemetry for DemandSensor."""
         resolved_id = self._resolve_zone_id(entity_id)
         telemetry = dict(self._last_zone_telemetry.get(resolved_id, {}))
         active_track = telemetry.get("active_track", "heat")
+        control_mode = telemetry.get("control_mode", "idle")
+        actuator_type = self._detect_zone_actuator_type(resolved_id, active_track)
+
         attrs: dict[str, Any] = {
-            "control_mode": telemetry.get("control_mode", "idle"),
+            "control_mode": control_mode,
             "active_track": active_track,
+            "actuator_type": actuator_type,
             "weather_ff": telemetry.get("weather_ff", 0.0),
             "smart_stop_offset": telemetry.get("smart_stop_offset", 0.0),
             "window_open": telemetry.get("window_open", False),
         }
+
+        climates_map = getattr(self.coordinator, "_climate_entities", None)
+        climate_ent = climates_map.get(resolved_id) if isinstance(climates_map, dict) else None
+        pwm_state = getattr(climate_ent, "_local_pwm_state", None) if climate_ent is not None else None
+        if isinstance(pwm_state, bool):
+            attrs["pwm_output_on"] = pwm_state
+
+        model = self.get_thermal_model(resolved_id) if hasattr(self, "get_thermal_model") else None
+        raw_kloss = getattr(model, "k_loss", 0.0) if model is not None else 0.0
+        attrs["k_loss"] = round(float(raw_kloss), 5) if isinstance(raw_kloss, (int, float)) and raw_kloss > 0 else 0.0
+
+        if control_mode == "hysteresis":
+            attrs["hysteresis_cold_tol"] = 0.3
+            attrs["hysteresis_hot_tol"] = 0.3
+
         pid = self._pids_cool.get(resolved_id) if active_track == "cool" else self._pids_heat.get(resolved_id)
         diag_fn = getattr(pid, "get_diagnostics", None)
         if callable(diag_fn):

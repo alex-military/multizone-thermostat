@@ -41,7 +41,7 @@ $$T_{\text{split\_injected}} = T_{\text{desired}} + \left(T_{\text{split\_sensor
 
 ## 2. Quick Heat Boost (Thermal Shock)
 
-When a room starts cold with a significant temperature gap:
+When enabled (`split_quick_boost: True`; default: `False`) and a room starts cold with a significant temperature gap:
 
 1. **Boost Trigger**: If $\Delta T = (T_{\text{target}} - T_{\text{ambient}}) \ge 1.5\ ^\circ\text{C}$ (configurable via `split_boost_delta`), the system fires both hydronic radiators and the split unit at full capacity (**Dual Heat**).
 2. **Rapid Warm-up**: Forced warm air circulates the room volume, reducing warm-up times by 60–70%.
@@ -50,7 +50,9 @@ When a room starts cold with a significant temperature gap:
 
 ---
 
-## 3. Automatic Hydronic Decoupling
+## 3. Automatic Hydronic Decoupling & Solar Priority
+
+With **`split_solar_priority: True`** *(default)*, solar PV surplus or electric-priority modes automatically dispatch the room split ahead of hydronic heating.
 
 When a room split is actively heating (via solar surplus, boost, or manual run):
 * Multizone Thermostat **suppresses hydronic gas demand for that specific room to `0.0%`**.
@@ -67,7 +69,7 @@ On the Lovelace **Dial Card**, centered in the header, is a dedicated split butt
 * **Smart Visibility**: Appears only in rooms configured with a split unit (`split_climate_entity`).
 * **Operation with Central Heating OFF**:
   * Tapping the button when central heating is OFF turns on **only the electric split** for that room.
-  * The gas boiler and hydronic circulators remain off (`switch.caldaia: off`).
+  * The gas boiler and hydronic circulators remain off (`switch.boiler_switch: off`).
   * The card immediately displays the **`⚡ ELECTRIC`** badge and cyan glow.
 * **Master ON Safety Lockout**:
   * When central heating is ON, the button is disabled to prevent accidental clicks from interfering with whole-house orchestration.
@@ -79,7 +81,7 @@ On the Lovelace **Dial Card**, centered in the header, is a dedicated split butt
 
 ## 5. Operational Roles
 
-Configured via the `split_role` parameter:
-* **`heat_cool` (All Year)**: Operates for winter heating support and primary summer air conditioning.
+Configured via the `split_role` parameter in Config Flow or Options:
+* **`heat_cool` (All Year, default)**: Operates for winter heating support and primary summer air conditioning.
 * **`heating_only` (Winter Only)**: Assists radiators or absorbs solar surplus; idle in summer.
 * **`cooling_only` (Summer Only)**: Reserved exclusively for summer cooling (never engages in winter).

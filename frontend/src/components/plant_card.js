@@ -207,6 +207,25 @@ class MultizoneThermostatPlantCard extends HTMLElement {
         align-items: center;
         gap: 8px;
       }
+      .plant-charts-btn {
+        background: rgba(56, 189, 248, 0.14);
+        border: 1px solid rgba(56, 189, 248, 0.38);
+        color: #7dd3fc;
+        border-radius: 9999px;
+        padding: 6px 13px;
+        font-size: 12px;
+        font-weight: 800;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.18s ease;
+      }
+      .plant-charts-btn:hover {
+        background: rgba(56, 189, 248, 0.28);
+        color: #ffffff;
+        transform: translateY(-1px);
+      }
     `;
 
     const t = (k) => getTranslation(this._hass, k);
@@ -222,9 +241,15 @@ class MultizoneThermostatPlantCard extends HTMLElement {
             <div class="subtitle-text" id="plant-sub">${t('plant_health_sub')}</div>
           </div>
         </div>
-        <div class="status-badge status-optimal" id="health-badge">
-          <span class="status-dot"></span>
-          <span id="health-text">${t('optimal')}</span>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <button type="button" class="plant-charts-btn" id="plant-charts-btn">
+            <ha-icon icon="mdi:chart-areaspline" style="--mdc-icon-size: 16px;"></ha-icon>
+            <span id="plant-charts-label">${t('tel_open_charts_btn')}</span>
+          </button>
+          <div class="status-badge status-optimal" id="health-badge">
+            <span class="status-dot"></span>
+            <span id="health-text">${t('optimal')}</span>
+          </div>
         </div>
       </div>
 
@@ -294,6 +319,14 @@ class MultizoneThermostatPlantCard extends HTMLElement {
 
     this.shadowRoot.appendChild(style);
     this.shadowRoot.appendChild(card);
+    const chartsBtn = this.shadowRoot.getElementById('plant-charts-btn');
+    if (chartsBtn) {
+      chartsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        try { sessionStorage.setItem('mz_telemetry_target', 'plant'); } catch (err) {}
+        navigateOrFallbackModal(this, 'telemetria', () => openMzStandaloneModal('telemetry', this._hass));
+      });
+    }
     this._rendered = true;
   }
 
@@ -304,6 +337,7 @@ class MultizoneThermostatPlantCard extends HTMLElement {
     try {
       const t = (k) => getTranslation(this._hass, k);
       const labelMap = {
+        'plant-charts-label': 'tel_open_charts_btn',
         'plant-title': 'plant_health_title',
         'plant-sub': 'plant_health_sub',
         'cycles-label': 'cycles_label',

@@ -3,6 +3,7 @@ class MultizoneThermostatDashboardStrategy extends HTMLElement {
     const view = await this.generateView(info);
     const schedView = await this.generateSchedulerView(info);
     const diagView = await this.generateDiagnosticView(info);
+    const telView = await this.generateTelemetryView(info);
     return {
       title: "Multizone Thermostat",
       views: [
@@ -28,6 +29,29 @@ class MultizoneThermostatDashboardStrategy extends HTMLElement {
           subview: true,
           panel: true,
           cards: diagView.cards,
+        },
+        {
+          title: "Grafici & Telemetria",
+          path: "telemetria",
+          icon: "mdi:chart-areaspline",
+          subview: true,
+          panel: true,
+          cards: telView.cards,
+        }
+      ]
+    };
+  }
+
+  static async generateTelemetryView(info) {
+    return {
+      cards: [
+        {
+          type: "vertical-stack",
+          cards: [
+            {
+              type: "custom:multizone-thermostat-telemetry-card"
+            }
+          ]
         }
       ]
     };
@@ -277,6 +301,11 @@ window.customStrategies.push({
   name: "Multizone Thermostat Scheduler",
   description: "Auto-generated scheduler and Smart Return view for your heating zones."
 });
+window.customStrategies.push({
+  type: "multizone-thermostat-telemetry",
+  name: "Multizone Thermostat Telemetry",
+  description: "Auto-generated native plant and PID telemetry charts view."
+});
 
 class MultizoneThermostatViewStrategy extends MultizoneThermostatDashboardStrategy {}
 class MultizoneThermostatDiagnosticViewStrategy extends HTMLElement {
@@ -287,6 +316,11 @@ class MultizoneThermostatDiagnosticViewStrategy extends HTMLElement {
 class MultizoneThermostatSchedulerViewStrategy extends HTMLElement {
   static async generateView(info) {
     return MultizoneThermostatDashboardStrategy.generateSchedulerView(info);
+  }
+}
+class MultizoneThermostatTelemetryViewStrategy extends HTMLElement {
+  static async generateView(info) {
+    return MultizoneThermostatDashboardStrategy.generateTelemetryView(info);
   }
 }
 
@@ -301,5 +335,8 @@ if (!customElements.get("ll-strategy-view-multizone-thermostat-diagnostics")) {
 }
 if (!customElements.get("ll-strategy-view-multizone-thermostat-scheduler")) {
   customElements.define("ll-strategy-view-multizone-thermostat-scheduler", MultizoneThermostatSchedulerViewStrategy);
+}
+if (!customElements.get("ll-strategy-view-multizone-thermostat-telemetry")) {
+  customElements.define("ll-strategy-view-multizone-thermostat-telemetry", MultizoneThermostatTelemetryViewStrategy);
 }
 

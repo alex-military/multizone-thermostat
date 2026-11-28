@@ -28,13 +28,13 @@ flowchart TD
 1. **Impianto Ibrido Standard (Bivalente)**: Caldaia a gas per la stagione rigida invernale e Pompa di Calore per le mezze stagioni o per il freddo estivo.
 2. **Impianto Full-Electric (Solo PDC)**: Disabilitando la caldaia (`enable_gas_heater: False`), la PDC gestisce il 100% dell'abitazione in caldo e in freddo.
 3. **Impianto a Gas Tradizionale + Split d'Ambiente**: Caldaia per radiatori con ausilio di climatizzatori split nelle stanze principali per sfruttare l'energia solare.
-4. **Riscaldamento Centralizzato Condominiale (`CentralizedBoilerBackend`)**: Per appartamenti con impianto condominiale o teleriscaldamento (`boiler_mode: central` o `enable_gas_heater: False` senza PDC) privi di switch caldaia locale: pilota direttamente TRV e valvole di zona.
+4. **Riscaldamento Centralizzato Condominiale (`CentralizedBoilerBackend`)**: Per appartamenti con impianto condominiale o teleriscaldamento (`enable_gas_heater: True` con `boiler_mode: central`) privi di switch caldaia locale: pilota direttamente TRV e valvole di zona. *(Nota: disattivare entrambi i generatori centrali è bloccato nel Config Flow iniziale; `enable_gas_heater: False` senza PDC è consentito solo nelle Opzioni se almeno una zona ha uno Split).*
 
 ---
 
-## 2. Le 5 Modalità di Priorità Riscaldamento
+## 2. Le 7 Modalità di Priorità Riscaldamento
 
-Configurabili istantaneamente dalla barra Lovelace (Preset Card) o tramite l'entità `select.master_control_heat_source_priority`:
+Configurabili tramite l'entità `select.master_control_heat_source_priority` (con le 5 modalità principali accessibili anche come pillole rapide sulla Lovelace Preset Card):
 
 | Priorità | Comportamento Caldaia a Gas | Comportamento Elettrico (Split & PDC) | Scenario Consigliato |
 |---|---|---|---|
@@ -43,6 +43,8 @@ Configurabili istantaneamente dalla barra Lovelace (Preset Card) o tramite l'ent
 | **`combined`** | Lavora stabilmente a regime idronico. | Lavora in parallelo continuo al gas in caso di surplus o forte dislivello termico (escludendo zone `OFF` e `BYPASS`) per riscaldare la casa nel minor tempo possibile. | Abitazioni con grande volumetria o rientri da assenze prolungate. |
 | **`electric_only`** | **Forzata a 0%** (zero gas bruciato). | 100% della richiesta termica gestito da Pompa di Calore centrale e split d'ambiente. | Case Full-Electric, allarmi fornitura gas o giornate di sole pieno. |
 | **`gas_only`** | 100% della richiesta termica erogata a gas. | Split e pompe di calore disattivati in riscaldamento. | Blackout solare o manutenzione condizionatori. |
+| **`gas_priority`** | Sorgente primaria per la domanda della casa. | PDC centrale e split intervengono solo in supporto o quando richiesto boost elettrico. | Impianti bivalenti con tariffa gas più conveniente. |
+| **`electric_priority`** | Interviene come picco/backup se la capacità elettrica non basta. | Dà precedenza a Pompa di Calore centrale e split elettrici. | Case con PDC primaria e tariffe elettriche favorevoli. |
 
 ---
 
@@ -93,19 +95,26 @@ Puoi collegare direttamente l'entità di output del tuo ottimizzatore economico 
 
 | Parametro | Chiave Configurazione | Default | Note |
 |---|---|---|---|
-| Abilita Caldaia Gas | `enable_gas_heater` | `True` | Se disabilitato, opera in modalità Full-Electric. |
+| Abilita Caldaia Gas | `enable_gas_heater` | `True` | Se disabilitato (con PDC o split), rimuove la caldaia a combustione. |
 | Abilita Pompa Calore | `enable_heat_pump` | `False` | Attiva il coordinamento della PDC idronica centrale. |
 | Tipo Controllo PDC | `heat_pump_type` | `climate` | Selezionabile tra `climate`, `switch` o `opentherm`. |
+| Entità PDC | `heat_pump_entity` | `None` | Entità `climate`, `switch` o `number` della PDC centrale. |
+| Range Mandata Caldo PDC | `heat_pump_min_temp` / `max` | `25.0–55.0 °C` | Limiti temperatura acqua in riscaldamento. |
+| Switch Consenso Caldo PDC | `heat_pump_ch_switch` | `None` | Interruttore esterno opzionale di abilitazione riscaldamento PDC. |
 | Reversibilità Estiva PDC | `heat_pump_cooling` | `True` | Abilita il raffrescamento idronico in estate escludendo il gas. |
+| Range Mandata Freddo PDC | `hp_cool_min_temp` / `max` | `7.0–18.0 °C` | Limiti temperatura acqua refrigerata in raffrescamento. |
+| Valvola Miscelatrice | `has_mixing_valve` | `False` | Indica circuiti miscelati (rimuove il tetto 40 °C sul pavimento). |
 | Gestione Solare | `energy_management_enabled` | `False` | Interruttore principale dell'Energy Manager. |
 | Sensore Produzione PV | `solar_power_sensor` | `None` | Potenza istantanea generata dai pannelli in Watt. |
 | Sensore Immissione Rete | `grid_export_sensor` | `None` | Potenza esportata verso la rete in Watt (facoltativo). |
 | Inverti Segno Export | `grid_export_inverted` | `False` | Abilita se il contatore segnala l'immissione in rete con valori negativi. |
 | Soglia Minima Export | `solar_export_threshold` | `500.0 W` | Potenza esportata minima per avviare il surplus a rete. |
 | Sensore Carica Batteria | `battery_soc_sensor` | `None` | Percentuale di carica della batteria domestica (SoC). |
-| Sensore Potenza Batteria | `battery_power_sensor` | `None` | Potenza di carica/scarica della batteria in Watt. |
-| Riserva Minima Notturna | `battery_min_reserve_soc` | `20.0%` | Consigliato 80–85% per preservare la batteria per la notte. |
+| Sensore Potenza Batteria | `battery_power_sensor` | `None` | Potenza batteria in Watt (+ carica, - scarica). |
+| Inverti Segno Batteria | `battery_power_inverted` | `False` | Abilita se il sensore batteria riporta la scarica con segno positivo. |
+| Previsione / Irraggiamento FV | `solar_forecast_sensor` / `solar_irradiance_sensor` | `None` | Sensori opzionali previsione FV (`W`/`kWh`) e irraggiamento (`W/m²`/`lux`). |
+| Riserva Minima Notturna | `battery_min_reserve_soc` | `20.0%` | Soglia minima SoC (consigliato `50–85%` per riserva notturna). |
 | Guardia Scarica Batteria | `battery_max_discharge_time` | `5 min` | Minuti consecutivi di scarica prima del fallback a gas. |
 | Tempo Minimo Ciclo PV | `solar_min_run_time` | `10 min` | Protezione anti-chatter del compressore inverter. |
-| Offset Accumulo Muri | `solar_overheat_offset` | `0.0°C` | Innalzamento target durante surplus (fino a +3.0°C). |
+| Offset Accumulo Muri | `solar_overheat_offset` | `0.0 °C` | Innalzamento target durante surplus (fino a +3.0 °C). |
 | Entità Override Esterno | `external_solar_override_entity` | `None` | Sensore EMHASS o segnale Predbat. |

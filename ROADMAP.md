@@ -36,7 +36,7 @@ Multizone Thermostat transforms Home Assistant into an **autonomous, self-learni
 - [x] **Authoritative Hardware Climate Sync (Phase 9)**: Opt-in authoritative mode source for physical wall thermostats (e.g., Vimar, Bticino) propagating manual OFF states without setpoint corruption.
 - [x] **Configurable Demand Aggregator Strategies & Zone Weights (Phase 10)**: Selection of plant formulas (`MAX`, `WEIGHTED_AVERAGE`, `SUM_CAPPED`) with live entity selector and zone weight multipliers.
 - [x] **Dynamic Feed-Forward Weather Curve ($T_{\text{ext}} \rightarrow T_{\text{flow}}$) (Phase 10)**: Continuously adapts boiler flow temperature based on real outdoor temperature and building thermal retention time.
-- [x] **Air-in-Radiator Anomaly Detection (`ANOMALY_AIR_IN_RADIATOR`) (Phase 10)**: Automated supervision identifying valves opened at 100% with abnormally slow heat-up rates.
+- [x] **Hydraulic Anomaly Detection Engine (Phase 10)**: Automated supervision identifying stuck-closed valves (`> 75 min` at 99%+ demand), ghost heating, TRV non-opening (`trv_not_opening`), and plant/sensor faults (superseded legacy `ANOMALY_AIR_IN_RADIATOR` constant).
 - [x] **Startup Availability Guards & Command De-Duplication (v5.1.2)**: Entity readiness verification during late Zigbee2MQTT startup and suppression of duplicate 10s OFF MQTT spam.
 
 ### Advanced Weekly Scheduling & Next-Gen Lovelace UI (v6.0.0 → v6.0.2)
@@ -50,33 +50,40 @@ Multizone Thermostat transforms Home Assistant into an **autonomous, self-learni
 - [x] **"Smart Return" (Pianifica Rientro) Arrival Planner & Auto-Wake (Phase 7)**: Arrival planner with thermal radar and automatic plant wake-up from master OFF.
 - [x] **UI Polish, Single-Column Wrapping & Strategy View Compatibility (v6.0.1 / v6.0.2 - PR #8)**: Responsive layout stacking for top header cards, robust navigation fallback, and seamless support for Lovelace strategy views.
 
+### Hardening, Actuator Precision & SIMC/Sensorless Upgrade (v6.0.23 → v6.0.26)
+- [x] **Normally Open (NO) Output Inversion (`v6.0.23` - #17)**: Added `invert_switch` for NO PWM relays and `invert_valve` for reverse-acting proportional / 0–10V valves.
+- [x] **TRV `Disabled` Mode, Offset Anti-Ratchet & PID Diagnostics (`v6.0.24` - #18, #19)**: Added `disabled` TRV calibration mode (for native Matter/Zigbee binding), offset deadband/cooldown/`offset_stalled` protection, 15-minute least-squares derivative with anti-flicker guard, coherent median FOPDT, and live JSON `pid_state`.
+- [x] **Per-Zone Setpoint Step `0.5° / 0.1°` (`v6.0.25` - #20)**: Configurable high-resolution `target_temp_step` across backend, Config/Options Flow, Lovelace Dial/Scheduler cards, and 6-language translations.
+- [x] **SIMC Autotuner, Sensorless `ThermalObserver`, Anti-Chattering PWM & Live `DemandSensor` Telemetry (`v6.0.26`)**: Comfort-tuned SIMC gain derivation with OLS slope regression, weekly EMA overshoot guardrail & auto-rollback, trapezoidal PID with `0.03 °C` deadband and dynamic zero-offset Smart Stop, sensorless draft/rebound detection + weather-invariant Newton `k_loss`, single-pulse anti-chattering PWM with `95%` continuous-ON threshold, and live `p_term`/`i_term`/`d_term` attributes directly on `DemandSensor`.
+
 ---
 
 ## 🚀 Active Roadmap & Upcoming Features
 
 ### Phase 11 — Hybrid Multi-Generator, Room Split Climate & Solar Self-Consumption (v6.1.0-beta)
-*Complete documentation and guide available in [`hybrid_and_energy.md`](hybrid_and_energy.md).*
+*Complete documentation and guide available in [`hybrid_energy.md`](docs/wiki/hybrid_energy.md).*
 
 - [x] **Dual-Level Heating Architecture (Central Hydronic + Room Air Splits)**:
-  - **Central Hydronic Drive**: Coordinated bivalent staging between primary Heat Pump (PDC) and auxiliary/peak Gas Boiler on the shared water loop with 5 priority modes (`auto`, `hybrid`, `combined`, `electric_only`, `gas_only`).
+  - **Central Hydronic Drive**: Coordinated bivalent staging between primary Heat Pump (PDC) and auxiliary/peak Gas Boiler on the shared water loop with **7 priority modes** (`auto`, `hybrid`, `combined`, `electric_only`, `gas_only`, `gas_priority`, `electric_priority`).
   - **Room Direct Expansion Actuators**: Integration of room-level AC/heat pump split units (`climate.*` entities) as secondary/auxiliary climate actuators with automatic hydronic decoupling.
 - [x] **Configurable Split Operational Roles & Runtime Master Controls**:
   - Per-zone role configuration: *Heating Only*, *Cooling Only*, or *Both (Heat & Cool)*.
   - Global Dashboard Master Switches for immediate runtime control without re-configuration:
     - `switch.master_control_allow_split_heating` (Toggle Split Heating ON/OFF globally).
     - `switch.master_control_allow_split_cooling` (Toggle Split Cooling ON/OFF globally).
-  - Per-zone runtime behaviors: *Solar Priority*, *Thermal Shock / Quick Heat Boost* ($\Delta T \ge 1.5^\circ	ext{C}$), and *Real Room Sensor Injection* (bypassing the ceiling probe).
+  - Per-zone runtime behaviors: *Solar Priority*, *Thermal Shock / Quick Heat Boost* ($\Delta T \ge 1.5^\circ\text{C}$), and *Real Room Sensor Injection* (bypassing the ceiling probe).
   - Single-room independent split run button with safety lockout when Master is active.
 - [x] **Solar Self-Consumption & Off-Grid Inverter Clipping Engine**:
   - Runtime priority selector (`select.master_control_heat_source_priority`).
   - Multiple solar surplus detection methods: Inverter Clipping / Curtailment detection without export, Grid Export threshold, and EMHASS / Predbat predictive optimizers.
   - Active battery anti-discharge safeguard (timeout after 5 min of continuous discharge >150W reverts to gas) and minimum SoC night reserve.
-  - Free solar thermal over-heating offset ($0.0^\circ	ext{C} \dots +3.0^\circ	ext{C}$) and 10-minute anti-chatter compressor protection.
+  - Free solar thermal over-heating offset ($0.0^\circ\text{C} \dots +3.0^\circ\text{C}$) and 10-minute anti-chatter compressor protection.
 - [x] **Summer Cooling & Dual-Track Climate Engine**:
   - Seasonal Master Mode Switch (`HVACMode.HEAT` / `HVACMode.COOL`).
-  - Dual-track PID loops (`_pids_heat` vs `_pids_cool`) and passive Ziegler-Nichols cooling autotuner.
+  - Dual-track PID loops (`_pids_heat` vs `_pids_cool`) and passive SIMC cooling autotuner.
   - Dual-track isolated preset memory (`presets_heat` and `presets_cool`).
   - Visual Twin Lovelace cards with 14px dial stroke, direct arc touch, and active heat source badges.
+- [x] **Native Adaptive Telemetry & PID/Plant Charts Card (`v6.1.0-beta.22`)**: Dedicated `telemetria` subview (`multizone-thermostat-telemetry-card`) with 100% auto-discovery, zero-dependency interactive SVG charts adapting automatically to control mode (Smart PID vs Hysteresis), actuator class, and central generator (`opentherm`, `relay`, `heat_pump`, `centralized`), plus one-click **`📋 Copy Support Snapshot`** and modal fallback for custom dashboards.
 
 ---
 

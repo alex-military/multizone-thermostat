@@ -459,11 +459,82 @@ class MultizoneMasterDemandSensor(SensorEntity):
     def extra_state_attributes(self) -> dict[str, Any]:
         agg = self._aggregate()
         backend = getattr(self._coordinator, "boiler_backend", None)
+        hp_backend = getattr(self._coordinator, "heat_pump_backend", None)
+        raw_boiler_mode = getattr(self._coordinator, "boiler_mode", None)
+        boiler_mode = str(raw_boiler_mode).lower() if isinstance(raw_boiler_mode, str) else ""
+
+        enable_hp = getattr(self._coordinator, "enable_heat_pump", False) is True
+        enable_gas = getattr(self._coordinator, "enable_gas_heater", False) is True
+
+        if enable_hp and hp_backend is not None:
+            boiler_type = "heat_pump"
+        elif boiler_mode == "opentherm" or getattr(backend, "is_modulating", False) is True or isinstance(getattr(self._coordinator, "opentherm_entity", None), str):
+            boiler_type = "opentherm"
+        elif boiler_mode in ("central", "centralized") or (backend is not None and type(backend).__name__ == "CentralizedBoilerBackend"):
+            boiler_type = "centralized"
+        else:
+            boiler_type = "relay"
+
+        boiler_active = bool(agg is not None and getattr(agg, "demand", 0.0) > 0.0)
+        if boiler_type == "relay" and backend is not None and isinstance(getattr(backend, "_last_known_boiler_on", None), bool):
+            boiler_active = bool(backend._last_known_boiler_on)
+        elif boiler_type == "heat_pump" and hp_backend is not None and isinstance(getattr(hp_backend, "_last_state_on", None), bool):
+            boiler_active = bool(hp_backend._last_state_on)
+
         attrs: dict[str, Any] = {
             "master_on": self._coordinator.get_master_state(),
             "master_hvac_mode": getattr(self._coordinator, "master_hvac_mode", "heat"),
+            "boiler_type": boiler_type,
+            "boiler_active": boiler_active,
             "boiler_status": getattr(self._coordinator, "boiler_status_reason", None) or getattr(backend, "status_reason", None),
         }
+        if enable_hp and enable_gas:
+            attrs["is_bivalent"] = True
+
+        plant_diag = getattr(self._coordinator, "plant_diagnostics", None)
+        ot_fn = getattr(plant_diag, "get_opentherm_diagnostics", None)
+        if callable(ot_fn):
+            try:
+                ot = ot_fn()
+                if isinstance(ot, dict) and ot.get("enabled"):
+                    if "flame_active" in ot and isinstance(ot["flame_active"], bool):
+                        attrs["boiler_active"] = ot["flame_active"]
+                        attrs["flame_active"] = ot["flame_active"]
+                    for src_k, dst_k in (
+                        ("flow_temperature", "flow_temp"),
+                        ("return_temperature", "return_temp"),
+                        ("modulation_level", "modulation_level"),
+                        ("water_pressure", "water_pressure"),
+                        ("condensing_optimal", "condensing_optimal"),
+                    ):
+                        if ot.get(src_k) is not None:
+                            attrs[dst_k] = ot[src_k]
+            except (KeyError, AttributeError, TypeError, ValueError):
+                pass
+
+        w_id = getattr(self._coordinator, "weather_sensor", None)
+        if isinstance(w_id, str) and w_id not in ("", "none") and self.hass is not None and hasattr(self.hass, "states"):
+            w_st = self.hass.states.get(w_id)
+            if w_st is not None and getattr(w_st, "state", None) not in ("unavailable", "unknown", None):
+                try:
+                    w_attrs = getattr(w_st, "attributes", None) or {}
+                    raw_out = w_attrs.get("temperature") if w_id.startswith("weather.") else w_st.state
+                    if raw_out is not None:
+                        attrs["outdoor_temp"] = round(float(raw_out), 1)
+                except (ValueError, TypeError):
+                    pass
+
+        energy_mgr = getattr(self._coordinator, "energy_manager", None)
+        if energy_mgr is not None:
+            try:
+                if hasattr(energy_mgr, "is_solar_boost_active") and callable(energy_mgr.is_solar_boost_active):
+                    attrs["solar_boost_active"] = bool(energy_mgr.is_solar_boost_active())
+                soc_val = getattr(energy_mgr, "_last_battery_soc", None)
+                if isinstance(soc_val, (int, float)):
+                    attrs["battery_soc"] = round(float(soc_val), 1)
+            except (AttributeError, TypeError, ValueError):
+                pass
+
         if agg is not None:
             attrs.update({
                 "peak_zone": agg.peak_zone,

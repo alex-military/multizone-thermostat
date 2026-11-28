@@ -13,31 +13,32 @@ La diagnostica esamina in tempo reale l'evoluzione della temperatura di ogni sin
 ```mermaid
 flowchart TD
     Diagnosi["Supervisore Idraulico Continuo"]
-    Diagnosi --> CheckBlocco{"Richiesta Calore >45 min<br>ma Temperatura Cala?"}
+    Diagnosi --> CheckBlocco{"Domanda >= 99% > 75 min<br>e Salita < 0.2 °C?"}
     CheckBlocco -->|Si| AllarmeBlocco["⚠️ Valvola Bloccata Chiusa"]
     
     Diagnosi --> CheckTrafilamento{"Valvola Chiusa a 0%<br>ma Temperatura Sale?"}
     CheckTrafilamento -->|Si| AllarmeTrafilamento["⚠️ Trafilamento Calore (Ghost Heating)"]
     
-    Diagnosi --> CheckAria{"Valvola Aperta 100%<br>ma Velocita Riscaldamento << Storico?"}
-    CheckAria -->|Si| AllarmeAria["⚠️ Presenza Aria nel Termosifone"]
+    Diagnosi --> CheckOvershoot{"Temp > Target + 1.5 °C<br>Entro 2h da Richiesta?"}
+    CheckOvershoot -->|Si| AllarmeOvershoot["⚠️ Sovratemperatura (Overshoot)"]
     
-    Diagnosi --> CheckSonda{"Nessun aggiornamento sonda<br>da oltre 240 minuti?"}
-    CheckSonda -->|Si| AllarmeSonda["⚠️ Timeout Watchdog Sonda Wireless<br>-> Fallback Istantaneo su Sonda TRV"]
+    Diagnosi --> CheckSonda{"Nessun aggiornamento sonda<br>da oltre 240 min (o > 6h Stale)?"}
+    CheckSonda -->|Si| AllarmeSonda["⚠️ Timeout Watchdog / Sonda Stantia<br>-> Fallback Istantaneo su Sonda TRV"]
     
     Diagnosi --> CheckTrvOpen{"Richiesta Zona > 20% & Generatore ON > 5 min<br>ma Tutte le TRV Chiuse/Idle?"}
     CheckTrvOpen -->|Si| AllarmeTrvOpen["⚠️ trv_not_opening<br>(Allarme Non Bloccante)"]
 ```
 
-### Le 5 Anomalie Meccaniche Principali
+### Anomalie Attive su Impianto e Zone
 
-| Anomalia | Causa Rilevata | Azione Automatica del Sistema |
+| Anomalia | Criteri di Attivazione | Risposta Automatica del Sistema |
 |---|---|---|
-| **Valvola Bloccata Chiusa** | La stanza richiede calore continuativo da oltre 45 minuti con caldaia attiva, ma la temperatura ambiente continua inesorabilmente a scendere. | Segnalazione rossa sulla scheda Lovelace, notifica persistente su Home Assistant e attivazione dell'entità `binary_sensor.heating_zones_[stanza]_anomaly`. |
-| **TRV Non in Apertura (`trv_not_opening`)** | *"TRV valve not opening despite active zone heating demand"*: richiesta di riscaldamento zona > 20% e generatore centrale attivo (`boiler_on`) per > 5 minuti mentre tutte le TRV della zona risultano chiuse/`idle`. | **Allarme diagnostico non bloccante**: segnala l'anomalia sulla zona senza fermare la centrale, consentendo di continuare a servire le altre stanze. |
-| **Trafilamento di Calore (*Ghost Heating*)** | La temperatura della stanza sale in modo significativo mentre la valvola o il relè della stanza dovrebbero essere sigillati a 0%. | Rilevamento di trafilamento della guarnizione della valvola, testina non a battuta o bypass idraulico difettoso. |
-| **Presenza di Aria nel Radiatore** | La valvola è aperta al 100% ma la velocità di riscaldamento registrata è inferiore al 30% della pendenza storica $R$. | Segnalazione di spurgo aria necessario sul corpo scaldante per ripristinare lo scambio termico. |
-| **Timeout Watchdog Sonda Wireless** | La sonda di temperatura a batteria (Zigbee, Wi-Fi o BLE) non invia aggiornamenti per oltre 240 minuti (tempo configurabile tramite `CONF_ZONE_SENSOR_TIMEOUT`). | **Fallback istantaneo di sicurezza (`safety_fallback_active`)**: commuta la regolazione sulla sonda integrata nella TRV, riporta `trv_sensor_selects` sul sensore interno/locale e riporta eventuali TRV `demand_driven` in modalità `standard`. |
+| **Valvola Bloccata Chiusa (`stuck_closed`)** | Richiesta di zona `>= 99%` per **`> 75 minuti`** con generatore attivo, mentre la temperatura sale di `< 0.2 °C`. | Segnalazione rossa sulla scheda Lovelace, notifica persistente su Home Assistant e attivazione del sensore binario anomalia di zona. |
+| **TRV Non in Apertura (`trv_not_opening`)** | Richiesta di zona `> 20%` e generatore centrale attivo (`boiler_on`) per `> 5 minuti` mentre tutte le TRV risultano chiuse/`idle`. | **Allarme diagnostico non bloccante**: segnala la zona interessata senza fermare la centrale, lasciando servire le altre stanze. |
+| **Trafilamento di Calore (`ghost_heating`)** | La temperatura ambiente sale significativamente mentre valvola o relè di zona sono comandati a 0% (sospeso se `allow_passive_heat` è attivo). | Avvisa di guarnizione danneggiata, spillo non a battuta o valvola bypass difettosa. |
+| **Sovratemperatura (`overshoot`)** | La temperatura ambiente supera il target di oltre `1.5 °C` entro 2 ore da una chiamata termica attiva. | Segnala sovra-erogazione termica o guadagni PID/radiatore sovradimensionati. |
+| **Watchdog / Sonda Stantia / Guasto (`stale_sensor`, `sensor_fault`)** | Batteria scarica o assenza aggiornamenti (`> sensor_timeout_min` default `240 min`, stale `> 6h`, o valori/picchi implausibili). | **Fallback istantaneo (`safety_fallback_active`)**: regola tramite sonda interna TRV, riporta `trv_sensor_selects` sul sensore locale e riporta TRV `demand_driven` a `standard`. |
+| **Batteria Bassa / Cicli Brevi / Pressione & Errori Caldaia** | Batteria TRV/sonda `<= 10%` (`low_battery`), caldaia `> 5` cicli/ora (`short_cycling`), pressione OpenTherm `< 0.8 bar` (`boiler_low_pressure`) o codice guasto OEM (`boiler_fault`). | Aggiorna lo stato salute impianto (`Optimal` / `Warning` / `Critical`) e i badge diagnostici. |
 
 ---
 
@@ -45,9 +46,10 @@ flowchart TD
 
 Quattro livelli di protezione hardware salvaguardano la caldaia e gli attuatori da usura o danneggiamenti:
 
-### 1. Protezione Anti-Short-Cycle (Caldaia & Pompa di Calore)
+### 1. Protezione Anti-Short-Cycle & PWM Anti-Chattering (Caldaia & PDC)
 Le continue accensioni e spegnimenti riducono l'efficienza e usurano bruciatori o compressori:
 * **Caldaia a Gas**: `number.master_control_min_cycle_on` / `min_cycle_off` (default: **5 minuti**).
+* **PWM Anti-Chattering sui Relè**: `PWMEngine` impone un latch rigoroso a singolo impulso OFF per ciclo, azzera domande residue (*trickle*), resta in **ON continuo oltre il `95%` di domanda** ed esegue `RelayBoilerBackend` con periodo adattivo sincronizzato in fase `max(900 s, 2 × (min_on + min_off))` (`20 min` default con `5 + 5 min` = max 3 cicli/h).
 * **Pompa di Calore Centrale**: Controlli indipendenti `number.master_control_hp_min_cycle_on` / `hp_min_cycle_off` dedicati al compressore.
 * **Diagnostica Impianto**: Il conteggio cicli/ora e le ore di funzionamento giornaliere supportano anche impianti in sola pompa di calore.
 
@@ -61,8 +63,8 @@ Durante la stagione estiva le valvole dei termosifoni e le giranti delle pompe r
 * Se l'impianto rimane inattivo per più di 15 giorni (`number.master_control_anti_seize_idle_days`), l'integrazione esegue automaticamente un ciclo di apertura completa di tutte le valvole per una durata di 2 minuti (`number.master_control_anti_seize_duration`), richiudendole subito dopo (protetto da guardia anti-duplicazione e compatibile sia con caldaia che con pompa di calore tramite `anti_seize_boiler`).
 
 ### 4. Protezione Antigelo di Emergenza (Anti-Frost) & Ripristino Persistente
-Se la temperatura di qualsiasi stanza dell'abitazione scende al di sotto della soglia di sicurezza impostata su `number.master_control_anti_frost_temperature` (default: **7.0°C**):
-* Il sistema attiva immediatamente il riscaldamento forzato al 100% con temperatura di mandata configurabile (`number.master_control_frost_flow_temp`), scavalcando qualsiasi blocco (finestra aperta, Master spento o preset Fuori Casa), per scongiurare il congelamento delle tubature.
+Se la temperatura di qualsiasi stanza dell'abitazione scende al di sotto della soglia impostata su `number.master_control_anti_frost_temperature` (intervallo `5.0–16.0 °C`, default: **`12.0 °C`**):
+* Il sistema attiva immediatamente il riscaldamento forzato al 100% con temperatura di mandata configurabile (`number.master_control_frost_protection_flow_temp`, default: `40.0 °C`), scavalcando qualsiasi blocco (finestra aperta, Master spento o preset Fuori Casa), per scongiurare il congelamento delle tubature.
 * **Ripristino Persistente**: I target precedenti (`pre_frost_targets`) vengono salvati tra i riavvii di Home Assistant.
 * **Fallback Emergenza L5**: Se sia la sonda ambiente sia le TRV diventano non disponibili con temperatura esterna (meteo o `sensor.*` numerico) inferiore a **2.0 °C**, entra in funzione una protezione antigelo conservativa.
 
@@ -86,3 +88,15 @@ Se la caldaia è collegata tramite un'interfaccia OpenTherm, Multizone Thermosta
 * **Modulazione Fiamma (%)**: Visualizzazione istantanea della potenza percentuale erogata dal bruciatore.
 * **Codici Errore OEM della Caldaia**: Cattura e decodifica istantanea dei codici guasto inviati dalla centralina della caldaia (es. blocco fiamma, mancanza tiraggio fumi, sovratemperatura).
 * **Priorità Acqua Calda Sanitaria (DHW Freeze)**: Quando un rubinetto apre l'acqua calda sanitaria (incluso rilevamento multi-dispositivo EMS-ESP ed entità ACS personalizzate), la caldaia devia la valvola a tre vie sul boiler o sullo scambiatore a piastre. Multizone Thermostat **congela istantaneamente il calcolo integrale del PID del riscaldamento**, impedendo l'accumulo di errore fasullo mentre il bruciatore è dedicato al sanitario.
+
+---
+
+## 4. Diagnostica JSON Nativa Home Assistant (`pid_state`, `trv_health` & Attuatori)
+
+Da **Impostazioni → Dispositivi e Servizi → Multizone Thermostat → Scarica diagnostica**, ogni zona include telemetria dettagliata in tempo reale:
+
+* **Stato Live PID (`pid_state` / `pid_state_cool`)**: Espone `kp`, `ki`, `kd`, `p_contribution`, `i_contribution`, `d_contribution`, `integral_accumulator`, `pid_raw_output`, `pid_clamped_output`, `pid_error`, `pid_target` e `dt_seconds` nella diagnostica JSON.
+* **Attributi Live su `DemandSensor` (`sensor.<zona>_demand`)**: Espone direttamente negli attributi di stato `control_mode`, `p_term`, `i_term`, `d_term`, `integral_accumulator`, `error`, `set_point`, `raw_output`, `clamped_output`, `kp`, `ki`, `kd`, `weather_ff`, `smart_stop_offset`, `window_open` e `active_track`, pronti per essere plottati in ApexCharts senza calcoli inversi.
+* **Guardrail Autotuner & Modello Termico**: `AutotuneSensor` espone `weekly_guardrail_status` (`idle`, `monitoring`, `confirmed`, `reverted`, `cancelled_manual`, `expired`) per i rollback automatici su overshoot; la Classe Energetica usa il coefficiente di Newton `k_loss` indipendente dal meteo con auto-riparazione all'avvio dei vecchi valori corrotti; `target_temp_step` (`0.5` / `0.1`) è esposto per zona.
+* **Salute Calibrazione TRV (`trv_health`)**: Riporta `ext_temp_feed_mode` (`"auto"`, `"offset"`, `"external_temperature"` o `"disabled"`). La modalità offset applica deadband di `0.25 °C`, cooldown di `180 s`, finestra di assestamento anti-ratchet di `300 s` e attiva **`offset_stalled: true`** dopo 2 scritture non recepite (es. TRV associata via Matter Binding nativo), ripristinandosi automaticamente al primo reset manuale o risposta attesa della TRV.
+* **Inversione Attuatori**: Espone per ogni zona i flag `invert_switch` e `invert_valve` per testine Normalmente Aperte (NO) e valvole proporzionali/0–10V ad azione inversa.

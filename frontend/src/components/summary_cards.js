@@ -67,7 +67,9 @@ function openMzStandaloneModal(type, hass) {
   titleEl.style.cssText = 'font-size: 1.2rem; font-weight: 700; color: #ffffff; display: flex; align-items: center; gap: 10px;';
   titleEl.innerHTML = type === 'scheduler'
     ? `<ha-icon icon="mdi:calendar-clock" style="color:#38bdf8;"></ha-icon> <span>${getTranslation(hass, 'sched_modal_title') || 'Weekly Schedule'}</span>`
-    : `<ha-icon icon="mdi:chart-box-outline" style="color:#10b981;"></ha-icon> <span>${getTranslation(hass, 'diag_modal_title') || 'Plant & Diagnostics'}</span>`;
+    : (type === 'telemetry'
+      ? `<ha-icon icon="mdi:chart-areaspline" style="color:#38bdf8;"></ha-icon> <span>${getTranslation(hass, 'tel_title') || 'Telemetry & Charts'}</span>`
+      : `<ha-icon icon="mdi:chart-box-outline" style="color:#10b981;"></ha-icon> <span>${getTranslation(hass, 'diag_modal_title') || 'Plant & Diagnostics'}</span>`);
 
   const closeBtn = document.createElement('button');
   closeBtn.innerHTML = `✕ ${getTranslation(hass, 'close_btn') || 'Close'}`;
@@ -102,11 +104,13 @@ function openMzStandaloneModal(type, hass) {
   let innerCard;
   if (type === 'scheduler') {
     innerCard = document.createElement('multizone-thermostat-scheduler-card');
+  } else if (type === 'telemetry') {
+    innerCard = document.createElement('multizone-thermostat-telemetry-card');
   } else {
     innerCard = document.createElement('multizone-thermostat-plant-card');
   }
   if (typeof innerCard.setConfig === 'function') {
-    innerCard.setConfig({ border_radius: '16px' });
+    innerCard.setConfig({ border_radius: '16px', is_modal: (type === 'telemetry') });
   }
   if (effectiveHass) {
     innerCard.hass = effectiveHass;
@@ -219,6 +223,10 @@ function navigateOrFallbackModal(hostEl, targetPath, onFallback) {
         fullPath = `${dashboardBase}/${p}`;
         return true;
       }
+      if ((normalizedPath === 'telemetria' || normalizedPath === 'telemetry') && stratType.includes('multizone-thermostat-telemetry')) {
+        fullPath = `${dashboardBase}/${p}`;
+        return true;
+      }
       return false;
     });
 
@@ -248,7 +256,9 @@ function navigateOrFallbackModal(hostEl, targetPath, onFallback) {
 }
 
 function navigateToLovelaceView(viewSlug) {
-  const type = (viewSlug === 'programmazione' || viewSlug === 'schedulatore') ? 'scheduler' : 'diagnostics';
+  const type = (viewSlug === 'programmazione' || viewSlug === 'schedulatore')
+    ? 'scheduler'
+    : ((viewSlug === 'telemetria' || viewSlug === 'telemetry') ? 'telemetry' : 'diagnostics');
   navigateOrFallbackModal(document.body, viewSlug, () => openMzStandaloneModal(type, null));
 }
 

@@ -57,17 +57,16 @@ class PWMEngine:
                 demand = 0.0
 
         prev_demand = getattr(self, "_prev_demand", 0.0)
-        if prev_demand <= 0.0 and demand > 0.0:
-            self.cycle_start_time = self._aligned_cycle_start(now)
-            self._in_off_phase = False
-            self._last_cycle_on = 0.0
+        rising_from_idle = prev_demand <= 0.0 and demand > 0.0
         self._prev_demand = demand
 
         # High-demand continuous ON to avoid forced off-pulses when zones actively call for heat
         if demand >= self.CONTINUOUS_ON_THRESHOLD:
             self.time_on = self.pwm_interval
             self.time_off = 0.0
-            if now - self.cycle_start_time >= self.pwm_interval:
+            if rising_from_idle:
+                self.cycle_start_time = now
+            elif now - self.cycle_start_time >= self.pwm_interval:
                 self.cycle_start_time = now
             self._in_off_phase = False
             self._last_cycle_on = self.time_on
@@ -75,7 +74,6 @@ class PWMEngine:
             return self.current_state
 
         prev_state = self.current_state
-        time_passed = now - self.cycle_start_time
 
         # Calculate raw times
         if demand <= 0.0:
@@ -107,6 +105,16 @@ class PWMEngine:
 
         new_time_on = self.time_on
         new_time_off = self.time_off
+
+        if rising_from_idle:
+            aligned = self._aligned_cycle_start(now)
+            # Only snap cold-start onto the phase-locked grid if still inside the ON window;
+            # otherwise start immediately at `now` so a fresh heat call is never skipped.
+            self.cycle_start_time = aligned if (now - aligned) < new_time_on else now
+            self._in_off_phase = False
+            self._last_cycle_on = 0.0
+
+        time_passed = now - self.cycle_start_time
 
         # Anti-phase-jump latch: never re-ignite inside the OFF phase of the current cycle
         last_cycle_on = getattr(self, "_last_cycle_on", 0.0)

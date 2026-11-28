@@ -19,11 +19,11 @@ La scheda di programmazione visuale permette di gestire con la massima semplicit
 
 ## 2. Gestione Multi-Profilo & Scadenze Temporali
 
-Il sistema supporta la definizione di molteplici profili settimanali in funzione delle abitudini di vita:
-* **Standard**: La routine lavorativa feriale standard.
-* **Festivo / Weekend**: Sveglia posticipata e comfort continuo durante le ore diurne.
-* **Smart Working**: Riscaldamento continuativo per le stanze adibite a ufficio/studio durante le ore diurne.
-* **Vacanze / Ospiti**: Profili personalizzati salvati per eventi specifici.
+Il sistema pre-inizializza 3 profili built-in e consente di creare infiniti profili personalizzati:
+* **Standard (`standard`)**: Profilo built-in predefinito per la routine settimanale.
+* **Smart Working (`smart_working`)**: Profilo built-in dedicato al comfort diurno per lavoro da casa.
+* **Festivo (`holiday`)**: Profilo built-in per giorni festivi e comfort diurno continuativo.
+* **Profili Personalizzati** (es. *Ospiti / Vacanze*): Profili creati o duplicati dall'utente tramite card UI o servizi.
 
 ### Attivazione Temporanea con Scadenza Automatica
 È possibile attivare un profilo speciale impostando una data/ora di scadenza (sia dall'interfaccia sia tramite servizio Home Assistant):
@@ -50,11 +50,11 @@ flowchart TD
 ```
 
 ### Come Funziona il Calcolo di Anticipo
-Grazie all'autotuner passivo, il sistema conosce la pendenza di riscaldamento $R$ (°C/ora) di ciascuna stanza:
+Grazie all'autotuner passivo, il sistema conosce la velocità termica $R$ (°C/ora; in modalità `cool` usa il tasso di raffrescamento attivo; usa un fallback di `1.5 °C/h` prima del completamento dell'apprendimento, con limite massimo di anticipo pari a `6.0 h`):
 
-$$\Delta t_{\text{anticipo}} = \frac{T_{\text{comfort}} - T_{\text{corrente}}}{R}$$
+$$\Delta t_{\text{anticipo}} = \min\!\left(6.0\text{ h},\ \frac{|T_{\text{target}} - T_{\text{corrente}}|}{R}\right)$$
 
-* L'impianto non accende tutte le stanze contemporaneamente, ma scagliona l'avvio: le stanze a riscaldamento più lento partiranno per prime, mentre quelle veloci partiranno più tardi (in modalità `cool`, le zone non raffrescabili vengono saltate al completamento dello Smart Return).
+* L'impianto non accende tutte le stanze contemporaneamente, ma scagliona l'avvio: le stanze più lente partiranno per prime, mentre quelle veloci partiranno più tardi (in modalità `cool`, le zone non raffrescabili vengono saltate al completamento dello Smart Return).
 * **Risultato**: Alle 18:30 precise tutte le stanze raggiungono la temperatura desiderata nello stesso istante, evitando sprechi dovuti ad accensioni troppo anticipate.
 
 ---

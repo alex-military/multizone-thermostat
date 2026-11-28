@@ -193,6 +193,25 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
         gap: 8px;
         font-weight: 600;
       }
+      .zone-charts-btn {
+        background: rgba(56, 189, 248, 0.14);
+        border: 1px solid rgba(56, 189, 248, 0.38);
+        color: #7dd3fc;
+        border-radius: 999px;
+        padding: 4px 10px;
+        font-size: 0.78em;
+        font-weight: 700;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        margin-right: 8px;
+        transition: all 0.15s ease;
+      }
+      .zone-charts-btn:hover {
+        background: rgba(56, 189, 248, 0.28);
+        color: #ffffff;
+      }
       .pulse-dot {
         width: 8px;
         height: 8px;
@@ -530,6 +549,10 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
           <span class="pulse-dot pulse-green" id="valve-dot"></span>
           <span id="valve-text">${t('valve_ok')}</span>
         </div>
+        <button type="button" class="zone-charts-btn" id="zone-charts-btn" title="${t('tel_zone_charts_btn')}">
+          <ha-icon icon="mdi:chart-areaspline" style="--mdc-icon-size: 15px;"></ha-icon>
+          <span id="zone-charts-label">${t('tel_zone_charts_btn')}</span>
+        </button>
         <div class="battery-status" id="battery-status" style="display:flex; align-items:center; gap: 4px; font-weight:600;">
           <ha-icon icon="mdi:battery" id="battery-icon" style="--mdc-icon-size: 18px;"></ha-icon>
           <span id="battery-text">--%</span>
@@ -582,6 +605,17 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
     this._activePidParam = null;
     this._modalMode = null;
     this._pidEditAction = 'manual';
+
+    const chartsBtn = this.shadowRoot.getElementById('zone-charts-btn');
+    if (chartsBtn) {
+      chartsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (this._config && this._config.entity) {
+          try { sessionStorage.setItem('mz_telemetry_target', this._config.entity); } catch (err) {}
+        }
+        navigateOrFallbackModal(this, 'telemetria', () => openMzStandaloneModal('telemetry', this._hass));
+      });
+    }
 
     const closeModal = () => {
       const backdrop = this.shadowRoot.getElementById('pid-modal-backdrop');
@@ -909,6 +943,8 @@ class MultizoneThermostatZoneEnergyCard extends HTMLElement {
       if (retentionUnit) retentionUnit.innerText = t('hours');
       if (sizingLabel) sizingLabel.innerText = t('sizing_label');
       if (valveStatusLabel) valveStatusLabel.innerText = t('valve_status');
+      const zoneChartsLbl = this.shadowRoot.getElementById('zone-charts-label');
+      if (zoneChartsLbl) zoneChartsLbl.innerText = t('tel_zone_charts_btn');
 
       // Robust determination of zone mode (primary, secondary, bypass)
       let zoneMode = "primary";

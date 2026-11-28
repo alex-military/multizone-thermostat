@@ -42,7 +42,7 @@ Se vuoi testare in anteprima la centrale bivalente, i condizionatori split, il s
 1. Accedi alla scheda di **Multizone Thermostat** già presente all'interno di HACS.
 2. Fai clic sui **tre puntini in alto a destra** della pagina dell'integrazione e seleziona **Riscarica** (*Redownload*).
 3. Attiva la casella **"Mostra versioni beta"** (*Show beta versions*).
-4. Nel menu a tendina delle versioni, seleziona l'ultima release beta disponibile (es. `v6.1.0-beta.10`).
+4. Nel menu a tendina delle versioni, seleziona l'ultima release beta disponibile (es. `v6.1.0-beta.19`).
 5. Clicca su **Scarica**.
 6. Riavvia Home Assistant per caricare il nuovo componente Python.
 

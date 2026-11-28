@@ -37,6 +37,8 @@ SRC_FILES = [
     "components/nav_cards.js",
     "components/plant_card.js",
     "components/zone_energy_card.js",
+    "components/chart_engine.js",
+    "components/telemetry_card.js",
     "components/scheduler_card.js",
     "components/style_switcher.js",
     "strategies/dashboard_strategy.js",
