@@ -89,6 +89,17 @@ class DemandSensor(SensorEntity):
         demand = self._coordinator.get_zone_demand(self._climate_entity_id)
         return round(demand, 1) if demand is not None else 0.0
 
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return live PID breakdown and zone control telemetry."""
+        zc = getattr(self._coordinator, "zone_controller", None)
+        getter = getattr(zc, "get_zone_demand_attributes", None)
+        if callable(getter):
+            attrs = getter(self._climate_entity_id)
+            if isinstance(attrs, dict):
+                return attrs
+        return {}
+
     async def async_added_to_hass(self) -> None:
         """Listen to updates from the climate entity."""
         await super().async_added_to_hass()
@@ -165,6 +176,7 @@ class AutotuneSensor(SensorEntity):
             "learned_kd": round(getattr(tuner, "_learned_kd", 0.0), 2),
             "manual_overrides": sorted(overrides.keys()),
             "weekly_candidates_count": len(getattr(tuner, "weekly_candidates", [])),
+            "weekly_guardrail_status": getattr(tuner, "last_weekly_guardrail_status", "idle"),
         }
 
     async def async_added_to_hass(self) -> None:

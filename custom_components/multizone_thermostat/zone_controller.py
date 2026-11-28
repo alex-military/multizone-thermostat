@@ -13,6 +13,7 @@ from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from .const import (
     CONF_ZONE_NAME,
     CONF_ZONE_TEMP_SENSOR,
+    CONF_ZONE_WINDOW_SENSOR,
     make_zone_entity_id,
     HVAC_MODE_HEAT,
     MODE_OPENTHERM,
@@ -56,6 +57,88 @@ class ZoneController:
 
         self._was_dhw_active: bool = False
         self._smart_stop_bypass: set[str] = set()
+        self._last_zone_telemetry: dict[str, dict[str, Any]] = {}
+        self._last_inertia_event_ids: dict[str, int] = {}
+
+    def _is_zone_window_open(self, entity_id: str) -> bool:
+        """Return True if the zone currently has an open window (bypass state or sensor)."""
+        zm = getattr(self.coordinator, "zone_manager", None)
+        pre_win = getattr(zm, "_pre_window_state", None)
+        if isinstance(pre_win, dict) and entity_id in pre_win:
+            return True
+        zone_conf = next(
+            (
+                z for z in (self.zones or [])
+                if isinstance(z, dict)
+                and (z.get("climate_id") == entity_id or make_zone_entity_id(z.get(CONF_ZONE_NAME, "")) == entity_id)
+            ),
+            None,
+        )
+        ws_id = zone_conf.get(CONF_ZONE_WINDOW_SENSOR) if zone_conf else None
+        states_obj = getattr(self.hass, "states", None)
+        if ws_id and ws_id != "none" and states_obj is not None:
+            ws_state = states_obj.get(ws_id)
+            raw_ws = getattr(ws_state, "state", None) if ws_state is not None else None
+            if isinstance(raw_ws, str) and raw_ws.strip().lower() in ("on", "open"):
+                return True
+        return False
+
+    def _get_outdoor_temp(self) -> float | None:
+        """Safely read current outdoor temperature in Celsius if configured and available."""
+        ws_id = getattr(self.coordinator, "weather_sensor_id", None)
+        states_obj = getattr(self.hass, "states", None)
+        if not isinstance(ws_id, str) or not ws_id or ws_id == "none" or states_obj is None:
+            return None
+        w_state = states_obj.get(ws_id)
+        if not w_state or getattr(w_state, "state", None) in ("unavailable", "unknown", STATE_UNAVAILABLE, STATE_UNKNOWN):
+            return None
+        try:
+            w_attrs = getattr(w_state, "attributes", None)
+            is_weather = ws_id.startswith("weather.") or str(getattr(w_state, "entity_id", "")).startswith("weather.")
+            if is_weather and hasattr(w_attrs, "get"):
+                temp_attr = w_attrs.get("temperature")
+                if temp_attr is None:
+                    return None
+                w_unit = w_attrs.get("temperature_unit") or w_attrs.get("unit_of_measurement")
+                val = to_celsius(float(temp_attr), w_unit, self.hass)
+            else:
+                w_unit = w_attrs.get("unit_of_measurement") if hasattr(w_attrs, "get") else None
+                val = to_celsius(float(w_state.state), w_unit, self.hass)
+            return val if math.isfinite(val) else None
+        except (ValueError, TypeError):
+            return None
+
+    def get_zone_demand_attributes(self, entity_id: str) -> dict[str, Any]:
+        """Return live PID component breakdown and control telemetry for DemandSensor."""
+        resolved_id = self._resolve_zone_id(entity_id)
+        telemetry = dict(self._last_zone_telemetry.get(resolved_id, {}))
+        attrs: dict[str, Any] = {
+            "control_mode": telemetry.get("control_mode", "idle"),
+            "weather_ff": telemetry.get("weather_ff", 0.0),
+            "smart_stop_offset": telemetry.get("smart_stop_offset", 0.0),
+            "window_open": telemetry.get("window_open", False),
+        }
+        pid = self._pids.get(resolved_id)
+        diag_fn = getattr(pid, "get_diagnostics", None)
+        if callable(diag_fn):
+            diag = diag_fn()
+            if isinstance(diag, dict):
+                attrs.update(
+                    {
+                        "p_term": diag.get("p_contribution"),
+                        "i_term": diag.get("i_contribution"),
+                        "d_term": diag.get("d_contribution"),
+                        "integral_accumulator": diag.get("integral_accumulator"),
+                        "error": diag.get("pid_error"),
+                        "set_point": diag.get("pid_target"),
+                        "raw_output": diag.get("pid_raw_output"),
+                        "clamped_output": diag.get("pid_clamped_output"),
+                        "kp": diag.get("kp"),
+                        "ki": diag.get("ki"),
+                        "kd": diag.get("kd"),
+                    }
+                )
+        return attrs
 
     @property
     def pids(self) -> dict[str, MultizonePID]:
@@ -315,6 +398,10 @@ class ZoneController:
         # Check mode (don't calculate if off/bypass)
         hvac_mode = new_state.state
         zone_mode = self.coordinator.zone_manager.get_zone_mode(entity_id)
+        window_open = self._is_zone_window_open(entity_id)
+        control_mode = "off" if hvac_mode != HVAC_MODE_HEAT else ("bypass" if zone_mode == ZONE_MODE_BYPASS else "hysteresis")
+        ff_demand = 0.0
+        smart_stop_offset = 0.0
 
         if hvac_mode == HVAC_MODE_HEAT and zone_mode != ZONE_MODE_BYPASS:
             is_faulty = (
@@ -328,6 +415,12 @@ class ZoneController:
                     "Zone %s: Heating demand forced to 0%% due to critical sensor fault/low battery",
                     entity_id,
                 )
+                self._last_zone_telemetry[entity_id] = {
+                    "control_mode": "sensor_fault",
+                    "weather_ff": 0.0,
+                    "smart_stop_offset": 0.0,
+                    "window_open": window_open,
+                }
                 self.coordinator.demand_aggregator.set_zone_demand(entity_id, demand)
                 return 0.0
 
@@ -347,6 +440,12 @@ class ZoneController:
                 )
                 if entity_id in self._pids:
                     self._pids[entity_id].clear_samples()
+                self._last_zone_telemetry[entity_id] = {
+                    "control_mode": "dhw_paused",
+                    "weather_ff": 0.0,
+                    "smart_stop_offset": 0.0,
+                    "window_open": window_open,
+                }
                 return self.coordinator.demand_aggregator.get_zone_demand(entity_id)
 
             # Smart Stop: Calculate Effective Target based on learned Inertia
@@ -356,10 +455,12 @@ class ZoneController:
                 effective_target = target_temp - thermal_model.thermal_inertia
                 # Limit to avoid lowering it too much if inertia is crazy high
                 effective_target = max(target_temp - 1.0, effective_target)
+            smart_stop_offset = round(target_temp - effective_target, 3)
 
             tuner = self._autotuners[entity_id]
 
             if tuner.state != tuner.STATE_COMPLETED:
+                control_mode = "hysteresis"
                 # Hysteresis Fallback Mode (Learning phase)
                 tolerance = 0.3
                 current_demand = self.coordinator.demand_aggregator.get_zone_demand(entity_id)
@@ -370,7 +471,8 @@ class ZoneController:
                 else:
                     demand = current_demand  # Keep previous demand inside the hysteresis band
             else:
-                # Smart PID Mode
+                control_mode = "smart_pid"
+                # Smart PID Mode with Dynamic Ramp-Scaled Smart Stop (0 offset in steady-state)
                 pid_ctrl = self._pids[entity_id]
                 if current_temp >= target_temp or effective_target > current_temp:
                     self._smart_stop_bypass.discard(entity_id)
@@ -378,7 +480,20 @@ class ZoneController:
                     # Latch Smart Stop bypass when starting/resuming (e.g. post-DHW) with zero integral
                     # while still below target, preventing 10s chattering as integral turns positive.
                     self._smart_stop_bypass.add(entity_id)
-                pid_target = target_temp if entity_id in self._smart_stop_bypass else effective_target
+                if entity_id in self._smart_stop_bypass:
+                    pid_target = target_temp
+                elif thermal_model.thermal_inertia > 0.05:
+                    live_slope = getattr(pid_ctrl._pid, "last_slope", None)
+                    if isinstance(live_slope, (int, float)) and not isinstance(live_slope, bool) and live_slope > 0.0:
+                        ramp_ref = max(thermal_model.heating_rate / 3600.0, 0.5 / 3600.0) if thermal_model.heating_rate > 0.1 else (0.5 / 3600.0)
+                        ramp_ratio = min(1.0, max(0.0, live_slope / ramp_ref))
+                        dynamic_offset = min(1.0, thermal_model.thermal_inertia) * ramp_ratio
+                        pid_target = target_temp - dynamic_offset
+                    else:
+                        pid_target = target_temp
+                else:
+                    pid_target = target_temp
+                smart_stop_offset = round(target_temp - pid_target, 3)
                 demand = pid_ctrl.calc(current_temp, pid_target)
 
                 # Apply Weather Compensation (Feed Forward) ONLY for non-OpenTherm plants
@@ -441,28 +556,38 @@ class ZoneController:
             self._smart_stop_bypass.discard(entity_id)
             demand = 0.0
 
+        self._last_zone_telemetry[entity_id] = {
+            "control_mode": control_mode,
+            "weather_ff": round(float(ff_demand), 2),
+            "smart_stop_offset": smart_stop_offset,
+            "window_open": window_open,
+        }
         self.coordinator.demand_aggregator.set_zone_demand(entity_id, demand)
 
         tuner = self._autotuners[entity_id]
         thermal_model = self._thermal_models[entity_id]
         was_completed = tuner.state == tuner.STATE_COMPLETED
         prev_cycles = len(tuner.completed_cycles)
-        tuner_update_fn = tuner.update
-        try:
-            t_params = inspect.signature(tuner_update_fn).parameters
-            if "demand" in t_params or any(
-                p.kind == inspect.Parameter.VAR_KEYWORD for p in t_params.values()
-            ):
-                tuner_update_fn(
-                    current_temp,
-                    demand > 0,
-                    demand=demand,
-                    cooling_rate=thermal_model.cooling_rate,
-                )
-            else:
+        if window_open:
+            if getattr(tuner, "_ramp_active", False) and callable(getattr(tuner, "_reset_ramp", None)):
+                tuner._reset_ramp()
+        else:
+            tuner_update_fn = tuner.update
+            try:
+                t_params = inspect.signature(tuner_update_fn).parameters
+                if "demand" in t_params or any(
+                    p.kind == inspect.Parameter.VAR_KEYWORD for p in t_params.values()
+                ):
+                    tuner_update_fn(
+                        current_temp,
+                        demand > 0,
+                        demand=demand,
+                        cooling_rate=thermal_model.cooling_rate,
+                    )
+                else:
+                    tuner_update_fn(current_temp, demand > 0)
+            except (ValueError, TypeError):
                 tuner_update_fn(current_temp, demand > 0)
-        except (ValueError, TypeError):
-            tuner_update_fn(current_temp, demand > 0)
         just_completed = not was_completed and tuner.state == tuner.STATE_COMPLETED
         if just_completed or getattr(tuner, "weekly_updated_last_tick", False):
             self._apply_tuner_pid_to_controller(entity_id)
@@ -490,18 +615,33 @@ class ZoneController:
                 )
             await self.async_save_autotuner_states()
 
-        # Feed Thermal Observer (with effective demand gating for heating_rate)
+        # Feed Thermal Observer (with effective demand gating, open-window protection, and Newton k_loss)
+        outdoor_for_thermal = self._get_outdoor_temp() if demand <= 0.0 else None
         model_update_fn = thermal_model.update
         try:
             m_params = inspect.signature(model_update_fn).parameters
-            if "demand" in m_params or any(
-                p.kind == inspect.Parameter.VAR_KEYWORD for p in m_params.values()
-            ):
-                model_update_fn(current_temp, demand > 0, demand=demand)
-            else:
-                model_update_fn(current_temp, demand > 0)
+            has_varkw = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in m_params.values())
+            update_kwargs: dict[str, Any] = {}
+            if "demand" in m_params or has_varkw:
+                update_kwargs["demand"] = demand
+            if "window_open" in m_params or has_varkw:
+                update_kwargs["window_open"] = window_open
+            if "outdoor_temp" in m_params or has_varkw:
+                update_kwargs["outdoor_temp"] = outdoor_for_thermal
+            model_update_fn(current_temp, demand > 0, **update_kwargs)
         except (ValueError, TypeError):
             model_update_fn(current_temp, demand > 0)
+
+        inertia_event_id = getattr(thermal_model, "last_inertia_event_id", 0)
+        if isinstance(inertia_event_id, int) and inertia_event_id > self._last_inertia_event_ids.get(entity_id, 0):
+            self._last_inertia_event_ids[entity_id] = inertia_event_id
+            rec_fn = getattr(tuner, "record_overshoot", None)
+            if callable(rec_fn) and rec_fn(getattr(thermal_model, "last_inertia_sample", 0.0)) is True:
+                self._apply_tuner_pid_to_controller(entity_id)
+                if callable(getattr(self.coordinator, "async_notify_pid_entities", None)):
+                    self.coordinator.async_notify_pid_entities()
+                await self.async_save_autotuner_states()
+
         # Debounced save: avoid writing to disk on every state change (SD card wear)
         if hasattr(self.coordinator, "storage"):
             self.coordinator.debounced_save_thermal_states(self._thermal_models)

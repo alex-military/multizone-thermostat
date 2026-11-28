@@ -22,6 +22,7 @@ class PID:
     MIN_DERIVATIVE_SAMPLES = 3
     MIN_SPAN_FRACTION = 1.0 / 3.0
     MIN_DERIVATIVE_TEMP_SPAN = 0.105
+    INTEGRAL_DEADBAND = 0.03
     error: float
 
     def __init__(self, kp, ki, kd, ke=0, out_min=float('-inf'), out_max=float('+inf'),
@@ -79,6 +80,8 @@ class PID:
         self._last_input = None
         self._last_input_time = None
         self._error = 0
+        self._last_error: float | None = None
+        self._last_slope: float | None = None
         self._input_diff = 0
         self._dext = 0
         self._dt = 0
@@ -169,6 +172,11 @@ class PID:
     def max_dt(self):
         return self._max_dt
 
+    @property
+    def last_slope(self) -> float | None:
+        """Return latest OLS temperature slope (input units per second) or None."""
+        return self._last_slope
+
     @max_dt.setter
     def max_dt(self, val):
         self._max_dt = float(val)
@@ -236,6 +244,8 @@ class PID:
         self._input_time = None
         self._last_input = None
         self._last_input_time = None
+        self._last_error = None
+        self._last_slope = None
         self._derivative = 0.0
         self._history.clear()
         
@@ -311,13 +321,17 @@ class PID:
         # Compute P and D before integral update for conditional anti-windup
         self._proportional = self._Kp * self._error
         slope = self._temperature_slope(self._input_time)
+        self._last_slope = slope
         if slope is None or self._derivative_limit <= 0.0 or (self._last_input is not None and self._dt < 1.0):
             self._derivative = 0.0
         else:
             raw_d = -self._Kd * slope
             self._derivative = max(-self._derivative_limit, min(self._derivative_limit, raw_d))
 
-        # Anti-windup: conditional integration + back-calculation clamp
+        if self._last_input_time is None:
+            self._last_error = None
+
+        # Anti-windup: conditional trapezoidal integration + integral deadband + back-calculation clamp
         # Reset integral only on large setpoint drop (>= 1.5°C) while preserving
         # steady-state integral on warm-up rises and minor inertia shifts.
         if self._last_set_point is not None and (self._last_set_point - self._set_point) >= 1.5:
@@ -325,7 +339,11 @@ class PID:
             pre_backcalc_total = self._proportional + self._integral + self._derivative + self._external
         else:
             dt_int = max(0.0, min(self._dt, self._max_dt))
-            delta_i = self._Ki * self._error * dt_int
+            avg_error = 0.5 * (self._last_error + self._error) if self._last_error is not None else self._error
+            if abs(self._error) < self.INTEGRAL_DEADBAND and abs(avg_error) < self.INTEGRAL_DEADBAND:
+                delta_i = 0.0
+            else:
+                delta_i = self._Ki * avg_error * dt_int
             pre_output = self._proportional + self._integral + self._derivative + self._external
             if not ((pre_output >= self._out_max and delta_i > 0) or
                     (pre_output <= self._out_min and delta_i < 0)):
@@ -347,6 +365,7 @@ class PID:
                 self._integral = min(max(self._integral, back_min), max_i)
 
         # Compute PID Output
+        self._last_error = self._error
         self._raw_output = pre_backcalc_total
         output = self._proportional + self._integral + self._derivative + self._external
         self._output = max(min(output, self._out_max), self._out_min)

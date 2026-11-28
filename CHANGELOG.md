@@ -1,5 +1,27 @@
 # Changelog
 
+## [6.0.26] - 2026-11-28
+### Fix & Upgrade: SIMC Autotuner, Sensorless Thermal Model, Anti-Chattering PWM & Live PID Demand Telemetry
+- **SIMC Autotuner, OLS Reaction Curve & Weekly EMA Guardrail (`autotune.py`, `zone_controller.py`, `sensor.py`)**:
+  - Upgraded FOPDT gain synthesis from aggressive Ziegler-Nichols (`120 / (R * L)`) to comfort-tuned **SIMC (Skogestad IMC)** (`tau_c = max(2 * L, 600s)`, bounded `Kp` `[10, 500]`, `Ti = max(900s, 4 * (tau_c + L))`, `Td = min(60s, 0.25 * L)`).
+  - Upgraded reaction-curve slope extraction to Ordinary Least Squares (OLS) linear regression over sliding `>= 180s` windows (`>= 3` samples), falling back cleanly on sparse windows.
+  - Added automatic weekly EMA overshoot guardrail & rollback: snapshots `pre_kp/ki/kd` before weekly drift updates, tracks the next `GUARDRAIL_MIN_CYCLES = 2` post-shutdown overshoot peaks via `record_overshoot()`, and automatically reverts gains (`weekly_guardrail_status = "reverted"` on `AutotuneSensor`) if post-update overshoot exceeds `0.45 °C` and degrades by `> +0.25 °C` vs baseline (expires after `7` days; cancels on manual override).
+- **Sensorless `ThermalObserver` Hardening & Weather-Invariant Newton `k_loss` (`thermal_model.py`, `zone_controller.py`, `plant_diagnostics/efficiency.py`)**:
+  - Excluded open-window periods (both window manager state and configured `CONF_ZONE_WINDOW_SENSOR`) from thermal learning and autotuner ramps, and prevented active heating from touching `weather_sensor_id` when `weather_curve == 0.0`.
+  - Enforced quiet passive cooling windows (`MIN_COOLING_WINDOW_SECONDS = 1800s`, `MIN_COOLING_DELTA_C = 0.25 °C`) strictly outside post-shutdown thermal inertia tails.
+  - Added sensorless window/draft protections: 10-minute wall thermal rebound confirmation (`COOLING_REBOUND_CONFIRM_SECONDS = 600s`, `COOLING_REBOUND_DELTA_C = 0.1 °C`), fast-draft detector (`> 2.0 °C/h`), and 40-minute re-equilibration lockout (`DRAFT_LOCKOUT_SECONDS = 2400s`).
+  - Added OLS linearity verification (`MIN_COOLING_R2 = 0.65`), asymmetric outlier rejection (`> 2.5x` median rejected), and a 35th-percentile robust estimator over a 10-sample rolling buffer (`cooling_samples`).
+  - Added weather-invariant Newton cooling coefficient `k_loss` (`1/h`, plausible `0.001–0.25`) used as the primary Energy Class metric in `get_zone_energy_class()`, plus automatic self-healing reset of corrupted/out-of-range stored rates on startup.
+- **PID Precision, Dynamic Smart Stop & Live `DemandSensor` Telemetry (`pid.py`, `zone_controller.py`, `sensor.py`)**:
+  - Upgraded integral accumulation to trapezoidal integration (`0.5 * (last_error + error) * dt`) with a `0.03 °C` error deadband (`INTEGRAL_DEADBAND`).
+  - Scaled Smart PID Smart Stop offset dynamically by real-time heating slope (`last_slope`), yielding `0` offset at steady-state/cooling so zones hold exact setpoint while preserving active warm-up braking and hysteresis Smart Stop.
+  - Exposed live PID terms directly in `DemandSensor` (`sensor.multizone_brain_<zone>_demand`) attributes: `control_mode`, `p_term`, `i_term`, `d_term`, `integral_accumulator`, `error`, `set_point`, `raw_output`, `clamped_output`, `kp`, `ki`, `kd`, `weather_ff`, `smart_stop_offset`, and `window_open`.
+- **Anti-Chattering `PWMEngine` & Adaptive Relay Boiler Period (`pwm_engine.py`, `boiler/relay_backend.py`)**:
+  - Backported trickle-demand zeroing, enforced a strict single-pulse-per-cycle OFF latch (preventing intra-cycle double-switching), raised `CONTINUOUS_ON_THRESHOLD` to `95%` (preventing artificial off-pulses under high demand), and added optional `phase_locked` support.
+  - Updated `RelayBoilerBackend` to compute a phase-locked adaptive PWM interval `max(900s, 2 * (min_on + min_off))` (`20 min` default with `5 + 5 min` protection, max 3 cycles/hr).
+- **Automated Tests**:
+  - Added `tests/test_community_fixes_v6_26.py`, `tests/test_math_upgrades_v6_26.py`, and updated `tests/test_boiler_subsystem.py` (283 tests passing).
+
 ## [6.0.25] - 2026-11-26
 ### Feat: Per-Zone Configurable Setpoint Temperature Step (`0.5°` / `0.1°`) (#20)
 - **Per-Zone Temperature Step (`target_temp_step`)**:

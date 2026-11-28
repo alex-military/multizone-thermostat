@@ -30,17 +30,25 @@ class PassiveAutotuneObserver:
     WEEKLY_MIN_DURATION = 300.0
     WEEKLY_MIN_DT = 0.4
 
+    GUARDRAIL_MIN_CYCLES = 2
+    GUARDRAIL_MAX_DAYS = 7.0
+    GUARDRAIL_OVERSHOOT_DEGRADATION_C = 0.25
+    GUARDRAIL_MAX_ABSOLUTE_OVERSHOOT_C = 0.45
+
     MIN_TI_SECONDS = 900.0
     MAX_AUTOTUNE_KI = 0.15
     MAX_TD_SECONDS = 60.0
     MAX_AUTOTUNE_KD = 500.0
+    SIMC_TAU_C_FACTOR = 2.0
+    SIMC_MIN_TAU_C = 600.0
 
     @classmethod
     def _derive_pid_from_fopdt(cls, L: float, effective_slope: float) -> tuple[float, float, float]:
-        """Derive coherent (Kp, Ki, Kd) gains from FOPDT parameters (L, effective_slope)."""
-        kp_calc = 120.0 / (effective_slope * L)
+        """Derive calm SIMC (Skogestad IMC) PID gains from FOPDT parameters (L, effective_slope)."""
+        tau_c = max(cls.SIMC_TAU_C_FACTOR * L, cls.SIMC_MIN_TAU_C)
+        kp_calc = 100.0 / (effective_slope * (tau_c + L))
         kp_calc = min(max(kp_calc, 10.0), 500.0)
-        ti_calc = max(cls.MIN_TI_SECONDS, 2.0 * L)
+        ti_calc = max(cls.MIN_TI_SECONDS, 4.0 * (tau_c + L))
         td_calc = min(cls.MAX_TD_SECONDS, 0.25 * L)
         ki_calc = round(min(cls.MAX_AUTOTUNE_KI, kp_calc / ti_calc), 5) if ti_calc > 0 else 0.0
         kd_calc = round(min(cls.MAX_AUTOTUNE_KD, kp_calc * td_calc), 2)
@@ -87,6 +95,9 @@ class PassiveAutotuneObserver:
         self._seeded_pi_only: bool = False
         self.weekly_updated_last_tick = False
         self.needs_save = False
+        self._baseline_overshoots: list[float] = []
+        self._pending_weekly_check: dict[str, Any] | None = None
+        self.last_weekly_guardrail_status: str = "idle"
 
     def load_state(self, data: dict):
         """Restore state from storage."""
@@ -97,6 +108,14 @@ class PassiveAutotuneObserver:
         self.completed_cycles = list(data.get("completed_cycles", []))
         self.weekly_candidates = list(data.get("weekly_candidates", []))
         self.last_weekly_update = float(data.get("last_weekly_update", 0.0) or 0.0)
+        raw_bo = data.get("baseline_overshoots", [])
+        self._baseline_overshoots = [
+            float(x) for x in raw_bo
+            if isinstance(x, (int, float)) and not isinstance(x, bool) and math.isfinite(x) and x >= 0.0
+        ][-10:] if isinstance(raw_bo, list) else []
+        raw_pwc = data.get("pending_weekly_check")
+        self._pending_weekly_check = dict(raw_pwc) if isinstance(raw_pwc, dict) else None
+        self.last_weekly_guardrail_status = str(data.get("last_weekly_guardrail_status", "idle") or "idle")
         raw_overrides = data.get("manual_overrides", {}) or {}
         self.manual_overrides = {}
         for raw_key, raw_val in raw_overrides.items():
@@ -155,6 +174,9 @@ class PassiveAutotuneObserver:
                 "Kd": self._baseline_kd,
             },
             "pre_reset_snapshot": dict(self._pre_reset_snapshot) if self._pre_reset_snapshot else None,
+            "baseline_overshoots": list(self._baseline_overshoots),
+            "pending_weekly_check": dict(self._pending_weekly_check) if self._pending_weekly_check else None,
+            "last_weekly_guardrail_status": self.last_weekly_guardrail_status,
         }
 
     @property
@@ -197,6 +219,10 @@ class PassiveAutotuneObserver:
             self.manual_overrides["Ki"] = float(ki)
         if kd is not None:
             self.manual_overrides["Kd"] = float(kd)
+        if self._pending_weekly_check is not None:
+            self._pending_weekly_check = None
+            self.last_weekly_guardrail_status = "cancelled_manual"
+            self.needs_save = True
         self._sync_effective_pid()
 
     def seed_learned_pid(self, kp: float, ki: float, kd: float, clear_overrides: bool = True) -> None:
@@ -208,6 +234,9 @@ class PassiveAutotuneObserver:
         self._baseline_ki = float(ki)
         self._baseline_kd = float(kd)
         self._seeded_pi_only = (float(kd) == 0.0)
+        self._baseline_overshoots.clear()
+        self._pending_weekly_check = None
+        self.last_weekly_guardrail_status = "idle"
         self.state = self.STATE_COMPLETED
         while len(self.completed_cycles) < self.required_cycles:
             self.completed_cycles.append(
@@ -304,9 +333,82 @@ class PassiveAutotuneObserver:
         self._was_idle_before_ramp = True
         self._last_sample_mono = None
         self._seeded_pi_only = False
+        self._baseline_overshoots.clear()
+        self._pending_weekly_check = None
+        self.last_weekly_guardrail_status = "idle"
         if not keep_manual_overrides:
             self.manual_overrides.clear()
         self._sync_effective_pid()
+
+    def record_overshoot(self, overshoot_c: float, wall_time: float | None = None) -> bool:
+        """Evaluate post-shutdown overshoot for the weekly EMA guardrail.
+
+        Returns True if the pending weekly EMA change was auto-reverted due to
+        degraded overshoot performance.
+        """
+        try:
+            overshoot = float(overshoot_c)
+        except (ValueError, TypeError):
+            return False
+        if not math.isfinite(overshoot):
+            return False
+        overshoot = max(0.0, overshoot)
+
+        if self.state != self.STATE_COMPLETED:
+            return False
+
+        if self._pending_weekly_check is None:
+            self._baseline_overshoots.append(overshoot)
+            if len(self._baseline_overshoots) > 10:
+                self._baseline_overshoots = self._baseline_overshoots[-10:]
+            return False
+
+        if self.manual_overrides:
+            self._pending_weekly_check = None
+            self.last_weekly_guardrail_status = "cancelled_manual"
+            self.needs_save = True
+            return False
+
+        post = self._pending_weekly_check.setdefault("post_overshoots", [])
+        post.append(overshoot)
+        self.needs_save = True
+
+        if len(post) < self.GUARDRAIL_MIN_CYCLES:
+            return False
+
+        post_mean = statistics.mean(post)
+        base_os = float(self._pending_weekly_check.get("baseline_overshoot", 0.25))
+        if (
+            post_mean > self.GUARDRAIL_MAX_ABSOLUTE_OVERSHOOT_C
+            and (post_mean - base_os) > self.GUARDRAIL_OVERSHOOT_DEGRADATION_C
+        ):
+            self._learned_kp = float(self._pending_weekly_check["pre_kp"])
+            self._learned_ki = float(self._pending_weekly_check["pre_ki"])
+            self._learned_kd = float(self._pending_weekly_check["pre_kd"])
+            self._sync_effective_pid()
+            self._pending_weekly_check = None
+            self.last_weekly_guardrail_status = "reverted"
+            self.weekly_updated_last_tick = True
+            _LOGGER.warning(
+                "Autotune [%s]: Weekly EMA update reverted due to overshoot degradation (baseline=%.2f°C, post=%.2f°C)",
+                self.zone_name,
+                base_os,
+                post_mean,
+            )
+            return True
+
+        self._baseline_overshoots.extend(post)
+        if len(self._baseline_overshoots) > 10:
+            self._baseline_overshoots = self._baseline_overshoots[-10:]
+        self._pending_weekly_check = None
+        self.last_weekly_guardrail_status = "confirmed"
+        _LOGGER.info(
+            "Autotune [%s]: Weekly EMA update confirmed (baseline=%.2f°C, post=%.2f°C)",
+            self.zone_name,
+            base_os,
+            post_mean,
+        )
+        return False
 
     def update(
         self,
@@ -385,17 +487,32 @@ class PassiveAutotuneObserver:
 
         for i in range(len(history_list)):
             t1, temp1 = history_list[i]
-            # Find a point roughly 3-5 minutes later
+            # Find a point roughly 3-5 minutes later and fit OLS over the window
             for j in range(i + 1, len(history_list)):
                 t2, temp2 = history_list[j]
                 dt = t2 - t1
                 if dt >= 180:  # At least 3 minutes diff to avoid noise
-                    slope = (temp2 - temp1) / dt
+                    window = history_list[i : j + 1]
+                    if len(window) >= 3:
+                        n = len(window)
+                        mean_t = sum(t for t, _ in window) / n
+                        mean_temp = sum(v for _, v in window) / n
+                        den = sum((t - mean_t) ** 2 for t, _ in window)
+                        if den > 0.0:
+                            slope = sum((t - mean_t) * (v - mean_temp) for t, v in window) / den
+                            anchor_t, anchor_temp = mean_t, mean_temp
+                        else:
+                            slope = (temp2 - temp1) / dt
+                            anchor_t = t1 + (dt / 2.0)
+                            anchor_temp = temp1 + (temp2 - temp1) / 2.0
+                    else:
+                        slope = (temp2 - temp1) / dt
+                        anchor_t = t1 + (dt / 2.0)
+                        anchor_temp = temp1 + (temp2 - temp1) / 2.0
                     if slope > max_slope:
                         max_slope = slope
-                        # Midpoint of interval for tangent line
-                        max_slope_t = t1 + (dt / 2.0)
-                        max_slope_temp = temp1 + (temp2 - temp1) / 2.0
+                        max_slope_t = anchor_t
+                        max_slope_temp = anchor_temp
                     break
 
         # Fallback to overall slope if no 3-min window found
@@ -565,13 +682,25 @@ class PassiveAutotuneObserver:
         if self.last_weekly_update <= 0.0:
             self.last_weekly_update = wall_time
 
+        if self._pending_weekly_check is not None:
+            applied_at = float(self._pending_weekly_check.get("applied_at", wall_time) or wall_time)
+            if (wall_time - applied_at) >= self.GUARDRAIL_MAX_DAYS * 86400.0:
+                self._pending_weekly_check = None
+                self.last_weekly_guardrail_status = "inconclusive_kept"
+                self.needs_save = True
+
         if (
-            len(self.weekly_candidates) >= self.WEEKLY_MIN_CANDIDATES
+            self._pending_weekly_check is None
+            and len(self.weekly_candidates) >= self.WEEKLY_MIN_CANDIDATES
             and (wall_time - self.last_weekly_update) >= self.WEEKLY_INTERVAL_SECONDS
         ):
             med_kp = statistics.median(c["Kp"] for c in self.weekly_candidates)
             med_ki = statistics.median(c["Ki"] for c in self.weekly_candidates)
             med_kd = statistics.median(c["Kd"] for c in self.weekly_candidates)
+
+            pre_kp = self._learned_kp
+            pre_ki = self._learned_ki
+            pre_kd = self._learned_kd
 
             for attr, baseline_attr, target in (
                 ("_learned_kp", "_baseline_kp", med_kp),
@@ -602,6 +731,19 @@ class PassiveAutotuneObserver:
                 setattr(self, attr, new_val)
 
             self._sync_effective_pid()
+            if pre_kp > 0.0 and (
+                self._learned_kp != pre_kp or self._learned_ki != pre_ki or self._learned_kd != pre_kd
+            ):
+                base_os = statistics.median(self._baseline_overshoots) if self._baseline_overshoots else 0.25
+                self._pending_weekly_check = {
+                    "pre_kp": pre_kp,
+                    "pre_ki": pre_ki,
+                    "pre_kd": pre_kd,
+                    "baseline_overshoot": base_os,
+                    "post_overshoots": [],
+                    "applied_at": wall_time,
+                }
+                self.last_weekly_guardrail_status = "monitoring"
             self.weekly_candidates.clear()
             self.last_weekly_update = wall_time
             self.weekly_updated_last_tick = True
